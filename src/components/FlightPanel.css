@@ -1,5 +1,20 @@
 /* Flight Panel Cockpit Display Styles */
 
+.flight-panel.cockpit-display {
+  background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+  color: #00ff00;
+  font-family: 'Courier New', monospace;
+  padding: 20px;
+  border-radius: 10px;
+  border: 2px solid #444;
+  box-shadow: 0 0 20px rgba(0, 255, 0, 0.1);
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  grid-template-rows: auto auto auto;
+  gap: 15px;
+  min-height: 600px;
+}
+
 .cockpit-display {
   background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
   color: #00ff00;

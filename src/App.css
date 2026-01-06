@@ -288,83 +288,88 @@
   text-align: center;
 }
 
-.initialize-btn {
-  background: linear-gradient(135deg, #10b981, #059669);
-  color: white;
-  border: none;
+.initialization-buttons {
+  display: flex;
+  gap: 1rem;
+  justify-content: center;
+  margin-top: 2rem;
+  flex-wrap: wrap;
+}
+
+.random-init-btn {
   padding: 1rem 2rem;
+  background: linear-gradient(135deg, #8b5cf6, #a855f7);
+  border: none;
   border-radius: 8px;
-  font-size: 1.2rem;
+  color: white;
   font-weight: 600;
+  font-size: 1.1rem;
   cursor: pointer;
   transition: all 0.3s ease;
-  text-transform: uppercase;
-  letter-spacing: 1px;
+  box-shadow: 0 4px 12px rgba(139, 92, 246, 0.4);
 }
 
-.initialize-btn:hover:not(:disabled) {
+.random-init-btn:hover {
   transform: translateY(-2px);
-  box-shadow: 0 6px 20px rgba(16, 185, 129, 0.4);
+  box-shadow: 0 6px 16px rgba(139, 92, 246, 0.6);
+  background: linear-gradient(135deg, #7c3aed, #9333ea);
 }
 
-.initialize-btn:disabled {
-  background: rgba(107, 114, 128, 0.5);
+.random-init-btn:active {
+  transform: translateY(0);
+}
+
+.init-flight-btn {
+  padding: 1rem 2rem;
+  background: linear-gradient(135deg, #10b981, #059669);
+  border: none;
+  border-radius: 8px;
+  color: white;
+  font-weight: 600;
+  font-size: 1.1rem;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  box-shadow: 0 4px 12px rgba(16, 185, 129, 0.4);
+}
+
+.init-flight-btn:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(16, 185, 129, 0.6);
+  background: linear-gradient(135deg, #059669, #047857);
+}
+
+.init-flight-btn:disabled {
+  background: #6b7280;
   cursor: not-allowed;
   opacity: 0.6;
+  box-shadow: none;
 }
 
-/* Flight in Progress Styles */
-.flight-in-progress {
-  background: rgba(255, 255, 255, 0.1);
-  backdrop-filter: blur(10px);
-  border-radius: 12px;
-  padding: 2rem;
+.flight-plan-summary {
+  background: rgba(0, 0, 0, 0.3);
   border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 8px;
+  padding: 1.5rem;
+  margin-top: 1rem;
 }
 
-.flight-in-progress h2 {
-  font-size: 2rem;
-  margin-bottom: 1.5rem;
+.flight-plan-summary h3 {
+  margin: 0 0 1rem 0;
   color: #fbbf24;
-  text-align: center;
+  font-size: 1.2rem;
 }
 
-.flight-summary {
+.summary-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
   gap: 1rem;
-  margin-bottom: 2rem;
 }
 
-.summary-item {
+.summary-grid div {
   background: rgba(255, 255, 255, 0.1);
-  padding: 1rem;
-  border-radius: 8px;
-  border-left: 4px solid #3b82f6;
-  text-align: center;
-}
-
-.flight-details {
-  margin-bottom: 2rem;
-}
-
-.flight-details h3 {
-  font-size: 1.5rem;
-  margin-bottom: 1rem;
-  color: #93c5fd;
-}
-
-.parameters-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-  gap: 1rem;
-}
-
-.param-item {
-  background: rgba(0, 0, 0, 0.2);
   padding: 0.75rem;
   border-radius: 6px;
-  border-left: 3px solid #10b981;
+  font-weight: 600;
 }
 
 .flight-controls {

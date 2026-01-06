@@ -53,33 +53,37 @@ const FlightInProgress = ({
     timeToWaypoint: flightPlan ? flightPlan.time : 0
   };
 
-  return React.createElement('div', { className: 'App' },
-    React.createElement('header', { className: 'app-header' },
-      React.createElement('h1', null, 'Flight in Progress - ', callsign || 'Unnamed Flight'),
-      React.createElement('p', null, 'Difficulty: ', difficulty.toUpperCase(), ' | Aircraft: ', aircraftModel),
-      React.createElement('button', { onClick: handleResetFlight, className: 'reset-btn' }, 'Reset Flight')
-    ),
+  return React.createElement('div', { className: 'App' }, [
+    React.createElement('header', { className: 'app-header' }, [
+      React.createElement('h1', { key: 'title' }, 'Flight in Progress - ', callsign || 'Unnamed Flight'),
+      React.createElement('p', { key: 'subtitle' }, 'Difficulty: ', difficulty.toUpperCase(), ' | Aircraft: ', aircraftModel),
+      React.createElement('button', { 
+        key: 'reset-btn',
+        onClick: handleResetFlight, 
+        className: 'reset-btn' 
+      }, 'Reset Flight')
+    ]),
 
-    React.createElement('main', { className: 'app-main' },
-      React.createElement('div', { className: 'flight-in-progress' },
-        React.createElement('div', { className: 'flight-summary' },
-          React.createElement('div', { className: 'summary-item' },
-            React.createElement('strong', null, 'Route:'),
+    React.createElement('main', { className: 'app-main' }, [
+      React.createElement('div', { className: 'flight-in-progress' }, [
+        React.createElement('div', { className: 'flight-summary' }, [
+          React.createElement('div', { className: 'summary-item' }, [
+            React.createElement('strong', { key: 'route-label' }, 'Route:'),
             ' ', selectedDeparture.iata, ' → ', selectedArrival.iata
-          ),
-          React.createElement('div', { className: 'summary-item' },
-            React.createElement('strong', null, 'Distance:'),
+          ]),
+          React.createElement('div', { className: 'summary-item' }, [
+            React.createElement('strong', { key: 'distance-label' }, 'Distance:'),
             ' ', flightPlan ? formatDistance(flightPlan.distance.nauticalMiles) : 'Calculating...'
-          ),
-          React.createElement('div', { className: 'summary-item' },
-            React.createElement('strong', null, 'Flight Time:'),
+          ]),
+          React.createElement('div', { className: 'summary-item' }, [
+            React.createElement('strong', { key: 'time-label' }, 'Flight Time:'),
             ' ', flightPlan ? formatFlightTime(flightPlan.time) : 'Calculating...'
-          ),
-          React.createElement('div', { className: 'summary-item' },
-            React.createElement('strong', null, 'Fuel:'),
+          ]),
+          React.createElement('div', { className: 'summary-item' }, [
+            React.createElement('strong', { key: 'fuel-label' }, 'Fuel:'),
             ' ', flightPlan ? formatFuel(flightPlan.fuel) : 'Calculating...'
-          )
-        ),
+          ])
+        ]),
         
         // Flight Panel Cockpit Display
         React.createElement(FlightPanel, {
@@ -90,46 +94,46 @@ const FlightInProgress = ({
           }
         }),
         
-        React.createElement('div', { className: 'flight-details' },
-          React.createElement('h3', null, 'Flight Parameters'),
-          React.createElement('div', { className: 'parameters-grid' },
-            React.createElement('div', { className: 'param-item' },
-              React.createElement('strong', null, 'Airline:'),
+        React.createElement('div', { className: 'flight-details' }, [
+          React.createElement('h3', { key: 'params-title' }, 'Flight Parameters'),
+          React.createElement('div', { className: 'parameters-grid' }, [
+            React.createElement('div', { className: 'param-item' }, [
+              React.createElement('strong', { key: 'airline-label' }, 'Airline:'),
               ' ', airline || 'Not specified'
-            ),
-            React.createElement('div', { className: 'param-item' },
-              React.createElement('strong', null, 'Callsign:'),
+            ]),
+            React.createElement('div', { className: 'param-item' }, [
+              React.createElement('strong', { key: 'callsign-label' }, 'Callsign:'),
               ' ', callsign || 'Not specified'
-            ),
-            React.createElement('div', { className: 'param-item' },
-              React.createElement('strong', null, 'PAX:'),
+            ]),
+            React.createElement('div', { className: 'param-item' }, [
+              React.createElement('strong', { key: 'pax-label' }, 'PAX:'),
               ' ', pax
-            ),
-            React.createElement('div', { className: 'param-item' },
-              React.createElement('strong', null, 'Payload:'),
+            ]),
+            React.createElement('div', { className: 'param-item' }, [
+              React.createElement('strong', { key: 'payload-label' }, 'Payload:'),
               ' ', payload, ' kg'
-            ),
-            React.createElement('div', { className: 'param-item' },
-              React.createElement('strong', null, 'Fuel Reserve:'),
+            ]),
+            React.createElement('div', { className: 'param-item' }, [
+              React.createElement('strong', { key: 'fuel-reserve-label' }, 'Fuel Reserve:'),
               ' ', fuelReserve * 100, '%'
-            ),
-            React.createElement('div', { className: 'param-item' },
-              React.createElement('strong', null, 'Cruise Height:'),
+            ]),
+            React.createElement('div', { className: 'param-item' }, [
+              React.createElement('strong', { key: 'cruise-label' }, 'Cruise Height:'),
               ' ', cruiseHeight, ' ft'
-            ),
-            React.createElement('div', { className: 'param-item' },
-              React.createElement('strong', null, 'Time (Zulu):'),
+            ]),
+            React.createElement('div', { className: 'param-item' }, [
+              React.createElement('strong', { key: 'time-zulu-label' }, 'Time (Zulu):'),
               ' ', useRandomTime ? generateRandomTime() : timeZulu
-            ),
-            React.createElement('div', { className: 'param-item' },
-              React.createElement('strong', null, 'Season:'),
+            ]),
+            React.createElement('div', { className: 'param-item' }, [
+              React.createElement('strong', { key: 'season-label' }, 'Season:'),
               ' ', useRandomSeason ? generateRandomSeason() : season
-            )
-          )
-        )
-      )
-    )
-  );
+            ])
+          ])
+        ])
+      ])
+    ])
+  ]);
 };
 
 export default FlightInProgress;

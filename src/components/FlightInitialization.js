@@ -1,5 +1,6 @@
 import React from 'react';
 import AirportSearchInput from './AirportSearchInput.js';
+import { randomFlightService } from '../services/randomFlightService.js';
 
 const FlightInitialization = ({
   difficulty, setDifficulty,
@@ -34,6 +35,38 @@ const FlightInitialization = ({
   const generateRandomSeason = () => {
     const seasons = ['Spring', 'Summer', 'Autumn', 'Winter'];
     return seasons[Math.floor(Math.random() * seasons.length)];
+  };
+
+  // Handle random flight initialization
+  const handleRandomInitialize = () => {
+    try {
+      const randomParams = randomFlightService.generateRandomFlightParameters();
+      
+      // Update all state variables with random parameters
+      setAirline(randomParams.airline);
+      setCallsign(randomParams.callsign);
+      setAircraftModel(randomParams.aircraftModel);
+      setPax(randomParams.pax);
+      setPayload(randomParams.payload);
+      setFuelReserve(randomParams.fuelReserve);
+      setCruiseHeight(randomParams.cruiseHeight);
+      setDifficulty(randomParams.difficulty);
+      setUseRandomTime(true);
+      setUseRandomSeason(true);
+      
+      // Select the random airports
+      selectDeparture(randomParams.selectedDeparture);
+      selectArrival(randomParams.selectedArrival);
+      
+      console.log('Random flight initialized:', randomParams);
+      
+      // Show confirmation message
+      alert(`Random flight initialized!\nRoute: ${randomParams.selectedDeparture.iata} → ${randomParams.selectedArrival.iata}\nAircraft: ${randomParams.aircraftModel}\nDistance: ${Math.round(randomParams.distance)} nm`);
+      
+    } catch (error) {
+      console.error('Error initializing random flight:', error);
+      alert('Error initializing random flight. Please try again.');
+    }
   };
 
   return React.createElement('div', { className: 'flight-initialization' },
@@ -205,225 +238,30 @@ const FlightInitialization = ({
           })
         )
       ),
-
-      flightPlan && React.createElement('div', { className: 'flight-preview' },
-        React.createElement('h3', null, 'Flight Preview'),
-        React.createElement('div', { className: 'preview-info' },
-          React.createElement('p', null,
-            React.createElement('strong', null, 'Distance:'),
-            ' ', formatDistance(flightPlan.distance.nauticalMiles)
-          ),
-          React.createElement('p', null,
-            React.createElement('strong', null, 'Flight Time:'),
-            ' ', formatFlightTime(flightPlan.time)
-          ),
-          React.createElement('p', null,
-            React.createElement('strong', null, 'Fuel Required:'),
-            ' ', formatFuel(flightPlan.fuel)
-          )
+      
+      // Flight plan summary
+      flightPlan && React.createElement('div', { className: 'flight-plan-summary' },
+        React.createElement('h3', null, 'Flight Plan Summary'),
+        React.createElement('div', { className: 'summary-grid' },
+          React.createElement('div', null, 'Distance: ', formatDistance(flightPlan.distance.nauticalMiles)),
+          React.createElement('div', null, 'Flight Time: ', formatFlightTime(flightPlan.time)),
+          React.createElement('div', null, 'Fuel Required: ', formatFuel(flightPlan.fuel))
         )
       )
     ),
 
-    React.createElement('div', { className: 'simulation-configuration' },
-      React.createElement('h2', null, 'Simulation Configuration'),
-      React.createElement('div', { className: 'config-section' },
-        React.createElement('h3', null, 'Failure Type'),
-        React.createElement('div', { className: 'failure-options' },
-          React.createElement('label', { className: 'radio-label' },
-            React.createElement('input', {
-              type: 'radio',
-              name: 'failureType',
-              value: 'random',
-              checked: failureType === 'random',
-              onChange: (e) => setFailureType(e.target.value)
-            }),
-            'Random (Difficulty-based)'
-          ),
-          React.createElement('label', { className: 'radio-label' },
-            React.createElement('input', {
-              type: 'radio',
-              name: 'failureType',
-              value: 'engine',
-              checked: failureType === 'engine',
-              onChange: (e) => setFailureType(e.target.value),
-              disabled: difficulty === 'rookie'
-            }),
-            'Engine Failure'
-          ),
-          React.createElement('label', { className: 'radio-label' },
-            React.createElement('input', {
-              type: 'radio',
-              name: 'failureType',
-              value: 'hydraulic',
-              checked: failureType === 'hydraulic',
-              onChange: (e) => setFailureType(e.target.value),
-              disabled: difficulty === 'rookie' || difficulty === 'amateur'
-            }),
-            'Hydraulic System'
-          ),
-          React.createElement('label', { className: 'radio-label' },
-            React.createElement('input', {
-              type: 'radio',
-              name: 'failureType',
-              value: 'electrical',
-              checked: failureType === 'electrical',
-              onChange: (e) => setFailureType(e.target.value),
-              disabled: difficulty === 'rookie' || difficulty === 'amateur'
-            }),
-            'Electrical System'
-          ),
-          React.createElement('label', { className: 'radio-label' },
-            React.createElement('input', {
-              type: 'radio',
-              name: 'failureType',
-              value: 'structural',
-              checked: failureType === 'structural',
-              onChange: (e) => setFailureType(e.target.value),
-              disabled: difficulty !== 'devil'
-            }),
-            'Structural Failure'
-          ),
-          React.createElement('label', { className: 'radio-label' },
-            React.createElement('input', {
-              type: 'radio',
-              name: 'failureType',
-              value: 'multiple',
-              checked: failureType === 'multiple',
-              onChange: (e) => setFailureType(e.target.value),
-              disabled: difficulty !== 'devil'
-            }),
-            'Multiple Systems'
-          )
-        )
-      ),
-
-      React.createElement('div', { className: 'config-section' },
-        React.createElement('h3', null, 'Weather Conditions'),
-        React.createElement('div', { className: 'weather-grid' },
-          React.createElement('div', { className: 'weather-param' },
-            React.createElement('label', null, 'Wind Speed (knots):'),
-            React.createElement('input', {
-              type: 'range',
-              min: '0',
-              max: difficulty === 'devil' ? 100 : difficulty === 'pro' ? 80 : difficulty === 'advanced' ? 60 : difficulty === 'intermediate' ? 40 : 20,
-              value: weatherData.windSpeed,
-              onChange: (e) => setWeatherData({...weatherData, windSpeed: parseInt(e.target.value)})
-            }),
-            React.createElement('span', null, weatherData.windSpeed, ' kts')
-          ),
-          
-          React.createElement('div', { className: 'weather-param' },
-            React.createElement('label', null, 'Visibility (miles):'),
-            React.createElement('input', {
-              type: 'range',
-              min: '0',
-              max: difficulty === 'devil' ? 0.5 : difficulty === 'pro' ? 1 : difficulty === 'advanced' ? 3 : difficulty === 'intermediate' ? 5 : 10,
-              step: '0.1',
-              value: weatherData.visibility,
-              onChange: (e) => setWeatherData({...weatherData, visibility: parseFloat(e.target.value)})
-            }),
-            React.createElement('span', null, weatherData.visibility, ' mi')
-          ),
-          
-          React.createElement('div', { className: 'weather-param' },
-            React.createElement('label', null, 'Cloud Cover:'),
-            React.createElement('select', {
-              value: weatherData.cloudCover,
-              onChange: (e) => setWeatherData({...weatherData, cloudCover: parseInt(e.target.value)})
-            },
-              React.createElement('option', { value: 0 }, 'Clear'),
-              React.createElement('option', { value: 25, disabled: difficulty === 'rookie' }, 'Scattered'),
-              React.createElement('option', { value: 50, disabled: difficulty === 'rookie' || difficulty === 'amateur' }, 'Broken'),
-              React.createElement('option', { value: 75, disabled: difficulty === 'rookie' || difficulty === 'amateur' || difficulty === 'intermediate' }, 'Overcast'),
-              React.createElement('option', { value: 100, disabled: difficulty !== 'devil' }, 'Dense')
-            )
-          ),
-          
-          React.createElement('div', { className: 'weather-param' },
-            React.createElement('label', null, 'Turbulence:'),
-            React.createElement('select', {
-              value: weatherData.turbulence,
-              onChange: (e) => setWeatherData({...weatherData, turbulence: e.target.value})
-            },
-              React.createElement('option', { value: 'none' }, 'None'),
-              React.createElement('option', { value: 'light', disabled: difficulty === 'rookie' }, 'Light'),
-              React.createElement('option', { value: 'moderate', disabled: difficulty === 'rookie' || difficulty === 'amateur' }, 'Moderate'),
-              React.createElement('option', { value: 'severe', disabled: difficulty !== 'devil' }, 'Severe')
-            )
-          ),
-          
-          React.createElement('div', { className: 'weather-param' },
-            React.createElement('label', null, 'Precipitation:'),
-            React.createElement('select', {
-              value: weatherData.precipitation,
-              onChange: (e) => setWeatherData({...weatherData, precipitation: e.target.value})
-            },
-              React.createElement('option', { value: 'none' }, 'None'),
-              React.createElement('option', { value: 'rain', disabled: difficulty === 'rookie' }, 'Rain'),
-              React.createElement('option', { value: 'snow', disabled: difficulty === 'rookie' || difficulty === 'amateur' }, 'Snow'),
-              React.createElement('option', { value: 'thunderstorm', disabled: difficulty !== 'devil' }, 'Thunderstorm')
-            )
-          ),
-          
-          React.createElement('div', { className: 'weather-param' },
-            React.createElement('label', { className: 'checkbox-label' },
-              React.createElement('input', {
-                type: 'checkbox',
-                checked: weatherData.birdStrike,
-                onChange: (e) => setWeatherData({...weatherData, birdStrike: e.target.checked}),
-                disabled: difficulty === 'rookie'
-              }),
-              'Bird Strike Risk'
-            )
-          )
-        )
-      ),
-
-      React.createElement('div', { className: 'config-section' },
-        React.createElement('h3', null, 'Crew Configuration'),
-        React.createElement('div', { className: 'crew-options' },
-          React.createElement('label', { className: 'radio-label' },
-            React.createElement('input', {
-              type: 'radio',
-              name: 'crewCount',
-              value: 1,
-              checked: crewCount === 1,
-              onChange: (e) => setCrewCount(parseInt(e.target.value)),
-              disabled: flightPlan && flightPlan.distance.nauticalMiles > 3000
-            }),
-            '1 Pilot (Domestic/Mid-range only)'
-          ),
-          React.createElement('label', { className: 'radio-label' },
-            React.createElement('input', {
-              type: 'radio',
-              name: 'crewCount',
-              value: 2,
-              checked: crewCount === 2,
-              onChange: (e) => setCrewCount(parseInt(e.target.value))
-            }),
-            '2 Pilots (Standard)'
-          ),
-          React.createElement('label', { className: 'radio-label' },
-            React.createElement('input', {
-              type: 'radio',
-              name: 'crewCount',
-              value: 3,
-              checked: crewCount === 3,
-              onChange: (e) => setCrewCount(parseInt(e.target.value)),
-              disabled: flightPlan && flightPlan.distance.nauticalMiles < 5000
-            }),
-            '3 Pilots (Long-haul)'
-          )
-        )
-      )
-    ),
-
-    React.createElement('div', { className: 'initialization-controls' },
+    // Random initialization button
+    React.createElement('div', { className: 'initialization-buttons' },
       React.createElement('button', {
+        className: 'random-init-btn',
+        onClick: handleRandomInitialize,
+        title: 'Generate random flight with valid aircraft-airport distance matching'
+      }, '🎲 Random Flight'),
+      
+      React.createElement('button', {
+        className: 'init-flight-btn',
         onClick: handleInitializeFlight,
-        disabled: !selectedDeparture || !selectedArrival,
-        className: 'initialize-btn'
+        disabled: !selectedDeparture || !selectedArrival
       }, 'Initialize Flight')
     )
   );
