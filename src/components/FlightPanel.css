@@ -1,0 +1,167 @@
+/* Flight Panel Cockpit Display Styles */
+
+.cockpit-display {
+  background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+  color: #00ff00;
+  font-family: 'Courier New', monospace;
+  padding: 20px;
+  border-radius: 10px;
+  border: 2px solid #444;
+  box-shadow: 0 0 20px rgba(0, 255, 0, 0.1);
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  grid-template-rows: auto auto auto;
+  gap: 15px;
+  min-height: 600px;
+}
+
+.instrument-group {
+  background: rgba(0, 0, 0, 0.7);
+  border: 1px solid #00ff00;
+  border-radius: 5px;
+  padding: 15px;
+  box-shadow: 0 0 10px rgba(0, 255, 0, 0.2);
+}
+
+.instrument-group h3 {
+  margin: 0 0 10px 0;
+  color: #00ff00;
+  font-size: 14px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  border-bottom: 1px solid #00ff00;
+  padding-bottom: 5px;
+}
+
+.instrument-group div {
+  margin: 5px 0;
+  font-size: 12px;
+  display: flex;
+  justify-content: space-between;
+}
+
+/* Specific group layouts */
+.navigation-group {
+  grid-column: 1;
+  grid-row: 1;
+}
+
+.flight-pose-group {
+  grid-column: 2;
+  grid-row: 1;
+}
+
+.engine-group {
+  grid-column: 3;
+  grid-row: 1;
+}
+
+.systems-group {
+  grid-column: 1;
+  grid-row: 2;
+}
+
+.autopilot-group {
+  grid-column: 2;
+  grid-row: 2;
+}
+
+.central-display {
+  grid-column: 3;
+  grid-row: 2;
+  background: linear-gradient(45deg, #1a1a2e, #0f3460);
+  border: 2px solid #00ff00;
+}
+
+.future-actions-panel {
+  grid-column: 1 / 3;
+  grid-row: 3;
+  background: rgba(0, 0, 0, 0.8);
+  border: 1px solid #ffff00;
+}
+
+.future-actions-panel h3 {
+  color: #ffff00;
+  border-bottom-color: #ffff00;
+}
+
+.typebox-container {
+  grid-column: 3;
+  grid-row: 3;
+  background: rgba(0, 0, 0, 0.8);
+  border: 1px solid #00ffff;
+}
+
+.typebox-container h3 {
+  color: #00ffff;
+  border-bottom-color: #00ffff;
+}
+
+.typebox-input {
+  width: 100%;
+  background: transparent;
+  border: 1px solid #00ffff;
+  color: #00ffff;
+  padding: 5px;
+  font-family: 'Courier New', monospace;
+  outline: none;
+}
+
+.typebox-input:focus {
+  box-shadow: 0 0 5px #00ffff;
+}
+
+/* Animation for real-time data updates */
+@keyframes dataUpdate {
+  0% { color: #00ff00; }
+  50% { color: #ffff00; }
+  100% { color: #00ff00; }
+}
+
+.instrument-group div {
+  transition: color 0.3s ease;
+}
+
+.instrument-group div:hover {
+  animation: dataUpdate 0.5s ease;
+}
+
+/* Alarm indicators */
+.alarm-indicator {
+  color: #ff0000 !important;
+  animation: blink 1s infinite;
+}
+
+@keyframes blink {
+  0%, 50% { opacity: 1; }
+  51%, 100% { opacity: 0.3; }
+}
+
+/* Responsive design */
+@media (max-width: 1200px) {
+  .cockpit-display {
+    grid-template-columns: repeat(2, 1fr);
+    grid-template-rows: auto auto auto auto;
+  }
+  
+  .navigation-group { grid-column: 1; grid-row: 1; }
+  .flight-pose-group { grid-column: 2; grid-row: 1; }
+  .engine-group { grid-column: 1; grid-row: 2; }
+  .systems-group { grid-column: 2; grid-row: 2; }
+  .autopilot-group { grid-column: 1; grid-row: 3; }
+  .central-display { grid-column: 2; grid-row: 3; }
+  .future-actions-panel { grid-column: 1 / 3; grid-row: 4; }
+  .typebox-container { grid-column: 1 / 3; grid-row: 5; }
+}
+
+@media (max-width: 768px) {
+  .cockpit-display {
+    grid-template-columns: 1fr;
+    grid-template-rows: auto;
+  }
+  
+  .instrument-group {
+    grid-column: 1 !important;
+    grid-row: auto !important;
+  }
+}

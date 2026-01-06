@@ -1,4 +1,5 @@
 import React from 'react';
+import FlightPanel from './FlightPanel.js';
 
 const FlightInProgress = ({
   callsign, aircraftModel, difficulty, selectedDeparture, selectedArrival, flightPlan,
@@ -17,6 +18,41 @@ const FlightInProgress = ({
     return seasons[Math.floor(Math.random() * seasons.length)];
   };
 
+  // Flight data for the cockpit display
+  const flightData = {
+    heading: 245,
+    trueAirspeed: 480,
+    groundSpeed: 465,
+    indicatedAirspeed: 250,
+    radioFreq: 121.5,
+    pitch: 2.5,
+    roll: 0.5,
+    verticalSpeed: 1200,
+    altitude: 28000,
+    altimeter: 29.92,
+    engineN1: [89.2, 88.7],
+    engineN2: [95.1, 94.8],
+    engineEGT: [625, 618],
+    fuel: 8500,
+    hydraulicPressure: 2950,
+    circuitBreakers: {
+      engine1: true,
+      engine2: true,
+      hydraulics: true,
+      electrical: true,
+      instruments: true
+    },
+    alarms: [],
+    autopilot: true,
+    flightDirector: true,
+    altitudeHold: true,
+    headingHold: true,
+    flightPhase: 'CLIMB',
+    nextWaypoint: selectedArrival ? selectedArrival.iata : 'DEST',
+    distanceToWaypoint: flightPlan ? flightPlan.distance.nauticalMiles : 0,
+    timeToWaypoint: flightPlan ? flightPlan.time : 0
+  };
+
   return React.createElement('div', { className: 'App' },
     React.createElement('header', { className: 'app-header' },
       React.createElement('h1', null, 'Flight in Progress - ', callsign || 'Unnamed Flight'),
@@ -26,7 +62,6 @@ const FlightInProgress = ({
 
     React.createElement('main', { className: 'app-main' },
       React.createElement('div', { className: 'flight-in-progress' },
-        React.createElement('h2', null, 'Flight Status'),
         React.createElement('div', { className: 'flight-summary' },
           React.createElement('div', { className: 'summary-item' },
             React.createElement('strong', null, 'Route:'),
@@ -45,6 +80,15 @@ const FlightInProgress = ({
             ' ', flightPlan ? formatFuel(flightPlan.fuel) : 'Calculating...'
           )
         ),
+        
+        // Flight Panel Cockpit Display
+        React.createElement(FlightPanel, {
+          key: 'cockpit-display',
+          flightData: flightData,
+          onActionRequest: (action) => {
+            console.log('Action requested:', action);
+          }
+        }),
         
         React.createElement('div', { className: 'flight-details' },
           React.createElement('h3', null, 'Flight Parameters'),
@@ -82,11 +126,6 @@ const FlightInProgress = ({
               ' ', useRandomSeason ? generateRandomSeason() : season
             )
           )
-        ),
-
-        React.createElement('div', { className: 'flight-controls' },
-          React.createElement('h3', null, 'Flight Controls'),
-          React.createElement('p', null, 'Flight simulation controls will appear here...')
         )
       )
     )
