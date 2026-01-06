@@ -1,0 +1,322 @@
+{
+  "airlines": [
+    {
+      "name": "Delta Air Lines",
+      "icao": "DAL",
+      "iata": "DL",
+      "callsign": "DELTA"
+    },
+    {
+      "name": "American Airlines",
+      "icao": "AAL",
+      "iata": "AA",
+      "callsign": "AMERICAN"
+    },
+    {
+      "name": "United Airlines",
+      "icao": "UAL",
+      "iata": "UA",
+      "callsign": "UNITED"
+    },
+    {
+      "name": "Lufthansa",
+      "icao": "DLH",
+      "iata": "LH",
+      "callsign": "LUFTHANSA"
+    },
+    {
+      "name": "British Airways",
+      "icao": "BAW",
+      "iata": "BA",
+      "callsign": "SPEEDBIRD"
+    },
+    {
+      "name": "Air France",
+      "icao": "AFR",
+      "iata": "AF",
+      "callsign": "AIRFRANS"
+    },
+    {
+      "name": "Emirates",
+      "icao": "UAE",
+      "iata": "EK",
+      "callsign": "EMIRATES"
+    },
+    {
+      "name": "Qatar Airways",
+      "icao": "QTR",
+      "iata": "QR",
+      "callsign": "QATARI"
+    },
+    {
+      "name": "Singapore Airlines",
+      "icao": "SIA",
+      "iata": "SQ",
+      "callsign": "SINGAPORE"
+    },
+    {
+      "name": "Cathay Pacific",
+      "icao": "CPA",
+      "iata": "CX",
+      "callsign": "CATHAY"
+    },
+    {
+      "name": "Japan Airlines",
+      "icao": "JAL",
+      "iata": "JL",
+      "callsign": "JAPANAIR"
+    },
+    {
+      "name": "ANA All Nippon Airways",
+      "icao": "ANA",
+      "iata": "NH",
+      "callsign": "ALL NIPPON"
+    },
+    {
+      "name": "Korean Air",
+      "icao": "KAL",
+      "iata": "KE",
+      "callsign": "KOREANAIR"
+    },
+    {
+      "name": "Turkish Airlines",
+      "icao": "THY",
+      "iata": "TK",
+      "callsign": "TURKISH"
+    },
+    {
+      "name": "Air Canada",
+      "icao": "ACA",
+      "iata": "AC",
+      "callsign": "AIR CANADA"
+    },
+    {
+      "name": "Qantas",
+      "icao": "QFA",
+      "iata": "QF",
+      "callsign": "QANTAS"
+    },
+    {
+      "name": "KLM Royal Dutch Airlines",
+      "icao": "KLM",
+      "iata": "KL",
+      "callsign": "KLM"
+    },
+    {
+      "name": "Swiss International Air Lines",
+      "icao": "SWR",
+      "iata": "LX",
+      "callsign": "SWISS"
+    },
+    {
+      "name": "Virgin Atlantic",
+      "icao": "VIR",
+      "iata": "VS",
+      "callsign": "VIRGIN"
+    },
+    {
+      "name": "Alaska Airlines",
+      "icao": "ASA",
+      "iata": "AS",
+      "callsign": "ALASKA"
+    },
+    {
+      "name": "Southwest Airlines",
+      "icao": "SWA",
+      "iata": "WN",
+      "callsign": "SOUTHWEST"
+    },
+    {
+      "name": "JetBlue Airways",
+      "icao": "JBU",
+      "iata": "B6",
+      "callsign": "JETBLUE"
+    },
+    {
+      "name": "Ryanair",
+      "icao": "RYR",
+      "iata": "FR",
+      "callsign": "RYANAIR"
+    },
+    {
+      "name": "EasyJet",
+      "icao": "EZY",
+      "iata": "U2",
+      "callsign": "EASY"
+    },
+    {
+      "name": "Air China",
+      "icao": "CCA",
+      "iata": "CA",
+      "callsign": "AIR CHINA"
+    },
+    {
+      "name": "China Southern Airlines",
+      "icao": "CSN",
+      "iata": "CZ",
+      "callsign": "CHINA SOUTHERN"
+    },
+    {
+      "name": "China Eastern Airlines",
+      "icao": "CES",
+      "iata": "MU",
+      "callsign": "CHINA EASTERN"
+    },
+    {
+      "name": "Hainan Airlines",
+      "icao": "CHH",
+      "iata": "HU",
+      "callsign": "HAINAN"
+    },
+    {
+      "name": "Ethiopian Airlines",
+      "icao": "ETH",
+      "iata": "ET",
+      "callsign": "ETHIOPIAN"
+    },
+    {
+      "name": "EgyptAir",
+      "icao": "MSR",
+      "iata": "MS",
+      "callsign": "EGYPTAIR"
+    },
+    {
+      "name": "Royal Air Maroc",
+      "icao": "RAM",
+      "iata": "AT",
+      "callsign": "ROYALAIRMAROC"
+    },
+    {
+      "name": "Aeroflot",
+      "icao": "AFL",
+      "iata": "SU",
+      "callsign": "AEROFLOT"
+    },
+    {
+      "name": "Air India",
+      "icao": "AIC",
+      "iata": "AI",
+      "callsign": "AIRINDIA"
+    },
+    {
+      "name": "IndiGo",
+      "icao": "IGO",
+      "iata": "6E",
+      "callsign": "IFLY"
+    },
+    {
+      "name": "Thai Airways",
+      "icao": "THA",
+      "iata": "TG",
+      "callsign": "THAI"
+    },
+    {
+      "name": "Malaysia Airlines",
+      "icao": "MAS",
+      "iata": "MH",
+      "callsign": "MALAYSIAN"
+    },
+    {
+      "name": "Garuda Indonesia",
+      "icao": "GIA",
+      "iata": "GA",
+      "callsign": "INDONESIA"
+    },
+    {
+      "name": "Vietnam Airlines",
+      "icao": "HVN",
+      "iata": "VN",
+      "callsign": "VIET NAM AIRLINES"
+    },
+    {
+      "name": "Philippine Airlines",
+      "icao": "PAL",
+      "iata": "PR",
+      "callsign": "PHILIPPINE"
+    },
+    {
+      "name": "EVA Air",
+      "icao": "EVA",
+      "iata": "BR",
+      "callsign": "EVA"
+    },
+    {
+      "name": "Asiana Airlines",
+      "icao": "AAR",
+      "iata": "OZ",
+      "callsign": "ASIANA"
+    },
+    {
+      "name": "Saudi Arabian Airlines",
+      "icao": "SVA",
+      "iata": "SV",
+      "callsign": "SAUDIA"
+    },
+    {
+      "name": "El Al Israel Airlines",
+      "icao": "ELY",
+      "iata": "LY",
+      "callsign": "ELAL"
+    },
+    {
+      "name": "Iberia",
+      "icao": "IBE",
+      "iata": "IB",
+      "callsign": "IBERIA"
+    },
+    {
+      "name": "Finnair",
+      "icao": "FIN",
+      "iata": "AY",
+      "callsign": "FINNAIR"
+    },
+    {
+      "name": "SAS Scandinavian Airlines",
+      "icao": "SAS",
+      "iata": "SK",
+      "callsign": "SCANDINAVIAN"
+    },
+    {
+      "name": "Austrian Airlines",
+      "icao": "AUA",
+      "iata": "OS",
+      "callsign": "AUSTRIAN"
+    },
+    {
+      "name": "Brussels Airlines",
+      "icao": "BEL",
+      "iata": "SN",
+      "callsign": "BEE-LINE"
+    },
+    {
+      "name": "TAP Air Portugal",
+      "icao": "TAP",
+      "iata": "TP",
+      "callsign": "AIR PORTUGAL"
+    },
+    {
+      "name": "Aegean Airlines",
+      "icao": "AEE",
+      "iata": "A3",
+      "callsign": "AEGEAN"
+    },
+    {
+      "name": "LATAM Airlines",
+      "icao": "LAN",
+      "iata": "LA",
+      "callsign": "LAN"
+    },
+    {
+      "name": "Avianca",
+      "icao": "AVA",
+      "iata": "AV",
+      "callsign": "AVIANCA"
+    },
+    {
+      "name": "Aeromexico",
+      "icao": "AMX",
+      "iata": "AM",
+      "callsign": "AEROMEXICO"
+    }
+  ]
+}
