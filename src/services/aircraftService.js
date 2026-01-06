@@ -165,20 +165,8 @@ class AircraftService {
 
   // Get popular aircraft models for suggestions
   getPopularAircraft() {
-    const popularModels = [
-      'Boeing 737-800',
-      'Airbus A320-200', 
-      'Boeing 777-300ER',
-      'Airbus A350-900',
-      'Embraer E190',
-      'Cessna Citation X',
-      'Boeing 747-400',
-      'Airbus A380-800'
-    ];
-    
-    return this.aircraftDatabase.filter(aircraft => 
-      popularModels.includes(aircraft.model)
-    );
+    // Return all available aircraft models instead of just 8
+    return this.aircraftDatabase;
   }
 }
 
