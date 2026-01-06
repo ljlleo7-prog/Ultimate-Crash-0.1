@@ -1,0 +1,422 @@
+/* App.css - Professional Aviation Flight Planner Styles */
+
+.App {
+  min-height: 100vh;
+  background: linear-gradient(135deg, #0c4a6e 0%, #1e40af 50%, #3b82f6 100%);
+  color: white;
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+}
+
+.app-header {
+  text-align: center;
+  padding: 2rem 1rem;
+  background: rgba(0, 0, 0, 0.3);
+  backdrop-filter: blur(10px);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.app-header h1 {
+  font-size: 2.5rem;
+  margin: 0 0 0.5rem 0;
+  font-weight: 700;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
+}
+
+.app-header p {
+  font-size: 1.1rem;
+  opacity: 0.9;
+  margin: 0;
+}
+
+.app-main {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 2rem 1rem;
+}
+
+/* Flight Initialization Styles */
+.flight-initialization {
+  background: rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(10px);
+  border-radius: 12px;
+  padding: 2rem;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.difficulty-section {
+  margin-bottom: 3rem;
+}
+
+.difficulty-section h2 {
+  font-size: 1.8rem;
+  margin-bottom: 1.5rem;
+  color: #fbbf24;
+  text-align: center;
+}
+
+.difficulty-buttons {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.75rem;
+}
+
+.difficulty-btn {
+  padding: 1rem;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.3);
+  color: white;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  text-transform: uppercase;
+}
+
+.difficulty-btn:hover {
+  border-color: #3b82f6;
+  transform: translateY(-2px);
+}
+
+.difficulty-btn.active {
+  background: linear-gradient(135deg, #3b82f6, #1d4ed8);
+  border-color: #3b82f6;
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.4);
+}
+
+.flight-parameters {
+  margin-bottom: 3rem;
+}
+
+.flight-parameters h2 {
+  font-size: 1.8rem;
+  margin-bottom: 1.5rem;
+  color: #fbbf24;
+  text-align: center;
+}
+
+.parameters-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 1.5rem;
+}
+
+.parameter-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.parameter-group label {
+  font-weight: 600;
+  color: #93c5fd;
+  font-size: 0.95rem;
+}
+
+.parameter-group input,
+.parameter-group select {
+  padding: 0.75rem;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  border-radius: 6px;
+  background: rgba(0, 0, 0, 0.3);
+  color: white;
+  font-size: 1rem;
+  transition: all 0.3s ease;
+}
+
+.parameter-group input:focus,
+.parameter-group select:focus {
+  outline: none;
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.3);
+}
+
+.time-controls,
+.season-controls {
+  display: flex;
+  gap: 1rem;
+  align-items: center;
+}
+
+.time-controls input,
+.season-controls select {
+  flex: 1;
+}
+
+.checkbox-label {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-weight: normal;
+  font-size: 0.9rem;
+  cursor: pointer;
+}
+
+.checkbox-label input[type="checkbox"] {
+  width: auto;
+  margin: 0;
+}
+
+.airport-selection-section {
+  margin-bottom: 3rem;
+}
+
+.airport-selection-section h2 {
+  font-size: 1.8rem;
+  margin-bottom: 1.5rem;
+  color: #fbbf24;
+  text-align: center;
+}
+
+.airport-inputs {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 2rem;
+  margin-bottom: 2rem;
+}
+
+.airport-group h3 {
+  font-size: 1.2rem;
+  margin-bottom: 1rem;
+  color: #93c5fd;
+}
+
+.search-input {
+  position: relative;
+}
+
+.airport-input {
+  width: 100%;
+  padding: 1rem;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.3);
+  color: white;
+  font-size: 1rem;
+  transition: all 0.3s ease;
+}
+
+.airport-input:focus {
+  outline: none;
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.3);
+}
+
+.selected-airport {
+  background: rgba(34, 197, 94, 0.2);
+  border: 1px solid rgba(34, 197, 94, 0.5);
+  border-radius: 8px;
+  padding: 1rem;
+  margin-top: 0.5rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.clear-btn {
+  background: rgba(239, 68, 68, 0.3);
+  border: 1px solid rgba(239, 68, 68, 0.5);
+  color: white;
+  border-radius: 50%;
+  width: 24px;
+  height: 24px;
+  cursor: pointer;
+  font-size: 1rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.clear-btn:hover {
+  background: rgba(239, 68, 68, 0.5);
+}
+
+.search-results {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  background: rgba(0, 0, 0, 0.9);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 8px;
+  max-height: 200px;
+  overflow-y: auto;
+  z-index: 1000;
+}
+
+.result-item {
+  padding: 0.75rem 1rem;
+  cursor: pointer;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  transition: background 0.2s ease;
+}
+
+.result-item:hover {
+  background: rgba(59, 130, 246, 0.3);
+}
+
+.result-item:last-child {
+  border-bottom: none;
+}
+
+.result-item strong {
+  color: #fbbf24;
+}
+
+.result-item small {
+  opacity: 0.8;
+}
+
+.flight-preview {
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 8px;
+  padding: 1.5rem;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.flight-preview h3 {
+  font-size: 1.3rem;
+  margin-bottom: 1rem;
+  color: #fbbf24;
+}
+
+.preview-info p {
+  margin: 0.5rem 0;
+  font-size: 1.1rem;
+}
+
+.initialization-controls {
+  text-align: center;
+}
+
+.initialize-btn {
+  background: linear-gradient(135deg, #10b981, #059669);
+  color: white;
+  border: none;
+  padding: 1rem 2rem;
+  border-radius: 8px;
+  font-size: 1.2rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+.initialize-btn:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(16, 185, 129, 0.4);
+}
+
+.initialize-btn:disabled {
+  background: rgba(107, 114, 128, 0.5);
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+/* Flight in Progress Styles */
+.flight-in-progress {
+  background: rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(10px);
+  border-radius: 12px;
+  padding: 2rem;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.flight-in-progress h2 {
+  font-size: 2rem;
+  margin-bottom: 1.5rem;
+  color: #fbbf24;
+  text-align: center;
+}
+
+.flight-summary {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 1rem;
+  margin-bottom: 2rem;
+}
+
+.summary-item {
+  background: rgba(255, 255, 255, 0.1);
+  padding: 1rem;
+  border-radius: 8px;
+  border-left: 4px solid #3b82f6;
+  text-align: center;
+}
+
+.flight-details {
+  margin-bottom: 2rem;
+}
+
+.flight-details h3 {
+  font-size: 1.5rem;
+  margin-bottom: 1rem;
+  color: #93c5fd;
+}
+
+.parameters-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 1rem;
+}
+
+.param-item {
+  background: rgba(0, 0, 0, 0.2);
+  padding: 0.75rem;
+  border-radius: 6px;
+  border-left: 3px solid #10b981;
+}
+
+.flight-controls {
+  background: rgba(0, 0, 0, 0.3);
+  border-radius: 8px;
+  padding: 1.5rem;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.flight-controls h3 {
+  font-size: 1.3rem;
+  margin-bottom: 1rem;
+  color: #fbbf24;
+}
+
+.reset-btn {
+  background: linear-gradient(135deg, #ef4444, #dc2626);
+  color: white;
+  border: none;
+  padding: 0.75rem 1.5rem;
+  border-radius: 6px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  margin-top: 0.5rem;
+}
+
+.reset-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(239, 68, 68, 0.4);
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  .difficulty-buttons {
+    grid-template-columns: 1fr 1fr;
+  }
+  
+  .parameters-grid {
+    grid-template-columns: 1fr;
+  }
+  
+  .airport-inputs {
+    grid-template-columns: 1fr;
+    gap: 1rem;
+  }
+  
+  .app-header h1 {
+    font-size: 2rem;
+  }
+  
+  .app-main {
+    padding: 1rem;
+  }
+}

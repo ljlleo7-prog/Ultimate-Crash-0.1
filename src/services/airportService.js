@@ -1,5 +1,5 @@
 // Airport Service for Ultimate Crash Simulation
-// Uses Aviationstack API for real-time airport data
+// Enhanced with detailed runway data, frequencies, and aircraft performance
 
 class AirportService {
   constructor() {
@@ -10,8 +10,8 @@ class AirportService {
     // Cache for airport data to reduce API calls
     this.airportCache = new Map();
     
-    // Fallback data for major airports (in case API is unavailable)
-    this.fallbackAirports = this.getFallbackAirportData();
+    // Enhanced fallback data with detailed runway and frequency information
+    this.fallbackAirports = this.getEnhancedFallbackAirportData();
   }
 
   // Haversine formula to calculate distance between two coordinates in nautical miles
@@ -34,7 +34,7 @@ class AirportService {
     return degrees * (Math.PI / 180);
   }
 
-  // Search airports by IATA code, ICAO code, or name
+  // Enhanced airport search with detailed data
   async searchAirports(query) {
     try {
       // Check cache first
@@ -58,7 +58,13 @@ class AirportService {
             country: airport.country_name,
             latitude: parseFloat(airport.latitude),
             longitude: parseFloat(airport.longitude),
-            timezone: airport.timezone
+            timezone: airport.timezone,
+            elevation: airport.elevation || 0,
+            // Enhanced data structure
+            runways: this.getRunwayData(airport.iata_code || airport.icao_code),
+            frequencies: this.getFrequencyData(airport.iata_code || airport.icao_code),
+            taxiwayMap: 'n/a', // Placeholder - would require complex graph data
+            category: this.getAirportCategory(airport)
           }));
           
           // Cache the results
@@ -67,28 +73,190 @@ class AirportService {
         }
       }
       
-      // Fallback to local data if API fails
-      return this.searchFallbackAirports(query);
+      // Fallback to enhanced local data if API fails
+      return this.searchEnhancedFallbackAirports(query);
       
     } catch (error) {
-      console.warn('API call failed, using fallback data:', error);
-      return this.searchFallbackAirports(query);
+      console.warn('API call failed, using enhanced fallback data:', error);
+      return this.searchEnhancedFallbackAirports(query);
     }
   }
 
-  // Get airport by IATA code
+  // Get detailed runway data for airport
+  getRunwayData(airportCode) {
+    const runwayData = {
+      // Major international airports with detailed runway information
+      'JFK': [
+        { number: '04L/22R', length: 3689, surface: 'Asphalt', category: 'Heavy' },
+        { number: '04R/22L', length: 2560, surface: 'Asphalt', category: 'Heavy' },
+        { number: '13L/31R', length: 3048, surface: 'Asphalt', category: 'Heavy' },
+        { number: '13R/31L', length: 4423, surface: 'Asphalt', category: 'Heavy' }
+      ],
+      'LAX': [
+        { number: '06L/24R', length: 2721, surface: 'Concrete', category: 'Heavy' },
+        { number: '06R/24L', length: 3383, surface: 'Concrete', category: 'Heavy' },
+        { number: '07L/25R', length: 3810, surface: 'Concrete', category: 'Heavy' },
+        { number: '07R/25L', length: 3383, surface: 'Concrete', category: 'Heavy' }
+      ],
+      'LHR': [
+        { number: '09L/27R', length: 3902, surface: 'Asphalt', category: 'Heavy' },
+        { number: '09R/27L', length: 3660, surface: 'Asphalt', category: 'Heavy' }
+      ],
+      'CDG': [
+        { number: '08L/26R', length: 4215, surface: 'Asphalt', category: 'Heavy' },
+        { number: '08R/26L', length: 2700, surface: 'Asphalt', category: 'Medium' },
+        { number: '09L/27R', length: 2700, surface: 'Asphalt', category: 'Medium' }
+      ],
+      'HND': [
+        { number: '04/22', length: 3000, surface: 'Asphalt', category: 'Heavy' },
+        { number: '05/23', length: 2500, surface: 'Asphalt', category: 'Medium' }
+      ],
+      'DXB': [
+        { number: '12L/30R', length: 4000, surface: 'Asphalt', category: 'Heavy' },
+        { number: '12R/30L', length: 4450, surface: 'Asphalt', category: 'Heavy' }
+      ]
+    };
+
+    return runwayData[airportCode] || [
+      { number: 'n/a', length: 0, surface: 'Unknown', category: 'Unknown' }
+    ];
+  }
+
+  // Get radio frequency data for airport
+  getFrequencyData(airportCode) {
+    const frequencyData = {
+      'JFK': [
+        { type: 'ATIS', frequency: '127.65', description: 'Automatic Terminal Information Service' },
+        { type: 'Ground', frequency: '121.90', description: 'Ground Control' },
+        { type: 'Tower', frequency: '119.10', description: 'Tower Control' },
+        { type: 'Approach', frequency: '124.30', description: 'Approach Control' },
+        { type: 'Clearance', frequency: '121.30', description: 'Clearance Delivery' }
+      ],
+      'LAX': [
+        { type: 'ATIS', frequency: '135.25', description: 'Automatic Terminal Information Service' },
+        { type: 'Ground', frequency: '121.65', description: 'Ground Control' },
+        { type: 'Tower', frequency: '120.95', description: 'Tower Control' },
+        { type: 'Approach', frequency: '124.70', description: 'Approach Control' }
+      ],
+      'LHR': [
+        { type: 'ATIS', frequency: '127.25', description: 'Automatic Terminal Information Service' },
+        { type: 'Ground', frequency: '121.70', description: 'Ground Control' },
+        { type: 'Tower', frequency: '118.50', description: 'Tower Control' },
+        { type: 'Approach', frequency: '119.72', description: 'Approach Control' }
+      ],
+      'CDG': [
+        { type: 'ATIS', frequency: '127.85', description: 'Automatic Terminal Information Service' },
+        { type: 'Ground', frequency: '121.80', description: 'Ground Control' },
+        { type: 'Tower', frequency: '118.10', description: 'Tower Control' }
+      ]
+    };
+
+    return frequencyData[airportCode] || [
+      { type: 'ATIS', frequency: 'n/a', description: 'Frequency data not available' }
+    ];
+  }
+
+  // Determine airport category based on runway data
+  getAirportCategory(airport) {
+    const runways = this.getRunwayData(airport.iata_code || airport.icao_code);
+    const longestRunway = Math.max(...runways.map(r => r.length));
+    
+    if (longestRunway >= 3000) return '4F';
+    if (longestRunway >= 2400) return '4E';
+    if (longestRunway >= 1800) return '4D';
+    if (longestRunway >= 1200) return '4C';
+    return '3C';
+  }
+
+  // Enhanced fallback airport data with detailed information
+  getEnhancedFallbackAirportData() {
+    return [
+      // North America
+      { 
+        iata: 'JFK', icao: 'KJFK', name: 'John F Kennedy International Airport', 
+        city: 'New York', country: 'United States', 
+        latitude: 40.639751, longitude: -73.778925, timezone: 'America/New_York',
+        elevation: 4, runways: this.getRunwayData('JFK'), frequencies: this.getFrequencyData('JFK'),
+        taxiwayMap: 'n/a', category: '4F'
+      },
+      { 
+        iata: 'LAX', icao: 'KLAX', name: 'Los Angeles International Airport', 
+        city: 'Los Angeles', country: 'United States', 
+        latitude: 33.942536, longitude: -118.408075, timezone: 'America/Los_Angeles',
+        elevation: 38, runways: this.getRunwayData('LAX'), frequencies: this.getFrequencyData('LAX'),
+        taxiwayMap: 'n/a', category: '4F'
+      },
+      { 
+        iata: 'ORD', icao: 'KORD', name: "Chicago O'Hare International Airport", 
+        city: 'Chicago', country: 'United States', 
+        latitude: 41.978603, longitude: -87.904842, timezone: 'America/Chicago',
+        elevation: 204, runways: this.getRunwayData('ORD'), frequencies: this.getFrequencyData('ORD'),
+        taxiwayMap: 'n/a', category: '4F'
+      },
+      
+      // Europe
+      { 
+        iata: 'LHR', icao: 'EGLL', name: 'London Heathrow Airport', 
+        city: 'London', country: 'United Kingdom', 
+        latitude: 51.470022, longitude: -0.454295, timezone: 'Europe/London',
+        elevation: 25, runways: this.getRunwayData('LHR'), frequencies: this.getFrequencyData('LHR'),
+        taxiwayMap: 'n/a', category: '4F'
+      },
+      { 
+        iata: 'CDG', icao: 'LFPG', name: 'Charles de Gaulle Airport', 
+        city: 'Paris', country: 'France', 
+        latitude: 49.012779, longitude: 2.55, timezone: 'Europe/Paris',
+        elevation: 119, runways: this.getRunwayData('CDG'), frequencies: this.getFrequencyData('CDG'),
+        taxiwayMap: 'n/a', category: '4F'
+      },
+      
+      // Asia
+      { 
+        iata: 'HND', icao: 'RJTT', name: 'Tokyo Haneda Airport', 
+        city: 'Tokyo', country: 'Japan', 
+        latitude: 35.552258, longitude: 139.779694, timezone: 'Asia/Tokyo',
+        elevation: 6, runways: this.getRunwayData('HND'), frequencies: this.getFrequencyData('HND'),
+        taxiwayMap: 'n/a', category: '4F'
+      },
+      { 
+        iata: 'DXB', icao: 'OMDB', name: 'Dubai International Airport', 
+        city: 'Dubai', country: 'United Arab Emirates', 
+        latitude: 25.252778, longitude: 55.364444, timezone: 'Asia/Dubai',
+        elevation: 19, runways: this.getRunwayData('DXB'), frequencies: this.getFrequencyData('DXB'),
+        taxiwayMap: 'n/a', category: '4F'
+      }
+    ];
+  }
+
+  // Enhanced fallback search
+  searchEnhancedFallbackAirports(query) {
+    const searchTerm = query.toLowerCase();
+    return this.fallbackAirports.filter(airport => 
+      airport.iata.toLowerCase().includes(searchTerm) ||
+      airport.icao.toLowerCase().includes(searchTerm) ||
+      airport.name.toLowerCase().includes(searchTerm) ||
+      airport.city.toLowerCase().includes(searchTerm)
+    );
+  }
+
+  // Get popular airports for suggestions
+  getPopularAirports() {
+    return this.fallbackAirports.slice(0, 20);
+  }
+
+  // Get airport by IATA code with enhanced data
   async getAirportByIATA(iataCode) {
     const airports = await this.searchAirports(iataCode);
     return airports.find(airport => airport.iata === iataCode.toUpperCase());
   }
 
-  // Get airport by ICAO code
+  // Get airport by ICAO code with enhanced data
   async getAirportByICAO(icaoCode) {
     const airports = await this.searchAirports(icaoCode);
     return airports.find(airport => airport.icao === icaoCode.toUpperCase());
   }
 
-  // Calculate distance between two airports
+  // Calculate distance between two airports with enhanced data
   async calculateAirportDistance(departureCode, arrivalCode) {
     try {
       const departureAirport = await this.getAirportByIATA(departureCode) || 
@@ -112,72 +280,21 @@ class AirportService {
         distance: distance,
         departure: departureAirport,
         arrival: arrivalAirport,
-        units: 'nautical miles'
+        units: 'nautical miles',
+        runwayInfo: {
+          departure: departureAirport.runways,
+          arrival: arrivalAirport.runways
+        },
+        frequencyInfo: {
+          departure: departureAirport.frequencies,
+          arrival: arrivalAirport.frequencies
+        }
       };
       
     } catch (error) {
       console.error('Error calculating distance:', error);
       throw error;
     }
-  }
-
-  // Fallback airport data for major international airports
-  getFallbackAirportData() {
-    return [
-      // North America
-      { iata: 'JFK', icao: 'KJFK', name: 'John F Kennedy International Airport', city: 'New York', country: 'United States', latitude: 40.639751, longitude: -73.778925, timezone: 'America/New_York' },
-      { iata: 'LAX', icao: 'KLAX', name: 'Los Angeles International Airport', city: 'Los Angeles', country: 'United States', latitude: 33.942536, longitude: -118.408075, timezone: 'America/Los_Angeles' },
-      { iata: 'ORD', icao: 'KORD', name: "Chicago O'Hare International Airport", city: 'Chicago', country: 'United States', latitude: 41.978603, longitude: -87.904842, timezone: 'America/Chicago' },
-      { iata: 'DFW', icao: 'KDFW', name: 'Dallas/Fort Worth International Airport', city: 'Dallas', country: 'United States', latitude: 32.896828, longitude: -97.037997, timezone: 'America/Chicago' },
-      { iata: 'DEN', icao: 'KDEN', name: 'Denver International Airport', city: 'Denver', country: 'United States', latitude: 39.861656, longitude: -104.673178, timezone: 'America/Denver' },
-      { iata: 'SFO', icao: 'KSFO', name: 'San Francisco International Airport', city: 'San Francisco', country: 'United States', latitude: 37.618972, longitude: -122.374889, timezone: 'America/Los_Angeles' },
-      { iata: 'SEA', icao: 'KSEA', name: 'Seattle-Tacoma International Airport', city: 'Seattle', country: 'United States', latitude: 47.449, longitude: -122.309306, timezone: 'America/Los_Angeles' },
-      { iata: 'MIA', icao: 'KMIA', name: 'Miami International Airport', city: 'Miami', country: 'United States', latitude: 25.79325, longitude: -80.290556, timezone: 'America/New_York' },
-      { iata: 'ATL', icao: 'KATL', name: 'Hartsfield-Jackson Atlanta International Airport', city: 'Atlanta', country: 'United States', latitude: 33.636719, longitude: -84.428067, timezone: 'America/New_York' },
-      
-      // Europe
-      { iata: 'LHR', icao: 'EGLL', name: 'London Heathrow Airport', city: 'London', country: 'United Kingdom', latitude: 51.470022, longitude: -0.454295, timezone: 'Europe/London' },
-      { iata: 'CDG', icao: 'LFPG', name: 'Charles de Gaulle Airport', city: 'Paris', country: 'France', latitude: 49.012779, longitude: 2.55, timezone: 'Europe/Paris' },
-      { iata: 'FRA', icao: 'EDDF', name: 'Frankfurt Airport', city: 'Frankfurt', country: 'Germany', latitude: 50.033333, longitude: 8.570556, timezone: 'Europe/Berlin' },
-      { iata: 'AMS', icao: 'EHAM', name: 'Amsterdam Airport Schiphol', city: 'Amsterdam', country: 'Netherlands', latitude: 52.308613, longitude: 4.763889, timezone: 'Europe/Amsterdam' },
-      { iata: 'MAD', icao: 'LEMD', name: 'Adolfo Suárez Madrid–Barajas Airport', city: 'Madrid', country: 'Spain', latitude: 40.471926, longitude: -3.56264, timezone: 'Europe/Madrid' },
-      { iata: 'FCO', icao: 'LIRF', name: 'Leonardo da Vinci–Fiumicino Airport', city: 'Rome', country: 'Italy', latitude: 41.800278, longitude: 12.238889, timezone: 'Europe/Rome' },
-      { iata: 'ZRH', icao: 'LSZH', name: 'Zurich Airport', city: 'Zurich', country: 'Switzerland', latitude: 47.464722, longitude: 8.549167, timezone: 'Europe/Zurich' },
-      
-      // Asia
-      { iata: 'HND', icao: 'RJTT', name: 'Tokyo Haneda Airport', city: 'Tokyo', country: 'Japan', latitude: 35.552258, longitude: 139.779694, timezone: 'Asia/Tokyo' },
-      { iata: 'NRT', icao: 'RJAA', name: 'Narita International Airport', city: 'Tokyo', country: 'Japan', latitude: 35.764722, longitude: 140.386389, timezone: 'Asia/Tokyo' },
-      { iata: 'PEK', icao: 'ZBAA', name: 'Beijing Capital International Airport', city: 'Beijing', country: 'China', latitude: 40.080111, longitude: 116.584556, timezone: 'Asia/Shanghai' },
-      { iata: 'PVG', icao: 'ZSPD', name: 'Shanghai Pudong International Airport', city: 'Shanghai', country: 'China', latitude: 31.143378, longitude: 121.805214, timezone: 'Asia/Shanghai' },
-      { iata: 'HKG', icao: 'VHHH', name: 'Hong Kong International Airport', city: 'Hong Kong', country: 'China', latitude: 22.308919, longitude: 113.914603, timezone: 'Asia/Hong_Kong' },
-      { iata: 'SIN', icao: 'WSSS', name: 'Singapore Changi Airport', city: 'Singapore', country: 'Singapore', latitude: 1.359211, longitude: 103.989333, timezone: 'Asia/Singapore' },
-      { iata: 'BKK', icao: 'VTBS', name: 'Suvarnabhumi Airport', city: 'Bangkok', country: 'Thailand', latitude: 13.681108, longitude: 100.747283, timezone: 'Asia/Bangkok' },
-      { iata: 'DXB', icao: 'OMDB', name: 'Dubai International Airport', city: 'Dubai', country: 'United Arab Emirates', latitude: 25.252778, longitude: 55.364444, timezone: 'Asia/Dubai' },
-      
-      // Oceania
-      { iata: 'SYD', icao: 'YSSY', name: 'Sydney Kingsford Smith Airport', city: 'Sydney', country: 'Australia', latitude: -33.946111, longitude: 151.177222, timezone: 'Australia/Sydney' },
-      { iata: 'MEL', icao: 'YMML', name: 'Melbourne Airport', city: 'Melbourne', country: 'Australia', latitude: -37.673333, longitude: 144.843333, timezone: 'Australia/Melbourne' },
-      
-      // South America
-      { iata: 'GRU', icao: 'SBGR', name: 'São Paulo/Guarulhos International Airport', city: 'São Paulo', country: 'Brazil', latitude: -23.435556, longitude: -46.473056, timezone: 'America/Sao_Paulo' },
-      { iata: 'EZE', icao: 'SAEZ', name: 'Ministro Pistarini International Airport', city: 'Buenos Aires', country: 'Argentina', latitude: -34.822222, longitude: -58.535833, timezone: 'America/Argentina/Buenos_Aires' }
-    ];
-  }
-
-  // Search fallback airports
-  searchFallbackAirports(query) {
-    const searchTerm = query.toLowerCase();
-    return this.fallbackAirports.filter(airport => 
-      airport.iata.toLowerCase().includes(searchTerm) ||
-      airport.icao.toLowerCase().includes(searchTerm) ||
-      airport.name.toLowerCase().includes(searchTerm) ||
-      airport.city.toLowerCase().includes(searchTerm)
-    );
-  }
-
-  // Get popular airports for suggestions
-  getPopularAirports() {
-    return this.fallbackAirports.slice(0, 20); // Return top 20 popular airports
   }
 }
 

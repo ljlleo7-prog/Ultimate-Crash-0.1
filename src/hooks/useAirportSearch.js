@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { airportService } from '../services/airportService';
-import { calculateGreatCircleDistance, calculateFlightTime, formatDistance, formatFlightTime } from '../utils/distanceCalculator';
+import { calculateDistance, calculateFlightTime, formatDistance, formatFlightTime } from '../utils/distanceCalculator';
 
 // Custom hook for airport search and distance calculations
 export function useAirportSearch() {
@@ -66,12 +66,11 @@ export function useAirportSearch() {
     if (!departure || !arrival) return;
 
     try {
-      const distance = calculateGreatCircleDistance(
+      const distance = calculateDistance(
         departure.latitude,
         departure.longitude,
         arrival.latitude,
-        arrival.longitude,
-        'nm'
+        arrival.longitude
       );
 
       const flightTime = calculateFlightTime(distance);
