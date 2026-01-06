@@ -180,3 +180,126 @@
     grid-row: auto !important;
   }
 }
+
+/* Flight Attitude Indicator Styles */
+.flight-attitude-indicator {
+  position: relative;
+  width: 200px;
+  height: 200px;
+  border-radius: 50%;
+  overflow: hidden;
+  border: 3px solid #333;
+  margin: 0 auto 15px;
+  background: #000;
+  transform-origin: center;
+  transition: transform 0.3s ease;
+}
+
+.attitude-sky {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 50%;
+  background: linear-gradient(to bottom, #87CEEB 0%, #4682B4 100%);
+}
+
+.attitude-ground {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 50%;
+  background: linear-gradient(to top, #FFA500 0%, #FF8C00 100%);
+}
+
+.horizon-line {
+  position: absolute;
+  top: 50%;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: #fff;
+  transform: translateY(-1px);
+}
+
+.pitch-lines {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+}
+
+.pitch-line {
+  position: absolute;
+  left: 20%;
+  right: 20%;
+  height: 1px;
+  background: rgba(255, 255, 255, 0.6);
+  transition: transform 0.3s ease;
+}
+
+.pitch-line.horizon {
+  background: #fff;
+  height: 2px;
+}
+
+.pitch-line span {
+  position: absolute;
+  top: -8px;
+  font-size: 10px;
+  color: #fff;
+  background: rgba(0, 0, 0, 0.7);
+  padding: 0 4px;
+}
+
+.pitch-line:nth-child(odd) span {
+  left: 10px;
+}
+
+.pitch-line:nth-child(even) span {
+  right: 10px;
+}
+
+.aircraft-symbol {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 10;
+}
+
+.wings {
+  width: 60px;
+  height: 4px;
+  background: #fff;
+  position: absolute;
+  top: -2px;
+  left: -30px;
+}
+
+.fuselage {
+  width: 4px;
+  height: 20px;
+  background: #fff;
+  position: absolute;
+  top: -10px;
+  left: -2px;
+}
+
+.pose-data-text {
+  text-align: center;
+  font-size: 11px;
+}
+
+.pose-data-text div {
+  display: inline-block;
+  margin: 0 10px;
+  min-width: 80px;
+}
+
+/* Flight pose group specific styling */
+.flight-pose-group {
+  text-align: center;
+}

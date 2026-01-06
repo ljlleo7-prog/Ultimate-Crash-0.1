@@ -2,8 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import './FlightPanel.css';
 
 const FlightPanel = ({ flightData, onActionRequest }) => {
-  // Static flight state for testing - no live updates
-  const flightState = {
+  const [flightState, setFlightState] = useState({
     // Navigation
     heading: 270,
     trueAirspeed: 450,
@@ -46,6 +45,81 @@ const FlightPanel = ({ flightData, onActionRequest }) => {
     nextWaypoint: 'WPT3',
     distanceToWaypoint: 125.4,
     timeToWaypoint: 18.2
+  });
+
+  // Dynamic updates
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setFlightState(prevState => ({
+        ...prevState,
+        // Simulate small variations in flight parameters
+        pitch: prevState.pitch + (Math.random() - 0.5) * 0.2,
+        roll: prevState.roll + (Math.random() - 0.5) * 0.1,
+        heading: (prevState.heading + Math.random() * 0.1) % 360,
+        altitude: prevState.altitude + (Math.random() - 0.5) * 10,
+        verticalSpeed: prevState.verticalSpeed + (Math.random() - 0.5) * 50,
+        indicatedAirspeed: prevState.indicatedAirspeed + (Math.random() - 0.5) * 2,
+        engineN1: prevState.engineN1.map(n => Math.max(0, Math.min(100, n + (Math.random() - 0.5) * 0.1))),
+        engineN2: prevState.engineN2.map(n => Math.max(0, Math.min(100, n + (Math.random() - 0.5) * 0.1))),
+        engineEGT: prevState.engineEGT.map(t => Math.max(0, t + (Math.random() - 0.5) * 5)),
+        fuel: Math.max(0, prevState.fuel - Math.random() * 0.5)
+      }));
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, []);
+
+  // Flight Attitude Indicator Component
+  const FlightAttitudeIndicator = () => {
+    const indicatorRef = useRef(null);
+    
+    useEffect(() => {
+      if (indicatorRef.current) {
+        const indicator = indicatorRef.current;
+        indicator.style.transform = `rotate(${flightState.roll}deg)`;
+        
+        // Update pitch lines
+        const pitchLines = indicator.querySelectorAll('.pitch-line');
+        pitchLines.forEach(line => {
+          const pitchValue = parseInt(line.getAttribute('data-pitch')) || 0;
+          const offset = (pitchValue - flightState.pitch) * 3; // 3px per degree
+          line.style.transform = `translateY(${offset}px)`;
+        });
+      }
+    }, [flightState.pitch, flightState.roll]);
+
+    return React.createElement('div', {
+      ref: indicatorRef,
+      className: 'flight-attitude-indicator'
+    },
+      // Sky (blue top half)
+      React.createElement('div', { className: 'attitude-sky' }),
+      
+      // Ground (orange bottom half)
+      React.createElement('div', { className: 'attitude-ground' }),
+      
+      // Horizon line
+      React.createElement('div', { className: 'horizon-line' }),
+      
+      // Pitch lines
+      React.createElement('div', { className: 'pitch-lines' },
+        [-30, -20, -10, 0, 10, 20, 30].map(pitch => 
+          React.createElement('div', {
+            key: `pitch-${pitch}`,
+            className: `pitch-line ${pitch === 0 ? 'horizon' : ''}`,
+            'data-pitch': pitch
+          },
+            pitch !== 0 && React.createElement('span', null, Math.abs(pitch))
+          )
+        )
+      ),
+      
+      // Aircraft symbol
+      React.createElement('div', { className: 'aircraft-symbol' },
+        React.createElement('div', { className: 'wings' }),
+        React.createElement('div', { className: 'fuselage' })
+      )
+    );
   };
 
   return React.createElement('div', {
@@ -69,13 +143,16 @@ const FlightPanel = ({ flightData, onActionRequest }) => {
       key: 'flight-pose-group',
       className: 'instrument-group flight-pose-group'
     }, 
-      React.createElement('h3', { key: 'pose-title' }, 'Flight Pose'),
-      React.createElement('div', { key: 'pose-data' }, 
-        React.createElement('div', { key: 'pitch' }, `Pitch: ${flightState.pitch.toFixed(1)}°`),
-        React.createElement('div', { key: 'roll' }, `Roll: ${flightState.roll.toFixed(1)}°`),
-        React.createElement('div', { key: 'vs' }, `V/S: ${flightState.verticalSpeed.toFixed(0)}`),
-        React.createElement('div', { key: 'alt' }, `ALT: ${Math.round(flightState.altitude)}`),
-        React.createElement('div', { key: 'altimeter' }, `Altimeter: ${flightState.altimeter}`)
+      React.createElement('h3', { key: 'pose-title' }, 'Flight Attitude'),
+      React.createElement('div', { key: 'attitude-indicator-container' },
+        FlightAttitudeIndicator(),
+        React.createElement('div', { key: 'pose-data', className: 'pose-data-text' },
+          React.createElement('div', { key: 'pitch' }, `Pitch: ${flightState.pitch.toFixed(1)}°`),
+          React.createElement('div', { key: 'roll' }, `Roll: ${flightState.roll.toFixed(1)}°`),
+          React.createElement('div', { key: 'vs' }, `V/S: ${flightState.verticalSpeed.toFixed(0)}`),
+          React.createElement('div', { key: 'alt' }, `ALT: ${Math.round(flightState.altitude)}`),
+          React.createElement('div', { key: 'altimeter' }, `Altimeter: ${flightState.altimeter}`)
+        )
       )
     ),
     
