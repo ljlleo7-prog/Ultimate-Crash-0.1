@@ -1,0 +1,576 @@
+{
+  "airports": [
+    {
+      "iata": "JFK",
+      "icao": "KJFK",
+      "name": "John F Kennedy International Airport",
+      "city": "New York",
+      "country": "United States",
+      "latitude": 40.639751,
+      "longitude": -73.778925,
+      "timezone": "America/New_York",
+      "elevation": 4,
+      "category": "4F",
+      "runways": [
+        { "number": "04L/22R", "length": 3689, "surface": "Asphalt", "category": "Heavy" },
+        { "number": "04R/22L", "length": 2560, "surface": "Asphalt", "category": "Heavy" },
+        { "number": "13L/31R", "length": 3048, "surface": "Asphalt", "category": "Heavy" },
+        { "number": "13R/31L", "length": 4423, "surface": "Asphalt", "category": "Heavy" }
+      ],
+      "frequencies": [
+        { "type": "ATIS", "frequency": "127.65", "description": "Automatic Terminal Information Service" },
+        { "type": "Ground", "frequency": "121.90", "description": "Ground Control" },
+        { "type": "Tower", "frequency": "119.10", "description": "Tower Control" },
+        { "type": "Approach", "frequency": "124.30", "description": "Approach Control" },
+        { "type": "Clearance", "frequency": "121.30", "description": "Clearance Delivery" }
+      ]
+    },
+    {
+      "iata": "LAX",
+      "icao": "KLAX",
+      "name": "Los Angeles International Airport",
+      "city": "Los Angeles",
+      "country": "United States",
+      "latitude": 33.942536,
+      "longitude": -118.408075,
+      "timezone": "America/Los_Angeles",
+      "elevation": 38,
+      "category": "4F",
+      "runways": [
+        { "number": "06L/24R", "length": 2721, "surface": "Concrete", "category": "Heavy" },
+        { "number": "06R/24L", "length": 3383, "surface": "Concrete", "category": "Heavy" },
+        { "number": "07L/25R", "length": 3810, "surface": "Concrete", "category": "Heavy" },
+        { "number": "07R/25L", "length": 3383, "surface": "Concrete", "category": "Heavy" }
+      ],
+      "frequencies": [
+        { "type": "ATIS", "frequency": "135.25", "description": "Automatic Terminal Information Service" },
+        { "type": "Ground", "frequency": "121.65", "description": "Ground Control" },
+        { "type": "Tower", "frequency": "120.95", "description": "Tower Control" },
+        { "type": "Approach", "frequency": "124.70", "description": "Approach Control" }
+      ]
+    },
+    {
+      "iata": "LHR",
+      "icao": "EGLL",
+      "name": "London Heathrow Airport",
+      "city": "London",
+      "country": "United Kingdom",
+      "latitude": 51.470022,
+      "longitude": -0.454295,
+      "timezone": "Europe/London",
+      "elevation": 25,
+      "category": "4F",
+      "runways": [
+        { "number": "09L/27R", "length": 3902, "surface": "Asphalt", "category": "Heavy" },
+        { "number": "09R/27L", "length": 3660, "surface": "Asphalt", "category": "Heavy" }
+      ],
+      "frequencies": [
+        { "type": "ATIS", "frequency": "127.25", "description": "Automatic Terminal Information Service" },
+        { "type": "Ground", "frequency": "121.70", "description": "Ground Control" },
+        { "type": "Tower", "frequency": "118.50", "description": "Tower Control" },
+        { "type": "Approach", "frequency": "119.72", "description": "Approach Control" }
+      ]
+    },
+    {
+      "iata": "CDG",
+      "icao": "LFPG",
+      "name": "Charles de Gaulle Airport",
+      "city": "Paris",
+      "country": "France",
+      "latitude": 49.009724,
+      "longitude": 2.547778,
+      "timezone": "Europe/Paris",
+      "elevation": 119,
+      "category": "4F",
+      "runways": [
+        { "number": "08L/26R", "length": 4215, "surface": "Asphalt", "category": "Heavy" },
+        { "number": "08R/26L", "length": 2700, "surface": "Asphalt", "category": "Medium" },
+        { "number": "09L/27R", "length": 2700, "surface": "Asphalt", "category": "Medium" }
+      ],
+      "frequencies": [
+        { "type": "ATIS", "frequency": "127.85", "description": "Automatic Terminal Information Service" },
+        { "type": "Ground", "frequency": "121.80", "description": "Ground Control" },
+        { "type": "Tower", "frequency": "118.10", "description": "Tower Control" }
+      ]
+    },
+    {
+      "iata": "HND",
+      "icao": "RJTT",
+      "name": "Tokyo Haneda Airport",
+      "city": "Tokyo",
+      "country": "Japan",
+      "latitude": 35.553333,
+      "longitude": 139.781111,
+      "timezone": "Asia/Tokyo",
+      "elevation": 6,
+      "category": "4F",
+      "runways": [
+        { "number": "04/22", "length": 3000, "surface": "Asphalt", "category": "Heavy" },
+        { "number": "05/23", "length": 2500, "surface": "Asphalt", "category": "Medium" }
+      ],
+      "frequencies": [
+        { "type": "ATIS", "frequency": "126.20", "description": "Automatic Terminal Information Service" },
+        { "type": "Ground", "frequency": "121.60", "description": "Ground Control" },
+        { "type": "Tower", "frequency": "118.70", "description": "Tower Control" }
+      ]
+    },
+    {
+      "iata": "DXB",
+      "icao": "OMDB",
+      "name": "Dubai International Airport",
+      "city": "Dubai",
+      "country": "United Arab Emirates",
+      "latitude": 25.252778,
+      "longitude": 55.364444,
+      "timezone": "Asia/Dubai",
+      "elevation": 19,
+      "category": "4F",
+      "runways": [
+        { "number": "12L/30R", "length": 4000, "surface": "Asphalt", "category": "Heavy" },
+        { "number": "12R/30L", "length": 4450, "surface": "Asphalt", "category": "Heavy" }
+      ],
+      "frequencies": [
+        { "type": "ATIS", "frequency": "128.60", "description": "Automatic Terminal Information Service" },
+        { "type": "Ground", "frequency": "121.75", "description": "Ground Control" },
+        { "type": "Tower", "frequency": "118.30", "description": "Tower Control" }
+      ]
+    },
+    {
+      "iata": "SIN",
+      "icao": "WSSS",
+      "name": "Singapore Changi Airport",
+      "city": "Singapore",
+      "country": "Singapore",
+      "latitude": 1.359167,
+      "longitude": 103.989444,
+      "timezone": "Asia/Singapore",
+      "elevation": 7,
+      "category": "4F",
+      "runways": [
+        { "number": "02L/20R", "length": 4000, "surface": "Asphalt", "category": "Heavy" },
+        { "number": "02C/20C", "length": 4000, "surface": "Asphalt", "category": "Heavy" },
+        { "number": "02R/20L", "length": 4000, "surface": "Asphalt", "category": "Heavy" }
+      ],
+      "frequencies": [
+        { "type": "ATIS", "frequency": "128.80", "description": "Automatic Terminal Information Service" },
+        { "type": "Ground", "frequency": "121.90", "description": "Ground Control" },
+        { "type": "Tower", "frequency": "118.10", "description": "Tower Control" }
+      ]
+    },
+    {
+      "iata": "SYD",
+      "icao": "YSSY",
+      "name": "Sydney Kingsford Smith Airport",
+      "city": "Sydney",
+      "country": "Australia",
+      "latitude": -33.946111,
+      "longitude": 151.177222,
+      "timezone": "Australia/Sydney",
+      "elevation": 6,
+      "category": "4F",
+      "runways": [
+        { "number": "16L/34R", "length": 2438, "surface": "Asphalt", "category": "Heavy" },
+        { "number": "16R/34L", "length": 3962, "surface": "Asphalt", "category": "Heavy" }
+      ],
+      "frequencies": [
+        { "type": "ATIS", "frequency": "127.50", "description": "Automatic Terminal Information Service" },
+        { "type": "Ground", "frequency": "121.70", "description": "Ground Control" },
+        { "type": "Tower", "frequency": "120.50", "description": "Tower Control" }
+      ]
+    },
+    {
+      "iata": "FRA",
+      "icao": "EDDF",
+      "name": "Frankfurt Airport",
+      "city": "Frankfurt",
+      "country": "Germany",
+      "latitude": 50.033333,
+      "longitude": 8.570556,
+      "timezone": "Europe/Berlin",
+      "elevation": 111,
+      "category": "4F",
+      "runways": [
+        { "number": "07L/25R", "length": 4000, "surface": "Concrete", "category": "Heavy" },
+        { "number": "07C/25C", "length": 4000, "surface": "Concrete", "category": "Heavy" },
+        { "number": "07R/25L", "length": 2800, "surface": "Concrete", "category": "Medium" }
+      ],
+      "frequencies": [
+        { "type": "ATIS", "frequency": "127.45", "description": "Automatic Terminal Information Service" },
+        { "type": "Ground", "frequency": "121.65", "description": "Ground Control" },
+        { "type": "Tower", "frequency": "118.30", "description": "Tower Control" }
+      ]
+    },
+    {
+      "iata": "ORD",
+      "icao": "KORD",
+      "name": "Chicago O'Hare International Airport",
+      "city": "Chicago",
+      "country": "United States",
+      "latitude": 41.978603,
+      "longitude": -87.904842,
+      "timezone": "America/Chicago",
+      "elevation": 204,
+      "category": "4F",
+      "runways": [
+        { "number": "04L/22R", "length": 2286, "surface": "Concrete", "category": "Heavy" },
+        { "number": "04R/22L", "length": 2469, "surface": "Concrete", "category": "Heavy" },
+        { "number": "09L/27R", "length": 2286, "surface": "Concrete", "category": "Heavy" },
+        { "number": "09C/27C", "length": 2896, "surface": "Concrete", "category": "Heavy" },
+        { "number": "10L/28R", "length": 3962, "surface": "Concrete", "category": "Heavy" },
+        { "number": "10C/28C", "length": 3292, "surface": "Concrete", "category": "Heavy" }
+      ],
+      "frequencies": [
+        { "type": "ATIS", "frequency": "135.25", "description": "Automatic Terminal Information Service" },
+        { "type": "Ground", "frequency": "121.90", "description": "Ground Control" },
+        { "type": "Tower", "frequency": "120.30", "description": "Tower Control" }
+      ]
+    },
+    {
+      "iata": "HKG",
+      "icao": "VHHH",
+      "name": "Hong Kong International Airport",
+      "city": "Hong Kong",
+      "country": "Hong Kong",
+      "latitude": 22.308889,
+      "longitude": 113.914444,
+      "timezone": "Asia/Hong_Kong",
+      "elevation": 9,
+      "category": "4F",
+      "runways": [
+        { "number": "07L/25R", "length": 3800, "surface": "Asphalt", "category": "Heavy" },
+        { "number": "07R/25L", "length": 3800, "surface": "Asphalt", "category": "Heavy" }
+      ],
+      "frequencies": [
+        { "type": "ATIS", "frequency": "126.00", "description": "Automatic Terminal Information Service" },
+        { "type": "Ground", "frequency": "121.65", "description": "Ground Control" },
+        { "type": "Tower", "frequency": "118.70", "description": "Tower Control" }
+      ]
+    },
+    {
+      "iata": "AMS",
+      "icao": "EHAM",
+      "name": "Amsterdam Airport Schiphol",
+      "city": "Amsterdam",
+      "country": "Netherlands",
+      "latitude": 52.308613,
+      "longitude": 4.763889,
+      "timezone": "Europe/Amsterdam",
+      "elevation": -3,
+      "category": "4F",
+      "runways": [
+        { "number": "04/22", "length": 3400, "surface": "Asphalt", "category": "Heavy" },
+        { "number": "06/24", "length": 3500, "surface": "Asphalt", "category": "Heavy" },
+        { "number": "09/27", "length": 3450, "surface": "Asphalt", "category": "Heavy" },
+        { "number": "18L/36R", "length": 3400, "surface": "Asphalt", "category": "Heavy" },
+        { "number": "18C/36C", "length": 3300, "surface": "Asphalt", "category": "Heavy" },
+        { "number": "18R/36L", "length": 3800, "surface": "Asphalt", "category": "Heavy" }
+      ],
+      "frequencies": [
+        { "type": "ATIS", "frequency": "127.55", "description": "Automatic Terminal Information Service" },
+        { "type": "Ground", "frequency": "121.75", "description": "Ground Control" },
+        { "type": "Tower", "frequency": "118.10", "description": "Tower Control" }
+      ]
+    },
+    {
+      "iata": "ICN",
+      "icao": "RKSI",
+      "name": "Incheon International Airport",
+      "city": "Seoul",
+      "country": "South Korea",
+      "latitude": 37.469167,
+      "longitude": 126.450556,
+      "timezone": "Asia/Seoul",
+      "elevation": 7,
+      "category": "4F",
+      "runways": [
+        { "number": "15L/33R", "length": 3750, "surface": "Asphalt", "category": "Heavy" },
+        { "number": "15R/33L", "length": 3750, "surface": "Asphalt", "category": "Heavy" }
+      ],
+      "frequencies": [
+        { "type": "ATIS", "frequency": "126.10", "description": "Automatic Terminal Information Service" },
+        { "type": "Ground", "frequency": "121.70", "description": "Ground Control" },
+        { "type": "Tower", "frequency": "118.10", "description": "Tower Control" }
+      ]
+    },
+    {
+      "iata": "BKK",
+      "icao": "VTBS",
+      "name": "Suvarnabhumi Airport",
+      "city": "Bangkok",
+      "country": "Thailand",
+      "latitude": 13.681111,
+      "longitude": 100.747222,
+      "timezone": "Asia/Bangkok",
+      "elevation": 2,
+      "category": "4F",
+      "runways": [
+        { "number": "01L/19R", "length": 4000, "surface": "Asphalt", "category": "Heavy" },
+        { "number": "01R/19L", "length": 3700, "surface": "Asphalt", "category": "Heavy" }
+      ],
+      "frequencies": [
+        { "type": "ATIS", "frequency": "126.20", "description": "Automatic Terminal Information Service" },
+        { "type": "Ground", "frequency": "121.65", "description": "Ground Control" },
+        { "type": "Tower", "frequency": "118.10", "description": "Tower Control" }
+      ]
+    },
+    {
+      "iata": "MAD",
+      "icao": "LEMD",
+      "name": "Adolfo Suárez Madrid–Barajas Airport",
+      "city": "Madrid",
+      "country": "Spain",
+      "latitude": 40.472222,
+      "longitude": -3.560833,
+      "timezone": "Europe/Madrid",
+      "elevation": 610,
+      "category": "4F",
+      "runways": [
+        { "number": "14L/32R", "length": 4100, "surface": "Asphalt", "category": "Heavy" },
+        { "number": "14R/32L", "length": 4100, "surface": "Asphalt", "category": "Heavy" },
+        { "number": "18L/36R", "length": 3500, "surface": "Asphalt", "category": "Heavy" },
+        { "number": "18R/36L", "length": 4300, "surface": "Asphalt", "category": "Heavy" }
+      ],
+      "frequencies": [
+        { "type": "ATIS", "frequency": "127.35", "description": "Automatic Terminal Information Service" },
+        { "type": "Ground", "frequency": "121.80", "description": "Ground Control" },
+        { "type": "Tower", "frequency": "118.10", "description": "Tower Control" }
+      ]
+    },
+    {
+      "iata": "YYZ",
+      "icao": "CYYZ",
+      "name": "Toronto Pearson International Airport",
+      "city": "Toronto",
+      "country": "Canada",
+      "latitude": 43.677222,
+      "longitude": -79.630556,
+      "timezone": "America/Toronto",
+      "elevation": 173,
+      "category": "4F",
+      "runways": [
+        { "number": "05/23", "length": 3389, "surface": "Asphalt", "category": "Heavy" },
+        { "number": "06L/24R", "length": 2865, "surface": "Asphalt", "category": "Heavy" },
+        { "number": "06R/24L", "length": 2743, "surface": "Asphalt", "category": "Heavy" },
+        { "number": "15L/33R", "length": 3389, "surface": "Asphalt", "category": "Heavy" },
+        { "number": "15R/33L", "length": 2987, "surface": "Asphalt", "category": "Heavy" }
+      ],
+      "frequencies": [
+        { "type": "ATIS", "frequency": "126.70", "description": "Automatic Terminal Information Service" },
+        { "type": "Ground", "frequency": "121.90", "description": "Ground Control" },
+        { "type": "Tower", "frequency": "118.30", "description": "Tower Control" }
+      ]
+    },
+    {
+      "iata": "PEK",
+      "icao": "ZBAA",
+      "name": "Beijing Capital International Airport",
+      "city": "Beijing",
+      "country": "China",
+      "latitude": 40.080111,
+      "longitude": 116.584556,
+      "timezone": "Asia/Shanghai",
+      "elevation": 35,
+      "category": "4F",
+      "runways": [
+        { "number": "18L/36R", "length": 3800, "surface": "Concrete", "category": "Heavy" },
+        { "number": "18R/36L", "length": 3800, "surface": "Concrete", "category": "Heavy" },
+        { "number": "01/19", "length": 3800, "surface": "Concrete", "category": "Heavy" }
+      ],
+      "frequencies": [
+        { "type": "ATIS", "frequency": "126.20", "description": "Automatic Terminal Information Service" },
+        { "type": "Ground", "frequency": "121.65", "description": "Ground Control" },
+        { "type": "Tower", "frequency": "118.10", "description": "Tower Control" }
+      ]
+    },
+    {
+      "iata": "PVG",
+      "icao": "ZSPD",
+      "name": "Shanghai Pudong International Airport",
+      "city": "Shanghai",
+      "country": "China",
+      "latitude": 31.143378,
+      "longitude": 121.805214,
+      "timezone": "Asia/Shanghai",
+      "elevation": 4,
+      "category": "4F",
+      "runways": [
+        { "number": "17L/35R", "length": 4000, "surface": "Concrete", "category": "Heavy" },
+        { "number": "17R/35L", "length": 3800, "surface": "Concrete", "category": "Heavy" },
+        { "number": "16/34", "length": 3800, "surface": "Concrete", "category": "Heavy" }
+      ],
+      "frequencies": [
+        { "type": "ATIS", "frequency": "126.40", "description": "Automatic Terminal Information Service" },
+        { "type": "Ground", "frequency": "121.70", "description": "Ground Control" },
+        { "type": "Tower", "frequency": "118.30", "description": "Tower Control" }
+      ]
+    },
+    {
+      "iata": "CAN",
+      "icao": "ZGGG",
+      "name": "Guangzhou Baiyun International Airport",
+      "city": "Guangzhou",
+      "country": "China",
+      "latitude": 23.392436,
+      "longitude": 113.298786,
+      "timezone": "Asia/Shanghai",
+      "elevation": 15,
+      "category": "4F",
+      "runways": [
+        { "number": "02L/20R", "length": 3800, "surface": "Concrete", "category": "Heavy" },
+        { "number": "02R/20L", "length": 3800, "surface": "Concrete", "category": "Heavy" }
+      ],
+      "frequencies": [
+        { "type": "ATIS", "frequency": "126.60", "description": "Automatic Terminal Information Service" },
+        { "type": "Ground", "frequency": "121.80", "description": "Ground Control" },
+        { "type": "Tower", "frequency": "118.50", "description": "Tower Control" }
+      ]
+    },
+    {
+      "iata": "SZX",
+      "icao": "ZGSZ",
+      "name": "Shenzhen Bao'an International Airport",
+      "city": "Shenzhen",
+      "country": "China",
+      "latitude": 22.639258,
+      "longitude": 113.810658,
+      "timezone": "Asia/Shanghai",
+      "elevation": 4,
+      "category": "4F",
+      "runways": [
+        { "number": "15/33", "length": 3800, "surface": "Concrete", "category": "Heavy" },
+        { "number": "16/34", "length": 3400, "surface": "Concrete", "category": "Heavy" }
+      ],
+      "frequencies": [
+        { "type": "ATIS", "frequency": "126.80", "description": "Automatic Terminal Information Service" },
+        { "type": "Ground", "frequency": "121.90", "description": "Ground Control" },
+        { "type": "Tower", "frequency": "118.70", "description": "Tower Control" }
+      ]
+    },
+    {
+      "iata": "CTU",
+      "icao": "ZUUU",
+      "name": "Chengdu Shuangliu International Airport",
+      "city": "Chengdu",
+      "country": "China",
+      "latitude": 30.578528,
+      "longitude": 103.947086,
+      "timezone": "Asia/Shanghai",
+      "elevation": 495,
+      "category": "4F",
+      "runways": [
+        { "number": "02L/20R", "length": 3600, "surface": "Concrete", "category": "Heavy" },
+        { "number": "02R/20L", "length": 3600, "surface": "Concrete", "category": "Heavy" }
+      ],
+      "frequencies": [
+        { "type": "ATIS", "frequency": "126.30", "description": "Automatic Terminal Information Service" },
+        { "type": "Ground", "frequency": "121.75", "description": "Ground Control" },
+        { "type": "Tower", "frequency": "118.20", "description": "Tower Control" }
+      ]
+    },
+    {
+      "iata": "FCO",
+      "icao": "LIRF",
+      "name": "Leonardo da Vinci–Fiumicino Airport",
+      "city": "Rome",
+      "country": "Italy",
+      "latitude": 41.804475,
+      "longitude": 12.250797,
+      "timezone": "Europe/Rome",
+      "elevation": 5,
+      "category": "4F",
+      "runways": [
+        { "number": "16L/34R", "length": 3900, "surface": "Asphalt", "category": "Heavy" },
+        { "number": "16R/34L", "length": 3900, "surface": "Asphalt", "category": "Heavy" }
+      ],
+      "frequencies": [
+        { "type": "ATIS", "frequency": "127.15", "description": "Automatic Terminal Information Service" },
+        { "type": "Ground", "frequency": "121.85", "description": "Ground Control" },
+        { "type": "Tower", "frequency": "118.40", "description": "Tower Control" }
+      ]
+    },
+    {
+      "iata": "MUC",
+      "icao": "EDDM",
+      "name": "Munich Airport",
+      "city": "Munich",
+      "country": "Germany",
+      "latitude": 48.353783,
+      "longitude": 11.786086,
+      "timezone": "Europe/Berlin",
+      "elevation": 453,
+      "category": "4F",
+      "runways": [
+        { "number": "08L/26R", "length": 4000, "surface": "Concrete", "category": "Heavy" },
+        { "number": "08R/26L", "length": 4000, "surface": "Concrete", "category": "Heavy" }
+      ],
+      "frequencies": [
+        { "type": "ATIS", "frequency": "127.65", "description": "Automatic Terminal Information Service" },
+        { "type": "Ground", "frequency": "121.95", "description": "Ground Control" },
+        { "type": "Tower", "frequency": "118.60", "description": "Tower Control" }
+      ]
+    },
+    {
+      "iata": "ZRH",
+      "icao": "LSZH",
+      "name": "Zurich Airport",
+      "city": "Zurich",
+      "country": "Switzerland",
+      "latitude": 47.464722,
+      "longitude": 8.549167,
+      "timezone": "Europe/Zurich",
+      "elevation": 432,
+      "category": "4F",
+      "runways": [
+        { "number": "14/32", "length": 3300, "surface": "Concrete", "category": "Heavy" },
+        { "number": "16/34", "length": 3700, "surface": "Concrete", "category": "Heavy" }
+      ],
+      "frequencies": [
+        { "type": "ATIS", "frequency": "127.25", "description": "Automatic Terminal Information Service" },
+        { "type": "Ground", "frequency": "121.70", "description": "Ground Control" },
+        { "type": "Tower", "frequency": "118.20", "description": "Tower Control" }
+      ]
+    },
+    {
+      "iata": "VIE",
+      "icao": "LOWW",
+      "name": "Vienna International Airport",
+      "city": "Vienna",
+      "country": "Austria",
+      "latitude": 48.110278,
+      "longitude": 16.569722,
+      "timezone": "Europe/Vienna",
+      "elevation": 183,
+      "category": "4F",
+      "runways": [
+        { "number": "11/29", "length": 3500, "surface": "Asphalt", "category": "Heavy" },
+        { "number": "16/34", "length": 3600, "surface": "Asphalt", "category": "Heavy" }
+      ],
+      "frequencies": [
+        { "type": "ATIS", "frequency": "127.35", "description": "Automatic Terminal Information Service" },
+        { "type": "Ground", "frequency": "121.75", "description": "Ground Control" },
+        { "type": "Tower", "frequency": "118.30", "description": "Tower Control" }
+      ]
+    },
+    {
+      "iata": "CPH",
+      "icao": "EKCH",
+      "name": "Copenhagen Airport",
+      "city": "Copenhagen",
+      "country": "Denmark",
+      "latitude": 55.617917,
+      "longitude": 12.655972,
+      "timezone": "Europe/Copenhagen",
+      "elevation": 5,
+      "category": "4F",
+      "runways": [
+        { "number": "04L/22R", "length": 3600, "surface": "Asphalt", "category": "Heavy" },
+        { "number": "04R/22L", "length": 3300, "surface": "Asphalt", "category": "Heavy" }
+      ],
+      "frequencies": [
+        { "type": "ATIS", "frequency": "127.45", "description": "Automatic Terminal Information Service" },
+        { "type": "Ground", "frequency": "121.85", "description": "Ground Control" },
+        { "type": "Tower", "frequency": "118.40", "description": "Tower Control" }
+      ]
+    }
+  ]
+}

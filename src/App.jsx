@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useAirportSearch } from './hooks/useAirportSearch';
+import useAirportSearch from './hooks/useAirportSearch';
 import { calculateFlightPlan, formatDistance, formatFlightTime, formatFuel } from './utils/distanceCalculator';
 import { aircraftService } from './services/aircraftService';
 import './App.css';
@@ -83,7 +83,7 @@ function App() {
     return seasons[Math.floor(Math.random() * seasons.length)];
   };
 
-  const AirportSearchInput = ({ placeholder, onSelect, selectedAirport }) => (
+  const AirportSearchInput = ({ placeholder, onSelect, selectedAirport, searchResults }) => (
     <div className="search-input">
       <input
         type="text"
@@ -97,7 +97,7 @@ function App() {
           <button onClick={() => onSelect(null)} className="clear-btn">×</button>
         </div>
       )}
-      {searchResults.length > 0 && !selectedAirport && (
+      {searchResults && searchResults.length > 0 && !selectedAirport && (
         <div className="search-results">
           {searchResults.slice(0, 5).map((airport, index) => (
             <div
@@ -197,7 +197,7 @@ function App() {
               {['rookie', 'amateur', 'intermediate', 'advanced', 'pro', 'devil'].map((level) => (
                 <button
                   key={level}
-                  className={`difficulty-btn ${difficulty === level ? 'active' : ''}`}
+                  className={`difficulty-btn ${level} ${difficulty === level ? 'active' : ''}`}
                   onClick={() => setDifficulty(level)}
                 >
                   {level.toUpperCase()}
@@ -348,6 +348,7 @@ function App() {
                   placeholder="Enter departure airport (IATA/ICAO/Name)"
                   onSelect={selectDeparture}
                   selectedAirport={selectedDeparture}
+                  searchResults={searchResults}
                 />
               </div>
 
@@ -357,6 +358,7 @@ function App() {
                   placeholder="Enter arrival airport (IATA/ICAO/Name)"
                   onSelect={selectArrival}
                   selectedAirport={selectedArrival}
+                  searchResults={searchResults}
                 />
               </div>
             </div>

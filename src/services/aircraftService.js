@@ -1,177 +1,12 @@
 // Aircraft Service for Ultimate Crash Simulation
 // Provides aircraft-specific performance data for fuel calculations
 
+import aircraftData from '../data/aircraftDatabase.json';
+
 class AircraftService {
   constructor() {
     // Comprehensive aircraft database with performance metrics
-    this.aircraftDatabase = this.getAircraftDatabase();
-  }
-
-  // Comprehensive aircraft performance database
-  getAircraftDatabase() {
-    return [
-      // Narrow-body jets
-      {
-        model: 'Boeing 737-800',
-        type: 'Narrow-body',
-        manufacturer: 'Boeing',
-        iata: '738',
-        icao: 'B738',
-        maxRange: 5430, // nautical miles
-        cruiseSpeed: 450, // knots
-        fuelConsumption: 2200, // kg/hour at cruise
-        maxFuelCapacity: 26020, // kg
-        maxPayload: 18900, // kg
-        maxPassengers: 189,
-        typicalFuelBurn: 2.4, // kg/nautical mile
-        takeoffDistance: 2400, // meters
-        landingDistance: 1600, // meters
-        engineType: 'CFM56-7B',
-        engineCount: 2,
-        category: 'Medium-haul'
-      },
-      {
-        model: 'Airbus A320-200',
-        type: 'Narrow-body',
-        manufacturer: 'Airbus',
-        iata: '320',
-        icao: 'A320',
-        maxRange: 3300,
-        cruiseSpeed: 447,
-        fuelConsumption: 2100,
-        maxFuelCapacity: 23800,
-        maxPayload: 16500,
-        maxPassengers: 180,
-        typicalFuelBurn: 2.3,
-        takeoffDistance: 2300,
-        landingDistance: 1500,
-        engineType: 'CFM56-5A/5B',
-        engineCount: 2,
-        category: 'Medium-haul'
-      },
-      
-      // Wide-body jets
-      {
-        model: 'Boeing 777-300ER',
-        type: 'Wide-body',
-        manufacturer: 'Boeing',
-        iata: '77W',
-        icao: 'B77W',
-        maxRange: 7930,
-        cruiseSpeed: 485,
-        fuelConsumption: 7500,
-        maxFuelCapacity: 181280,
-        maxPayload: 69850,
-        maxPassengers: 396,
-        typicalFuelBurn: 3.8,
-        takeoffDistance: 3200,
-        landingDistance: 1800,
-        engineType: 'GE90-115B',
-        engineCount: 2,
-        category: 'Long-haul'
-      },
-      {
-        model: 'Airbus A350-900',
-        type: 'Wide-body',
-        manufacturer: 'Airbus',
-        iata: '359',
-        icao: 'A359',
-        maxRange: 8100,
-        cruiseSpeed: 488,
-        fuelConsumption: 5800,
-        maxFuelCapacity: 141000,
-        maxPayload: 53500,
-        maxPassengers: 325,
-        typicalFuelBurn: 2.9,
-        takeoffDistance: 2800,
-        landingDistance: 1600,
-        engineType: 'Rolls-Royce Trent XWB',
-        engineCount: 2,
-        category: 'Long-haul'
-      },
-      
-      // Regional jets
-      {
-        model: 'Embraer E190',
-        type: 'Regional',
-        manufacturer: 'Embraer',
-        iata: 'E90',
-        icao: 'E190',
-        maxRange: 2400,
-        cruiseSpeed: 447,
-        fuelConsumption: 1500,
-        maxFuelCapacity: 12800,
-        maxPayload: 10800,
-        maxPassengers: 114,
-        typicalFuelBurn: 1.9,
-        takeoffDistance: 1800,
-        landingDistance: 1200,
-        engineType: 'GE CF34-10E',
-        engineCount: 2,
-        category: 'Regional'
-      },
-      
-      // Business jets
-      {
-        model: 'Cessna Citation X',
-        type: 'Business',
-        manufacturer: 'Cessna',
-        iata: 'CEX',
-        icao: 'C750',
-        maxRange: 3430,
-        cruiseSpeed: 528,
-        fuelConsumption: 950,
-        maxFuelCapacity: 6800,
-        maxPayload: 1200,
-        maxPassengers: 12,
-        typicalFuelBurn: 0.8,
-        takeoffDistance: 1600,
-        landingDistance: 900,
-        engineType: 'Rolls-Royce AE3007C',
-        engineCount: 2,
-        category: 'Business'
-      },
-      
-      // Additional aircraft models
-      {
-        model: 'Boeing 747-400',
-        type: 'Wide-body',
-        manufacturer: 'Boeing',
-        iata: '744',
-        icao: 'B744',
-        maxRange: 7260,
-        cruiseSpeed: 475,
-        fuelConsumption: 11000,
-        maxFuelCapacity: 216840,
-        maxPayload: 112760,
-        maxPassengers: 416,
-        typicalFuelBurn: 4.8,
-        takeoffDistance: 3300,
-        landingDistance: 2100,
-        engineType: 'PW4000/CF6-80C2/RB211-524',
-        engineCount: 4,
-        category: 'Long-haul'
-      },
-      {
-        model: 'Airbus A380-800',
-        type: 'Wide-body',
-        manufacturer: 'Airbus',
-        iata: '388',
-        icao: 'A388',
-        maxRange: 8200,
-        cruiseSpeed: 488,
-        fuelConsumption: 13000,
-        maxFuelCapacity: 323546,
-        maxPayload: 152400,
-        maxPassengers: 853,
-        typicalFuelBurn: 5.1,
-        takeoffDistance: 2900,
-        landingDistance: 2000,
-        engineType: 'Trent 900/GP7200',
-        engineCount: 4,
-        category: 'Long-haul'
-      }
-    ];
+    this.aircraftDatabase = aircraftData.aircraft;
   }
 
   // Search aircraft by model, manufacturer, or code
@@ -203,63 +38,9 @@ class AircraftService {
     );
   }
 
-  // Calculate fuel requirements for a specific flight
-  calculateFuelRequirements(aircraftModel, distance, payload, reserves = 0.1) {
-    const aircraft = this.getAircraftByModel(aircraftModel);
-    if (!aircraft) {
-      throw new Error(`Aircraft model '${aircraftModel}' not found`);
-    }
-
-    // Basic fuel calculation based on distance and typical fuel burn
-    const baseFuel = distance * aircraft.typicalFuelBurn;
-    
-    // Adjust for payload (higher payload = more fuel)
-    const payloadFactor = Math.min(payload / aircraft.maxPayload, 1.2);
-    const adjustedFuel = baseFuel * payloadFactor;
-    
-    // Add reserves (10% by default)
-    const totalFuel = adjustedFuel * (1 + reserves);
-    
-    // Ensure fuel doesn't exceed maximum capacity
-    const finalFuel = Math.min(totalFuel, aircraft.maxFuelCapacity);
-
-    return {
-      aircraft: aircraft.model,
-      distance: distance,
-      baseFuel: Math.round(baseFuel),
-      payloadFactor: Math.round(payloadFactor * 100) / 100,
-      adjustedFuel: Math.round(adjustedFuel),
-      reserveFuel: Math.round(adjustedFuel * reserves),
-      totalFuel: Math.round(finalFuel),
-      maxFuelCapacity: aircraft.maxFuelCapacity,
-      fuelSufficient: finalFuel <= aircraft.maxFuelCapacity,
-      flightTime: Math.round((distance / aircraft.cruiseSpeed) * 60), // minutes
-      units: 'kg'
-    };
-  }
-
-  // Calculate flight performance metrics
-  calculateFlightPerformance(aircraftModel, distance, payload) {
-    const aircraft = this.getAircraftByModel(aircraftModel);
-    if (!aircraft) {
-      throw new Error(`Aircraft model '${aircraftModel}' not found`);
-    }
-
-    const fuelRequirements = this.calculateFuelRequirements(aircraftModel, distance, payload);
-    
-    return {
-      aircraft: aircraft,
-      fuel: fuelRequirements,
-      performance: {
-        rangeSufficient: distance <= aircraft.maxRange,
-        payloadSufficient: payload <= aircraft.maxPayload,
-        takeoffDistance: aircraft.takeoffDistance,
-        landingDistance: aircraft.landingDistance,
-        cruiseSpeed: aircraft.cruiseSpeed,
-        estimatedFlightTime: fuelRequirements.flightTime,
-        fuelEfficiency: aircraft.typicalFuelBurn // kg/nm
-      }
-    };
+  // Get all aircraft models
+  getAllAircraft() {
+    return this.aircraftDatabase;
   }
 
   // Get aircraft by category
@@ -269,38 +50,139 @@ class AircraftService {
     );
   }
 
-  // Get all aircraft manufacturers
-  getManufacturers() {
-    return [...new Set(this.aircraftDatabase.map(aircraft => aircraft.manufacturer))];
+  // Calculate fuel requirements for a flight
+  calculateFuelRequirements(aircraftModel, distance, payload, fuelReserve = 0.05) {
+    const aircraft = this.getAircraftByModel(aircraftModel);
+    if (!aircraft) {
+      throw new Error(`Aircraft model '${aircraftModel}' not found`);
+    }
+
+    // Calculate trip fuel based on typical fuel burn
+    const tripFuel = aircraft.typicalFuelBurn * distance;
+    
+    // Calculate reserve fuel (5% by default)
+    const reserveFuel = tripFuel * fuelReserve;
+    
+    // Calculate total fuel requirement
+    const totalFuel = tripFuel + reserveFuel;
+    
+    // Check if fuel exceeds maximum capacity
+    if (totalFuel > aircraft.maxFuelCapacity) {
+      throw new Error(`Fuel requirement (${totalFuel.toFixed(0)} kg) exceeds maximum capacity (${aircraft.maxFuelCapacity} kg)`);
+    }
+
+    return {
+      tripFuel: Math.round(tripFuel),
+      reserveFuel: Math.round(reserveFuel),
+      totalFuel: Math.round(totalFuel),
+      maxCapacity: aircraft.maxFuelCapacity,
+      fuelPercentage: Math.round((totalFuel / aircraft.maxFuelCapacity) * 100)
+    };
   }
 
-  // Get popular aircraft models (most common)
+  // Calculate flight time
+  calculateFlightTime(aircraftModel, distance) {
+    const aircraft = this.getAircraftByModel(aircraftModel);
+    if (!aircraft) {
+      throw new Error(`Aircraft model '${aircraftModel}' not found`);
+    }
+
+    const flightTimeHours = distance / aircraft.cruiseSpeed;
+    const hours = Math.floor(flightTimeHours);
+    const minutes = Math.round((flightTimeHours - hours) * 60);
+
+    return {
+      hours,
+      minutes,
+      totalMinutes: Math.round(flightTimeHours * 60)
+    };
+  }
+
+  // Check payload limits
+  validatePayload(aircraftModel, payload) {
+    const aircraft = this.getAircraftByModel(aircraftModel);
+    if (!aircraft) {
+      throw new Error(`Aircraft model '${aircraftModel}' not found`);
+    }
+
+    if (payload > aircraft.maxPayload) {
+      throw new Error(`Payload (${payload} kg) exceeds maximum payload (${aircraft.maxPayload} kg)`);
+    }
+
+    return {
+      isValid: payload <= aircraft.maxPayload,
+      maxPayload: aircraft.maxPayload,
+      remainingCapacity: aircraft.maxPayload - payload
+    };
+  }
+
+  // Suggest suitable aircraft for a given distance
+  suggestAircraftForDistance(distance, passengerCount = null) {
+    return this.aircraftDatabase
+      .filter(aircraft => aircraft.maxRange >= distance)
+      .sort((a, b) => {
+        // Prioritize aircraft that can handle the distance efficiently
+        const aEfficiency = a.typicalFuelBurn * distance;
+        const bEfficiency = b.typicalFuelBurn * distance;
+        
+        // If passenger count is provided, prioritize aircraft with sufficient capacity
+        if (passengerCount) {
+          const aCapacityDiff = Math.abs(a.maxPassengers - passengerCount);
+          const bCapacityDiff = Math.abs(b.maxPassengers - passengerCount);
+          
+          if (aCapacityDiff !== bCapacityDiff) {
+            return aCapacityDiff - bCapacityDiff;
+          }
+        }
+        
+        return aEfficiency - bEfficiency;
+      });
+  }
+
+  // Get aircraft performance summary
+  getPerformanceSummary(aircraftModel) {
+    const aircraft = this.getAircraftByModel(aircraftModel);
+    if (!aircraft) {
+      throw new Error(`Aircraft model '${aircraftModel}' not found`);
+    }
+
+    return {
+      model: aircraft.model,
+      manufacturer: aircraft.manufacturer,
+      type: aircraft.type,
+      category: aircraft.category,
+      maxRange: aircraft.maxRange,
+      cruiseSpeed: aircraft.cruiseSpeed,
+      fuelEfficiency: aircraft.typicalFuelBurn,
+      maxPassengers: aircraft.maxPassengers,
+      maxPayload: aircraft.maxPayload,
+      takeoffDistance: aircraft.takeoffDistance,
+      landingDistance: aircraft.landingDistance,
+      engineType: aircraft.engineType,
+      engineCount: aircraft.engineCount
+    };
+  }
+
+  // Get popular aircraft models for suggestions
   getPopularAircraft() {
-    const popularModels = ['Boeing 737-800', 'Airbus A320-200', 'Boeing 777-300ER', 'Airbus A350-900'];
+    const popularModels = [
+      'Boeing 737-800',
+      'Airbus A320-200', 
+      'Boeing 777-300ER',
+      'Airbus A350-900',
+      'Embraer E190',
+      'Cessna Citation X',
+      'Boeing 747-400',
+      'Airbus A380-800'
+    ];
+    
     return this.aircraftDatabase.filter(aircraft => 
       popularModels.includes(aircraft.model)
     );
   }
-
-  // Validate if aircraft can operate a specific route
-  validateRoute(aircraftModel, distance, payload) {
-    const performance = this.calculateFlightPerformance(aircraftModel, distance, payload);
-    
-    return {
-      valid: performance.fuel.fuelSufficient && 
-              performance.performance.rangeSufficient &&
-              performance.performance.payloadSufficient,
-      issues: [
-        !performance.fuel.fuelSufficient ? 'Insufficient fuel capacity' : null,
-        !performance.performance.rangeSufficient ? 'Exceeds maximum range' : null,
-        !performance.performance.payloadSufficient ? 'Exceeds maximum payload' : null
-      ].filter(Boolean),
-      performance: performance
-    };
-  }
 }
 
 // Create singleton instance
-export const aircraftService = new AircraftService();
+const aircraftService = new AircraftService();
 
-export default AircraftService;
+export { aircraftService };
