@@ -54,6 +54,14 @@ const FlightInitialization = ({
       setUseRandomTime(true);
       setUseRandomSeason(true);
       
+      // Generate random weather based on difficulty
+      const randomWeather = generateRandomWeather(randomParams.difficulty);
+      setWeatherData(randomWeather);
+      
+      // Generate random failure based on difficulty (no "no failure" option)
+      const randomFailure = generateRandomFailure(randomParams.difficulty);
+      setFailureType(randomFailure);
+      
       // Select the random airports
       selectDeparture(randomParams.selectedDeparture);
       selectArrival(randomParams.selectedArrival);
@@ -61,11 +69,117 @@ const FlightInitialization = ({
       console.log('Random flight initialized:', randomParams);
       
       // Show confirmation message
-      alert(`Random flight initialized!\nRoute: ${randomParams.selectedDeparture.iata} → ${randomParams.selectedArrival.iata}\nAircraft: ${randomParams.aircraftModel}\nDistance: ${Math.round(randomParams.distance)} nm`);
+      alert(`Random flight initialized!\nRoute: ${randomParams.selectedDeparture.iata} → ${randomParams.selectedArrival.iata}\nAircraft: ${randomParams.aircraftModel}\nDifficulty: ${randomParams.difficulty}\nFailure: ${randomFailure}\nWeather: ${randomWeather.type}`);
       
     } catch (error) {
       console.error('Error initializing random flight:', error);
       alert('Error initializing random flight. Please try again.');
+    }
+  };
+
+  // Generate random weather based on difficulty
+  const generateRandomWeather = (difficultyLevel) => {
+    const weatherTypes = ['clear', 'cloudy', 'rain', 'storm', 'fog', 'snow'];
+    const difficultyWeights = {
+      'rookie': [0.4, 0.3, 0.2, 0.05, 0.03, 0.02],
+      'amateur': [0.3, 0.3, 0.2, 0.1, 0.05, 0.05],
+      'intermediate': [0.2, 0.25, 0.25, 0.15, 0.1, 0.05],
+      'advanced': [0.15, 0.2, 0.25, 0.2, 0.1, 0.1],
+      'pro': [0.1, 0.15, 0.25, 0.25, 0.15, 0.1],
+      'devil': [0.05, 0.1, 0.2, 0.3, 0.2, 0.15]
+    };
+    
+    const weights = difficultyWeights[difficultyLevel] || difficultyWeights['intermediate'];
+    const randomValue = Math.random();
+    let cumulativeWeight = 0;
+    
+    for (let i = 0; i < weatherTypes.length; i++) {
+      cumulativeWeight += weights[i];
+      if (randomValue <= cumulativeWeight) {
+        const selectedType = weatherTypes[i];
+        
+        // Generate weather parameters based on type and difficulty
+        const baseWind = difficultyLevel === 'devil' ? 30 : difficultyLevel === 'pro' ? 20 : 10;
+        const baseVisibility = difficultyLevel === 'devil' ? 0.5 : difficultyLevel === 'pro' ? 2 : 5;
+        
+        return {
+          type: selectedType,
+          windSpeed: Math.round(baseWind + (Math.random() * (difficultyLevel === 'devil' ? 40 : 20))),
+          visibility: Math.max(0.1, baseVisibility + (Math.random() * (difficultyLevel === 'devil' ? 2 : 5)))
+        };
+      }
+    }
+    
+    return { type: 'clear', windSpeed: 10, visibility: 10 };
+  };
+
+  // Generate random failure based on difficulty (no "no failure")
+  const generateRandomFailure = (difficultyLevel) => {
+    const failureTypes = ['engine_failure', 'hydraulic_failure', 'electrical_failure', 'instrument_failure', 'fuel_leak', 'structural_damage'];
+    const difficultyWeights = {
+      'rookie': [0.4, 0.2, 0.15, 0.15, 0.05, 0.05],
+      'amateur': [0.3, 0.2, 0.2, 0.15, 0.1, 0.05],
+      'intermediate': [0.25, 0.2, 0.2, 0.15, 0.1, 0.1],
+      'advanced': [0.2, 0.2, 0.2, 0.15, 0.15, 0.1],
+      'pro': [0.15, 0.2, 0.2, 0.15, 0.15, 0.15],
+      'devil': [0.1, 0.2, 0.2, 0.15, 0.15, 0.2]
+    };
+    
+    const weights = difficultyWeights[difficultyLevel] || difficultyWeights['intermediate'];
+    const randomValue = Math.random();
+    let cumulativeWeight = 0;
+    
+    for (let i = 0; i < failureTypes.length; i++) {
+      cumulativeWeight += weights[i];
+      if (randomValue <= cumulativeWeight) {
+        return failureTypes[i];
+      }
+    }
+    
+    return failureTypes[0]; // Fallback to engine failure
+  };
+
+  // Get available failure types based on difficulty
+  const getAvailableFailureTypes = () => {
+    const allFailureTypes = ['engine_failure', 'hydraulic_failure', 'electrical_failure', 'instrument_failure', 'fuel_leak', 'structural_damage'];
+    
+    switch (difficulty) {
+      case 'rookie':
+        return allFailureTypes.slice(0, 3); // Only engine, hydraulic, electrical
+      case 'amateur':
+        return allFailureTypes.slice(0, 4); // Add instrument failure
+      case 'intermediate':
+        return allFailureTypes.slice(0, 5); // Add fuel leak
+      case 'advanced':
+        return allFailureTypes.slice(0, 6); // All except structural damage
+      case 'pro':
+        return allFailureTypes; // All failure types
+      case 'devil':
+        return allFailureTypes; // All failure types
+      default:
+        return allFailureTypes.slice(0, 3);
+    }
+  };
+
+  // Get available weather types based on difficulty
+  const getAvailableWeatherTypes = () => {
+    const allWeatherTypes = ['clear', 'cloudy', 'rain', 'storm', 'fog', 'snow'];
+    
+    switch (difficulty) {
+      case 'rookie':
+        return allWeatherTypes.slice(0, 3); // Only clear, cloudy, rain
+      case 'amateur':
+        return allWeatherTypes.slice(0, 4); // Add storm
+      case 'intermediate':
+        return allWeatherTypes.slice(0, 5); // Add fog
+      case 'advanced':
+        return allWeatherTypes.slice(0, 6); // All weather types
+      case 'pro':
+        return allWeatherTypes; // All weather types
+      case 'devil':
+        return allWeatherTypes; // All weather types
+      default:
+        return allWeatherTypes.slice(0, 3);
     }
   };
 
@@ -79,6 +193,76 @@ const FlightInitialization = ({
             className: `difficulty-btn ${level} ${difficulty === level ? 'active' : ''}`,
             onClick: () => setDifficulty(level)
           }, level.toUpperCase())
+        )
+      )
+    ),
+
+    React.createElement('div', { className: 'weather-failure-section' },
+      React.createElement('h2', null, 'Weather & Failure Conditions'),
+      React.createElement('div', { className: 'weather-failure-grid' },
+        React.createElement('div', { className: 'parameter-group' },
+          React.createElement('label', null, 'Weather Type:'),
+          React.createElement('select', {
+            value: weatherData.type || 'clear',
+            onChange: (e) => setWeatherData({...weatherData, type: e.target.value})
+          },
+            getAvailableWeatherTypes().map((type) =>
+              React.createElement('option', { key: type, value: type },
+                type.charAt(0).toUpperCase() + type.slice(1)
+              )
+            )
+          )
+        ),
+
+        React.createElement('div', { className: 'parameter-group' },
+          React.createElement('label', null, 'Wind Speed (kts):'),
+          React.createElement('input', {
+            type: 'number',
+            value: weatherData.windSpeed || 0,
+            onChange: (e) => setWeatherData({...weatherData, windSpeed: parseInt(e.target.value) || 0}),
+            min: '0',
+            max: '100',
+            placeholder: '0-100 kts'
+          })
+        ),
+
+        React.createElement('div', { className: 'parameter-group' },
+          React.createElement('label', null, 'Visibility (mi):'),
+          React.createElement('input', {
+            type: 'number',
+            value: weatherData.visibility || 10,
+            onChange: (e) => setWeatherData({...weatherData, visibility: parseFloat(e.target.value) || 0}),
+            min: '0',
+            max: '50',
+            step: '0.1',
+            placeholder: '0-50 mi'
+          })
+        ),
+
+        React.createElement('div', { className: 'parameter-group' },
+          React.createElement('label', null, 'Failure Type:'),
+          React.createElement('select', {
+            value: failureType,
+            onChange: (e) => setFailureType(e.target.value)
+          },
+            getAvailableFailureTypes().map((type) =>
+              React.createElement('option', { key: type, value: type },
+                type.split('_').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ')
+              )
+            )
+          )
+        ),
+
+        React.createElement('div', { className: 'parameter-group' },
+          React.createElement('label', null, 'Crew Count:'),
+          React.createElement('input', {
+            type: 'number',
+            value: crewCount,
+            onChange: (e) => setCrewCount(parseInt(e.target.value) || 1),
+            min: '1',
+            max: '10',
+            placeholder: '1-10'
+          })
         )
       )
     ),
@@ -138,7 +322,7 @@ const FlightInitialization = ({
             value: payload,
             onChange: (e) => setPayload(parseInt(e.target.value) || 0),
             min: '0',
-            max: '200000'
+            max: '100000'
           })
         ),
 
@@ -146,11 +330,12 @@ const FlightInitialization = ({
           React.createElement('label', null, 'Fuel Reserve (%):'),
           React.createElement('input', {
             type: 'number',
-            value: fuelReserve * 100,
-            onChange: (e) => setFuelReserve((parseInt(e.target.value) || 0) / 100),
-            min: '5',
-            max: '50',
-            step: '1'
+            value: fuelReserve,
+            onChange: (e) => setFuelReserve(parseFloat(e.target.value) || 0),
+            min: '0',
+            max: '1',
+            step: '0.01',
+            placeholder: '0.0-1.0'
           })
         ),
 
@@ -160,106 +345,112 @@ const FlightInitialization = ({
             type: 'number',
             value: cruiseHeight,
             onChange: (e) => setCruiseHeight(parseInt(e.target.value) || 0),
-            min: '10000',
-            max: '45000',
-            step: '1000'
+            min: '1000',
+            max: '50000',
+            placeholder: '1000-50000'
           })
         ),
 
         React.createElement('div', { className: 'parameter-group' },
           React.createElement('label', null, 'Time (Zulu):'),
-          React.createElement('div', { className: 'time-controls' },
-            React.createElement('input', {
-              type: 'text',
-              value: timeZulu,
-              onChange: (e) => setTimeZulu(e.target.value),
-              placeholder: 'HH:MMZ',
-              disabled: useRandomTime
-            }),
-            React.createElement('label', { className: 'checkbox-label' },
-              React.createElement('input', {
-                type: 'checkbox',
-                checked: useRandomTime,
-                onChange: (e) => setUseRandomTime(e.target.checked)
-              }),
-              'Random'
-            )
-          )
+          React.createElement('input', {
+            type: 'text',
+            value: timeZulu,
+            onChange: (e) => setTimeZulu(e.target.value),
+            placeholder: 'HH:MMZ',
+            disabled: useRandomTime
+          })
+        ),
+
+        React.createElement('div', { className: 'parameter-group' },
+          React.createElement('label', null, 'Use Random Time:'),
+          React.createElement('input', {
+            type: 'checkbox',
+            checked: useRandomTime,
+            onChange: (e) => {
+              setUseRandomTime(e.target.checked);
+              if (e.target.checked) {
+                setTimeZulu(generateRandomTime());
+              }
+            }
+          })
         ),
 
         React.createElement('div', { className: 'parameter-group' },
           React.createElement('label', null, 'Season:'),
-          React.createElement('div', { className: 'season-controls' },
-            React.createElement('select', {
-              value: season,
-              onChange: (e) => setSeason(e.target.value),
-              disabled: useRandomSeason
-            },
-              React.createElement('option', { value: '' }, 'Select Season'),
-              React.createElement('option', { value: 'Spring' }, 'Spring'),
-              React.createElement('option', { value: 'Summer' }, 'Summer'),
-              React.createElement('option', { value: 'Autumn' }, 'Autumn'),
-              React.createElement('option', { value: 'Winter' }, 'Winter')
-            ),
-            React.createElement('label', { className: 'checkbox-label' },
-              React.createElement('input', {
-                type: 'checkbox',
-                checked: useRandomSeason,
-                onChange: (e) => setUseRandomSeason(e.target.checked)
-              }),
-              'Random'
-            )
+          React.createElement('select', {
+            value: season,
+            onChange: (e) => setSeason(e.target.value),
+            disabled: useRandomSeason
+          },
+            React.createElement('option', { value: 'Spring' }, 'Spring'),
+            React.createElement('option', { value: 'Summer' }, 'Summer'),
+            React.createElement('option', { value: 'Autumn' }, 'Autumn'),
+            React.createElement('option', { value: 'Winter' }, 'Winter')
           )
+        ),
+
+        React.createElement('div', { className: 'parameter-group' },
+          React.createElement('label', null, 'Use Random Season:'),
+          React.createElement('input', {
+            type: 'checkbox',
+            checked: useRandomSeason,
+            onChange: (e) => {
+              setUseRandomSeason(e.target.checked);
+              if (e.target.checked) {
+                setSeason(generateRandomSeason());
+              }
+            }
+          })
         )
       )
     ),
 
-    React.createElement('div', { className: 'airport-selection-section' },
+    React.createElement('div', { className: 'airport-selection' },
       React.createElement('h2', null, 'Route Selection'),
-      React.createElement('div', { className: 'airport-inputs' },
+      React.createElement('div', { className: 'airport-grid' },
         React.createElement('div', { className: 'airport-group' },
-          React.createElement('h3', null, 'Departure Airport'),
+          React.createElement('label', null, 'Departure Airport:'),
           React.createElement(AirportSearchInput, {
-            placeholder: 'Enter departure airport (IATA/ICAO/Name)',
-            onSelect: selectDeparture,
-            selectedAirport: selectedDeparture,
+            placeholder: 'Search departure airport...',
             searchResults: searchResults,
-            handleSearch: handleSearch
+            onSearch: handleSearch,
+            onSelect: selectDeparture,
+            selectedAirport: selectedDeparture
           })
         ),
+
         React.createElement('div', { className: 'airport-group' },
-          React.createElement('h3', null, 'Arrival Airport'),
+          React.createElement('label', null, 'Arrival Airport:'),
           React.createElement(AirportSearchInput, {
-            placeholder: 'Enter arrival airport (IATA/ICAO/Name)',
-            onSelect: selectArrival,
-            selectedAirport: selectedArrival,
+            placeholder: 'Search arrival airport...',
             searchResults: searchResults,
-            handleSearch: handleSearch
+            onSearch: handleSearch,
+            onSelect: selectArrival,
+            selectedAirport: selectedArrival
           })
-        )
-      ),
-      
-      // Flight plan summary
-      flightPlan && React.createElement('div', { className: 'flight-plan-summary' },
-        React.createElement('h3', null, 'Flight Plan Summary'),
-        React.createElement('div', { className: 'summary-grid' },
-          React.createElement('div', null, 'Distance: ', formatDistance(flightPlan.distance.nauticalMiles)),
-          React.createElement('div', null, 'Flight Time: ', formatFlightTime(flightPlan.time)),
-          React.createElement('div', null, 'Fuel Required: ', formatFuel(flightPlan.fuel))
         )
       )
     ),
 
-    // Random initialization button
+    flightPlan && React.createElement('div', { className: 'flight-plan-summary' },
+      React.createElement('h2', null, 'Flight Plan Summary'),
+      React.createElement('div', { className: 'plan-details' },
+        React.createElement('p', null, `Route: ${selectedDeparture.iata} → ${selectedArrival.iata}`),
+        React.createElement('p', null, `Distance: ${formatDistance(flightPlan.distance.nauticalMiles)}`),
+        React.createElement('p', null, `Flight Time: ${formatFlightTime(flightPlan.time)}`),
+        React.createElement('p', null, `Fuel Required: ${formatFuel(flightPlan.fuel)}`)
+      )
+    ),
+
     React.createElement('div', { className: 'initialization-buttons' },
       React.createElement('button', {
-        className: 'random-init-btn',
-        onClick: handleRandomInitialize,
-        title: 'Generate random flight with valid aircraft-airport distance matching'
+        className: 'random-btn',
+        onClick: handleRandomInitialize
       }, '🎲 Random Flight'),
       
       React.createElement('button', {
-        className: 'init-flight-btn',
+        className: 'initialize-btn',
         onClick: handleInitializeFlight,
         disabled: !selectedDeparture || !selectedArrival
       }, 'Initialize Flight')

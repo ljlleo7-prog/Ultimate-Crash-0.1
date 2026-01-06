@@ -155,7 +155,10 @@ function App() {
       handleResetFlight: handleResetFlight,
       formatDistance: formatDistance,
       formatFlightTime: formatFlightTime,
-      formatFuel: formatFuel
+      formatFuel: formatFuel,
+      weatherData: weatherData,
+      failureType: failureType,
+      crewCount: crewCount
     });
   }
 

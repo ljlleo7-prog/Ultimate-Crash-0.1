@@ -492,3 +492,91 @@
   border-color: #7c3aed;
   box-shadow: 0 4px 12px rgba(124, 58, 237, 0.4);
 }
+
+/* Weather & Failure Section Styles */
+.weather-failure-section {
+  margin: 20px 0;
+  padding: 20px;
+  background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+  border-radius: 10px;
+  border: 2px solid #4a90e2;
+  box-shadow: 0 0 15px rgba(74, 144, 226, 0.3);
+}
+
+.weather-failure-section h2 {
+  color: #ffffff;
+  margin-bottom: 15px;
+  font-size: 1.4em;
+  text-align: center;
+  text-shadow: 0 0 10px rgba(255, 255, 255, 0.5);
+}
+
+.weather-failure-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 15px;
+  margin-top: 15px;
+}
+
+.weather-failure-grid .parameter-group {
+  background: rgba(255, 255, 255, 0.1);
+  padding: 15px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.weather-failure-grid label {
+  color: #ffffff;
+  font-weight: 600;
+  margin-bottom: 8px;
+  display: block;
+}
+
+.weather-failure-grid select,
+.weather-failure-grid input {
+  width: 100%;
+  padding: 8px 12px;
+  border: 1px solid #4a90e2;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.9);
+  color: #333;
+  font-size: 0.9em;
+}
+
+.weather-failure-grid select:focus,
+.weather-failure-grid input:focus {
+  outline: none;
+  border-color: #ff6b6b;
+  box-shadow: 0 0 0 2px rgba(255, 107, 107, 0.2);
+}
+
+/* Difficulty-based color coding for failure types */
+.weather-failure-grid select option[value="engine_failure"] {
+  background: #ff6b6b;
+  color: white;
+}
+
+.weather-failure-grid select option[value="hydraulic_failure"] {
+  background: #ffa726;
+  color: white;
+}
+
+.weather-failure-grid select option[value="electrical_failure"] {
+  background: #ffee58;
+  color: #333;
+}
+
+.weather-failure-grid select option[value="instrument_failure"] {
+  background: #4ecdc4;
+  color: white;
+}
+
+.weather-failure-grid select option[value="fuel_leak"] {
+  background: #45b7d1;
+  color: white;
+}
+
+.weather-failure-grid select option[value="structural_damage"] {
+  background: #96ceb4;
+  color: #333;
+}

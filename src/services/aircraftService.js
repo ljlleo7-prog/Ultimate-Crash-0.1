@@ -80,6 +80,90 @@ class AircraftService {
     };
   }
 
+  // Calculate flight performance metrics
+  calculateFlightPerformance(aircraftModel, distance, payload = 0) {
+    const aircraft = this.getAircraftByModel(aircraftModel);
+    if (!aircraft) {
+      return null;
+    }
+
+    // Calculate fuel efficiency
+    const fuelEfficiency = aircraft.typicalFuelBurn;
+    const totalFuel = fuelEfficiency * distance;
+    
+    // Calculate range efficiency (how much of max range is used)
+    const rangeEfficiency = (distance / aircraft.maxRange) * 100;
+    
+    // Calculate payload efficiency
+    const payloadEfficiency = (payload / aircraft.maxPayload) * 100;
+    
+    // Calculate flight time
+    const flightTimeHours = distance / aircraft.cruiseSpeed;
+    
+    // Performance rating based on multiple factors
+    let performanceRating = 100;
+    
+    // Penalize for high range usage
+    if (rangeEfficiency > 80) performanceRating -= 20;
+    else if (rangeEfficiency > 60) performanceRating -= 10;
+    
+    // Penalize for high payload usage
+    if (payloadEfficiency > 80) performanceRating -= 15;
+    else if (payloadEfficiency > 60) performanceRating -= 5;
+    
+    // Bonus for fuel efficiency
+    if (fuelEfficiency < 2.0) performanceRating += 10;
+    else if (fuelEfficiency < 2.5) performanceRating += 5;
+    
+    performanceRating = Math.max(0, Math.min(100, performanceRating));
+
+    return {
+      performance: {
+        rating: Math.round(performanceRating),
+        rangeEfficiency: Math.round(rangeEfficiency),
+        payloadEfficiency: Math.round(payloadEfficiency),
+        fuelEfficiency: fuelEfficiency.toFixed(2),
+        flightTime: Math.round(flightTimeHours * 60), // minutes
+        totalFuel: Math.round(totalFuel),
+        suitability: performanceRating >= 80 ? 'Excellent' : 
+                     performanceRating >= 60 ? 'Good' : 
+                     performanceRating >= 40 ? 'Fair' : 'Poor'
+      }
+    };
+  }
+
+  // Validate route feasibility
+  validateRoute(aircraftModel, distance, payload = 0) {
+    const aircraft = this.getAircraftByModel(aircraftModel);
+    if (!aircraft) {
+      return { isValid: false, errors: ['Aircraft not found'] };
+    }
+
+    const errors = [];
+    
+    // Check range
+    if (distance > aircraft.maxRange) {
+      errors.push(`Distance (${distance} NM) exceeds aircraft range (${aircraft.maxRange} NM)`);
+    }
+    
+    // Check payload
+    if (payload > aircraft.maxPayload) {
+      errors.push(`Payload (${payload} kg) exceeds maximum (${aircraft.maxPayload} kg)`);
+    }
+    
+    // Check fuel capacity
+    const fuelRequired = aircraft.typicalFuelBurn * distance;
+    if (fuelRequired > aircraft.maxFuelCapacity) {
+      errors.push(`Fuel required (${Math.round(fuelRequired)} kg) exceeds capacity (${aircraft.maxFuelCapacity} kg)`);
+    }
+
+    return {
+      isValid: errors.length === 0,
+      errors: errors,
+      warnings: errors.length > 0 ? ['Route may not be feasible'] : []
+    };
+  }
+
   // Calculate flight time
   calculateFlightTime(aircraftModel, distance) {
     const aircraft = this.getAircraftByModel(aircraftModel);

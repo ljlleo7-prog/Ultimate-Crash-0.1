@@ -4,7 +4,8 @@ import FlightPanel from './FlightPanel.js';
 const FlightInProgress = ({
   callsign, aircraftModel, difficulty, selectedDeparture, selectedArrival, flightPlan,
   airline, pax, payload, fuelReserve, cruiseHeight, useRandomTime, timeZulu, useRandomSeason, season,
-  handleResetFlight, formatDistance, formatFlightTime, formatFuel
+  handleResetFlight, formatDistance, formatFlightTime, formatFuel,
+  weatherData, failureType, crewCount
 }) => {
   
   const generateRandomTime = () => {
@@ -128,6 +129,27 @@ const FlightInProgress = ({
             React.createElement('div', { className: 'param-item' }, [
               React.createElement('strong', { key: 'season-label' }, 'Season:'),
               ' ', useRandomSeason ? generateRandomSeason() : season
+            ])
+          ])
+        ]),
+        
+        // Weather and Failure Conditions Display
+        React.createElement('div', { className: 'conditions-display' }, [
+          React.createElement('h3', { key: 'conditions-title' }, 'Weather & Failure Conditions'),
+          React.createElement('div', { className: 'conditions-grid' }, [
+            React.createElement('div', { className: 'condition-item' }, [
+              React.createElement('strong', { key: 'weather-label' }, 'Weather:'),
+              ' ', weatherData?.type ? weatherData.type.charAt(0).toUpperCase() + weatherData.type.slice(1) : 'Clear',
+              weatherData?.windSpeed ? `, Wind: ${weatherData.windSpeed} kts` : '',
+              weatherData?.visibility ? `, Visibility: ${weatherData.visibility} mi` : ''
+            ]),
+            React.createElement('div', { className: 'condition-item' }, [
+              React.createElement('strong', { key: 'failure-label' }, 'Failure Type:'),
+              ' ', failureType ? failureType.split('_').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ') : 'None'
+            ]),
+            React.createElement('div', { className: 'condition-item' }, [
+              React.createElement('strong', { key: 'crew-label' }, 'Crew Count:'),
+              ' ', crewCount || 2
             ])
           ])
         ])
