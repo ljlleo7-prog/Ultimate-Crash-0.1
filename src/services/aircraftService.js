@@ -7,6 +7,12 @@ class AircraftService {
   constructor() {
     // Comprehensive aircraft database with performance metrics
     this.aircraftDatabase = aircraftData.aircraft;
+    
+    // Bind all methods to ensure proper this context
+    this.calculateFlightPerformance = this.calculateFlightPerformance.bind(this);
+    this.calculateFuelRequirements = this.calculateFuelRequirements.bind(this);
+    this.getAircraftByModel = this.getAircraftByModel.bind(this);
+    this.validateRoute = this.validateRoute.bind(this);
   }
 
   // Search aircraft by model, manufacturer, or code

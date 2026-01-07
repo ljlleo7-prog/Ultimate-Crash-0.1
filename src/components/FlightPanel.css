@@ -1180,3 +1180,19 @@
     min-height: 60px;
   }
 }
+
+/* Flash blink animation for alerts */
+@keyframes flashBlink {
+  0%, 100% { 
+    opacity: 1;
+    transform: translateX(-50%) scale(1);
+  }
+  50% { 
+    opacity: 0.3;
+    transform: translateX(-50%) scale(1.1);
+  }
+}
+
+.crash-warning-flash {
+  animation: flashBlink 0.2s 3 !important;
+}
