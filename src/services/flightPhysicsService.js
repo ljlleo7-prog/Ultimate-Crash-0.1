@@ -126,8 +126,8 @@ class FlightPhysicsService {
     // Maximum thrust at sea level (typical airliner)
     const maxThrust = 120000; // Newtons
     
-    // Thrust reduces with altitude (air density)
-    const altitudeDensityFactor = Math.max(0.3, 1 - (this.state.altitude / 50000));
+    // Thrust reduces with altitude (air density) - FIX: Less reduction at high altitude
+    const altitudeDensityFactor = Math.max(0.5, 1 - (this.state.altitude / 80000)); // Increased from 0.3 to 0.5
     
     // FIX: Ensure thrust is always positive (forward)
     this.physicsState.thrustForce = Math.max(0, thrustFactor * maxThrust * altitudeDensityFactor);
@@ -159,13 +159,21 @@ class FlightPhysicsService {
     
     this.physicsState.dragForce = 0.5 * dragCoefficient * airDensity * wingArea * airspeedMs * airspeedMs;
     
-    // Lift force (based on airspeed and angle of attack)
+    // Lift force (based on airspeed and angle of attack) - FIX: Improved lift calculation
     const angleOfAttack = this.calculateAngleOfAttack();
-    let liftCoefficient = 0.3 + (angleOfAttack * 0.05); // Simplified lift curve
+    
+    // More realistic lift curve with stall and high-speed effects
+    let liftCoefficient = 0.1 + (angleOfAttack * 0.08); // Lower base, higher sensitivity
+    
+    // High-speed lift reduction (compressibility effects)
+    if (airspeedKnots > 300) {
+      const highSpeedFactor = Math.max(0.7, 1 - ((airspeedKnots - 300) / 200));
+      liftCoefficient *= highSpeedFactor;
+    }
     
     // Stall effects
     if (this.state.isStalling) {
-      liftCoefficient *= 0.5; // Reduced lift in stall
+      liftCoefficient *= 0.3; // More severe lift reduction in stall
     }
     
     this.physicsState.liftForce = 0.5 * liftCoefficient * airDensity * wingArea * airspeedMs * airspeedMs;
@@ -217,15 +225,32 @@ class FlightPhysicsService {
     const maxHorizontalSpeed = this.calculateMaxSpeedAtAltitude();
     this.physicsState.horizontalVelocity = Math.min(maxHorizontalSpeed, this.physicsState.horizontalVelocity); // REMOVED Math.max(100, ...)
     
-    // **IMPROVED ENERGY CONVERSION: Convert vertical speed to horizontal speed when pitching down**
-    if (this.state.pitch < 0 && this.physicsState.verticalVelocity < 0) {
-      // When pitching down with negative VS, convert potential energy to kinetic energy
-      const energyConversionFactor = 0.1; // How much VS converts to IAS
-      const pitchDownFactor = Math.abs(this.state.pitch) / 15; // More pitch = more conversion
-      const vsMagnitude = Math.abs(this.physicsState.verticalVelocity);
+    // **IMPROVED ENERGY CONVERSION: Bidirectional energy exchange**
+    // When pitching down: convert potential energy to kinetic energy (speed gain)
+    // When pitching up: convert kinetic energy to potential energy (speed loss)
+    if (this.state.pitch !== 0) {
+      const energyConversionFactor = 0.15; // Increased energy conversion
+      const pitchMagnitude = Math.abs(this.state.pitch);
+      const pitchFactor = pitchMagnitude / 15; // More pitch = more conversion
       
-      const speedGain = vsMagnitude * pitchDownFactor * energyConversionFactor * dt;
-      this.physicsState.horizontalVelocity += speedGain;
+      if (this.state.pitch < 0 && this.physicsState.verticalVelocity < 0) {
+        // Pitching down with negative VS: gain speed
+        const vsMagnitude = Math.abs(this.physicsState.verticalVelocity);
+        const speedGain = vsMagnitude * pitchFactor * energyConversionFactor * dt;
+        this.physicsState.horizontalVelocity += speedGain;
+      } else if (this.state.pitch > 0 && this.physicsState.verticalVelocity > 0) {
+        // Pitching up with positive VS: lose speed
+        const vsMagnitude = Math.abs(this.physicsState.verticalVelocity);
+        const speedLoss = vsMagnitude * pitchFactor * energyConversionFactor * dt;
+        this.physicsState.horizontalVelocity = Math.max(100, this.physicsState.horizontalVelocity - speedLoss);
+      }
+    }
+    
+    // **HIGH SPEED LIFT EFFECT: At high speeds, lift pushes aircraft upward**
+    if (this.physicsState.horizontalVelocity > 350 && this.state.pitch >= 0) {
+      // High speed creates significant lift even at zero pitch
+      const speedLiftFactor = (this.physicsState.horizontalVelocity - 350) / 100 * 0.5;
+      this.physicsState.verticalVelocity += speedLiftFactor * dt;
     }
     
     // Stall detection
@@ -451,18 +476,21 @@ class FlightPhysicsService {
     const targetIAS = 250; // Target indicated airspeed
     const iasError = targetIAS - this.state.indicatedAirspeed;
     
-    // P controller for IAS
-    const iasKp = 0.2; // Proportional gain for thrust control
-    const thrustAdjustment = iasError * iasKp;
+    // P controller for IAS - FIX: More aggressive control at high altitudes
+    const iasKp = 0.5; // Increased from 0.2 to 0.5 for better control
+    
+    // Additional altitude compensation for better high-altitude performance
+    const altitudeCompensation = 1 + (this.state.altitude / 50000) * 0.3;
+    const thrustAdjustment = iasError * iasKp * altitudeCompensation;
     
     // Apply thrust control to both engines
     const baseThrust = 85; // Base N1 setting for cruise
-    const targetN1 = Math.max(50, Math.min(95, baseThrust + thrustAdjustment));
+    const targetN1 = Math.max(60, Math.min(95, baseThrust + thrustAdjustment)); // Increased minimum to 60
     
     // Apply thrust with realistic engine spooling
     this.state.engineN1 = this.state.engineN1.map((currentN1, index) => {
       const diff = targetN1 - currentN1;
-      const spoolRate = 2.0; // Slower spooling for autopilot
+      const spoolRate = 3.0; // Increased spooling rate from 2.0 to 3.0
       const change = Math.sign(diff) * Math.min(Math.abs(diff), spoolRate * dt);
       return currentN1 + change;
     });
