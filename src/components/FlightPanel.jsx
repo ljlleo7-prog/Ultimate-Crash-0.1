@@ -11,6 +11,9 @@ import FlightPosePanel from './FlightPosePanel';
 import NavigationPanel from './NavigationPanel';
 import CentralPanel from './CentralPanel';
 
+// **NEW: Import Control Surface Panel**
+import ControlSurfacePanel from './ControlSurfacePanel';
+
 // Crash Warning Flash Component - MOVED OUTSIDE main component
 const CrashWarningFlash = ({ flashActive, flashText, onAlertComplete }) => {
   const [isVisible, setIsVisible] = useState(false);
@@ -371,6 +374,31 @@ const FlightPanel = ({ onActionRequest }) => {
     flightPhysicsRef.current.controlThrust(engineIndex, amount);
   };
 
+  // **NEW: Control Surface Functions**
+  const controlFlaps = (position) => {
+    flightPhysicsRef.current.controlFlaps(position);
+    setFlightState(prevState => ({
+      ...prevState,
+      flaps: position
+    }));
+  };
+
+  const controlGear = (position) => {
+    flightPhysicsRef.current.controlGear(position);
+    setFlightState(prevState => ({
+      ...prevState,
+      gear: position
+    }));
+  };
+
+  const controlAirBrakes = (position) => {
+    flightPhysicsRef.current.controlAirBrakes(position);
+    setFlightState(prevState => ({
+      ...prevState,
+      airBrakes: position
+    }));
+  };
+
   const toggleAutopilot = () => {
     flightPhysicsRef.current.toggleAutopilot();
     setFlightState(prevState => ({
@@ -489,7 +517,14 @@ const FlightPanel = ({ onActionRequest }) => {
       // Manual controls at bottom
       React.createElement('div', { className: 'manual-controls' },
         React.createElement(DraggableJoystick, { controlPitch, controlRoll, flightState }),
-        React.createElement(ThrustManager, { controlThrust, flightState })
+        React.createElement(ThrustManager, { controlThrust, flightState }),
+        // **NEW: Control Surface Panel**
+        React.createElement(ControlSurfacePanel, { 
+          controlFlaps, 
+          controlGear, 
+          controlAirBrakes, 
+          flightState 
+        })
       )
     )
   );

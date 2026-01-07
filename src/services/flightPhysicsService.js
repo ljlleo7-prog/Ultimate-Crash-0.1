@@ -31,6 +31,16 @@ class FlightPhysicsService {
       flaps: 0, // 0 = up, 1 = takeoff, 2 = landing
       gear: false,
       
+      // **NEW: Control Surfaces**
+      ailerons: 0, // -1 (left) to +1 (right)
+      elevator: 0, // -1 (nose down) to +1 (nose up)
+      rudder: 0, // -1 (left) to +1 (right)
+      airBrakes: 0, // 0 (closed) to 1 (fully open)
+      
+      // **NEW: Hydraulic System**
+      hydraulicPressure: 3000, // psi
+      hydraulicSystem: 'normal', // normal, degraded, failed
+      
       // Autopilot
       autopilot: true,
       flightDirector: true,
@@ -62,6 +72,7 @@ class FlightPhysicsService {
       // Angular rates (degrees per second)
       pitchRate: 0,
       rollRate: 0,
+      yawRate: 0,
       
       // Acceleration vectors (knots per second)
       horizontalAcceleration: 0,
@@ -188,6 +199,57 @@ class FlightPhysicsService {
     
     // GRAVITY FORCE
     this.physicsState.gravityForce = this.physicsState.mass * 9.81;
+    
+    // **NEW: Control Surface Effects on Forces**
+    
+    // **ELEVATOR EFFECT: Pitch control moment**
+    const elevatorEffect = this.state.elevator * 20000; // Nm per unit deflection
+    const pitchMoment = elevatorEffect * airspeedMs * airspeedMs * airDensity;
+    
+    // **AILERON EFFECT: Roll control moment**
+    const aileronEffect = this.state.ailerons * 15000; // Nm per unit deflection
+    const rollMoment = aileronEffect * airspeedMs * airspeedMs * airDensity;
+    
+    // **RUDDER EFFECT: Yaw control moment**
+    const rudderEffect = this.state.rudder * 10000; // Nm per unit deflection
+    const yawMoment = rudderEffect * airspeedMs * airspeedMs * airDensity;
+    
+    // **FLAPS EFFECT: Increased lift and drag**
+    let flapsLiftMultiplier = 1.0;
+    let flapsDragMultiplier = 1.0;
+    
+    switch (this.state.flaps) {
+      case 1: // Takeoff flaps
+        flapsLiftMultiplier = 1.3;
+        flapsDragMultiplier = 1.2;
+        break;
+      case 2: // Landing flaps
+        flapsLiftMultiplier = 1.6;
+        flapsDragMultiplier = 1.8;
+        break;
+      default: // Flaps up
+        flapsLiftMultiplier = 1.0;
+        flapsDragMultiplier = 1.0;
+    }
+    
+    // **AIR BRAKES EFFECT: Increased drag**
+    const airBrakesDragMultiplier = 1.0 + (this.state.airBrakes * 1.5);
+    
+    // **GEAR EFFECT: Increased drag**
+    const gearDragMultiplier = this.state.gear ? 1.3 : 1.0;
+    
+    // Apply control surface effects to forces
+    this.physicsState.liftForce *= flapsLiftMultiplier;
+    this.physicsState.dragForce *= (flapsDragMultiplier * airBrakesDragMultiplier * gearDragMultiplier);
+    
+    // Apply control moments to angular rates
+    const momentOfInertiaPitch = 100000; // kg·m²
+    const momentOfInertiaRoll = 80000; // kg·m²
+    const momentOfInertiaYaw = 120000; // kg·m²
+    
+    this.physicsState.pitchRate += (pitchMoment / momentOfInertiaPitch) * dt * (180 / Math.PI);
+    this.physicsState.rollRate += (rollMoment / momentOfInertiaRoll) * dt * (180 / Math.PI);
+    this.physicsState.yawRate += (yawMoment / momentOfInertiaYaw) * dt * (180 / Math.PI);
     
     // NATURAL ALTITUDE STABILITY - Enhanced stability system
     // When aircraft is near level flight, provide natural stability
@@ -493,6 +555,69 @@ class FlightPhysicsService {
     }
   }
 
+  // **NEW: Control Surface Methods**
+  controlAilerons(position) {
+    if (!this.state.hasCrashed) {
+      // Apply hydraulic system effects
+      const effectiveness = this.getHydraulicEffectiveness();
+      this.state.ailerons = Math.max(-1, Math.min(1, position * effectiveness));
+    }
+  }
+
+  controlElevator(position) {
+    if (!this.state.hasCrashed) {
+      // Apply hydraulic system effects
+      const effectiveness = this.getHydraulicEffectiveness();
+      this.state.elevator = Math.max(-1, Math.min(1, position * effectiveness));
+    }
+  }
+
+  controlRudder(position) {
+    if (!this.state.hasCrashed) {
+      // Apply hydraulic system effects
+      const effectiveness = this.getHydraulicEffectiveness();
+      this.state.rudder = Math.max(-1, Math.min(1, position * effectiveness));
+    }
+  }
+
+  controlAirBrakes(position) {
+    if (!this.state.hasCrashed) {
+      // Air brakes can still function with reduced hydraulic pressure
+      const effectiveness = this.getHydraulicEffectiveness();
+      this.state.airBrakes = Math.max(0, Math.min(1, position * effectiveness));
+    }
+  }
+
+  // **NEW: Hydraulic System Methods**
+  getHydraulicEffectiveness() {
+    switch (this.state.hydraulicSystem) {
+      case 'normal':
+        return 1.0;
+      case 'degraded':
+        return 0.5; // Reduced control effectiveness
+      case 'failed':
+        return 0.1; // Minimal control (manual reversion)
+      default:
+        return 1.0;
+    }
+  }
+
+  setHydraulicSystem(status) {
+    this.state.hydraulicSystem = status;
+    // Update hydraulic pressure based on system status
+    switch (status) {
+      case 'normal':
+        this.state.hydraulicPressure = 3000;
+        break;
+      case 'degraded':
+        this.state.hydraulicPressure = 1500;
+        break;
+      case 'failed':
+        this.state.hydraulicPressure = 500;
+        break;
+    }
+  }
+
   // Autopilot functions - FIX IAS DROP ON DISENGAGEMENT
   toggleAutopilot() {
     if (!this.state.hasCrashed) {
@@ -627,6 +752,38 @@ class FlightPhysicsService {
   updateAutopilotMode(deltaTime) {
     const dt = deltaTime / 1000;
     
+    // Calculate current angle of attack
+    const currentAoA = this.calculateAngleOfAttack();
+    
+    // **AIRBUS ALPHA-FLOOR ANTI-STALL SYSTEM**
+    // Strong, aggressive pitch control to prevent stall conditions
+    const targetAoA = 2.5; // Optimal cruise angle of attack (degrees)
+    const stallWarningAoA = 12.0; // Stall warning threshold
+    const criticalStallAoA = 16.0; // Critical stall threshold
+    
+    // **ALPHA-FLOOR PROTECTION: Active pitch control to prevent stall**
+    let aoaCorrection = 0;
+    let stallProtectionActive = false;
+    
+    if (Math.abs(currentAoA) > criticalStallAoA) {
+      // **CRITICAL STALL: Maximum pitch down authority**
+      aoaCorrection = -15.0; // Immediate maximum nose-down pitch
+      stallProtectionActive = true;
+      console.log("ALPHA-FLOOR: CRITICAL STALL! Maximum pitch down applied");
+    } else if (Math.abs(currentAoA) > stallWarningAoA) {
+      // **STALL WARNING: Strong pitch down**
+      aoaCorrection = -8.0; // Strong nose-down pitch
+      stallProtectionActive = true;
+      console.log("ALPHA-FLOOR: Stall warning! Strong pitch down applied");
+    } else if (Math.abs(currentAoA) > 8.0) {
+      // **HIGH AOA: Moderate correction**
+      aoaCorrection = (targetAoA - currentAoA) * 0.3;
+      stallProtectionActive = true;
+    } else {
+      // **NORMAL RANGE: Gentle correction**
+      aoaCorrection = (targetAoA - currentAoA) * 0.05;
+    }
+    
     // Altitude hold with P control
     const targetAltitude = 35000; // Target altitude to maintain
     const altitudeError = targetAltitude - this.state.altitude;
@@ -641,33 +798,51 @@ class FlightPhysicsService {
     // Calculate required pitch to achieve target VS
     const currentAirspeed = this.state.indicatedAirspeed;
     const vsToPitchGain = 0.05; // Gain for VS to pitch conversion
-    const targetPitch = targetVS_fts * vsToPitchGain;
+    const targetPitchFromVS = targetVS_fts * vsToPitchGain;
     
-    // Apply pitch control with smoothing
+    // **ALPHA-FLOOR PRIORITY: Stall protection overrides all other controls**
+    let targetPitch;
+    if (stallProtectionActive) {
+      // **STALL PROTECTION ACTIVE: Ignore altitude control, prioritize AoA safety**
+      targetPitch = aoaCorrection;
+      console.log(`ALPHA-FLOOR: Stall protection active. Target pitch: ${targetPitch.toFixed(1)}°`);
+    } else {
+      // **NORMAL OPERATION: Combine altitude and AoA control**
+      const aoaPriority = Math.min(1.0, Math.abs(currentAoA) / stallWarningAoA);
+      targetPitch = targetPitchFromVS * (1 - aoaPriority) + aoaCorrection * aoaPriority;
+    }
+    
+    // Apply pitch control with aggressive smoothing for stall protection
     const pitchError = targetPitch - this.state.pitch;
-    const pitchRate = 0.5; // Degrees per second
+    const pitchRate = stallProtectionActive ? 3.0 : 0.5; // Faster response during stall
     this.state.pitch += Math.sign(pitchError) * Math.min(Math.abs(pitchError), pitchRate * dt);
-    this.state.pitch = Math.max(-10, Math.min(10, this.state.pitch));
+    this.state.pitch = Math.max(-15, Math.min(15, this.state.pitch));
     
-    // IAS hold with P control - NEW: Maintain 250 knots
+    // **ADDITIONAL STALL PROTECTION: Increase thrust during stall conditions**
+    let targetThrustAdjustment = 0;
+    if (stallProtectionActive) {
+      // **TOGA (Takeoff/Go-Around) thrust during stall recovery**
+      targetThrustAdjustment = 15; // Additional thrust for stall recovery
+      console.log("ALPHA-FLOOR: TOGA thrust applied for stall recovery");
+    }
+    
+    // IAS hold with P control - Maintain 250 knots
     const targetIAS = 250; // Target indicated airspeed
     const iasError = targetIAS - this.state.indicatedAirspeed;
     
-    // P controller for IAS - FIX: More aggressive control at high altitudes
-    const iasKp = 0.5; // Increased from 0.2 to 0.5 for better control
-    
-    // Additional altitude compensation for better high-altitude performance
+    // P controller for IAS with stall protection boost
+    const iasKp = 0.5;
     const altitudeCompensation = 1 + (this.state.altitude / 50000) * 0.3;
-    const thrustAdjustment = iasError * iasKp * altitudeCompensation;
+    const thrustAdjustment = iasError * iasKp * altitudeCompensation + targetThrustAdjustment;
     
     // Apply thrust control to both engines
     const baseThrust = 85; // Base N1 setting for cruise
-    const targetN1 = Math.max(60, Math.min(95, baseThrust + thrustAdjustment)); // Increased minimum to 60
+    const targetN1 = Math.max(75, Math.min(95, baseThrust + thrustAdjustment)); // Higher minimum during stall
     
-    // Apply thrust with realistic engine spooling
+    // Apply thrust with realistic engine spooling during stall
+    const spoolRate = stallProtectionActive ? 5.0 : 3.0; // Faster spooling during stall
     this.state.engineN1 = this.state.engineN1.map((currentN1, index) => {
       const diff = targetN1 - currentN1;
-      const spoolRate = 3.0; // Increased spooling rate from 2.0 to 3.0
       const change = Math.sign(diff) * Math.min(Math.abs(diff), spoolRate * dt);
       return currentN1 + change;
     });
