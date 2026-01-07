@@ -249,7 +249,7 @@ const ModernAutopilotModule = ({ flightState, setAutopilotTargets, toggleAutopil
   );
 };
 
-// Flight Pose Panel Component - REDESIGNED: Civil aviation jet style
+// Flight Pose Panel Component - Vertically compressed 3-column layout
 const FlightPosePanel = ({ flightState }) => {
   // Calculate altitude in 20-foot increments
   const altitude20ft = Math.round(flightState.altitude / 20) * 20;
@@ -257,17 +257,17 @@ const FlightPosePanel = ({ flightState }) => {
   return React.createElement('div', { className: 'civil-aviation-pose-panel' },
     React.createElement('h3', null, 'Primary Flight Display'),
     
-    // Main display area with three sections
-    React.createElement('div', { className: 'pfd-main-display' },
+    // Main display area with three sections - vertically compressed
+    React.createElement('div', { className: 'pfd-compressed-3col' },
       
-      // Left: IAS Vertical Bar
-      React.createElement('div', { className: 'ias-vertical-bar' },
+      // Left: IAS Vertical Bar (compressed)
+      React.createElement('div', { className: 'ias-vertical-bar compressed' },
         React.createElement('div', { className: 'ias-label' }, 'IAS'),
         React.createElement('div', { className: 'vertical-scale-container' },
           // IAS scale from 0 to 400 knots
           React.createElement('div', { className: 'vertical-scale' },
-            Array.from({ length: 9 }, (_, i) => {
-              const speed = i * 50; // 0, 50, 100, 150, 200, 250, 300, 350, 400
+            Array.from({ length: 5 }, (_, i) => {
+              const speed = i * 100; // 0, 100, 200, 300, 400 knots
               const position = (speed / 400) * 100;
               return React.createElement('div', {
                 key: `speed-${speed}`,
@@ -289,8 +289,8 @@ const FlightPosePanel = ({ flightState }) => {
         )
       ),
       
-      // Center: Artificial Horizon with Pitch/Roll
-      React.createElement('div', { className: 'artificial-horizon' },
+      // Center: Artificial Horizon with Pitch/Roll (compressed)
+      React.createElement('div', { className: 'artificial-horizon compressed' },
         React.createElement('div', { 
           className: 'horizon-container',
           style: { transform: `rotate(${flightState.roll}deg)` }
@@ -298,18 +298,18 @@ const FlightPosePanel = ({ flightState }) => {
           // Sky and ground
           React.createElement('div', { 
             className: 'sky',
-            style: { transform: `translateY(${flightState.pitch * 2}px)` }
+            style: { transform: `translateY(${flightState.pitch * 1.5}px)` }
           }),
           React.createElement('div', { 
             className: 'ground',
-            style: { transform: `translateY(${flightState.pitch * 2}px)` }
+            style: { transform: `translateY(${flightState.pitch * 1.5}px)` }
           }),
           
           // Pitch ladder
           React.createElement('div', { className: 'pitch-ladder' },
-            Array.from({ length: 7 }, (_, i) => {
-              const pitch = (i - 3) * 5; // -15, -10, -5, 0, 5, 10, 15 degrees
-              const position = pitch * 8;
+            Array.from({ length: 5 }, (_, i) => {
+              const pitch = (i - 2) * 10; // -20, -10, 0, 10, 20 degrees
+              const position = pitch * 4;
               return React.createElement('div', {
                 key: `pitch-${pitch}`,
                 className: `pitch-line ${pitch === 0 ? 'center-line' : ''}`,
@@ -334,8 +334,8 @@ const FlightPosePanel = ({ flightState }) => {
             style: { transform: `rotate(${-flightState.roll}deg)` }
           }),
           React.createElement('div', { className: 'roll-scale' },
-            Array.from({ length: 7 }, (_, i) => {
-              const roll = (i - 3) * 15; // -45, -30, -15, 0, 15, 30, 45 degrees
+            Array.from({ length: 5 }, (_, i) => {
+              const roll = (i - 2) * 30; // -60, -30, 0, 30, 60 degrees
               return React.createElement('div', {
                 key: `roll-${roll}`,
                 className: `roll-mark ${roll === 0 ? 'center-mark' : ''}`,
@@ -346,14 +346,14 @@ const FlightPosePanel = ({ flightState }) => {
         )
       ),
       
-      // Right: ALT Vertical Bar
-      React.createElement('div', { className: 'alt-vertical-bar' },
+      // Right: ALT Vertical Bar (compressed)
+      React.createElement('div', { className: 'alt-vertical-bar compressed' },
         React.createElement('div', { className: 'alt-label' }, 'ALT'),
         React.createElement('div', { className: 'vertical-scale-container' },
-          // ALT scale from 0 to 45000 feet in 1000ft increments
+          // ALT scale from 0 to 45000 feet in 5000ft increments
           React.createElement('div', { className: 'vertical-scale' },
-            Array.from({ length: 10 }, (_, i) => {
-              const altitude = i * 5000; // 0, 5000, 10000, 15000, 20000, 25000, 30000, 35000, 40000, 45000
+            Array.from({ length: 5 }, (_, i) => {
+              const altitude = i * 10000; // 0, 10000, 20000, 30000, 40000 feet
               const position = (altitude / 45000) * 100;
               return React.createElement('div', {
                 key: `alt-${altitude}`,
@@ -376,8 +376,8 @@ const FlightPosePanel = ({ flightState }) => {
       )
     ),
     
-    // Bottom: Additional information
-    React.createElement('div', { className: 'pfd-bottom-info' },
+    // Bottom: Additional information (compressed)
+    React.createElement('div', { className: 'pfd-bottom-info compressed' },
       React.createElement('div', { className: 'vs-display' },
         React.createElement('span', { className: 'label' }, 'VS'),
         React.createElement('span', { 
@@ -387,6 +387,14 @@ const FlightPosePanel = ({ flightState }) => {
       React.createElement('div', { className: 'heading-display' },
         React.createElement('span', { className: 'label' }, 'HDG'),
         React.createElement('span', { className: 'value' }, `${flightState.heading.toFixed(0)}°`)
+      ),
+      React.createElement('div', { className: 'gs-display' },
+        React.createElement('span', { className: 'label' }, 'GS'),
+        React.createElement('span', { className: 'value' }, `${flightState.groundSpeed.toFixed(0)}`)
+      ),
+      React.createElement('div', { className: 'tas-display' },
+        React.createElement('span', { className: 'label' }, 'TAS'),
+        React.createElement('span', { className: 'value' }, `${flightState.trueAirspeed.toFixed(0)}`)
       )
     )
   );
@@ -474,7 +482,7 @@ const CentralPanel = ({ flightState }) => {
   );
 };
 
-const FlightPanel = ({ flightData, onActionRequest }) => {
+const FlightPanel = ({ flightData, onActionRequest, aircraftModel }) => {
   const [flightState, setFlightState] = useState({
     // Navigation
     heading: 270,
@@ -530,7 +538,7 @@ const FlightPanel = ({ flightData, onActionRequest }) => {
     hasCrashed: false
   });
 
-  const flightPhysicsRef = useRef(new FlightPhysicsService());
+  const flightPhysicsRef = useRef(new FlightPhysicsService(aircraftModel));
   const [flashActive, setFlashActive] = useState(false);
   const [flashText, setFlashText] = useState('');
   const [showCrashPanel, setShowCrashPanel] = useState(false);
@@ -633,7 +641,7 @@ const FlightPanel = ({ flightData, onActionRequest }) => {
       
       // Manual controls at bottom
       React.createElement('div', { className: 'manual-controls' },
-        React.createElement(JoystickController, { controlPitch, controlRoll, flightState }),
+        React.createElement(DraggableJoystick, { controlPitch, controlRoll, flightState }),
         React.createElement(ThrustManager, { controlThrust, flightState })
       )
     )
@@ -641,3 +649,84 @@ const FlightPanel = ({ flightData, onActionRequest }) => {
 };
 
 export default FlightPanel;
+
+// Draggable Joystick Controller Component - REPLACES button-based joystick
+const DraggableJoystick = ({ controlPitch, controlRoll, flightState }) => {
+  const [isDragging, setIsDragging] = useState(false);
+  const [position, setPosition] = useState({ x: 0, y: 0 });
+  const joystickRef = useRef(null);
+  const maxDistance = 50; // Maximum drag distance from center
+
+  const handleMouseDown = (e) => {
+    if (flightState.autopilot || flightState.hasCrashed) return;
+    e.preventDefault(); // Prevent text selection
+    setIsDragging(true);
+    document.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('mouseup', handleMouseUp);
+  };
+
+  const handleMouseMove = (e) => {
+    if (!isDragging) return;
+    
+    const joystick = joystickRef.current;
+    if (!joystick) return;
+    
+    const rect = joystick.getBoundingClientRect();
+    const centerX = rect.left + rect.width / 2;
+    const centerY = rect.top + rect.height / 2;
+    
+    const deltaX = e.clientX - centerX;
+    const deltaY = e.clientY - centerY;
+    
+    // Limit movement to maxDistance
+    const distance = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
+    const limitedDistance = Math.min(distance, maxDistance);
+    
+    if (distance > 0) {
+      const ratio = limitedDistance / distance;
+      const newX = deltaX * ratio;
+      const newY = deltaY * ratio;
+      
+      setPosition({ x: newX, y: newY });
+      
+      // Calculate pitch and roll based on joystick position
+      const pitchAmount = -(newY / maxDistance) * 10; // Pitch: -10 to +10 degrees (increased from 2)
+      const rollAmount = (newX / maxDistance) * 15; // Roll: -15 to +15 degrees (increased from 5)
+      
+      // Apply controls continuously while dragging
+      controlRoll(rollAmount * 0.3); // Scale up for more responsive control (from 0.1)
+      controlPitch(pitchAmount * 0.3);
+    }
+  };
+
+  const handleMouseUp = () => {
+    setIsDragging(false);
+    setPosition({ x: 0, y: 0 }); // Reset to center
+    document.removeEventListener('mousemove', handleMouseMove);
+    document.removeEventListener('mouseup', handleMouseUp);
+  };
+
+  return React.createElement('div', { className: 'draggable-joystick' },
+    React.createElement('h4', null, 'Flight Controls (Drag to Fly)'),
+    React.createElement('div', { 
+      ref: joystickRef,
+      className: `joystick-base ${flightState.autopilot || flightState.hasCrashed ? 'disabled' : ''}`,
+      onMouseDown: handleMouseDown,
+      style: { userSelect: 'none' } // Prevent text selection
+    },
+      React.createElement('div', { 
+        className: 'joystick-handle',
+        style: { 
+          transform: `translate(${position.x}px, ${position.y}px)`,
+          cursor: flightState.autopilot || flightState.hasCrashed ? 'not-allowed' : 'grab',
+          pointerEvents: 'none' // Allow events to pass through to base
+        }
+      }, '✈️'),
+      React.createElement('div', { className: 'joystick-center-mark' })
+    ),
+    React.createElement('div', { className: 'joystick-instructions' },
+      React.createElement('p', null, 'Drag the aircraft symbol to control pitch and roll'),
+      React.createElement('p', null, 'Up/Down: Pitch | Left/Right: Roll')
+    )
+  );
+};

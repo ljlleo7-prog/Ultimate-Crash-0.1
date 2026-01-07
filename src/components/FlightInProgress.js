@@ -90,6 +90,7 @@ const FlightInProgress = ({
         React.createElement(FlightPanel, {
           key: 'cockpit-display',
           flightData: flightData,
+          aircraftModel: aircraftModel,
           onActionRequest: (action) => {
             console.log('Action requested:', action);
             if (action === 'reset-to-initiation') {

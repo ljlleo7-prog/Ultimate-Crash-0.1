@@ -1,7 +1,11 @@
 // Flight Physics Service - Handles realistic aircraft flight dynamics with force-based physics
 
 class FlightPhysicsService {
-  constructor() {
+  constructor(aircraftModel = null) {
+    // Load aircraft parameters from database if model is provided
+    this.aircraftModel = aircraftModel;
+    this.aircraftParams = this.loadAircraftParameters(aircraftModel);
+    
     this.state = {
       // Navigation
       heading: 270,
@@ -59,8 +63,8 @@ class FlightPhysicsService {
       horizontalAcceleration: 0,
       verticalAcceleration: 0,
       
-      // Mass and forces
-      mass: 80000, // kg (typical airliner)
+      // Mass and forces - Use aircraft parameters if available, otherwise defaults
+      mass: this.aircraftParams?.mass || 80000, // kg
       thrustForce: 0,
       dragForce: 0,
       liftForce: 0,
@@ -70,59 +74,49 @@ class FlightPhysicsService {
     this.lastUpdateTime = Date.now();
   }
 
-  // Calculate flight dynamics based on current state using force-based physics
-  updateFlightDynamics(deltaTime) {
-    const dt = deltaTime / 1000; // Convert to seconds
+  // Load aircraft parameters from database
+  loadAircraftParameters(model) {
+    if (!model) return null;
     
-    // Calculate forces
-    this.calculateForces(dt);
-    
-    // Calculate accelerations (F = ma)
-    this.calculateAccelerations(dt);
-    
-    // Update velocities using accelerations
-    this.updateVelocities(dt);
-    
-    // Convert velocities to display values
-    this.updateDisplayValues();
-    
-    // Update altitude and position
-    this.updatePosition(dt);
-    
-    // Update engine parameters with realistic variations
-    this.updateEngineParameters(dt);
-    
-    // Check for crash conditions
-    this.checkCrashConditions(dt);
-    
-    // Update time
-    this.lastUpdateTime = Date.now();
-  }
-
-  // Update function to be called regularly
-  update() {
-    const currentTime = Date.now();
-    const deltaTime = currentTime - this.lastUpdateTime;
-    
-    if (!this.state.hasCrashed) {
-      if (this.state.autopilot) {
-        // Autopilot mode - use P control for altitude hold
-        this.updateAutopilotMode(deltaTime);
-      } else {
-        // Manual mode - full physics
-        this.updateFlightDynamics(deltaTime);
+    try {
+      // Import aircraft database
+      const aircraftDatabase = require('../data/aircraftDatabase.json');
+      const aircraft = aircraftDatabase.aircraft.find(a => a.model === model);
+      
+      if (aircraft) {
+        // Use actual aircraft parameters from database
+        return {
+          mass: aircraft.emptyWeight + (aircraft.maxPayload * 0.7), // Realistic operating weight
+          cruiseSpeed: aircraft.cruiseSpeed,
+          maxRange: aircraft.maxRange,
+          engineCount: aircraft.engineCount,
+          engineType: aircraft.engineType,
+          wingArea: aircraft.wingArea,
+          wingSpan: aircraft.wingSpan,
+          aspectRatio: aircraft.aspectRatio,
+          maxLiftCoefficient: aircraft.maxLiftCoefficient,
+          stallSpeed: aircraft.stallSpeed,
+          maxOperatingMach: aircraft.maxOperatingMach,
+          emptyWeight: aircraft.emptyWeight,
+          maxTakeoffWeight: aircraft.maxTakeoffWeight
+        };
       }
+    } catch (error) {
+      console.warn('Failed to load aircraft parameters for', model, error);
     }
     
-    return { ...this.state };
+    return null;
   }
 
   // Calculate all forces acting on the aircraft
   calculateForces(dt) {
+    // Use aircraft parameters if available, otherwise use defaults
+    const engineCount = this.aircraftParams?.engineCount || 2;
+    const maxThrust = this.aircraftParams?.maxThrust || 240000; // Default for 2 engines
+    const wingArea = this.aircraftParams?.wingArea || 125; // Default wing area
+    
     // Thrust force (from engines) - IMPROVED: Single-engine thrust multiplied by engine count
-    const singleEngineThrust = 120000; // Newtons per engine (typical airliner engine)
-    const engineCount = 2; // Number of engines
-    const maxThrust = singleEngineThrust * engineCount; // Total maximum thrust
+    const singleEngineThrust = maxThrust / engineCount; // Newtons per engine
     
     // Calculate average thrust percentage from both engines
     const avgThrust = (this.state.engineN1[0] + this.state.engineN1[1]) / 2;
@@ -156,33 +150,37 @@ class FlightPhysicsService {
     // Air density at altitude (kg/m³) - More realistic density model
     const airDensity = 1.225 * Math.exp(-this.state.altitude / 10000); // Standard atmospheric model
     
-    // Reference area (typical airliner)
-    const wingArea = 125; // m²
-    
     this.physicsState.dragForce = 0.5 * dragCoefficient * airDensity * wingArea * airspeedMs * airspeedMs;
     
-    // Lift force (based on airspeed and angle of attack) - FIXED: Improved lift generation
+    // Lift force (based on airspeed and angle of attack) - REWRITTEN: Use aircraft parameters
     const angleOfAttack = this.calculateAngleOfAttack();
     
-    // FIXED: More realistic lift curve with proper altitude maintenance at 250kts IAS
-    let liftCoefficient = 0.18 + (angleOfAttack * 0.1); // Increased base lift coefficient for better altitude maintenance
+    // Calculate lift coefficient based on angle of attack and aircraft characteristics
+    const maxLiftCoefficient = this.aircraftParams?.maxLiftCoefficient || 1.6;
+    const stallSpeed = this.aircraftParams?.stallSpeed || 125;
     
-    // FIXED: Enhanced lift generation specifically at 250kts IAS range
-    if (airspeedKnots >= 200 && airspeedKnots <= 300) {
-      // Optimal lift range - significantly enhance lift generation for altitude maintenance
-      const optimalFactor = 1.0 + (0.15 * (airspeedKnots - 200) / 100); // Stronger lift boost in optimal range
-      liftCoefficient *= optimalFactor;
+    // Realistic lift curve slope (per degree)
+    const liftCurveSlope = 0.08; // Typical value for transport aircraft
+    
+    // Calculate base lift coefficient
+    let liftCoefficient = 0.1 + (angleOfAttack * liftCurveSlope);
+    
+    // Limit to maximum lift coefficient
+    liftCoefficient = Math.min(maxLiftCoefficient * 0.9, liftCoefficient); // 90% of max for safety
+    
+    // High-speed compressibility effects (Mach effects)
+    const mach = airspeedMs / 340; // Speed of sound at sea level
+    const maxMach = this.aircraftParams?.maxOperatingMach || 0.82;
+    
+    if (mach > maxMach * 0.8) {
+      // Compressibility drag and lift reduction
+      const machFactor = Math.max(0.7, 1 - ((mach - maxMach * 0.8) / (maxMach * 0.2)));
+      liftCoefficient *= machFactor;
     }
     
-    // High-speed lift reduction (compressibility effects) - More realistic
-    if (airspeedKnots > 300) {
-      const highSpeedFactor = Math.max(0.85, 1 - ((airspeedKnots - 300) / 150)); // Less severe high-speed penalty
-      liftCoefficient *= highSpeedFactor;
-    }
-    
-    // Stall effects - More realistic stall behavior
+    // Stall effects
     if (this.state.isStalling) {
-      liftCoefficient *= 0.5; // Moderate lift reduction in stall
+      liftCoefficient *= 0.3; // Severe lift reduction in stall
     }
     
     this.physicsState.liftForce = 0.5 * liftCoefficient * airDensity * wingArea * airspeedMs * airspeedMs;
@@ -264,10 +262,20 @@ class FlightPhysicsService {
     
     // **FIXED: ADD ALTITUDE MAINTENANCE AT 250kts IAS**
     // When at optimal cruise speed (250kts), provide natural altitude stability
-    if (this.state.indicatedAirspeed >= 240 && this.state.indicatedAirspeed <= 260) {
-      const altitudeError = 35000 - this.state.altitude; // Target altitude
+    // Only apply altitude maintenance when above 10,000ft to avoid sea level issues
+    if (this.state.indicatedAirspeed >= 240 && this.state.indicatedAirspeed <= 260 && this.state.altitude > 10000) {
+      const targetAltitude = 35000; // Target cruise altitude
+      const altitudeError = targetAltitude - this.state.altitude;
       const altitudeCorrection = altitudeError * 0.0001 * dt; // Gentle correction
       this.physicsState.verticalVelocity += altitudeCorrection;
+      
+      // **FIX: Add pitch stabilization at cruise altitude**
+      // When near target altitude, stabilize pitch around 2 degrees
+      if (Math.abs(altitudeError) < 500) { // Within 500ft of target
+        const pitchError = 2 - this.state.pitch; // Target pitch of 2 degrees
+        const pitchCorrection = pitchError * 0.01 * dt;
+        this.state.pitch += pitchCorrection;
+      }
     }
     
     // Stall detection
@@ -332,11 +340,16 @@ class FlightPhysicsService {
 
   // Calculate stall speed based on configuration
   calculateStallSpeed() {
-    let baseStallSpeed = 160;
-    if (this.state.flaps === 1) baseStallSpeed = 140;
-    if (this.state.flaps === 2) baseStallSpeed = 120;
-    if (this.state.gear) baseStallSpeed += 5;
-    return baseStallSpeed;
+    // Use aircraft stall speed as base
+    const baseStallSpeed = this.aircraftParams?.stallSpeed || 125;
+    
+    // Adjust for configuration
+    let stallSpeed = baseStallSpeed;
+    if (this.state.flaps === 1) stallSpeed *= 0.9; // Takeoff flaps reduce stall speed by 10%
+    if (this.state.flaps === 2) stallSpeed *= 0.8; // Landing flaps reduce stall speed by 20%
+    if (this.state.gear) stallSpeed *= 1.05; // Gear down increases stall speed by 5%
+    
+    return stallSpeed;
   }
 
   // Calculate true airspeed from indicated airspeed
@@ -552,6 +565,30 @@ class FlightPhysicsService {
     this.state.crashWarning = null;
     this.state.timeToCrash = null;
     this.state.autopilot = true;
+  }
+
+  // Main update method called by FlightPanel
+  update() {
+    const currentTime = Date.now();
+    const deltaTime = currentTime - this.lastUpdateTime;
+    this.lastUpdateTime = currentTime;
+    
+    // Update physics if not crashed
+    if (!this.state.hasCrashed) {
+      if (this.state.autopilot) {
+        this.updateAutopilotMode(deltaTime);
+      } else {
+        this.updateFlightDynamics(deltaTime);
+      }
+      
+      // Update engine parameters
+      this.updateEngineParameters(deltaTime / 1000);
+      
+      // Update crash detection
+      this.updateCrashDetection();
+    }
+    
+    return this.state;
   }
 }
 
