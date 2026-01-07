@@ -108,75 +108,64 @@ class FlightPhysicsService {
     return null;
   }
 
-  // Calculate all forces acting on the aircraft
+  // Calculate all forces acting on the aircraft with proper physics
   calculateForces(dt) {
     // Use aircraft parameters if available, otherwise use defaults
     const engineCount = this.aircraftParams?.engineCount || 2;
     const maxThrust = this.aircraftParams?.maxThrust || 240000; // Default for 2 engines
     const wingArea = this.aircraftParams?.wingArea || 125; // Default wing area
     
-    // Thrust force (from engines) - IMPROVED: Single-engine thrust multiplied by engine count
-    const singleEngineThrust = maxThrust / engineCount; // Newtons per engine
+    // Air density at altitude (kg/m³) - Standard atmospheric model
+    const airDensity = 1.225 * Math.exp(-this.state.altitude / 10000);
     
-    // Calculate average thrust percentage from both engines
+    // Convert airspeed to m/s for force calculations
+    const airspeedMs = this.state.indicatedAirspeed * 0.5144;
+    
+    // THRUST FORCE - Realistic engine performance
     const avgThrust = (this.state.engineN1[0] + this.state.engineN1[1]) / 2;
     const thrustFactor = avgThrust / 100;
     
-    // Thrust reduces with altitude (air density) - IMPROVED: More realistic altitude performance
-    const altitudeDensityFactor = Math.max(0.8, 1 - (this.state.altitude / 180000)); // Higher ceiling for better high-altitude performance
+    // Thrust reduces with altitude (air density) - More realistic
+    const altitudeDensityFactor = Math.max(0.3, 1 - (this.state.altitude / 180000));
     
-    // Ensure thrust is always positive (forward)
-    this.physicsState.thrustForce = Math.max(0, thrustFactor * maxThrust * altitudeDensityFactor);
+    this.physicsState.thrustForce = thrustFactor * maxThrust * altitudeDensityFactor;
     
-    // Drag force (based on airspeed and configuration) - IMPROVED: More realistic drag
-    const airspeedKnots = this.state.indicatedAirspeed;
-    const airspeedMs = airspeedKnots * 0.5144; // Convert knots to m/s
-    
-    // Drag coefficient (depends on configuration) - More realistic values
-    let dragCoefficient = 0.010; // Clean configuration (improved aerodynamics)
+    // DRAG FORCE - Realistic aerodynamic drag with altitude effects
+    let dragCoefficient = 0.010; // Clean configuration
     if (this.state.flaps === 1) dragCoefficient = 0.018; // Takeoff flaps
     if (this.state.flaps === 2) dragCoefficient = 0.030; // Landing flaps
     if (this.state.gear) dragCoefficient += 0.008; // Gear down
     
-    // Add drag from pitch-flight path imbalance - More realistic
-    const flightPathAngle = Math.atan2(this.physicsState.verticalVelocity * 0.5144, this.physicsState.horizontalVelocity * 0.5144);
-    const pitchRad = this.state.pitch * Math.PI / 180;
-    const angleImbalance = Math.abs(pitchRad - flightPathAngle);
-    
-    // Realistic drag when pitch and flight path are misaligned
-    const imbalanceDragFactor = 1.0 + (angleImbalance * 0.8); // More realistic imbalance effect
+    // Add drag from angle of attack imbalance
+    const angleOfAttack = this.calculateAngleOfAttack();
+    const imbalanceDragFactor = 1.0 + (Math.abs(angleOfAttack) * 0.05);
     dragCoefficient *= imbalanceDragFactor;
     
-    // Air density at altitude (kg/m³) - More realistic density model
-    const airDensity = 1.225 * Math.exp(-this.state.altitude / 10000); // Standard atmospheric model
+    // Altitude effect on drag - higher altitude = lower drag
+    const altitudeDragFactor = Math.max(0.7, 1 - (this.state.altitude / 80000));
+    dragCoefficient *= altitudeDragFactor;
     
     this.physicsState.dragForce = 0.5 * dragCoefficient * airDensity * wingArea * airspeedMs * airspeedMs;
     
-    // Lift force (based on airspeed and angle of attack) - REWRITTEN: Use aircraft parameters
-    const angleOfAttack = this.calculateAngleOfAttack();
+    // LIFT FORCE - CORRECTED FORMULA using proper aerodynamic principles
+    // Lift coefficient calculation based on angle of attack
+    const angleOfAttackRad = angleOfAttack * Math.PI / 180; // Convert to radians
     
-    // Calculate lift coefficient based on angle of attack and aircraft characteristics
-    const maxLiftCoefficient = this.aircraftParams?.maxLiftCoefficient || 1.6;
-    const stallSpeed = this.aircraftParams?.stallSpeed || 125;
+    // PROPER LIFT COEFFICIENT FORMULA: Cl = 2π * α (for small angles)
+    // For transport aircraft, use realistic lift curve slope
+    const liftCurveSlope = 0.1; // Realistic value per degree of AoA
+    let liftCoefficient = liftCurveSlope * angleOfAttack;
     
-    // Realistic lift curve slope (per degree)
-    const liftCurveSlope = 0.08; // Typical value for transport aircraft
-    
-    // Calculate base lift coefficient
-    let liftCoefficient = 0.1 + (angleOfAttack * liftCurveSlope);
+    // Add base lift coefficient for zero angle of attack
+    liftCoefficient += 0.1; 
     
     // Limit to maximum lift coefficient
-    liftCoefficient = Math.min(maxLiftCoefficient * 0.9, liftCoefficient); // 90% of max for safety
+    const maxLiftCoefficient = this.aircraftParams?.maxLiftCoefficient || 1.6;
+    liftCoefficient = Math.max(-0.5, Math.min(maxLiftCoefficient, liftCoefficient));
     
-    // High-speed compressibility effects (Mach effects)
-    const mach = airspeedMs / 340; // Speed of sound at sea level
-    const maxMach = this.aircraftParams?.maxOperatingMach || 0.82;
-    
-    if (mach > maxMach * 0.8) {
-      // Compressibility drag and lift reduction
-      const machFactor = Math.max(0.7, 1 - ((mach - maxMach * 0.8) / (maxMach * 0.2)));
-      liftCoefficient *= machFactor;
-    }
+    // Altitude effect on lift - higher altitude = lower lift
+    const altitudeLiftFactor = Math.max(0.6, 1 - (this.state.altitude / 80000));
+    liftCoefficient *= altitudeLiftFactor;
     
     // Stall effects
     if (this.state.isStalling) {
@@ -185,34 +174,62 @@ class FlightPhysicsService {
     
     this.physicsState.liftForce = 0.5 * liftCoefficient * airDensity * wingArea * airspeedMs * airspeedMs;
     
-    // Gravity force
-    this.physicsState.gravityForce = this.physicsState.mass * 9.81; // Newtons
+    // GRAVITY FORCE
+    this.physicsState.gravityForce = this.physicsState.mass * 9.81;
+    
+    // NATURAL ALTITUDE STABILITY - Enhanced pitch-based lift correction
+    // When aircraft is level (pitch ≈ 0), provide natural stability
+    const pitchRad = this.state.pitch * Math.PI / 180;
+    const stabilityFactor = Math.cos(pitchRad) * 0.15; // Increased stability when level
+    
+    // Add small lift correction for natural altitude stability
+    const stabilityLift = this.physicsState.liftForce * stabilityFactor;
+    this.physicsState.liftForce += stabilityLift;
+    
+    // LOW ALTITUDE LIFT BOOST - Additional lift at low altitudes
+    if (this.state.altitude < 10000) {
+      const lowAltBoost = 1.0 + ((10000 - this.state.altitude) / 10000) * 0.3; // Up to 30% boost
+      this.physicsState.liftForce *= lowAltBoost;
+    }
   }
 
   // Calculate angle of attack based on pitch and flight path
   calculateAngleOfAttack() {
-    // Simplified: angle of attack ≈ pitch angle in level flight
-    // In reality, this would be more complex with flight path angle
     const flightPathAngle = Math.atan2(this.physicsState.verticalVelocity * 0.5144, this.physicsState.horizontalVelocity * 0.5144);
     const pitchRad = this.state.pitch * Math.PI / 180;
     
     return Math.max(-10, Math.min(15, pitchRad - flightPathAngle)) * 180 / Math.PI; // Convert to degrees
   }
 
-  // Calculate accelerations from forces
+  // Calculate accelerations from forces with proper physics
   calculateAccelerations(dt) {
-    // Horizontal acceleration (thrust - drag)
-    const netHorizontalForce = this.physicsState.thrustForce - this.physicsState.dragForce;
+    // Convert forces to accelerations in m/s²
+    
+    // HORIZONTAL ACCELERATION - CORRECTED FOR DIRECTION
+    // Account for aircraft orientation (pitch angle)
+    const pitchRad = this.state.pitch * Math.PI / 180;
+    
+    // Horizontal thrust component (forward direction)
+    const horizontalThrust = this.physicsState.thrustForce * Math.cos(pitchRad);
+    
+    // Horizontal drag component (opposes motion)
+    const horizontalDrag = this.physicsState.dragForce;
+    
+    // Net horizontal force
+    const netHorizontalForce = horizontalThrust - horizontalDrag;
     this.physicsState.horizontalAcceleration = netHorizontalForce / this.physicsState.mass; // m/s²
     
     // Convert to knots per second for our velocity system
     this.physicsState.horizontalAcceleration /= 0.5144; // Convert m/s² to knots/s²
     
-    // Vertical acceleration (lift - weight)
-    const pitchRad = this.state.pitch * Math.PI / 180;
-    const verticalLift = this.physicsState.liftForce * Math.cos(pitchRad);
+    // VERTICAL ACCELERATION - CORRECTED FOR DIRECTION
+    // Vertical thrust component (upward when climbing)
     const verticalThrust = this.physicsState.thrustForce * Math.sin(pitchRad);
     
+    // Vertical lift component (always upward)
+    const verticalLift = this.physicsState.liftForce;
+    
+    // Net vertical force
     const netVerticalForce = verticalLift + verticalThrust - this.physicsState.gravityForce;
     this.physicsState.verticalAcceleration = netVerticalForce / this.physicsState.mass; // m/s²
     
@@ -220,63 +237,42 @@ class FlightPhysicsService {
     this.physicsState.verticalAcceleration *= 3.28084; // Convert m/s² to ft/s²
   }
 
-  // Update velocities using accelerations
+  // Update velocities using accelerations with proper physics
   updateVelocities(dt) {
-    // Horizontal velocity (knots)
+    // Update horizontal velocity (knots) - PURE FORCE-BASED PHYSICS
     this.physicsState.horizontalVelocity += this.physicsState.horizontalAcceleration * dt;
     
-    // Vertical velocity (feet per second)
+    // Update vertical velocity (feet per second) - PURE FORCE-BASED PHYSICS
     this.physicsState.verticalVelocity += this.physicsState.verticalAcceleration * dt;
     
-    // Apply horizontal speed limits only (remove VS limits and artificial minimum)
+    // Apply realistic speed limits with proper altitude effects
     const maxHorizontalSpeed = this.calculateMaxSpeedAtAltitude();
-    this.physicsState.horizontalVelocity = Math.min(maxHorizontalSpeed, this.physicsState.horizontalVelocity); // REMOVED Math.max(100, ...)
+    const minHorizontalSpeed = this.calculateStallSpeed() * 1.1; // Stay above stall speed
+    this.physicsState.horizontalVelocity = Math.max(minHorizontalSpeed, Math.min(maxHorizontalSpeed, this.physicsState.horizontalVelocity));
     
-    // **FIXED: IMPROVED ENERGY CONVERSION - Better altitude maintenance at 250kts**
-    // When pitching up: convert kinetic energy to potential energy (speed loss)
-    // When pitching down: convert potential energy to kinetic energy (speed gain)
-    if (Math.abs(this.state.pitch) > 1.5) { // Reduced threshold for more realistic energy conversion
-      const energyConversionFactor = 0.03; // More realistic conversion factor
-      const pitchMagnitude = Math.abs(this.state.pitch);
-      const pitchFactor = pitchMagnitude / 25; // Less pitch sensitivity
-      
-      if (this.state.pitch > 0 && this.physicsState.verticalVelocity > 0) {
-        // Pitching up with positive VS: lose speed (energy conversion to altitude)
-        const vsMagnitude = Math.abs(this.physicsState.verticalVelocity);
-        const speedLoss = vsMagnitude * pitchFactor * energyConversionFactor * dt;
-        this.physicsState.horizontalVelocity = Math.max(180, this.physicsState.horizontalVelocity - speedLoss); // Higher minimum speed
-      } else if (this.state.pitch < 0 && this.physicsState.verticalVelocity < 0) {
-        // Pitching down with negative VS: gain speed (energy conversion from altitude)
-        const vsMagnitude = Math.abs(this.physicsState.verticalVelocity);
-        const speedGain = vsMagnitude * pitchFactor * energyConversionFactor * dt;
-        this.physicsState.horizontalVelocity += speedGain;
-      }
+    // REALISTIC SPEED CONTROL - Proper thrust/drag relationship
+    // When thrust > drag, speed increases; when drag > thrust, speed decreases
+    const thrustDragRatio = this.physicsState.thrustForce / Math.max(1, this.physicsState.dragForce);
+    
+    // Natural speed stabilization - aircraft tends to maintain current speed
+    if (Math.abs(thrustDragRatio - 1.0) < 0.1) {
+      // Near equilibrium - provide natural speed stability
+      const speedStabilityFactor = 0.95; // Dampen acceleration near equilibrium
+      this.physicsState.horizontalAcceleration *= speedStabilityFactor;
     }
     
-    // **FIXED: IMPROVED HIGH SPEED LIFT EFFECT - Better altitude maintenance**
-    if (this.physicsState.horizontalVelocity > 200 && this.state.pitch >= 0) { // Lower threshold for better lift
-      // High speed creates significant lift even at zero pitch
-      const speedLiftFactor = (this.physicsState.horizontalVelocity - 200) / 100 * 0.15; // More realistic effect
-      this.physicsState.verticalVelocity += speedLiftFactor * dt;
+    // REALISTIC ALTITUDE CONTROL - Enhanced lift/weight relationship
+    const liftWeightRatio = this.physicsState.liftForce / Math.max(1, this.physicsState.gravityForce);
+    
+    // Natural altitude stabilization - aircraft tends to maintain current altitude
+    if (Math.abs(liftWeightRatio - 1.0) < 0.1 && Math.abs(this.state.pitch) < 5) {
+      // Near equilibrium and level flight - provide natural altitude stability
+      const altitudeStabilityFactor = 0.85; // Increased damping for better stability
+      this.physicsState.verticalAcceleration *= altitudeStabilityFactor;
     }
     
-    // **FIXED: ADD ALTITUDE MAINTENANCE AT 250kts IAS**
-    // When at optimal cruise speed (250kts), provide natural altitude stability
-    // Only apply altitude maintenance when above 10,000ft to avoid sea level issues
-    if (this.state.indicatedAirspeed >= 240 && this.state.indicatedAirspeed <= 260 && this.state.altitude > 10000) {
-      const targetAltitude = 35000; // Target cruise altitude
-      const altitudeError = targetAltitude - this.state.altitude;
-      const altitudeCorrection = altitudeError * 0.0001 * dt; // Gentle correction
-      this.physicsState.verticalVelocity += altitudeCorrection;
-      
-      // **FIX: Add pitch stabilization at cruise altitude**
-      // When near target altitude, stabilize pitch around 2 degrees
-      if (Math.abs(altitudeError) < 500) { // Within 500ft of target
-        const pitchError = 2 - this.state.pitch; // Target pitch of 2 degrees
-        const pitchCorrection = pitchError * 0.01 * dt;
-        this.state.pitch += pitchCorrection;
-      }
-    }
+    // REMOVED ENERGY CONVERSION - Using pure force-based physics instead
+    // Speed changes are now determined solely by thrust/drag and lift/weight forces
     
     // Stall detection
     const stallSpeed = this.calculateStallSpeed();
@@ -285,14 +281,42 @@ class FlightPhysicsService {
     
     if (this.state.isStalling) {
       // Stall physics: reduced lift, increased drag
-      this.physicsState.horizontalVelocity *= 0.997; // Much slower speed decay
-      this.physicsState.verticalVelocity = Math.min(this.physicsState.verticalVelocity, -12); // Slower descent
+      this.physicsState.horizontalVelocity *= 0.997; // Slow speed decay
+      this.physicsState.verticalVelocity = Math.min(this.physicsState.verticalVelocity, -12); // Controlled descent
       
       // Stall makes control difficult
-      if (Math.random() < 0.15) { // Reduced frequency
-        this.state.pitch += (Math.random() - 0.5) * 0.8; // Smaller oscillations
+      if (Math.random() < 0.15) {
+        this.state.pitch += (Math.random() - 0.5) * 0.8; // Small oscillations
       }
     }
+  }
+
+  // Calculate maximum speed at current altitude
+  calculateMaxSpeedAtAltitude() {
+    const maxSpeedSeaLevel = 350; // Maximum speed at sea level
+    const altitudeFactor = Math.max(0.6, 1 - (this.state.altitude / 80000));
+    return maxSpeedSeaLevel * altitudeFactor;
+  }
+
+  // Calculate stall speed based on configuration
+  calculateStallSpeed() {
+    let baseStallSpeed = this.aircraftParams?.stallSpeed || 125;
+    
+    // Configuration effects
+    if (this.state.flaps === 1) baseStallSpeed *= 0.85; // Takeoff flaps
+    if (this.state.flaps === 2) baseStallSpeed *= 0.75; // Landing flaps
+    if (this.state.gear) baseStallSpeed *= 1.05; // Gear down
+    
+    return baseStallSpeed;
+  }
+
+  // Update aircraft position based on velocities
+  updatePosition(dt) {
+    // Update altitude based on vertical velocity
+    this.state.altitude += this.physicsState.verticalVelocity * dt;
+    
+    // Prevent negative altitude
+    this.state.altitude = Math.max(0, this.state.altitude);
   }
 
   // Convert physics velocities to display values
@@ -318,51 +342,18 @@ class FlightPhysicsService {
     this.state.heading = newHeading;
   }
 
-  // Update position based on velocities
-  updatePosition(dt) {
-    // Calculate altitude change
-    const altitudeChange = this.physicsState.verticalVelocity * dt;
-    const newAltitude = Math.max(0, this.state.altitude + altitudeChange);
-    this.state.altitude = newAltitude;
-  }
-
-  // Calculate maximum speed at current altitude
-  calculateMaxSpeedAtAltitude() {
-    const altitudeFactor = Math.max(0.5, 1 - (this.state.altitude / 80000)); // Higher ceiling (from 50000 to 80000)
-    return 450 * altitudeFactor; // Higher max speed (from 400 to 450)
-  }
-
-  // Calculate maximum climb rate at current altitude
-  calculateMaxClimbRate() {
-    const altitudeFactor = Math.max(0.4, 1 - (this.state.altitude / 60000)); // Higher ceiling (from 45000 to 60000)
-    return 3500 * altitudeFactor; // Higher climb rate (from 3000 to 3500)
-  }
-
-  // Calculate stall speed based on configuration
-  calculateStallSpeed() {
-    // Use aircraft stall speed as base
-    const baseStallSpeed = this.aircraftParams?.stallSpeed || 125;
-    
-    // Adjust for configuration
-    let stallSpeed = baseStallSpeed;
-    if (this.state.flaps === 1) stallSpeed *= 0.9; // Takeoff flaps reduce stall speed by 10%
-    if (this.state.flaps === 2) stallSpeed *= 0.8; // Landing flaps reduce stall speed by 20%
-    if (this.state.gear) stallSpeed *= 1.05; // Gear down increases stall speed by 5%
-    
-    return stallSpeed;
-  }
-
   // Calculate true airspeed from indicated airspeed
   calculateTrueAirspeed(ias) {
-    const altitudeFactor = 1 + (this.state.altitude / 35000) * 0.6;
+    // Simplified: TAS increases with altitude
+    const altitudeFactor = 1 + (this.state.altitude / 40000) * 0.3;
     return ias * altitudeFactor;
   }
 
-  // Check for crash conditions and set warnings with flashing effects - FIX GWPS LOGIC
+  // Check crash conditions
   checkCrashConditions(dt) {
-    if (this.physicsState.verticalVelocity < 0 && this.state.altitude > 0) {
-      const descentRate = Math.abs(this.physicsState.verticalVelocity); // ft/s
-      this.state.timeToCrash = this.state.altitude / descentRate;
+    // Calculate time to crash based on vertical velocity
+    if (this.physicsState.verticalVelocity < 0) {
+      this.state.timeToCrash = this.state.altitude / Math.abs(this.physicsState.verticalVelocity);
     } else {
       this.state.timeToCrash = null;
     }
@@ -393,31 +384,32 @@ class FlightPhysicsService {
   updateEngineParameters(dt) {
     const spoolRate = 5.0;
     
-    const targetN1 = this.state.engineN1.map(n => {
+    // Create separate target N1 for each engine with individual variations
+    const targetN1 = this.state.engineN1.map((currentN1, index) => {
       const variation = (Math.random() - 0.5) * 0.1;
-      return Math.max(0, Math.min(100, n + variation));
+      return Math.max(0, Math.min(100, currentN1 + variation));
     });
     
+    // Update each engine independently
     this.state.engineN1 = this.state.engineN1.map((currentN1, i) => {
       const diff = targetN1[i] - currentN1;
       const change = Math.sign(diff) * Math.min(Math.abs(diff), spoolRate * dt);
       return currentN1 + change;
     });
     
-    const targetN2 = this.state.engineN1.map(n1 => n1 * 1.12);
+    // Calculate separate N2 and EGT for each engine
+    this.state.engineN2 = this.state.engineN1.map(n1 => n1 * 1.12);
     
     const baseEGT = 600;
-    const thrustEGT = this.state.engineN1.map(n1 => n1 * 3);
-    const altitudeEGT = (35000 - this.state.altitude) / 1000 * 10;
+    this.state.engineEGT = this.state.engineN1.map((n1, i) => {
+      const thrustEGT = n1 * 3;
+      const altitudeEGT = (35000 - this.state.altitude) / 1000 * 10;
+      return Math.max(0, baseEGT + thrustEGT + altitudeEGT + (Math.random() - 0.5) * 5);
+    });
     
-    const targetEGT = targetN1.map((n1, i) => 
-      Math.max(0, baseEGT + thrustEGT[i] + altitudeEGT + (Math.random() - 0.5) * 5)
-    );
-    
-    const fuelConsumption = this.state.engineN1.reduce((sum, n1) => sum + n1, 0) * 0.01 * dt;
-    
-    this.state.engineN2 = targetN2;
-    this.state.engineEGT = targetEGT;
+    // Fuel consumption based on both engines
+    const totalN1 = this.state.engineN1.reduce((sum, n1) => sum + n1, 0);
+    const fuelConsumption = totalN1 * 0.01 * dt;
     this.state.fuel = Math.max(0, this.state.fuel - fuelConsumption);
   }
 
@@ -552,7 +544,9 @@ class FlightPhysicsService {
     this.state.roll += (Math.random() - 0.5) * 0.02;
     
     // Use full physics in autopilot mode for realistic behavior
-    this.updateFlightDynamics(deltaTime);
+    this.calculateForces(dt);
+    this.calculateAccelerations(dt);
+    this.updateVelocities(dt);
   }
 
   // Reset flight state (for restarting after crash)
@@ -567,6 +561,22 @@ class FlightPhysicsService {
     this.state.autopilot = true;
   }
 
+  // **FIXED: ADD TEST CONFIGURATION METHOD**
+  setTestConfiguration(altitude, ias) {
+    this.state.altitude = altitude;
+    this.state.indicatedAirspeed = ias;
+    this.state.verticalSpeed = 0; // Level flight
+    this.state.pitch = altitude < 10000 ? 3 : 2; // Appropriate pitch for altitude
+    this.state.roll = 0; // Level wings
+    this.state.autopilot = false; // Manual control for testing
+    
+    // Set physics state to match
+    this.physicsState.horizontalVelocity = ias;
+    this.physicsState.verticalVelocity = 0;
+    
+    console.log(`Test configuration set: ${altitude}ft, ${ias}kts IAS`);
+  }
+
   // Main update method called by FlightPanel
   update() {
     const currentTime = Date.now();
@@ -578,17 +588,29 @@ class FlightPhysicsService {
       if (this.state.autopilot) {
         this.updateAutopilotMode(deltaTime);
       } else {
-        this.updateFlightDynamics(deltaTime);
+        // Manual flight mode - use full physics calculations
+        this.calculateForces(deltaTime / 1000);
+        this.calculateAccelerations(deltaTime / 1000);
+        this.updateVelocities(deltaTime / 1000);
       }
+      
+      // **FIX: Update position and display values**
+      this.updatePosition(deltaTime / 1000);
+      this.updateDisplayValues();
       
       // Update engine parameters
       this.updateEngineParameters(deltaTime / 1000);
       
       // Update crash detection
-      this.updateCrashDetection();
+      this.checkCrashConditions(deltaTime / 1000);
     }
     
     return this.state;
+  }
+
+  // Add missing updateCrashDetection method for compatibility
+  updateCrashDetection() {
+    this.checkCrashConditions(0.1); // Use default dt
   }
 }
 

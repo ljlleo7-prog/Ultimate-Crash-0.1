@@ -546,28 +546,60 @@ const FlightPanel = ({ flightData, onActionRequest, aircraftModel }) => {
   // Dynamic updates with realistic flight physics
   useEffect(() => {
     const interval = setInterval(() => {
-      const updatedState = flightPhysicsRef.current.update();
-      setFlightState(updatedState);
-      
-      // Handle crash warnings and effects
-      if (updatedState.crashWarning && !updatedState.hasCrashed) {
-        setFlashText(updatedState.crashWarning);
-        setFlashActive(true);
+      if (!flightState.hasCrashed) {
+        // Call the physics service update method
+        const updatedState = flightPhysicsRef.current.update();
         
-        // Flash effect duration
-        setTimeout(() => setFlashActive(false), 2000);
-      }
-      
-      // Handle actual crash
-      if (updatedState.hasCrashed && !showCrashPanel) {
-        setShowCrashPanel(true);
-        setFlashText('CRASHED');
-        setFlashActive(true);
+        // Update the flight state with real physics data
+        setFlightState(prevState => ({
+          ...prevState,
+          // Navigation
+          heading: updatedState.heading,
+          trueAirspeed: updatedState.trueAirspeed,
+          groundSpeed: updatedState.groundSpeed,
+          indicatedAirspeed: updatedState.indicatedAirspeed,
+          
+          // Flight Pose
+          pitch: updatedState.pitch,
+          roll: updatedState.roll,
+          verticalSpeed: updatedState.verticalSpeed,
+          altitude: updatedState.altitude,
+          
+          // Engine - separate parameters for each engine
+          engineN1: updatedState.engineN1,
+          engineN2: updatedState.engineN2,
+          engineEGT: updatedState.engineEGT,
+          fuel: updatedState.fuel,
+          
+          // Systems
+          hydraulicPressure: updatedState.hydraulicPressure,
+          
+          // Autopilot
+          autopilot: updatedState.autopilot,
+          
+          // Crash Detection
+          crashWarning: updatedState.crashWarning,
+          timeToCrash: updatedState.timeToCrash,
+          hasCrashed: updatedState.hasCrashed,
+          alarms: updatedState.alarms || []
+        }));
+        
+        // Handle crash warnings
+        if (updatedState.crashWarning) {
+          setFlashActive(true);
+          setFlashText(updatedState.crashWarning);
+          
+          if (updatedState.crashWarning === 'CRASHED') {
+            setShowCrashPanel(true);
+          }
+        } else {
+          setFlashActive(false);
+        }
       }
     }, 100); // Update every 100ms for smooth physics
-
+    
     return () => clearInterval(interval);
-  }, [showCrashPanel]);
+  }, [flightState.hasCrashed]);
 
   // Control functions
   const controlPitch = (amount) => {
@@ -610,6 +642,21 @@ const FlightPanel = ({ flightData, onActionRequest, aircraftModel }) => {
     }
   };
 
+  // **FIXED: ADD TEST CONFIGURATION FUNCTION**
+  const setTestConfiguration = (altitude, ias) => {
+    flightPhysicsRef.current.setTestConfiguration(altitude, ias);
+    setFlightState(prevState => ({
+      ...prevState,
+      altitude,
+      indicatedAirspeed: ias,
+      verticalSpeed: 0,
+      pitch: altitude < 10000 ? 3 : 2,
+      roll: 0,
+      autopilot: false
+    }));
+    console.log(`Test configuration set: ${altitude}ft, ${ias}kts IAS`);
+  };
+
   // Main render function
   return React.createElement('div', { className: 'modern-flight-panel' },
     // Crash warning flash
@@ -617,6 +664,41 @@ const FlightPanel = ({ flightData, onActionRequest, aircraftModel }) => {
     
     // Crash panel (if crashed)
     React.createElement(CrashPanel, { showCrashPanel, resetFlight }),
+    
+    // **FIXED: ADD TEST BUTTONS**
+    React.createElement('div', { className: 'test-controls', style: { 
+      position: 'absolute', 
+      top: '10px', 
+      right: '10px', 
+      zIndex: 1000,
+      display: 'flex',
+      gap: '10px'
+    } },
+      React.createElement('button', {
+        onClick: () => setTestConfiguration(3000, 190),
+        style: {
+          padding: '8px 12px',
+          background: '#3b82f6',
+          color: 'white',
+          border: 'none',
+          borderRadius: '4px',
+          cursor: 'pointer',
+          fontSize: '12px'
+        }
+      }, 'Test: 3000ft, 190kts'),
+      React.createElement('button', {
+        onClick: () => setTestConfiguration(35000, 250),
+        style: {
+          padding: '8px 12px',
+          background: '#10b981',
+          color: 'white',
+          border: 'none',
+          borderRadius: '4px',
+          cursor: 'pointer',
+          fontSize: '12px'
+        }
+      }, 'Test: 35000ft, 250kts')
+    ),
     
     // Modern cockpit layout
     React.createElement('div', { className: 'modern-cockpit' },
