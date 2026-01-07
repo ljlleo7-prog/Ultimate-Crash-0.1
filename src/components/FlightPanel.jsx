@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import './FlightPanel.css';
 import FlightPhysicsService from '../services/flightPhysicsService';
 
@@ -295,14 +295,14 @@ const FlightPosePanel = ({ flightState }) => {
           className: 'horizon-container',
           style: { transform: `rotate(${flightState.roll}deg)` }
         },
-          // Sky and ground
+          // Sky and ground - fixed pitch movement (opposite directions)
           React.createElement('div', { 
             className: 'sky',
-            style: { transform: `translateY(${flightState.pitch * 1.5}px)` }
+            style: { transform: `translateY(${-flightState.pitch * 2}px)` }
           }),
           React.createElement('div', { 
             className: 'ground',
-            style: { transform: `translateY(${flightState.pitch * 1.5}px)` }
+            style: { transform: `translateY(${flightState.pitch * 2}px)` }
           }),
           
           // Pitch ladder
@@ -324,6 +324,26 @@ const FlightPosePanel = ({ flightState }) => {
           React.createElement('div', { className: 'aircraft-symbol' },
             React.createElement('div', { className: 'wings' }),
             React.createElement('div', { className: 'fuselage' })
+          ),
+          
+          // Debug text for pitch and roll values
+          React.createElement('div', { 
+            className: 'debug-values',
+            style: { 
+              position: 'absolute',
+              top: '10px',
+              left: '10px',
+              color: '#ffff00',
+              fontSize: '12px',
+              fontFamily: 'Courier New, monospace',
+              background: 'rgba(0,0,0,0.7)',
+              padding: '5px',
+              borderRadius: '3px',
+              zIndex: 10
+            }
+          },
+            React.createElement('div', null, `Pitch: ${flightState.pitch.toFixed(1)}°`),
+            React.createElement('div', null, `Roll: ${flightState.roll.toFixed(1)}°`)
           )
         ),
         
@@ -604,10 +624,24 @@ const FlightPanel = ({ flightData, onActionRequest, aircraftModel }) => {
   // Control functions
   const controlPitch = (amount) => {
     flightPhysicsRef.current.controlPitch(amount);
+    // Immediately update flight state to reflect changes
+    const updatedState = flightPhysicsRef.current.update();
+    setFlightState(prevState => ({
+      ...prevState,
+      pitch: updatedState.pitch,
+      roll: updatedState.roll
+    }));
   };
 
   const controlRoll = (amount) => {
     flightPhysicsRef.current.controlRoll(amount);
+    // Immediately update flight state to reflect changes
+    const updatedState = flightPhysicsRef.current.update();
+    setFlightState(prevState => ({
+      ...prevState,
+      pitch: updatedState.pitch,
+      roll: updatedState.roll
+    }));
   };
 
   const controlThrust = (engineIndex, amount) => {
@@ -732,35 +766,92 @@ const FlightPanel = ({ flightData, onActionRequest, aircraftModel }) => {
 
 export default FlightPanel;
 
-// Draggable Joystick Controller Component - REPLACES button-based joystick
+// **FIXED: Continuous control application joystick implementation**
 const DraggableJoystick = ({ controlPitch, controlRoll, flightState }) => {
   const [isDragging, setIsDragging] = useState(false);
   const [position, setPosition] = useState({ x: 0, y: 0 });
   const joystickRef = useRef(null);
-  const maxDistance = 50; // Maximum drag distance from center
+  const maxDistance = 50;
+  const controlIntervalRef = useRef(null);
 
+  // **FIX: Force proper centering on mount and resize**
+  useEffect(() => {
+    const centerJoystick = () => {
+      if (joystickRef.current) {
+        // Reset to true center (0,0)
+        setPosition({ x: 0, y: 0 });
+      }
+    };
+
+    centerJoystick();
+    window.addEventListener('resize', centerJoystick);
+    
+    return () => {
+      window.removeEventListener('resize', centerJoystick);
+      // Cleanup control interval
+      if (controlIntervalRef.current) {
+        clearInterval(controlIntervalRef.current);
+      }
+    };
+  }, []);
+
+  // **FIX: Continuous control application while dragging**
+  const applyContinuousControls = useCallback(() => {
+    if (!isDragging || flightState.autopilot || flightState.hasCrashed) return;
+    
+    // Calculate control inputs based on current position
+    const pitchInput = -(position.y / maxDistance) * 0.5; // Reduced sensitivity
+    const rollInput = (position.x / maxDistance) * 0.5;
+    
+    // Apply controls continuously
+    controlPitch(pitchInput);
+    controlRoll(rollInput);
+  }, [isDragging, position, controlPitch, controlRoll, flightState]);
+
+  // Setup continuous control interval when dragging starts
+  useEffect(() => {
+    if (isDragging) {
+      // Apply controls immediately
+      applyContinuousControls();
+      
+      // Set up continuous control application (10 times per second)
+      controlIntervalRef.current = setInterval(applyContinuousControls, 100);
+      
+      return () => {
+        if (controlIntervalRef.current) {
+          clearInterval(controlIntervalRef.current);
+          controlIntervalRef.current = null;
+        }
+      };
+    } else {
+      // Stop continuous controls when not dragging
+      if (controlIntervalRef.current) {
+        clearInterval(controlIntervalRef.current);
+        controlIntervalRef.current = null;
+      }
+    }
+  }, [isDragging, applyContinuousControls]);
+
+  // Simple mouse down handler
   const handleMouseDown = (e) => {
     if (flightState.autopilot || flightState.hasCrashed) return;
-    e.preventDefault(); // Prevent text selection
+    e.preventDefault();
     setIsDragging(true);
-    document.addEventListener('mousemove', handleMouseMove);
-    document.addEventListener('mouseup', handleMouseUp);
   };
 
-  const handleMouseMove = (e) => {
-    if (!isDragging) return;
+  // Mouse move handler with proper event binding
+  const handleMouseMove = useCallback((e) => {
+    if (!isDragging || !joystickRef.current) return;
     
-    const joystick = joystickRef.current;
-    if (!joystick) return;
-    
-    const rect = joystick.getBoundingClientRect();
+    const rect = joystickRef.current.getBoundingClientRect();
+    // **FIX: Use exact center calculation**
     const centerX = rect.left + rect.width / 2;
     const centerY = rect.top + rect.height / 2;
     
     const deltaX = e.clientX - centerX;
     const deltaY = e.clientY - centerY;
     
-    // Limit movement to maxDistance
+    // Limit to max distance
     const distance = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
     const limitedDistance = Math.min(distance, maxDistance);
     
@@ -770,45 +861,59 @@ const DraggableJoystick = ({ controlPitch, controlRoll, flightState }) => {
       const newY = deltaY * ratio;
       
       setPosition({ x: newX, y: newY });
-      
-      // Calculate pitch and roll based on joystick position
-      const pitchAmount = -(newY / maxDistance) * 10; // Pitch: -10 to +10 degrees (increased from 2)
-      const rollAmount = (newX / maxDistance) * 15; // Roll: -15 to +15 degrees (increased from 5)
-      
-      // Apply controls continuously while dragging
-      controlRoll(rollAmount * 0.3); // Scale up for more responsive control (from 0.1)
-      controlPitch(pitchAmount * 0.3);
     }
-  };
+  }, [isDragging]);
 
-  const handleMouseUp = () => {
-    setIsDragging(false);
-    setPosition({ x: 0, y: 0 }); // Reset to center
-    document.removeEventListener('mousemove', handleMouseMove);
-    document.removeEventListener('mouseup', handleMouseUp);
-  };
+  // Mouse up handler
+  const handleMouseUp = useCallback(() => {
+    if (isDragging) {
+      setIsDragging(false);
+      // **FIX: Smooth return to true center**
+      setPosition({ x: 0, y: 0 });
+      
+      // Apply neutral controls when released
+      controlPitch(0);
+      controlRoll(0);
+    }
+  }, [isDragging, controlPitch, controlRoll]);
 
+  // Setup and cleanup event listeners
+  useEffect(() => {
+    if (isDragging) {
+      document.addEventListener('mousemove', handleMouseMove);
+      document.addEventListener('mouseup', handleMouseUp);
+      
+      return () => {
+        document.removeEventListener('mousemove', handleMouseMove);
+        document.removeEventListener('mouseup', handleMouseUp);
+      };
+    }
+  }, [isDragging, handleMouseMove, handleMouseUp]);
+
+  // Simple, clean JSX return with proper centering
   return React.createElement('div', { className: 'draggable-joystick' },
-    React.createElement('h4', null, 'Flight Controls (Drag to Fly)'),
+    React.createElement('h4', null, 'Flight Controls'),
     React.createElement('div', { 
       ref: joystickRef,
       className: `joystick-base ${flightState.autopilot || flightState.hasCrashed ? 'disabled' : ''}`,
       onMouseDown: handleMouseDown,
-      style: { userSelect: 'none' } // Prevent text selection
+      style: { 
+        userSelect: 'none',
+        cursor: flightState.autopilot || flightState.hasCrashed ? 'not-allowed' : 'grab'
+      }
     },
       React.createElement('div', { 
         className: 'joystick-handle',
         style: { 
-          transform: `translate(${position.x}px, ${position.y}px)`,
-          cursor: flightState.autopilot || flightState.hasCrashed ? 'not-allowed' : 'grab',
-          pointerEvents: 'none' // Allow events to pass through to base
+          transform: `translate(calc(-50% + ${position.x}px), calc(-50% + ${position.y}px))`,
+          transition: isDragging ? 'none' : 'transform 0.2s ease-out'
         }
-      }, '✈️'),
-      React.createElement('div', { className: 'joystick-center-mark' })
+      }, '✈️')
     ),
-    React.createElement('div', { className: 'joystick-instructions' },
-      React.createElement('p', null, 'Drag the aircraft symbol to control pitch and roll'),
-      React.createElement('p', null, 'Up/Down: Pitch | Left/Right: Roll')
+    React.createElement('div', { className: 'joystick-status' },
+      React.createElement('p', null, `Position: ${position.x.toFixed(0)}, ${position.y.toFixed(0)}`),
+      React.createElement('p', null, `Pitch: ${flightState.pitch.toFixed(1)}° | Roll: ${flightState.roll.toFixed(1)}°`),
+      React.createElement('p', null, `Continuous: ${isDragging ? 'ACTIVE' : 'INACTIVE'}`)
     )
   );
 };

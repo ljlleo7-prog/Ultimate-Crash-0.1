@@ -460,11 +460,30 @@ class FlightPhysicsService {
         this.state.headingHold = true;
         this.state.altitudeHold = true;
       } else {
-        // **FIX IAS DROP: When disengaging AP, preserve current physics state**
-        // Keep all velocity and acceleration values exactly as they are
-        // No reset or sudden changes to horizontal/vertical velocities
-        console.log('AP disengaged - preserving physics state');
+        // **FIX: When disengaging AP, allow full manual control at any altitude**
+        // Remove any restrictions that prevent manual control at high altitude
+        console.log('AP disengaged - manual control enabled at', this.state.altitude, 'ft');
+        
+        // Ensure control functions can accept inputs at any altitude
+        // No special restrictions needed - manual control should work everywhere
       }
+    }
+  }
+
+  // Control functions - FIX: Remove altitude restrictions for manual control
+  controlPitch(amount) {
+    if (!this.state.autopilot && !this.state.hasCrashed) {
+      // **FIX: Allow manual control at any altitude**
+      const controlEffectiveness = this.state.isStalling ? 0.3 : 1.0;
+      this.state.pitch = Math.max(-15, Math.min(15, this.state.pitch + amount * controlEffectiveness));
+    }
+  }
+
+  controlRoll(amount) {
+    if (!this.state.autopilot && !this.state.hasCrashed) {
+      // **FIX: Allow manual control at any altitude**
+      const controlEffectiveness = this.state.isStalling ? 0.5 : 1.0;
+      this.state.roll = Math.max(-30, Math.min(30, this.state.roll + amount * controlEffectiveness));
     }
   }
 
