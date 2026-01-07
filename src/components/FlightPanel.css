@@ -303,3 +303,210 @@
 .flight-pose-group {
   text-align: center;
 }
+
+/* Control Panel Styles */
+.control-panel {
+  grid-column: 1 / 4;
+  grid-row: 4;
+  text-align: center;
+}
+
+.joystick-controller {
+  margin-bottom: 20px;
+  padding: 15px;
+  background: rgba(0, 0, 0, 0.5);
+  border-radius: 10px;
+  border: 1px solid #00ff00;
+}
+
+.joystick-controller h4 {
+  margin: 0 0 15px 0;
+  color: #00ff00;
+  font-size: 14px;
+  text-transform: uppercase;
+}
+
+.joystick-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 80px);
+  grid-template-rows: repeat(3, 60px);
+  gap: 5px;
+  justify-content: center;
+  align-items: center;
+}
+
+.control-btn {
+  width: 100%;
+  height: 100%;
+  background: #333;
+  border: 2px solid #666;
+  color: #fff;
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  border-radius: 5px;
+}
+
+.control-btn:hover {
+  background: #555;
+  border-color: #00ff00;
+  transform: scale(1.05);
+}
+
+.control-btn:active {
+  background: #00ff00;
+  color: #000;
+  transform: scale(0.95);
+}
+
+.pitch-up { grid-column: 2; grid-row: 1; }
+.pitch-down { grid-column: 2; grid-row: 3; }
+.roll-left { grid-column: 1; grid-row: 2; }
+.roll-right { grid-column: 3; grid-row: 2; }
+
+.joystick-center {
+  grid-column: 2;
+  grid-row: 2;
+  font-size: 24px;
+  color: #00ff00;
+  text-align: center;
+}
+
+/* Thrust Manager Styles */
+.thrust-manager {
+  padding: 15px;
+  background: rgba(0, 0, 0, 0.5);
+  border-radius: 10px;
+  border: 1px solid #ffa500;
+}
+
+.thrust-manager h4 {
+  margin: 0 0 15px 0;
+  color: #ffa500;
+  font-size: 14px;
+  text-transform: uppercase;
+}
+
+.thrust-controls {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.engine-control {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+  background: rgba(255, 165, 0, 0.1);
+  border-radius: 5px;
+  border: 1px solid #ffa500;
+}
+
+.engine-control.both {
+  background: rgba(255, 255, 0, 0.1);
+  border-color: #ffff00;
+}
+
+.engine-control span:first-child {
+  color: #ffa500;
+  font-weight: bold;
+  min-width: 80px;
+}
+
+.thrust-btn {
+  width: 30px;
+  height: 30px;
+  background: #333;
+  border: 1px solid #666;
+  color: #fff;
+  font-size: 16px;
+  font-weight: bold;
+  cursor: pointer;
+  border-radius: 3px;
+  transition: all 0.2s ease;
+}
+
+.thrust-btn:hover {
+  background: #555;
+  border-color: #ffa500;
+}
+
+.thrust-btn.increase:hover {
+  background: #4CAF50;
+}
+
+.thrust-btn.decrease:hover {
+  background: #f44336;
+}
+
+.thrust-value {
+  color: #fff;
+  font-family: 'Courier New', monospace;
+  font-size: 12px;
+  min-width: 50px;
+  text-align: center;
+}
+
+/* Autopilot Toggle Styles */
+.autopilot-toggle {
+  margin-top: 15px;
+  text-align: center;
+}
+
+.ap-toggle-btn {
+  padding: 10px 20px;
+  border: 2px solid #666;
+  background: #333;
+  color: #fff;
+  font-size: 14px;
+  font-weight: bold;
+  cursor: pointer;
+  border-radius: 5px;
+  transition: all 0.3s ease;
+  text-transform: uppercase;
+}
+
+.ap-toggle-btn.ap-engaged {
+  background: #4CAF50;
+  border-color: #4CAF50;
+  color: #fff;
+}
+
+.ap-toggle-btn.ap-disengaged {
+  background: #f44336;
+  border-color: #f44336;
+  color: #fff;
+}
+
+.ap-toggle-btn:hover {
+  transform: scale(1.05);
+  box-shadow: 0 0 10px rgba(255, 255, 255, 0.3);
+}
+
+.ap-toggle-btn:active {
+  transform: scale(0.95);
+}
+
+/* Disabled button styles */
+.control-btn:disabled,
+.thrust-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none !important;
+}
+
+.control-btn:disabled:hover,
+.thrust-btn:disabled:hover {
+  background: #333;
+  border-color: #666;
+  transform: none !important;
+}
+
+.thrust-value {
+  color: #fff;
+  font-family: 'Courier New', monospace;
+  font-size: 12px;
+  min-width: 50px;
+  text-align: center;
+}

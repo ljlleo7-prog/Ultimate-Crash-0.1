@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import './FlightPanel.css';
+import FlightPhysicsService from '../services/flightPhysicsService';
 
 const FlightPanel = ({ flightData, onActionRequest }) => {
   const [flightState, setFlightState] = useState({
@@ -47,27 +48,151 @@ const FlightPanel = ({ flightData, onActionRequest }) => {
     timeToWaypoint: 18.2
   });
 
-  // Dynamic updates
+  const flightPhysicsRef = useRef(new FlightPhysicsService());
+
+  // Dynamic updates with realistic flight physics
   useEffect(() => {
     const interval = setInterval(() => {
-      setFlightState(prevState => ({
-        ...prevState,
-        // Simulate small variations in flight parameters
-        pitch: prevState.pitch + (Math.random() - 0.5) * 0.2,
-        roll: prevState.roll + (Math.random() - 0.5) * 0.1,
-        heading: (prevState.heading + Math.random() * 0.1) % 360,
-        altitude: prevState.altitude + (Math.random() - 0.5) * 10,
-        verticalSpeed: prevState.verticalSpeed + (Math.random() - 0.5) * 50,
-        indicatedAirspeed: prevState.indicatedAirspeed + (Math.random() - 0.5) * 2,
-        engineN1: prevState.engineN1.map(n => Math.max(0, Math.min(100, n + (Math.random() - 0.5) * 0.1))),
-        engineN2: prevState.engineN2.map(n => Math.max(0, Math.min(100, n + (Math.random() - 0.5) * 0.1))),
-        engineEGT: prevState.engineEGT.map(t => Math.max(0, t + (Math.random() - 0.5) * 5)),
-        fuel: Math.max(0, prevState.fuel - Math.random() * 0.5)
-      }));
-    }, 1000);
+      const updatedState = flightPhysicsRef.current.update();
+      setFlightState(updatedState);
+    }, 100); // Update every 100ms for smooth physics
 
     return () => clearInterval(interval);
   }, []);
+
+  // Control functions
+  const controlPitch = (amount) => {
+    flightPhysicsRef.current.controlPitch(amount);
+  };
+
+  const controlRoll = (amount) => {
+    flightPhysicsRef.current.controlRoll(amount);
+  };
+
+  const controlThrust = (engineIndex, amount) => {
+    flightPhysicsRef.current.controlThrust(engineIndex, amount);
+  };
+
+  const toggleAutopilot = () => {
+    flightPhysicsRef.current.toggleAutopilot();
+    setFlightState(prevState => ({
+      ...prevState,
+      autopilot: !prevState.autopilot
+    }));
+  };
+
+  // Joystick Controller Component
+  const JoystickController = () => {
+    return React.createElement('div', { className: 'joystick-controller' },
+      React.createElement('h4', null, 'Flight Controls'),
+      React.createElement('div', { className: 'joystick-grid' },
+        // Pitch controls
+        React.createElement('button', {
+          key: 'pitch-up',
+          className: 'control-btn pitch-up',
+          onClick: () => controlPitch(-1),
+          disabled: flightState.autopilot
+        }, '↑ Pitch Up'),
+        React.createElement('button', {
+          key: 'pitch-down',
+          className: 'control-btn pitch-down',
+          onClick: () => controlPitch(1),
+          disabled: flightState.autopilot
+        }, '↓ Pitch Down'),
+        
+        // Roll controls
+        React.createElement('button', {
+          key: 'roll-left',
+          className: 'control-btn roll-left',
+          onClick: () => controlRoll(-1),
+          disabled: flightState.autopilot
+        }, '← Roll Left'),
+        React.createElement('button', {
+          key: 'roll-right',
+          className: 'control-btn roll-right',
+          onClick: () => controlRoll(1),
+          disabled: flightState.autopilot
+        }, '→ Roll Right'),
+        
+        // Center indicator
+        React.createElement('div', { key: 'center', className: 'joystick-center' }, '✈')
+      )
+    );
+  };
+
+  // Thrust Manager Component
+  const ThrustManager = () => {
+    return React.createElement('div', { className: 'thrust-manager' },
+      React.createElement('h4', null, 'Thrust Management'),
+      React.createElement('div', { className: 'thrust-controls' },
+        // Engine 1 controls
+        React.createElement('div', { key: 'engine1', className: 'engine-control' },
+          React.createElement('span', null, 'Engine 1:'),
+          React.createElement('button', {
+            className: 'thrust-btn decrease',
+            onClick: () => controlThrust(0, -5),
+            disabled: flightState.autopilot
+          }, '-'),
+          React.createElement('span', { className: 'thrust-value' }, `${flightState.engineN1[0].toFixed(1)}%`),
+          React.createElement('button', {
+            className: 'thrust-btn increase',
+            onClick: () => controlThrust(0, 5),
+            disabled: flightState.autopilot
+          }, '+')
+        ),
+        
+        // Engine 2 controls
+        React.createElement('div', { key: 'engine2', className: 'engine-control' },
+          React.createElement('span', null, 'Engine 2:'),
+          React.createElement('button', {
+            className: 'thrust-btn decrease',
+            onClick: () => controlThrust(1, -5),
+            disabled: flightState.autopilot
+          }, '-'),
+          React.createElement('span', { className: 'thrust-value' }, `${flightState.engineN1[1].toFixed(1)}%`),
+          React.createElement('button', {
+            className: 'thrust-btn increase',
+            onClick: () => controlThrust(1, 5),
+            disabled: flightState.autopilot
+          }, '+')
+        ),
+        
+        // Both engines together
+        React.createElement('div', { key: 'both-engines', className: 'engine-control both' },
+          React.createElement('span', null, 'Both Engines:'),
+          React.createElement('button', {
+            className: 'thrust-btn decrease',
+            onClick: () => {
+              controlThrust(0, -5);
+              controlThrust(1, -5);
+            },
+            disabled: flightState.autopilot
+          }, '-'),
+          React.createElement('span', { className: 'thrust-value' }, 'SYNC'),
+          React.createElement('button', {
+            className: 'thrust-btn increase',
+            onClick: () => {
+              controlThrust(0, 5);
+              controlThrust(1, 5);
+            },
+            disabled: flightState.autopilot
+          }, '+')
+        )
+      )
+    );
+  };
+
+  // Autopilot Toggle Component
+  const AutopilotToggle = () => {
+    return React.createElement('div', { className: 'autopilot-toggle' },
+      React.createElement('button', {
+        className: `ap-toggle-btn ${flightState.autopilot ? 'ap-engaged' : 'ap-disengaged'}`,
+        onClick: toggleAutopilot
+      },
+        `AP: ${flightState.autopilot ? 'ENGAGED' : 'DISENGAGED'}`
+      )
+    );
+  };
 
   // Flight Attitude Indicator Component
   const FlightAttitudeIndicator = () => {
@@ -191,6 +316,18 @@ const FlightPanel = ({ flightData, onActionRequest }) => {
         React.createElement('div', { key: 'fd' }, `FD: ${flightState.flightDirector ? 'ON' : 'OFF'}`),
         React.createElement('div', { key: 'alt-hold' }, `ALT HOLD: ${flightState.altitudeHold ? 'ON' : 'OFF'}`),
         React.createElement('div', { key: 'hdg-hold' }, `HDG HOLD: ${flightState.headingHold ? 'ON' : 'OFF'}`)
+      ),
+      AutopilotToggle()
+    ),
+    
+    React.createElement('div', {
+      key: 'control-panel',
+      className: 'instrument-group control-panel'
+    }, 
+      React.createElement('h3', { key: 'control-title' }, 'Flight Controls'),
+      React.createElement('div', { key: 'controls-container' },
+        JoystickController(),
+        ThrustManager()
       )
     ),
     
