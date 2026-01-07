@@ -14,6 +14,9 @@ import CentralPanel from './CentralPanel';
 // **NEW: Import Control Surface Panel**
 import ControlSurfacePanel from './ControlSurfacePanel';
 
+// **NEW: Import Autopilot Debug Panel**
+import AutopilotDebugPanel from './AutopilotDebugPanel';
+
 // Crash Warning Flash Component - MOVED OUTSIDE main component
 const CrashWarningFlash = ({ flashActive, flashText, onAlertComplete }) => {
   const [isVisible, setIsVisible] = useState(false);
@@ -492,6 +495,9 @@ const FlightPanel = ({ onActionRequest }) => {
     
     // Physics Debug Panel
     React.createElement(PhysicsDebugPanel, { flightPhysicsRef }),
+    
+    // **NEW: Autopilot Debug Panel**
+    React.createElement(AutopilotDebugPanel, { flightPhysicsRef }),
     
     // Modern cockpit layout
     React.createElement('div', { className: 'modern-cockpit' },

@@ -17,7 +17,7 @@ class FlightPhysicsService {
       // Flight Pose
       pitch: 2.5,
       roll: 0.5,
-      verticalSpeed: 1200,
+      verticalSpeed: 0, // FIXED: Start with level flight (0 FPM)
       altitude: 35000,
       altimeter: 29.92,
       
@@ -66,8 +66,8 @@ class FlightPhysicsService {
     // Physics state (not displayed)
     this.physicsState = {
       // Velocity vectors (knots)
-      horizontalVelocity: 280,
-      verticalVelocity: 20, // feet per second (converted from FPM)
+      horizontalVelocity: 280, // FIXED: Consistent with indicated airspeed
+      verticalVelocity: 0, // FIXED: Start with level flight (0 ft/s)
       
       // Angular rates (degrees per second)
       pitchRate: 0,
@@ -138,7 +138,9 @@ class FlightPhysicsService {
     const airDensity = 1.225 * Math.exp(-altitudeMeters / scaleHeight);
     
     // Convert airspeed to m/s for force calculations
-    const airspeedMs = this.state.indicatedAirspeed * 0.5144;
+    // FIXED: Use True Airspeed (TAS) instead of Indicated Airspeed (IAS) for lift/drag calculations
+    // IAS already accounts for air density, so using it would double-count density effects
+    const airspeedMs = this.state.trueAirspeed * 0.5144;
     
     // THRUST FORCE - Realistic engine performance with proper altitude effects
     const avgThrust = (this.state.engineN1[0] + this.state.engineN1[1]) / 2;
@@ -161,10 +163,8 @@ class FlightPhysicsService {
     const imbalanceDragFactor = 1.0 + (Math.abs(angleOfAttack) * 0.08); // Increased effect
     dragCoefficient *= imbalanceDragFactor;
     
-    // FIX: Improved altitude effect on drag - more realistic high altitude drag
-    // At high altitudes, drag should be lower but not unrealistically small
-    const altitudeDragFactor = Math.max(0.3, 1 - (this.state.altitude / 80000)); // Increased minimum to 0.3
-    dragCoefficient *= altitudeDragFactor;
+    // FIXED: Remove hard-coded altitude factor - air density is already accounted for in the drag formula
+    // Drag formula: Drag = 0.5 * Cd * ρ * S * V² - ρ already handles altitude effects
     
     this.physicsState.dragForce = 0.5 * dragCoefficient * airDensity * wingArea * airspeedMs * airspeedMs;
     
@@ -173,8 +173,9 @@ class FlightPhysicsService {
     const angleOfAttackRad = angleOfAttack * Math.PI / 180;
     
     // PROPER LIFT COEFFICIENT: Cl = Cl0 + (dCl/dα) * α
-    const liftCurveSlope = 0.08; // Realistic value per degree of AoA for transport aircraft (reduced from 0.11)
-    let liftCoefficient = 0.3 + (liftCurveSlope * angleOfAttack); // Cl0 = 0.3 for typical airfoil
+    // FIXED: More realistic lift coefficients for transport aircraft
+    const liftCurveSlope = 0.05; // Reduced from 0.08 - more realistic 0.05 per degree
+    let liftCoefficient = 0.8 + (liftCurveSlope * angleOfAttack); // Increased Cl0 from 0.3 to 0.8
     
     // FIX: Improved stall modeling with realistic stall behavior
     const stallAngle = 15; // Typical stall angle for transport aircraft
@@ -196,6 +197,16 @@ class FlightPhysicsService {
     liftCoefficient *= altitudeLiftFactor;
     
     this.physicsState.liftForce = 0.5 * liftCoefficient * airDensity * wingArea * airspeedMs * airspeedMs;
+    
+    // DEBUG: Log lift calculation details
+    if (Math.random() < 0.02) { // Log 2% of updates
+      console.log(`Lift Debug: AoA=${angleOfAttack.toFixed(1)}°, ` +
+                  `Cl=${liftCoefficient.toFixed(3)}, ` +
+                  `ρ=${airDensity.toFixed(3)}kg/m³, ` +
+                  `V=${airspeedMs.toFixed(1)}m/s, ` +
+                  `S=${wingArea}m², ` +
+                  `Lift=${this.physicsState.liftForce.toFixed(0)}N`);
+    }
     
     // GRAVITY FORCE
     this.physicsState.gravityForce = this.physicsState.mass * 9.81;
@@ -277,7 +288,7 @@ class FlightPhysicsService {
 
   // Calculate angle of attack based on pitch and flight path
   calculateAngleOfAttack() {
-    // FIX: Proper angle of attack calculation with realistic limits
+    // FIXED: Realistic angle of attack calculation that follows flight dynamics
     // Angle of attack = pitch angle - flight path angle
     
     // Handle edge case when horizontal velocity is very low
@@ -288,6 +299,12 @@ class FlightPhysicsService {
     // Calculate flight path angle (gamma) in radians
     const horizontalVelocityMs = this.physicsState.horizontalVelocity * 0.5144;
     const verticalVelocityMs = this.physicsState.verticalVelocity * 0.3048; // Convert ft/s to m/s
+    
+    // FIX: Handle division by zero and very small velocities
+    if (Math.abs(horizontalVelocityMs) < 0.1) {
+      return this.state.pitch; // When barely moving horizontally, AoA ≈ pitch
+    }
+    
     const flightPathAngle = Math.atan2(verticalVelocityMs, horizontalVelocityMs);
     
     // Convert pitch to radians
@@ -296,12 +313,36 @@ class FlightPhysicsService {
     // Calculate angle of attack in radians, then convert to degrees
     let angleOfAttackRad = pitchRad - flightPathAngle;
     
-    // Convert to degrees and apply realistic limits
+    // Convert to degrees
     let angleOfAttackDeg = angleOfAttackRad * 180 / Math.PI;
     
-    // Apply realistic limits: -10° to +25° for normal flight
-    // Allow brief excursions beyond these limits for stall physics
+    // FIXED: Realistic AoA behavior - it should naturally follow the flight path
+    // The key insight: AoA should be stable and realistic, not jump to extremes
+    // In normal flight, AoA should be between -5° and +15° for transport aircraft
+    
+    // Apply realistic limits for normal flight
+    const normalAoALimit = 15;
+    const normalAoAMin = -5;
+    
+    // Only allow extreme AoA values during actual stall conditions
+    if (Math.abs(angleOfAttackDeg) > normalAoALimit && !this.state.isStalling) {
+      // If not stalling, gently bring AoA back to normal range
+      const correctionRate = 2.0; // Degrees per second
+      const correction = Math.sign(angleOfAttackDeg) * Math.min(Math.abs(angleOfAttackDeg - normalAoALimit), correctionRate * 0.1);
+      angleOfAttackDeg -= correction;
+    }
+    
+    // Apply final limits for safety
     angleOfAttackDeg = Math.max(-30, Math.min(30, angleOfAttackDeg));
+    
+    // DEBUG: Log AoA calculation for troubleshooting
+    if (Math.random() < 0.02) { // Log 2% of updates
+      const flightPathDeg = flightPathAngle * 180 / Math.PI;
+      console.log(`AoA Debug: Pitch=${this.state.pitch.toFixed(1)}°, ` +
+                  `FlightPath=${flightPathDeg.toFixed(1)}°, ` +
+                  `AoA=${angleOfAttackDeg.toFixed(1)}°, ` +
+                  `Difference: ${(this.state.pitch - flightPathDeg).toFixed(1)}°`);
+    }
     
     return angleOfAttackDeg;
   }
@@ -807,16 +848,30 @@ class FlightPhysicsService {
       targetPitch = aoaCorrection;
       console.log(`ALPHA-FLOOR: Stall protection active. Target pitch: ${targetPitch.toFixed(1)}°`);
     } else {
-      // **NORMAL OPERATION: Combine altitude and AoA control**
-      const aoaPriority = Math.min(1.0, Math.abs(currentAoA) / stallWarningAoA);
-      targetPitch = targetPitchFromVS * (1 - aoaPriority) + aoaCorrection * aoaPriority;
+      // **NORMAL OPERATION: Allow natural flight dynamics with gentle guidance**
+      // FIXED: Reduced altitude control authority to allow natural flight path
+      const altitudePriority = 0.3; // Reduced from aggressive control
+      const aoaPriority = Math.min(0.7, Math.abs(currentAoA) / stallWarningAoA);
+      
+      // Combine controls with natural flight dynamics
+      targetPitch = targetPitchFromVS * altitudePriority + aoaCorrection * aoaPriority;
+      
+      // Allow aircraft to naturally follow flight path
+      const flightPathAngle = Math.atan2(this.physicsState.verticalVelocity * 0.3048, 
+                                        this.physicsState.horizontalVelocity * 0.5144) * 180 / Math.PI;
+      const naturalPitchInfluence = 0.4; // Allow natural flight path influence
+      targetPitch = targetPitch * (1 - naturalPitchInfluence) + flightPathAngle * naturalPitchInfluence;
     }
     
     // Apply pitch control with aggressive smoothing for stall protection
     const pitchError = targetPitch - this.state.pitch;
     const pitchRate = stallProtectionActive ? 3.0 : 0.5; // Faster response during stall
     this.state.pitch += Math.sign(pitchError) * Math.min(Math.abs(pitchError), pitchRate * dt);
-    this.state.pitch = Math.max(-15, Math.min(15, this.state.pitch));
+    
+    // FIXED: Only apply artificial limits during normal operation, not during stall protection
+    if (!stallProtectionActive) {
+      this.state.pitch = Math.max(-15, Math.min(15, this.state.pitch));
+    }
     
     // **ADDITIONAL STALL PROTECTION: Increase thrust during stall conditions**
     let targetThrustAdjustment = 0;
@@ -941,6 +996,69 @@ class FlightPhysicsService {
     };
   }
 
+  // **NEW: Autopilot Debug Information Method**
+  getAutopilotDebugInfo() {
+    const currentAoA = this.calculateAngleOfAttack();
+    
+    // Calculate what the autopilot would do
+    const targetAoA = 2.5;
+    const stallWarningAoA = 12.0;
+    const criticalStallAoA = 16.0;
+    
+    let aoaCorrection = 0;
+    let stallProtectionActive = false;
+    
+    if (Math.abs(currentAoA) > criticalStallAoA) {
+      aoaCorrection = -15.0;
+      stallProtectionActive = true;
+    } else if (Math.abs(currentAoA) > stallWarningAoA) {
+      aoaCorrection = -8.0;
+      stallProtectionActive = true;
+    } else if (Math.abs(currentAoA) > 8.0) {
+      aoaCorrection = (targetAoA - currentAoA) * 0.3;
+      stallProtectionActive = true;
+    } else {
+      aoaCorrection = (targetAoA - currentAoA) * 0.05;
+    }
+    
+    // Calculate target pitch from altitude hold
+    const targetAltitude = 35000;
+    const altitudeError = targetAltitude - this.state.altitude;
+    const kp = 0.001;
+    const targetVS = altitudeError * kp;
+    const targetVS_fts = targetVS / 60;
+    const vsToPitchGain = 0.05;
+    const targetPitchFromVS = targetVS_fts * vsToPitchGain;
+    
+    // Determine final target pitch
+    let targetPitch;
+    if (stallProtectionActive) {
+      targetPitch = aoaCorrection;
+    } else {
+      const aoaPriority = Math.min(1.0, Math.abs(currentAoA) / stallWarningAoA);
+      targetPitch = targetPitchFromVS * (1 - aoaPriority) + aoaCorrection * aoaPriority;
+    }
+    
+    const pitchError = targetPitch - this.state.pitch;
+    
+    return {
+      currentAoA: currentAoA,
+      pitch: this.state.pitch,
+      altitude: this.state.altitude,
+      airspeed: this.state.indicatedAirspeed,
+      autopilotActive: this.state.autopilot,
+      stallProtectionActive: stallProtectionActive,
+      targetAoA: targetAoA,
+      stallWarningAoA: stallWarningAoA,
+      criticalStallAoA: criticalStallAoA,
+      aoaCorrection: aoaCorrection,
+      targetPitch: targetPitch,
+      pitchError: pitchError,
+      targetPitchFromVS: targetPitchFromVS,
+      altitudeError: altitudeError
+    };
+  }
+
   // Add method to set specific test conditions for debugging
   setDebugConditions(altitude, ias, pitch, thrust) {
     this.state.altitude = altitude;
@@ -994,7 +1112,7 @@ class FlightPhysicsService {
     
     // Apply thrust control to both engines
     const baseThrust = 85; // Base N1 setting for cruise
-    const targetN1 = Math.max(60, Math.min(95, baseThrust + thrustAdjustment)); // Increased minimum to 60
+    const targetN1 = Math.max(60, Math.min(95, baseThrust + thrustAdjustment)); // Higher minimum to 60
     
     // Apply thrust with realistic engine spooling
     this.state.engineN1 = this.state.engineN1.map((currentN1, index) => {
