@@ -1,5 +1,5 @@
 import React from 'react';
-import FlightPanel from './FlightPanel.js';
+import FlightPanel from './FlightPanel.jsx';
 
 const FlightInProgress = ({
   callsign, aircraftModel, difficulty, selectedDeparture, selectedArrival, flightPlan,
@@ -92,6 +92,9 @@ const FlightInProgress = ({
           flightData: flightData,
           onActionRequest: (action) => {
             console.log('Action requested:', action);
+            if (action === 'reset-to-initiation') {
+              handleResetFlight();
+            }
           }
         }),
         

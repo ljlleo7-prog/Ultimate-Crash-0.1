@@ -414,7 +414,7 @@ const FlightInitialization = ({
           React.createElement(AirportSearchInput, {
             placeholder: 'Search departure airport...',
             searchResults: searchResults,
-            onSearch: handleSearch,
+            handleSearch: handleSearch, // FIXED: Changed from onSearch to handleSearch
             onSelect: selectDeparture,
             selectedAirport: selectedDeparture
           })
@@ -425,7 +425,7 @@ const FlightInitialization = ({
           React.createElement(AirportSearchInput, {
             placeholder: 'Search arrival airport...',
             searchResults: searchResults,
-            onSearch: handleSearch,
+            handleSearch: handleSearch, // FIXED: Changed from onSearch to handleSearch
             onSelect: selectArrival,
             selectedAirport: selectedArrival
           })
