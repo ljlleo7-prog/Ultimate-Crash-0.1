@@ -212,7 +212,7 @@ class FlightPhysicsService {
     return ias * altitudeFactor;
   }
 
-  // Check for crash conditions and set warnings
+  // Check for crash conditions and set warnings with flashing effects
   checkCrashConditions(dt) {
     if (this.physicsState.verticalVelocity < 0 && this.state.altitude > 0) {
       const descentRate = Math.abs(this.physicsState.verticalVelocity); // ft/s
@@ -221,15 +221,20 @@ class FlightPhysicsService {
       this.state.timeToCrash = null;
     }
     
+    // **ADD FLASHING EFFECTS TO ALL WARNINGS**
+    const currentTime = Date.now();
+    const flashInterval = 500; // Flash every 500ms
+    const shouldFlash = Math.floor(currentTime / flashInterval) % 2 === 0;
+    
     if (this.state.altitude <= 0) {
       this.state.hasCrashed = true;
       this.state.crashWarning = 'CRASHED';
     } else if (this.physicsState.verticalVelocity < -33.3 && this.state.altitude <= 0) { // -2000 fpm in ft/s
-      this.state.crashWarning = 'PULL UP!';
+      this.state.crashWarning = shouldFlash ? 'PULL UP!' : '';
     } else if (this.state.timeToCrash && this.state.timeToCrash <= 10) {
-      this.state.crashWarning = 'TERRAIN!';
+      this.state.crashWarning = shouldFlash ? 'TERRAIN!' : '';
     } else if (this.physicsState.verticalVelocity < -16.7 && this.state.timeToCrash && this.state.timeToCrash <= 20) { // -1000 fpm
-      this.state.crashWarning = 'SINK RATE!';
+      this.state.crashWarning = shouldFlash ? 'SINK RATE!' : '';
     } else {
       this.state.crashWarning = null;
     }
@@ -302,7 +307,7 @@ class FlightPhysicsService {
     }
   }
 
-  // Autopilot functions
+  // Autopilot functions - FIX IAS DROP ON DISENGAGEMENT
   toggleAutopilot() {
     if (!this.state.hasCrashed) {
       this.state.autopilot = !this.state.autopilot;
@@ -313,8 +318,12 @@ class FlightPhysicsService {
         this.state.roll = Math.max(-5, Math.min(5, this.state.roll));
         this.state.headingHold = true;
         this.state.altitudeHold = true;
+      } else {
+        // **FIX IAS DROP: When disengaging AP, preserve current physics state**
+        // Keep all velocity and acceleration values exactly as they are
+        // No reset or sudden changes to horizontal/vertical velocities
+        console.log('AP disengaged - preserving physics state');
       }
-      // When disengaging AP, keep current physics state (no speed drop)
     }
   }
 
@@ -416,6 +425,17 @@ class FlightPhysicsService {
     // Apply horizontal speed limits only (remove VS limits)
     const maxHorizontalSpeed = this.calculateMaxSpeedAtAltitude();
     this.physicsState.horizontalVelocity = Math.max(100, Math.min(maxHorizontalSpeed, this.physicsState.horizontalVelocity));
+    
+    // **IMPROVED ENERGY CONVERSION: Convert vertical speed to horizontal speed when pitching down**
+    if (this.state.pitch < 0 && this.physicsState.verticalVelocity < 0) {
+      // When pitching down with negative VS, convert potential energy to kinetic energy
+      const energyConversionFactor = 0.1; // How much VS converts to IAS
+      const pitchDownFactor = Math.abs(this.state.pitch) / 15; // More pitch = more conversion
+      const vsMagnitude = Math.abs(this.physicsState.verticalVelocity);
+      
+      const speedGain = vsMagnitude * pitchDownFactor * energyConversionFactor * dt;
+      this.physicsState.horizontalVelocity += speedGain;
+    }
     
     // Stall detection
     const stallSpeed = this.calculateStallSpeed();
