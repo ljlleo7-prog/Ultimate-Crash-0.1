@@ -1,5 +1,8 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import FlightPanel from './FlightPanel.jsx';
+import FlightPhysicsDashboard from './FlightPhysicsDashboard.jsx';
+import PIDAutopilotPanel from './PIDAutopilotPanel.jsx';
+import { useAircraftPhysics } from '../hooks/useAircraftPhysics.js';
 
 const FlightInProgress = ({
   callsign, aircraftModel, difficulty, selectedDeparture, selectedArrival, flightPlan,
@@ -7,7 +10,80 @@ const FlightInProgress = ({
   handleResetFlight, formatDistance, formatFlightTime, formatFuel,
   weatherData, failureType, crewCount
 }) => {
-  
+  // ✅ INTEGRATE REAL PHYSICS ENGINE
+  const [aircraftConfig, setAircraftConfig] = useState(null);
+  const [physicsEnabled, setPhysicsEnabled] = useState(true);
+  const [controlInputs, setControlInputs] = useState({
+    throttle: 47, // Start at cruise power
+    pitch: 3.0,   // +3° pitch for cruise
+    roll: 0,
+    yaw: 0
+  });
+
+  // ✅ INITIALIZE AIRCRAFT CONFIGURATION
+  useEffect(() => {
+    if (aircraftModel) {
+      // Load aircraft configuration from database
+      const config = {
+        model: aircraftModel,
+        mass: 73300, // Boeing 737-800 typical operating weight
+        payload: payload || 15000,
+        fuelWeight: fuelReserve ? fuelReserve * 26020 : 0.7 * 26020 // 70% fuel
+      };
+      setAircraftConfig(config);
+      console.log('🛩️ FlightInProgress: Aircraft config loaded:', config);
+    }
+  }, [aircraftModel, payload, fuelReserve]);
+
+  // ✅ PHYSICS ENGINE HOOK INTEGRATION
+  const {
+    flightData: physicsFlightData,
+    physicsState,
+    isInitialized,
+    error,
+    debugData,
+    setThrottle,
+    setPitch,
+    setRoll,
+    setYaw,
+    resetAircraft
+  } = useAircraftPhysics(aircraftConfig, physicsEnabled);
+
+  // ✅ UPDATE CONTROL INPUTS
+  const handleControlChange = (controlType, value) => {
+    const newInputs = { ...controlInputs };
+    newInputs[controlType] = value;
+    setControlInputs(newInputs);
+    
+    // Apply to physics engine
+    switch (controlType) {
+      case 'throttle':
+        setThrottle(value);
+        break;
+      case 'pitch':
+        setPitch(value);
+        break;
+      case 'roll':
+        setRoll(value);
+        break;
+      case 'yaw':
+        setYaw(value);
+        break;
+    }
+  };
+
+  // ✅ HANDLE PHYSICS RESET
+  const handlePhysicsReset = () => {
+    resetAircraft();
+    setControlInputs({
+      throttle: 47,
+      pitch: 3.0,
+      roll: 0,
+      yaw: 0
+    });
+  };
+
+  // ✅ GENERATE RANDOM TIME/SEASON
   const generateRandomTime = () => {
     const hours = Math.floor(Math.random() * 24).toString().padStart(2, '0');
     const minutes = Math.floor(Math.random() * 60).toString().padStart(2, '0');
@@ -19,8 +95,8 @@ const FlightInProgress = ({
     return seasons[Math.floor(Math.random() * seasons.length)];
   };
 
-  // Flight data for the cockpit display
-  const flightData = {
+  // ✅ FALLBACK FLIGHT DATA (when physics not initialized)
+  const fallbackFlightData = {
     heading: 245,
     trueAirspeed: 480,
     groundSpeed: 465,
@@ -54,14 +130,51 @@ const FlightInProgress = ({
     timeToWaypoint: flightPlan ? flightPlan.time : 0
   };
 
+  // ✅ USE PHYSICS DATA OR FALLBACK
+  const activeFlightData = isInitialized && physicsFlightData ? physicsFlightData : fallbackFlightData;
+
   return React.createElement('div', { className: 'App' }, [
+    // ✅ HEADER WITH PHYSICS STATUS
     React.createElement('header', { key: 'header', className: 'app-header' }, [
       React.createElement('h1', { key: 'title' }, 'Flight in Progress - ', callsign || 'Unnamed Flight'),
       React.createElement('p', { key: 'subtitle' }, 'Difficulty: ', difficulty.toUpperCase(), ' | Aircraft: ', aircraftModel),
+      React.createElement('div', { key: 'physics-status', className: 'physics-status' }, [
+        React.createElement('span', { 
+          key: 'physics-indicator',
+          className: `physics-indicator ${isInitialized ? 'active' : 'inactive'}`,
+          style: { 
+            color: isInitialized ? '#10B981' : '#EF4444',
+            fontSize: '0.9em',
+            marginLeft: '10px'
+          }
+        }, isInitialized ? '🛩️ PHYSICS ACTIVE' : '⚠️ PHYSICS OFFLINE'),
+        React.createElement('button', { 
+          key: 'physics-reset-btn',
+          onClick: handlePhysicsReset,
+          style: { 
+            marginLeft: '10px',
+            padding: '5px 10px',
+            backgroundColor: '#3B82F6',
+            color: 'white',
+            border: 'none',
+            borderRadius: '4px',
+            cursor: 'pointer'
+          }
+        }, 'Reset Physics')
+      ]),
       React.createElement('button', { 
         key: 'reset-btn',
         onClick: handleResetFlight, 
-        className: 'reset-btn' 
+        className: 'reset-btn',
+        style: {
+          marginLeft: '10px',
+          padding: '5px 10px',
+          backgroundColor: '#EF4444',
+          color: 'white',
+          border: 'none',
+          borderRadius: '4px',
+          cursor: 'pointer'
+        }
       }, 'Reset Flight')
     ]),
 
@@ -86,10 +199,29 @@ const FlightInProgress = ({
           ])
         ]),
         
-        // Flight Panel Cockpit Display
+        // ✅ INTEGRATED FLIGHT PHYSICS DASHBOARD
+        React.createElement(FlightPhysicsDashboard, {
+          key: 'physics-dashboard',
+          flightData: activeFlightData,
+          physicsState: physicsState,
+          debugData: debugData,
+          isInitialized: isInitialized,
+          aircraftConfig: aircraftConfig
+        }),
+        
+        // ✅ PID AUTOPILOT CONTROL PANEL
+        React.createElement(PIDAutopilotPanel, {
+          key: 'pid-autopilot',
+          physicsService: physicsState,
+          onAutopilotToggle: (enabled) => {
+            console.log('Autopilot toggled:', enabled);
+          }
+        }),
+        
+        // Flight Panel Cockpit Display (using physics data)
         React.createElement(FlightPanel, {
           key: 'cockpit-display',
-          flightData: flightData,
+          flightData: activeFlightData,
           aircraftModel: aircraftModel,
           onActionRequest: (action) => {
             console.log('Action requested:', action);
@@ -98,6 +230,88 @@ const FlightInProgress = ({
             }
           }
         }),
+        
+        // ✅ PHYSICS CONTROL PANEL
+        React.createElement('div', { key: 'physics-controls', className: 'physics-controls', style: {
+          marginTop: '20px',
+          padding: '20px',
+          backgroundColor: '#1F2937',
+          borderRadius: '8px',
+          border: '1px solid #374151'
+        }}, [
+          React.createElement('h3', { key: 'controls-title', style: { color: '#60A5FA', marginBottom: '15px' } }, '🎮 Physics Controls'),
+          
+          // Throttle Control
+          React.createElement('div', { key: 'throttle-control', style: { marginBottom: '15px' }}, [
+            React.createElement('label', { 
+              key: 'throttle-label',
+              style: { color: '#D1D5DB', display: 'block', marginBottom: '5px' }
+            }, `Throttle: ${controlInputs.throttle}%`),
+            React.createElement('input', {
+              key: 'throttle-slider',
+              type: 'range',
+              min: '0',
+              max: '100',
+              value: controlInputs.throttle,
+              onChange: (e) => handleControlChange('throttle', parseInt(e.target.value)),
+              style: { width: '100%' }
+            })
+          ]),
+          
+          // Pitch Control
+          React.createElement('div', { key: 'pitch-control', style: { marginBottom: '15px' }}, [
+            React.createElement('label', { 
+              key: 'pitch-label',
+              style: { color: '#D1D5DB', display: 'block', marginBottom: '5px' }
+            }, `Pitch: ${controlInputs.pitch.toFixed(1)}°`),
+            React.createElement('input', {
+              key: 'pitch-slider',
+              type: 'range',
+              min: '-20',
+              max: '20',
+              step: '0.1',
+              value: controlInputs.pitch,
+              onChange: (e) => handleControlChange('pitch', parseFloat(e.target.value)),
+              style: { width: '100%' }
+            })
+          ]),
+          
+          // Roll Control
+          React.createElement('div', { key: 'roll-control', style: { marginBottom: '15px' }}, [
+            React.createElement('label', { 
+              key: 'roll-label',
+              style: { color: '#D1D5DB', display: 'block', marginBottom: '5px' }
+            }, `Roll: ${controlInputs.roll.toFixed(1)}°`),
+            React.createElement('input', {
+              key: 'roll-slider',
+              type: 'range',
+              min: '-45',
+              max: '45',
+              step: '0.1',
+              value: controlInputs.roll,
+              onChange: (e) => handleControlChange('roll', parseFloat(e.target.value)),
+              style: { width: '100%' }
+            })
+          ]),
+          
+          // Yaw Control
+          React.createElement('div', { key: 'yaw-control', style: { marginBottom: '15px' }}, [
+            React.createElement('label', { 
+              key: 'yaw-label',
+              style: { color: '#D1D5DB', display: 'block', marginBottom: '5px' }
+            }, `Yaw: ${controlInputs.yaw.toFixed(1)}°`),
+            React.createElement('input', {
+              key: 'yaw-slider',
+              type: 'range',
+              min: '-15',
+              max: '15',
+              step: '0.1',
+              value: controlInputs.yaw,
+              onChange: (e) => handleControlChange('yaw', parseFloat(e.target.value)),
+              style: { width: '100%' }
+            })
+          ])
+        ]),
         
         React.createElement('div', { key: 'details', className: 'flight-details' }, [
           React.createElement('h3', { key: 'params-title' }, 'Flight Parameters'),

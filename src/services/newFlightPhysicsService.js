@@ -1,11 +1,65 @@
 /**
- * New Flight Physics Service - Advanced 6-DOF Aircraft Dynamics
+ * PID Controller for Autopilot Systems
+ */
+class PIDController {
+  constructor(kp, ki, kd, outputMin = -1, outputMax = 1) {
+    this.kp = kp; // Proportional gain
+    this.ki = ki; // Integral gain
+    this.kd = kd; // Derivative gain
+    this.outputMin = outputMin;
+    this.outputMax = outputMax;
+    
+    this.previousError = 0;
+    this.integral = 0;
+    this.lastTime = 0;
+  }
+  
+  /**
+   * Calculate PID output
+   * @param {number} setpoint - Target value
+   * @param {number} currentValue - Current measured value
+   * @param {number} dt - Time step in seconds
+   * @returns {number} PID controller output
+   */
+  calculate(setpoint, currentValue, dt) {
+    // Calculate error
+    const error = setpoint - currentValue;
+    
+    // Calculate integral term with anti-windup
+    this.integral += error * dt;
+    this.integral = Math.max(-10, Math.min(10, this.integral)); // Anti-windup limit
+    
+    // Calculate derivative term
+    const derivative = (error - this.previousError) / dt;
+    this.previousError = error;
+    
+    // Calculate PID output
+    let output = this.kp * error + this.ki * this.integral + this.kd * derivative;
+    
+    // Apply output limits
+    output = Math.max(this.outputMin, Math.min(this.outputMax, output));
+    
+    return output;
+  }
+  
+  /**
+   * Reset controller state
+   */
+  reset() {
+    this.previousError = 0;
+    this.integral = 0;
+  }
+}
+
+/**
+ * New Flight Physics Service - Advanced 6-DOF Aircraft Dynamics with PID Autopilot
  * Implements realistic aerodynamic forces, propulsion, and flight physics
  * 
  * Key Improvements:
  * - Realistic mass calculation (empty weight + fuel + payload)
  * - Correct angle of attack calculation for cruise flight
  * - Proper aerodynamic force directions
+ * - PID-controlled autopilot for altitude and speed maintenance
  * - No NaN/Infinity issues with singularity protection
  * - Database integration with complete aircraft properties
  */
@@ -55,7 +109,7 @@ class NewFlightPhysicsService {
     // Environment parameters (cruise altitude)
     this.environment = {
       density: 0.379,     // kg/m³ at FL350
-      pressure: 23840,    // Pa at FL350
+      pressure: 23840,   // Pa at FL350
       temperature: 229,   // K at FL350
       speedOfSound: 295, // m/s at FL350
       wind: { x: 0, y: 0, z: 0 }
@@ -72,6 +126,51 @@ class NewFlightPhysicsService {
     
     // Debug data storage
     this.debugData = {};
+    
+    // 🚁 PID AUTOPILOT SYSTEM
+    this.autopilot = {
+      enabled: false,
+      engaged: false,
+      targets: {
+        altitude: -10668, // 35,000 ft in meters (negative = downward)
+        speed: 231.5,     // 450 KTS in m/s
+        heading: 0        // 0° (North)
+      },
+      limits: {
+        maxPitch: 15 * Math.PI/180, // ±15° pitch limit
+        minPitch: -5 * Math.PI/180, // Don't allow nose-down beyond -5°
+        maxThrottle: 0.95,         // 95% max thrust
+        minThrottle: 0.20          // 20% min thrust
+      }
+    };
+    
+    // Initialize PID Controllers with tuned parameters
+    this.pidControllers = {
+      altitude: new PIDController(
+        0.0008, // Kp - altitude error to pitch response
+        0.0001, // Ki - eliminate steady-state error
+        0.002,  // Kd - damping for smooth control
+        -0.3,   // min pitch
+        0.3     // max pitch
+      ),
+      speed: new PIDController(
+        0.5,    // Kp - speed error to throttle response
+        0.05,   // Ki - eliminate steady-state error
+        0.1,    // Kd - damping for smooth response
+        -0.5,   // min throttle change
+        0.5     // max throttle change
+      ),
+      heading: new PIDController(
+        0.8,    // Kp - heading error to roll response
+        0.1,    // Ki - eliminate steady-state error
+        0.3,    // Kd - damping
+        -0.5,   // min roll
+        0.5     // max roll
+      )
+    };
+    
+    // Store previous control values for smooth transitions
+    this.previousControls = { ...this.state.controls };
   }
   
   /**
@@ -142,15 +241,29 @@ class NewFlightPhysicsService {
   }
   
   /**
-   * Main physics update step
-   * Applies input smoothing and integrates all forces
+   * Main physics update step with PID autopilot integration
+   * Applies input smoothing, autopilot control, and integrates all forces
    */
-  update(input) {
+  update(input = {}) {
+    // Handle autopilot engagement/disengagement
+    if (input.autopilot !== undefined) {
+      this.autopilot.engaged = input.autopilot;
+    }
+    
+    if (input.targets !== undefined) {
+      this.updateAutopilotTargets(input.targets);
+    }
+    
+    // Calculate control inputs (autopilot or manual)
+    const controlInputs = this.autopilot.engaged ? 
+      this.calculateAutopilotControls() : 
+      this.applyManualControls(input);
+    
     // Apply input smoothing to prevent control oscillations
-    this.state.controls.throttle = this.smoothInput(this.state.controls.throttle, input.throttle, 0.1);
-    this.state.controls.pitch = this.smoothInput(this.state.controls.pitch, input.pitch, 0.2);
-    this.state.controls.roll = this.smoothInput(this.state.controls.roll, input.roll, 0.2);
-    this.state.controls.yaw = this.smoothInput(this.state.controls.yaw, input.yaw, 0.1);
+    this.state.controls.throttle = this.smoothInput(this.state.controls.throttle, controlInputs.throttle, 0.1);
+    this.state.controls.pitch = this.smoothInput(this.state.controls.pitch, controlInputs.pitch, 0.2);
+    this.state.controls.roll = this.smoothInput(this.state.controls.roll, controlInputs.roll, 0.2);
+    this.state.controls.yaw = this.smoothInput(this.state.controls.yaw, controlInputs.yaw, 0.1);
     
     // Calculate all forces and moments
     this.calculateAerodynamicForces();
@@ -161,8 +274,171 @@ class NewFlightPhysicsService {
     this.sumForcesAndMoments();
     this.integrateMotion();
     
+    // Store debug data for analysis
+    if (this.autopilot.engaged) {
+      this.debugData.autopilot = {
+        engaged: true,
+        altitude_error: this.autopilot.targets.altitude - this.state.position.z,
+        speed_error: this.autopilot.targets.speed - Math.sqrt(
+          this.state.velocity.u * this.state.velocity.u + 
+          this.state.velocity.v * this.state.velocity.v + 
+          this.state.velocity.w * this.state.velocity.w
+        ),
+        pitch_command: controlInputs.pitch,
+        throttle_command: controlInputs.throttle
+      };
+    } else {
+      this.debugData.autopilot = { engaged: false };
+    }
+    
     // Return updated state
     return this.getAircraftState();
+  }
+  
+  /**
+   * Calculate autopilot control inputs using PID controllers
+   */
+  calculateAutopilotControls() {
+    const currentAltitude = this.state.position.z;
+    const currentSpeed = Math.sqrt(
+      this.state.velocity.u * this.state.velocity.u + 
+      this.state.velocity.v * this.state.velocity.v + 
+      this.state.velocity.w * this.state.velocity.w
+    );
+    const currentHeading = this.state.orientation.psi;
+    
+    // Calculate PID outputs
+    const pitchCommand = this.pidControllers.altitude.calculate(
+      this.autopilot.targets.altitude, 
+      currentAltitude, 
+      this.dt
+    );
+    
+    const throttleCommand = this.pidControllers.speed.calculate(
+      this.autopilot.targets.speed, 
+      currentSpeed, 
+      this.dt
+    );
+    
+    const rollCommand = this.pidControllers.heading.calculate(
+      this.autopilot.targets.heading, 
+      currentHeading, 
+      this.dt
+    );
+    
+    // Apply control limits
+    const limitedPitch = Math.max(
+      this.autopilot.limits.minPitch, 
+      Math.min(this.autopilot.limits.maxPitch, pitchCommand)
+    );
+    
+    const limitedThrottle = Math.max(
+      this.autopilot.limits.minThrottle, 
+      Math.min(this.autopilot.limits.maxThrottle, this.state.controls.throttle + throttleCommand)
+    );
+    
+    const limitedRoll = Math.max(-0.5, Math.min(0.5, rollCommand));
+    
+    // Add small coordination inputs for smooth flight
+    const yawCoordination = -rollCommand * 0.1; // Coordinated turn
+    
+    return {
+      pitch: limitedPitch,
+      throttle: limitedThrottle,
+      roll: limitedRoll,
+      yaw: yawCoordination
+    };
+  }
+  
+  /**
+   * Apply manual control inputs with safety limits
+   */
+  applyManualControls(input) {
+    // Use input values, but apply safety limits
+    return {
+      pitch: Math.max(this.autopilot.limits.minPitch, Math.min(this.autopilot.limits.maxPitch, input.pitch || 0)),
+      throttle: Math.max(this.autopilot.limits.minThrottle, Math.min(this.autopilot.limits.maxThrottle, input.throttle || 0.55)),
+      roll: Math.max(-0.5, Math.min(0.5, input.roll || 0)),
+      yaw: Math.max(-0.3, Math.min(0.3, input.yaw || 0))
+    };
+  }
+  
+  /**
+   * Update autopilot targets
+   */
+  updateAutopilotTargets(newTargets) {
+    if (newTargets.altitude !== undefined) {
+      this.autopilot.targets.altitude = newTargets.altitude;
+    }
+    if (newTargets.speed !== undefined) {
+      this.autopilot.targets.speed = newTargets.speed;
+    }
+    if (newTargets.heading !== undefined) {
+      this.autopilot.targets.heading = newTargets.heading;
+    }
+  }
+  
+  /**
+   * Enable/disable autopilot with smooth transition
+   */
+  setAutopilot(enabled) {
+    this.autopilot.engaged = enabled;
+    
+    if (enabled) {
+      // Reset PID controllers for smooth engagement
+      Object.values(this.pidControllers).forEach(controller => controller.reset());
+      
+      // Set current values as targets to prevent sudden jumps
+      this.autopilot.targets.altitude = this.state.position.z;
+      this.autopilot.targets.speed = Math.sqrt(
+        this.state.velocity.u * this.state.velocity.u + 
+        this.state.velocity.v * this.state.velocity.v + 
+        this.state.velocity.w * this.state.velocity.w
+      );
+      this.autopilot.targets.heading = this.state.orientation.psi;
+    }
+  }
+  
+  /**
+   * Get current autopilot status
+   */
+  getAutopilotStatus() {
+    return {
+      enabled: this.autopilot.enabled,
+      engaged: this.autopilot.engaged,
+      targets: { ...this.autopilot.targets },
+      limits: { ...this.autopilot.limits },
+      controllers: {
+        altitude: {
+          kp: this.pidControllers.altitude.kp,
+          ki: this.pidControllers.altitude.ki,
+          kd: this.pidControllers.altitude.kd
+        },
+        speed: {
+          kp: this.pidControllers.speed.kp,
+          ki: this.pidControllers.speed.ki,
+          kd: this.pidControllers.speed.kd
+        },
+        heading: {
+          kp: this.pidControllers.heading.kp,
+          ki: this.pidControllers.heading.ki,
+          kd: this.pidControllers.heading.kd
+        }
+      }
+    };
+  }
+  
+  /**
+   * Tune PID parameters in real-time
+   */
+  tunePID(controller, kp, ki, kd) {
+    if (this.pidControllers[controller]) {
+      this.pidControllers[controller].kp = kp;
+      this.pidControllers[controller].ki = ki;
+      this.pidControllers[controller].kd = kd;
+      return true;
+    }
+    return false;
   }
   
   /**
@@ -503,7 +779,9 @@ class NewFlightPhysicsService {
       aeroForces: { ...this.aeroForces },
       thrustForces: { ...this.thrustForces },
       gravityForces: { ...this.gravityForces },
-      debug: { ...this.debugData }
+      debug: { ...this.debugData },
+      // 🚁 AUTOPILOT DATA for UI display
+      autopilot: this.getAutopilotStatus()
     };
   }
   

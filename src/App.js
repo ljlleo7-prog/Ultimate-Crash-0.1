@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import './App.css';
 import useAirportSearch from './hooks/useAirportSearch';
-import { aircraftService } from './services/aircraftService';
+import aircraftService from './services/aircraftService';
 import { airportService } from './services/airportService';
 import { calculateDistance, calculateFlightPlan, formatDistance, formatFlightTime, formatFuel } from './utils/distanceCalculator';
 import AirportSearchInput from './components/AirportSearchInput.js';
@@ -51,8 +51,16 @@ function App() {
 
   // Load popular aircraft models
   useEffect(() => {
-    const popularAircraft = aircraftService.getPopularAircraft();
-    setAircraftSuggestions(popularAircraft);
+    const loadAircraft = async () => {
+      try {
+        const popularAircraft = await aircraftService.getPopularAircraft();
+        setAircraftSuggestions(popularAircraft);
+      } catch (error) {
+        console.error('Error loading popular aircraft:', error);
+        setAircraftSuggestions([]);
+      }
+    };
+    loadAircraft();
   }, []);
 
   // Calculate flight plan when airports and aircraft are selected

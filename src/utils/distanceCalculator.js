@@ -1,7 +1,7 @@
 // Distance Calculator for Ultimate Crash Simulation
 // Enhanced with aircraft-specific fuel calculations
 
-import { aircraftService } from '../services/aircraftService';
+import aircraftService from '../services/aircraftService';
 
 // Haversine formula to calculate great-circle distance between two coordinates in nautical miles
 function calculateDistance(lat1, lon1, lat2, lon2) {

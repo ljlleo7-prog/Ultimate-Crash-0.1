@@ -1,6 +1,6 @@
 import airlinesData from '../data/airlinesDatabase.json';
 import { airportService } from './airportService.js';
-import { aircraftService } from './aircraftService.js';
+import aircraftService from './aircraftService.js';
 import { calculateDistance } from '../utils/distanceCalculator.js';
 
 class RandomFlightService {

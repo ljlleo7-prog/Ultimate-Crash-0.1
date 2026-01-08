@@ -1,21 +1,21 @@
 // Aircraft Service for Ultimate Crash Simulation
 // Provides aircraft-specific performance data for fuel calculations
 
-import fs from 'fs';
-import path from 'path';
-import { fileURLToPath } from 'url';
+// Load aircraft database using dynamic import
+let aircraftDatabase = null;
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-
-// Load aircraft database directly
-const aircraftDataPath = path.join(__dirname, '../data/aircraftDatabase.json');
-const aircraftData = JSON.parse(fs.readFileSync(aircraftDataPath, 'utf8'));
+async function loadAircraftData() {
+  if (!aircraftDatabase) {
+    const response = await fetch('/src/data/aircraftDatabase.json');
+    const data = await response.json();
+    aircraftDatabase = data.aircraft;
+  }
+  return aircraftDatabase;
+}
 
 class AircraftService {
   constructor() {
-    // Comprehensive aircraft database with performance metrics
-    this.aircraftDatabase = aircraftData.aircraft;
+    this.aircraftDatabase = null;
     
     // Bind all methods to ensure proper this context
     this.calculateFlightPerformance = this.calculateFlightPerformance.bind(this);
@@ -24,10 +24,18 @@ class AircraftService {
     this.validateRoute = this.validateRoute.bind(this);
   }
 
+  async initialize() {
+    if (!this.aircraftDatabase) {
+      this.aircraftDatabase = await loadAircraftData();
+    }
+    return this.aircraftDatabase;
+  }
+
   // Search aircraft by model, manufacturer, or code
-  searchAircraft(query) {
+  async searchAircraft(query) {
+    const db = await this.initialize();
     const searchTerm = query.toLowerCase();
-    return this.aircraftDatabase.filter(aircraft =>
+    return db.filter(aircraft =>
       aircraft.model.toLowerCase().includes(searchTerm) ||
       aircraft.manufacturer.toLowerCase().includes(searchTerm) ||
       aircraft.iata.toLowerCase().includes(searchTerm) ||
@@ -37,37 +45,68 @@ class AircraftService {
   }
 
   // Get aircraft by IATA code
-  getAircraftByIATA(iataCode) {
-    return this.aircraftDatabase.find(aircraft => aircraft.iata === iataCode.toUpperCase());
+  async getAircraftByIATA(iataCode) {
+    const db = await this.initialize();
+    return db.find(aircraft => aircraft.iata === iataCode.toUpperCase());
   }
 
   // Get aircraft by ICAO code
-  getAircraftByICAO(icaoCode) {
-    return this.aircraftDatabase.find(aircraft => aircraft.icao === icaoCode.toUpperCase());
+  async getAircraftByICAO(icaoCode) {
+    const db = await this.initialize();
+    return db.find(aircraft => aircraft.icao === icaoCode.toUpperCase());
   }
 
   // Get aircraft by model name
-  getAircraftByModel(modelName) {
-    return this.aircraftDatabase.find(aircraft => 
+  async getAircraftByModel(modelName) {
+    const db = await this.initialize();
+    return db.find(aircraft => 
       aircraft.model.toLowerCase() === modelName.toLowerCase()
     );
   }
 
   // Get all aircraft models
-  getAllAircraft() {
-    return this.aircraftDatabase;
+  async getAllAircraft() {
+    const db = await this.initialize();
+    return db;
   }
 
   // Get aircraft by category
-  getAircraftByCategory(category) {
-    return this.aircraftDatabase.filter(aircraft => 
+  async getAircraftByCategory(category) {
+    const db = await this.initialize();
+    return db.filter(aircraft => 
       aircraft.category.toLowerCase() === category.toLowerCase()
     );
   }
 
+  // Get popular aircraft models for suggestions
+  async getPopularAircraft() {
+    const db = await this.initialize();
+    
+    // Return a curated list of popular aircraft models for user suggestions
+    const popularModels = [
+      'Boeing 737-800',
+      'Airbus A320-200',
+      'Boeing 777-300ER',
+      'Airbus A350-900',
+      'Embraer E190'
+    ];
+    
+    return this.aircraftDatabase.filter(aircraft => 
+      popularModels.some(model => 
+        aircraft.model.toLowerCase().includes(model.toLowerCase()) ||
+        model.toLowerCase().includes(aircraft.model.toLowerCase())
+      )
+    ).map(aircraft => ({
+      value: aircraft.model,
+      label: `${aircraft.manufacturer} ${aircraft.model}`,
+      iata: aircraft.iata,
+      icao: aircraft.icao
+    }));
+  }
+
   // Calculate fuel requirements for a flight
-  calculateFuelRequirements(aircraftModel, distance, payload, fuelReserve = 0.05) {
-    const aircraft = this.getAircraftByModel(aircraftModel);
+  async calculateFuelRequirements(aircraftModel, distance, payload, fuelReserve = 0.05) {
+    const aircraft = await this.getAircraftByModel(aircraftModel);
     if (!aircraft) {
       throw new Error(`Aircraft model '${aircraftModel}' not found`);
     }
@@ -96,8 +135,8 @@ class AircraftService {
   }
 
   // Calculate flight performance metrics
-  calculateFlightPerformance(aircraftModel, distance, payload = 0) {
-    const aircraft = this.getAircraftByModel(aircraftModel);
+  async calculateFlightPerformance(aircraftModel, distance, payload = 0) {
+    const aircraft = await this.getAircraftByModel(aircraftModel);
     if (!aircraft) {
       return null;
     }
@@ -148,8 +187,8 @@ class AircraftService {
   }
 
   // Validate route feasibility
-  validateRoute(aircraftModel, distance, payload = 0) {
-    const aircraft = this.getAircraftByModel(aircraftModel);
+  async validateRoute(aircraftModel, distance, payload = 0) {
+    const aircraft = await this.getAircraftByModel(aircraftModel);
     if (!aircraft) {
       return { isValid: false, errors: ['Aircraft not found'] };
     }
@@ -180,8 +219,8 @@ class AircraftService {
   }
 
   // Calculate flight time
-  calculateFlightTime(aircraftModel, distance) {
-    const aircraft = this.getAircraftByModel(aircraftModel);
+  async calculateFlightTime(aircraftModel, distance) {
+    const aircraft = await this.getAircraftByModel(aircraftModel);
     if (!aircraft) {
       throw new Error(`Aircraft model '${aircraftModel}' not found`);
     }
@@ -198,85 +237,135 @@ class AircraftService {
   }
 
   // Check payload limits
-  validatePayload(aircraftModel, payload) {
-    const aircraft = this.getAircraftByModel(aircraftModel);
+  async checkPayloadLimits(aircraftModel, payload, fuel = 0) {
+    const aircraft = await this.getAircraftByModel(aircraftModel);
     if (!aircraft) {
-      throw new Error(`Aircraft model '${aircraftModel}' not found`);
+      return { isValid: false, errors: ['Aircraft not found'] };
     }
 
-    if (payload > aircraft.maxPayload) {
-      throw new Error(`Payload (${payload} kg) exceeds maximum payload (${aircraft.maxPayload} kg)`);
-    }
-
+    const totalWeight = payload + fuel;
+    const maxWeight = aircraft.maxTakeoffWeight;
+    
     return {
-      isValid: payload <= aircraft.maxPayload,
-      maxPayload: aircraft.maxPayload,
-      remainingCapacity: aircraft.maxPayload - payload
+      isValid: totalWeight <= maxWeight,
+      totalWeight: Math.round(totalWeight),
+      maxWeight: maxWeight,
+      remainingCapacity: Math.round(maxWeight - totalWeight),
+      percentage: Math.round((totalWeight / maxWeight) * 100)
     };
   }
 
-  // Suggest suitable aircraft for a given distance
-  suggestAircraftForDistance(distance, passengerCount = null) {
-    return this.aircraftDatabase
-      .filter(aircraft => aircraft.maxRange >= distance)
-      .sort((a, b) => {
-        // Prioritize aircraft that can handle the distance efficiently
-        const aEfficiency = a.typicalFuelBurn * distance;
-        const bEfficiency = b.typicalFuelBurn * distance;
-        
-        // If passenger count is provided, prioritize aircraft with sufficient capacity
-        if (passengerCount) {
-          const aCapacityDiff = Math.abs(a.maxPassengers - passengerCount);
-          const bCapacityDiff = Math.abs(b.maxPassengers - passengerCount);
-          
-          if (aCapacityDiff !== bCapacityDiff) {
-            return aCapacityDiff - bCapacityDiff;
-          }
-        }
-        
-        return aEfficiency - bEfficiency;
-      });
-  }
-
-  // Get aircraft performance summary
-  getPerformanceSummary(aircraftModel) {
-    const aircraft = this.getAircraftByModel(aircraftModel);
+  // Enhanced physics integration methods
+  
+  // Get aircraft physics configuration
+  async getAircraftPhysicsConfig(aircraftModel) {
+    const aircraft = await this.getAircraftByModel(aircraftModel);
     if (!aircraft) {
       throw new Error(`Aircraft model '${aircraftModel}' not found`);
     }
 
     return {
-      model: aircraft.model,
-      manufacturer: aircraft.manufacturer,
-      type: aircraft.type,
-      category: aircraft.category,
-      maxRange: aircraft.maxRange,
+      mass: aircraft.emptyWeight,
+      wingArea: aircraft.wingArea,
+      aspectRatio: aircraft.aspectRatio,
+      maxLiftCoefficient: aircraft.maxLiftCoefficient,
       cruiseSpeed: aircraft.cruiseSpeed,
-      fuelEfficiency: aircraft.typicalFuelBurn,
-      maxPassengers: aircraft.maxPassengers,
-      maxPayload: aircraft.maxPayload,
-      takeoffDistance: aircraft.takeoffDistance,
-      landingDistance: aircraft.landingDistance,
-      engineType: aircraft.engineType,
-      engineCount: aircraft.engineCount
+      maxRange: aircraft.maxRange,
+      momentOfInertia: aircraft.momentOfInertia || {
+        x: aircraft.emptyWeight * 1000, // Rough approximation
+        y: aircraft.emptyWeight * 2000,
+        z: aircraft.emptyWeight * 2500
+      },
+      engine: {
+        maxThrust: aircraft.maxThrust || aircraft.emptyWeight * 9.81 * 0.3, // Estimate 30% of weight
+        specificFuelConsumption: aircraft.typicalFuelBurn / 1000 // Convert to kg/N/s
+      }
     };
   }
 
-  // Get popular aircraft models for suggestions (static method for compatibility)
-  static listPopularAircraft() {
-    const service = new AircraftService();
-    return service.getAllAircraft();
+  // Calculate dynamic mass including fuel
+  async calculateDynamicMass(aircraftModel, payload, fuelLevel) {
+    const aircraft = await this.getAircraftByModel(aircraftModel);
+    if (!aircraft) {
+      throw new Error(`Aircraft model '${aircraftModel}' not found`);
+    }
+
+    const fuelWeight = fuelLevel * aircraft.maxFuelCapacity;
+    const totalMass = aircraft.emptyWeight + payload + fuelWeight;
+
+    return {
+      emptyMass: aircraft.emptyWeight,
+      payload: payload,
+      fuelMass: fuelWeight,
+      totalMass: totalMass,
+      centerOfGravity: {
+        x: (aircraft.emptyWeight * 0.4 + payload * 0.5 + fuelWeight * 0.45) / totalMass,
+        y: 0, // Simplified
+        z: (aircraft.emptyWeight * 0.1 + payload * 0.1 + fuelWeight * 0.15) / totalMass
+      }
+    };
   }
 
-  // Get popular aircraft models for suggestions
-  getPopularAircraft() {
-    // Return all available aircraft models instead of just 8
-    return this.aircraftDatabase;
+  // Validate aircraft for simulation
+  async validateAircraftForSimulation(aircraftModel) {
+    const aircraft = await this.getAircraftByModel(aircraftModel);
+    if (!aircraft) {
+      return { isValid: false, errors: ['Aircraft not found'] };
+    }
+
+    const errors = [];
+    const warnings = [];
+
+    // Check required physics properties
+    if (!aircraft.wingArea) errors.push('Wing area not defined');
+    if (!aircraft.aspectRatio) warnings.push('Aspect ratio not defined - using default');
+    if (!aircraft.maxLiftCoefficient) warnings.push('Max lift coefficient not defined - using default');
+    if (!aircraft.momentOfInertia) warnings.push('Moment of inertia not defined - using estimates');
+
+    // Check performance data
+    if (!aircraft.cruiseSpeed) errors.push('Cruise speed not defined');
+    if (!aircraft.maxRange) errors.push('Maximum range not defined');
+    if (!aircraft.typicalFuelBurn) errors.push('Fuel consumption data not defined');
+
+    return {
+      isValid: errors.length === 0,
+      errors: errors,
+      warnings: warnings,
+      physicsReady: errors.length === 0 && warnings.length <= 1
+    };
+  }
+
+  // Get performance envelope
+  async getPerformanceEnvelope(aircraftModel) {
+    const aircraft = await this.getAircraftByModel(aircraftModel);
+    if (!aircraft) {
+      throw new Error(`Aircraft model '${aircraftModel}' not found`);
+    }
+
+    return {
+      speed: {
+        min: aircraft.cruiseSpeed * 0.6, // Approach speed
+        max: aircraft.cruiseSpeed * 1.3, // High speed
+        cruise: aircraft.cruiseSpeed
+      },
+      altitude: {
+        min: 0,
+        max: aircraft.serviceCeiling || 41000,
+        optimal: 35000
+      },
+      weight: {
+        empty: aircraft.emptyWeight,
+        maxTakeoff: aircraft.maxTakeoffWeight,
+        maxLanding: aircraft.maxLandingWeight || aircraft.maxTakeoffWeight * 0.85
+      },
+      range: {
+        typical: aircraft.maxRange * 0.85,
+        maximum: aircraft.maxRange
+      }
+    };
   }
 }
 
-// Create singleton instance
+// Create and export a singleton instance
 const aircraftService = new AircraftService();
-
-export default AircraftService;
-export { aircraftService };
+export default aircraftService;
