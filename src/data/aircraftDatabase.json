@@ -25,7 +25,19 @@
       "stallSpeed": 125,
       "maxOperatingMach": 0.82,
       "emptyWeight": 41400,
-      "maxTakeoffWeight": 79000
+      "maxTakeoffWeight": 79000,
+      "maxThrustPerEngine": 120000,
+      "liftCurveSlope": 5.7,
+      "zeroLiftDragCoefficient": 0.025,
+      "inducedDragFactor": 0.040,
+      "controlPower": {
+        "x": 0.01,
+        "y": 0.01,
+        "z": 0.01
+      },
+      "momentOfInertiaRoll": 30000,
+      "momentOfInertiaPitch": 50000,
+      "momentOfInertiaYaw": 80000
     },
     {
       "model": "Airbus A320-200",
@@ -52,7 +64,19 @@
       "stallSpeed": 120,
       "maxOperatingMach": 0.82,
       "emptyWeight": 42500,
-      "maxTakeoffWeight": 77000
+      "maxTakeoffWeight": 77000,
+      "maxThrustPerEngine": 115000,
+      "liftCurveSlope": 5.8,
+      "zeroLiftDragCoefficient": 0.024,
+      "inducedDragFactor": 0.038,
+      "controlPower": {
+        "x": 0.012,
+        "y": 0.011,
+        "z": 0.009
+      },
+      "momentOfInertiaRoll": 32000,
+      "momentOfInertiaPitch": 52000,
+      "momentOfInertiaYaw": 85000
     },
     {
       "model": "Boeing 777-300ER",
@@ -79,7 +103,19 @@
       "stallSpeed": 145,
       "maxOperatingMach": 0.89,
       "emptyWeight": 167800,
-      "maxTakeoffWeight": 351500
+      "maxTakeoffWeight": 351500,
+      "maxThrustPerEngine": 510000,
+      "liftCurveSlope": 6.0,
+      "zeroLiftDragCoefficient": 0.022,
+      "inducedDragFactor": 0.035,
+      "controlPower": {
+        "x": 0.008,
+        "y": 0.009,
+        "z": 0.007
+      },
+      "momentOfInertiaRoll": 180000,
+      "momentOfInertiaPitch": 250000,
+      "momentOfInertiaYaw": 320000
     },
     {
       "model": "Airbus A350-900",
@@ -106,7 +142,19 @@
       "stallSpeed": 140,
       "maxOperatingMach": 0.89,
       "emptyWeight": 115000,
-      "maxTakeoffWeight": 280000
+      "maxTakeoffWeight": 280000,
+      "maxThrustPerEngine": 430000,
+      "liftCurveSlope": 6.2,
+      "zeroLiftDragCoefficient": 0.021,
+      "inducedDragFactor": 0.033,
+      "controlPower": {
+        "x": 0.009,
+        "y": 0.010,
+        "z": 0.008
+      },
+      "momentOfInertiaRoll": 165000,
+      "momentOfInertiaPitch": 230000,
+      "momentOfInertiaYaw": 295000
     },
     {
       "model": "Embraer E190",
@@ -133,7 +181,19 @@
       "stallSpeed": 110,
       "maxOperatingMach": 0.82,
       "emptyWeight": 28000,
-      "maxTakeoffWeight": 50790
+      "maxTakeoffWeight": 50790,
+      "maxThrustPerEngine": 82000,
+      "liftCurveSlope": 5.5,
+      "zeroLiftDragCoefficient": 0.027,
+      "inducedDragFactor": 0.042,
+      "controlPower": {
+        "x": 0.015,
+        "y": 0.014,
+        "z": 0.012
+      },
+      "momentOfInertiaRoll": 18000,
+      "momentOfInertiaPitch": 28000,
+      "momentOfInertiaYaw": 42000
     },
     {
       "model": "Cessna Citation X",
@@ -160,7 +220,19 @@
       "stallSpeed": 95,
       "maxOperatingMach": 0.92,
       "emptyWeight": 10500,
-      "maxTakeoffWeight": 16500
+      "maxTakeoffWeight": 16500,
+      "maxThrustPerEngine": 9700,
+      "liftCurveSlope": 5.2,
+      "zeroLiftDragCoefficient": 0.030,
+      "inducedDragFactor": 0.050,
+      "controlPower": {
+        "x": 0.020,
+        "y": 0.018,
+        "z": 0.015
+      },
+      "momentOfInertiaRoll": 2500,
+      "momentOfInertiaPitch": 3500,
+      "momentOfInertiaYaw": 5500
     },
     {
       "model": "Boeing 747-400",
@@ -187,7 +259,19 @@
       "stallSpeed": 155,
       "maxOperatingMach": 0.92,
       "emptyWeight": 178800,
-      "maxTakeoffWeight": 396900
+      "maxTakeoffWeight": 396900,
+      "maxThrustPerEngine": 280000,
+      "liftCurveSlope": 5.8,
+      "zeroLiftDragCoefficient": 0.023,
+      "inducedDragFactor": 0.037,
+      "controlPower": {
+        "x": 0.007,
+        "y": 0.008,
+        "z": 0.006
+      },
+      "momentOfInertiaRoll": 250000,
+      "momentOfInertiaPitch": 380000,
+      "momentOfInertiaYaw": 450000
     },
     {
       "model": "Airbus A380-800",
@@ -214,7 +298,19 @@
       "stallSpeed": 130,
       "maxOperatingMach": 0.89,
       "emptyWeight": 277000,
-      "maxTakeoffWeight": 575000
+      "maxTakeoffWeight": 575000,
+      "maxThrustPerEngine": 350000,
+      "liftCurveSlope": 6.0,
+      "zeroLiftDragCoefficient": 0.020,
+      "inducedDragFactor": 0.032,
+      "controlPower": {
+        "x": 0.006,
+        "y": 0.007,
+        "z": 0.005
+      },
+      "momentOfInertiaRoll": 420000,
+      "momentOfInertiaPitch": 580000,
+      "momentOfInertiaYaw": 680000
     },
     {
       "model": "Airbus A330-300",
@@ -241,7 +337,19 @@
       "stallSpeed": 135,
       "maxOperatingMach": 0.86,
       "emptyWeight": 122000,
-      "maxTakeoffWeight": 233000
+      "maxTakeoffWeight": 233000,
+      "maxThrustPerEngine": 320000,
+      "liftCurveSlope": 5.9,
+      "zeroLiftDragCoefficient": 0.022,
+      "inducedDragFactor": 0.036,
+      "controlPower": {
+        "x": 0.009,
+        "y": 0.010,
+        "z": 0.008
+      },
+      "momentOfInertiaRoll": 150000,
+      "momentOfInertiaPitch": 210000,
+      "momentOfInertiaYaw": 280000
     },
     {
       "model": "Airbus A340-600",
@@ -268,7 +376,19 @@
       "stallSpeed": 140,
       "maxOperatingMach": 0.86,
       "emptyWeight": 177000,
-      "maxTakeoffWeight": 368000
+      "maxTakeoffWeight": 368000,
+      "maxThrustPerEngine": 250000,
+      "liftCurveSlope": 5.8,
+      "zeroLiftDragCoefficient": 0.023,
+      "inducedDragFactor": 0.037,
+      "controlPower": {
+        "x": 0.008,
+        "y": 0.009,
+        "z": 0.007
+      },
+      "momentOfInertiaRoll": 220000,
+      "momentOfInertiaPitch": 320000,
+      "momentOfInertiaYaw": 390000
     },
     {
       "model": "Boeing 757-200",
@@ -295,7 +415,19 @@
       "stallSpeed": 125,
       "maxOperatingMach": 0.86,
       "emptyWeight": 58000,
-      "maxTakeoffWeight": 115700
+      "maxTakeoffWeight": 115700,
+      "maxThrustPerEngine": 195000,
+      "liftCurveSlope": 5.6,
+      "zeroLiftDragCoefficient": 0.026,
+      "inducedDragFactor": 0.041,
+      "controlPower": {
+        "x": 0.011,
+        "y": 0.012,
+        "z": 0.010
+      },
+      "momentOfInertiaRoll": 42000,
+      "momentOfInertiaPitch": 65000,
+      "momentOfInertiaYaw": 95000
     }
   ]
 }

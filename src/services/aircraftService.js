@@ -1,7 +1,16 @@
 // Aircraft Service for Ultimate Crash Simulation
 // Provides aircraft-specific performance data for fuel calculations
 
-import aircraftData from '../data/aircraftDatabase.json';
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+// Load aircraft database directly
+const aircraftDataPath = path.join(__dirname, '../data/aircraftDatabase.json');
+const aircraftData = JSON.parse(fs.readFileSync(aircraftDataPath, 'utf8'));
 
 class AircraftService {
   constructor() {
@@ -253,6 +262,12 @@ class AircraftService {
     };
   }
 
+  // Get popular aircraft models for suggestions (static method for compatibility)
+  static listPopularAircraft() {
+    const service = new AircraftService();
+    return service.getAllAircraft();
+  }
+
   // Get popular aircraft models for suggestions
   getPopularAircraft() {
     // Return all available aircraft models instead of just 8
@@ -263,4 +278,5 @@ class AircraftService {
 // Create singleton instance
 const aircraftService = new AircraftService();
 
+export default AircraftService;
 export { aircraftService };
