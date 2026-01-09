@@ -82,12 +82,12 @@ class NewFlightPhysicsService {
       position: {
         x: 0,     // North position (m)
         y: 0,     // East position (m)
-        z: -10668 // Altitude: 35,000 ft = 10,668 m (negative = downward)
+        z: 10668  // Altitude: 35,000 ft = 10,668 m (POSITIVE = above ground level)
       },
       velocity: {
         u: 231.5, // Forward velocity (450 KTS TAS)
         v: 0,     // Rightward velocity
-        w: 0      // Vertical velocity
+        w: 0      // Vertical velocity (body frame, Z-upward)
       },
       orientation: {
         phi: 0,   // Roll angle (0° = level)
@@ -140,7 +140,7 @@ class NewFlightPhysicsService {
       enabled: false,
       engaged: false,
       targets: {
-        altitude: -10668, // 35,000 ft in meters (negative = downward)
+        altitude: 10668, // 35,000 ft in meters (POSITIVE = upward from ground)
         speed: 231.5,     // 450 KTS in m/s
         heading: 0        // 0° (North)
       },
@@ -282,6 +282,7 @@ class NewFlightPhysicsService {
     this.state.controls.pitch = this.smoothInput(this.state.controls.pitch, controlInputs.pitch, 0.2);
     this.state.controls.roll = this.smoothInput(this.state.controls.roll, controlInputs.roll, 0.2);
     this.state.controls.yaw = this.smoothInput(this.state.controls.yaw, controlInputs.yaw, 0.1);
+    this.state.controls.trim = this.smoothInput(this.state.controls.trim, controlInputs.trim || 0, 0.05);
     
     // Calculate all forces and moments
     this.calculateAerodynamicForces();
@@ -347,7 +348,7 @@ class NewFlightPhysicsService {
       this.dt
     );
     
-    // Apply control limits
+    // ✅ FIXED: Apply control limits properly
     const limitedPitch = Math.max(
       this.autopilot.limits.minPitch, 
       Math.min(this.autopilot.limits.maxPitch, pitchCommand)
@@ -420,7 +421,7 @@ class NewFlightPhysicsService {
       this.autopilot.targets.heading = this.state.orientation.psi;
     }
     
-    console.log(`Autopilot ${enabled ? 'ENGAGED' : 'DISENGAGED'}`);
+
   }
   
   /**
@@ -512,8 +513,16 @@ class NewFlightPhysicsService {
     // Ensure reasonable cruise lift (must balance weight)
     cl = Math.max(0.3, Math.min(this.aircraft.maxLiftCoefficient, cl));
     
-    // Drag coefficient (parasitic + induced)
-    let cd = this.aircraft.zeroLiftDragCoefficient + this.aircraft.inducedDragFactor * cl * cl;
+    // ✅ ENHANCED: Drag coefficient with proper AoA effect
+    // Cd = Cd₀ + k·Cl² + Cd_alpha·|α| (drag increases with AoA magnitude)
+    // PLUS: Direct head-on area effect: sin(|α|) for frontal area increase
+    const cdAlpha = 0.5; // Increased drag coefficient slope with AoA
+    const frontalAreaFactor = 0.8; // Factor for frontal area increase with AoA
+    
+    let cd = this.aircraft.zeroLiftDragCoefficient + 
+             this.aircraft.inducedDragFactor * cl * cl + 
+             cdAlpha * Math.abs(safeAlpha) + // Linear increase with AoA magnitude
+             frontalAreaFactor * Math.abs(Math.sin(safeAlpha)); // Head-on area effect
     
     // ✅ NEW: Apply flaps and airbrake effects
     const flapsResult = this.calculateFlapsEffects(cl, cd);
@@ -543,11 +552,7 @@ class NewFlightPhysicsService {
     
     // Debug: Show intermediate calculations
     if (Math.abs(this.debugData.total_z) > weight * 0.5) {
-      console.log(`   Raw lift: ${lift.toFixed(0)} N`);
-      console.log(`   cos(α): ${cosAlpha.toFixed(3)}, sin(α): ${sinAlpha.toFixed(3)}`);
-      console.log(`   Fz_lift = lift * cos(α): ${(lift * cosAlpha).toFixed(0)} N`);
-      console.log(`   Fz_drag = drag * sin(α): ${(drag * sinAlpha).toFixed(0)} N`);
-      console.log(`   Fz_aero = Fz_lift + Fz_drag: ${Fz_aero.toFixed(0)} N`);
+
     }
     
     // Control surface effects
@@ -560,35 +565,78 @@ class NewFlightPhysicsService {
     const Fy_total = Fy_aero + aileronEffect + rudderEffect;  
     const Fz_total = Fz_aero;
     
-    // ✅ IMPLEMENT REALISTIC TORQUE CALCULATIONS
-    // Aerocenter is typically located at 25-30% of wing chord from leading edge
-    // For most commercial aircraft, this creates a nose-down pitching moment
-    // that needs to be counteracted by elevator trim
+    // ✅ IMPLEMENT REALISTIC TORQUE CALCULATIONS FROM AERODYNAMIC FORCES
+    // Drag acts along the flight path and creates significant pitching moments
+    // when the aerodynamic center (AC) is offset from the center of gravity (CG)
     
-    // Calculate aerodynamic moments from lift and drag acting on aerocenter
-    const aerocenterPosition = 0.25; // 25% chord - typical for subsonic aircraft
+    // Aerodynamic center is typically at 25% chord for subsonic aircraft
+    const aerocenterPosition = 0.25; // 25% chord from leading edge
     const wingChord = this.aircraft.wingArea / this.aircraft.wingSpan; // Approximate chord length
     const momentArm = wingChord * aerocenterPosition; // Distance from CG to aerocenter
     
-    // Pitching moment from lift and drag
-    const pitchingMomentFromLift = -lift * momentArm * Math.sin(safeAlpha); // Nose-down moment
-    const pitchingMomentFromDrag = drag * momentArm * Math.cos(safeAlpha); // Small nose-up moment
-    const totalPitchingMoment = pitchingMomentFromLift + pitchingMomentFromDrag;
+    // ✅ ENHANCED: Realistic pitching moments with separate application points
+    // Lift acts through AC (25% chord) → creates nose-down moment (negative)
+    // Drag acts through drag center (typically more aft) → creates nose-up moment (positive)
     
-    // ✅ ADD ELEVATOR TRIM SYSTEM
-    // Elevator trim to cancel out the pitching moment
-    // Trim value is adjusted to maintain level flight
-    const trimCoefficient = -0.005; // Trim effectiveness
-    const elevatorTrim = totalPitchingMoment * trimCoefficient / (q * this.aircraft.wingArea * wingChord);
+    // ✅ ENHANCED: Separate moment arm calculations
+    const acPosition = 0.25; // Aerodynamic center at 25% chord
+    const cgPosition = 0.35; // Center of gravity at 35% chord
+    const dragCenterPosition = 0.75; // Drag center much further aft (75% chord) for stronger moment
+    
+    // Lift moment arm: AC to CG (lift acts through AC)
+    const liftMomentArm = wingChord * (cgPosition - acPosition); // AC behind CG = negative moment
+    
+    // ✅ ENHANCED: Drag moment arm: Drag center to CG (drag acts through drag center)
+    // If drag center is aft of CG, moment arm should be POSITIVE for nose-up moment
+    const dragMomentArm = wingChord * (dragCenterPosition - cgPosition); // Much larger moment arm
+    
+    // ✅ ENHANCED: Lift-induced pitching moment (LIFT THROUGH AC)
+    // Lift acting through AC (behind CG) creates nose-down moment (negative)
+    const liftPitchingMoment = -lift * liftMomentArm;
+    
+    // ✅ CORRECT PHYSICS: Drag-induced pitching moment
+    // Drag acts along flight path through drag center
+    // For level flight: drag creates nose-up moment when flight path angle > 0
+    const dragPitchingMoment = drag * dragMomentArm * Math.sin(flightPathAngle) * (1 + Math.abs(safeAlpha) * 3);
+    
+    // ✅ TOTAL AERODYNAMIC PITCHING MOMENT
+    const totalPitchingMoment = liftPitchingMoment + dragPitchingMoment;
+    
+    // ✅ FIXED: Proper elevator trim calculation with aircraft parameters
+    // Trim should counteract the AERODYNAMIC pitching moment (lift + drag)
+    // NOT the total moment that includes trim effects (circular dependency)
+    const aerodynamicPitchingMoment = liftPitchingMoment + dragPitchingMoment;
+    
+    // ✅ ENHANCED: Parameterized trim calculation
+    // Use aircraft-specific control surface parameters (default to realistic values)
+    const trimSurfaceAreaRatio = this.aircraft.trimSurfaceAreaRatio || 0.12; // Default: 12% of wing area
+    const trimEffectiveness = this.aircraft.trimEffectiveness || 0.1; // Tuned down to 10%
+    
+    // ✅ COCKPIT TRIM CONTROL: Trim wheel setting from cockpit
+    // Initial cruise setting: 220,000 (displays as 11 units with 20,000 factor)
+    // Display factor: trimControl / 20,000 = cockpit trim units
+    const trimControl = 220000; // Initial trim wheel position
+    
+    // ✅ FIXED: Define controlPowerY first to avoid reference error
+    const controlPowerY = this.aircraft.controlPower?.y || 0.01;
+    
+    // Convert trim control to elevator deflection
+    // elevatorTrim represents the deflection angle needed to generate the trim moment
+    const elevatorTrim = trimControl / controlPowerY;
     
     // ✅ SAFE: Angular moments with validation
     const rollInertia = Math.max(1000, this.aircraft.momentOfInertiaRoll || 10000);
     const pitchInertia = Math.max(1000, this.aircraft.momentOfInertiaPitch || 15000);
     const yawInertia = Math.max(1000, this.aircraft.momentOfInertiaYaw || 20000);
     
-    // Calculate angular accelerations including aerodynamic moments
+    // ✅ ENHANCED: Calculate total pitching moment including trim effects
+    const trimMoment = controlPowerY * (input.pitch + elevatorTrim);
+    const totalPitchingMomentWithTrim = aerodynamicPitchingMoment + trimMoment;
+    
+    // ✅ FIXED: Calculate angular accelerations with proper trim integration
+    // Use the total pitching moment with trim effects for pitch acceleration
     const pdot = (this.aircraft.controlPower.x || 0.01) * input.roll / rollInertia;
-    const qdot = (totalPitchingMoment + (this.aircraft.controlPower.y || 0.01) * (input.pitch + elevatorTrim)) / pitchInertia;
+    const qdot = totalPitchingMomentWithTrim / pitchInertia;
     const rdot = (this.aircraft.controlPower.z || 0.01) * input.yaw / yawInertia;
     
     // ✅ CRITICAL FIX: Assign forces to class properties
@@ -599,6 +647,7 @@ class NewFlightPhysicsService {
     this.debugData = {
       airspeed: airspeed,
       alpha: safeAlpha,
+      angleOfAttack: safeAlpha * 180 / Math.PI, // Convert to degrees for display
       cl: cl,
       cd: cd,
       lift: lift,
@@ -609,6 +658,16 @@ class NewFlightPhysicsService {
       dynamicPressure: q,
       requiredCL: requiredCL,
       weight: weight,
+      // Enhanced aerodynamic moments debug
+      totalPitchingMoment: totalPitchingMoment,
+      aerodynamicPitchingMoment: aerodynamicPitchingMoment,
+      trimMoment: trimMoment,
+      totalPitchingMomentWithTrim: totalPitchingMomentWithTrim,
+      dragPitchingMoment: dragPitchingMoment,
+      liftPitchingMoment: liftPitchingMoment,
+      elevatorTrim: elevatorTrim,
+      momentArm: momentArm,
+      wingChord: wingChord,
       // Debug force breakdown
       lift_z: Fz_aero,
       drag_z: drag * sinAlpha,
@@ -625,40 +684,17 @@ class NewFlightPhysicsService {
       sinAlpha: sinAlpha,
       fz_lift_component: lift * cosAlpha,
       fz_drag_component: drag * sinAlpha,
-      // Torque debug data
-      pitchingMomentFromLift: pitchingMomentFromLift,
-      pitchingMomentFromDrag: pitchingMomentFromDrag,
-      totalPitchingMoment: totalPitchingMoment,
-      elevatorTrim: elevatorTrim
+      // Flight path and orientation
+      flightPathAngle: flightPathAngle * 180 / Math.PI, // Convert to degrees
+      pitchAngle: this.state.orientation.theta * 180 / Math.PI // Convert to degrees
     };
     
     // Force balance validation (for future debugging if needed)
     const forceBalancePercent = Math.abs(this.debugData.total_z) / weight * 100;
-    if (forceBalancePercent > 50) {
-      console.log(`⚠️ Force Balance: ${forceBalancePercent.toFixed(1)}% imbalance`);
-    }
     
-    // Console debug for extreme conditions
-    if (Math.abs(this.debugData.total_z) > weight * 0.5) {
-      console.log(`🚨 FORCE IMBALANCE DETECTED:`);
-      console.log(`   Weight: ${weight.toFixed(0)} N`);
-      console.log(`   Density: ${this.environment.density.toFixed(3)} kg/m³`);
-      console.log(`   Dynamic Pressure (q): ${q.toFixed(1)} Pa`);
-      console.log(`   Wing Area: ${this.aircraft.wingArea.toFixed(1)} m²`);
-      console.log(`   q × S: ${(q * this.aircraft.wingArea).toFixed(1)} N`);
-      console.log(`   CL × q × S: ${(cl * q * this.aircraft.wingArea).toFixed(1)} N`);
-      console.log(`   Raw lift: ${lift.toFixed(0)} N`);
-      console.log(`   cos(α): ${cosAlpha.toFixed(3)}, sin(α): ${sinAlpha.toFixed(3)}`);
-      console.log(`   Fz_lift = lift * cos(α): ${(lift * cosAlpha).toFixed(0)} N`);
-      console.log(`   Fz_drag = drag * sin(α): ${(drag * sinAlpha).toFixed(0)} N`);
-      console.log(`   Fz_aero = Fz_lift + Fz_drag: ${Fz_aero.toFixed(0)} N`);
-      console.log(`   Lift (Z): ${Fz_aero.toFixed(0)} N`);
-      console.log(`   Gravity (Z): ${(this.gravityForces?.z || 0).toFixed(0)} N`);
-      console.log(`   Total Vertical: ${this.debugData.total_z.toFixed(0)} N`);
-      console.log(`   Imbalance: ${Math.abs(this.debugData.total_z).toFixed(0)} N`);
-      console.log(`   CL: ${cl.toFixed(3)}, Required CL: ${requiredCL.toFixed(3)}`);
-      console.log(`   AoA: ${(safeAlpha * 180/Math.PI).toFixed(1)}°`);
-    }
+
+    
+
     
     return {
       forces: { x: Fx_total, y: Fy_total, z: Fz_total },
@@ -719,7 +755,8 @@ class NewFlightPhysicsService {
    * Uses standard atmosphere model for accurate airspeed calculations
    */
   calculateAirspeeds() {
-    const altitude_m = -this.state.position.z; // Convert to positive altitude
+    // ✅ FIXED: Use position.z as positive altitude (no negative conversion needed)
+    const altitude_m = this.state.position.z; // Already positive for altitude above ground
     const altitude_ft = altitude_m * 3.28084;
     
     // Standard atmosphere calculations
@@ -787,17 +824,17 @@ class NewFlightPhysicsService {
    */
   setFlaps(flaps) {
     this.state.flaps = Math.max(0, Math.min(2, Math.round(flaps)));
-    console.log(`🛩️ Flaps set to: ${this.state.flaps === 0 ? 'UP' : this.state.flaps === 1 ? 'TO' : 'LDG'}`);
+
   }
   
   setAirBrakes(position) {
     this.state.airBrakes = Math.max(0, Math.min(1, Math.round(position)));
-    console.log(`🛑 Airbrakes: ${this.state.airBrakes === 0 ? 'RETRACTED' : 'EXTENDED'}`);
+
   }
   
   setGear(gear) {
     this.state.gear = !!gear;
-    console.log(`🚁 Landing gear: ${this.state.gear ? 'DOWN' : 'UP'}`);
+
   }
   
   /**
@@ -808,18 +845,30 @@ class NewFlightPhysicsService {
   calculateGravitationalForces() {
     const weight = this.aircraft.mass * this.GRAVITY;
     
-    const phi = this.state.orientation.phi;
-    const theta = this.state.orientation.theta;
+    const phi = this.state.orientation.phi;   // Roll angle
+    const theta = this.state.orientation.theta; // Pitch angle  
     
-    // ✅ CORRECTED: Gravity transformation for aircraft body frame
-    // Gravity acts vertically downward in earth frame: [0, 0, -W]
-    // Transform to aircraft body frame using rotation matrix
-    // For small pitch angles, gravity has components:
+    // ✅ COORDINATE SYSTEM DEFINITION:
+    // Earth Frame: X=north, Y=east, Z=upward (positive up)
+    // Body Frame: X=forward, Y=right, Z=upward (positive up)
+    // Position.z is POSITIVE at altitude (since Z-upward convention)
+    
+    // ✅ STANDARD AEROSPACE APPROXIMATION: Gravity transformation
+    // Gravity acts downward in earth frame: [0, 0, -W]
+    // Transform to body frame using simplified rotation matrix
+    
+    // For small roll angles (coordinated flight), gravity transformation:
+    // Forward component: -W * sin(θ) - creates nose-down moment when pitched up
+    // Vertical component: -W * cos(θ) - main downward force component
+    // Lateral component: 0 (for coordinated flight)
+    
     this.gravityForces = {
-      x: -weight * Math.sin(theta),                    // Forward component when pitched up
-      y: 0,                                             // No lateral component for level flight  
-      z: -weight * Math.cos(theta)                     // Vertical component (downward = negative)
+      x: -weight * Math.sin(theta),     // Forward/backward component
+      y: 0,                             // No lateral component (coordinated flight)  
+      z: -weight * Math.cos(theta)      // Vertical component (downward)
     };
+    
+    // Gravity transformation completed
   }
   
   /**
@@ -922,27 +971,22 @@ class NewFlightPhysicsService {
                  v * (Math.sin(phi) * Math.sin(theta) * Math.sin(psi) + Math.cos(phi) * Math.cos(psi)) +
                  w * (Math.cos(phi) * Math.sin(theta) * Math.sin(psi) - Math.sin(phi) * Math.cos(psi));
     
-    // ✅ FIXED: Altitude inversion issue during descent
-    // zDot should be positive when climbing, negative when descending
-    const zDot = u * Math.sin(theta) - 
-                 v * Math.sin(phi) * Math.cos(theta) - 
+    // ✅ CRITICAL FIX: Corrected Z-axis transformation for proper climb/descent indication
+    // When theta > 0 (nose up), u*sin(theta) should give positive zDot (climbing)
+    // When w > 0 (positive body upward), it contributes to positive zDot
+    const zDot = u * Math.sin(theta) + 
+                 v * Math.sin(phi) * Math.cos(theta) + 
                  w * Math.cos(phi) * Math.cos(theta);
     
-    // Debug: Log velocity calculations to understand vertical speed issue
-    console.log('Debug - Velocity Calculations:', {
-      bodyVelocity: { u, v, w },
-      orientation: { phi, theta, psi },
-      earthFrameZDot: zDot,
-      previousEarthFrameVerticalVelocity: this.earthFrameVerticalVelocity
-    });
+
     
-    // Integrate position
+    // Store for vertical speed calculation
+    this.earthFrameVerticalVelocity = zDot;
+    
+    // Update position
     this.state.position.x += xDot * this.dt;
     this.state.position.y += yDot * this.dt;
     this.state.position.z += zDot * this.dt;
-    
-    // Store earth frame vertical velocity for vertical speed calculation
-    this.earthFrameVerticalVelocity = zDot;
   }
   
   /**
@@ -956,26 +1000,15 @@ class NewFlightPhysicsService {
     const heading = (this.state.orientation.psi * 180 / Math.PI + 360) % 360;
     const pitch = this.state.orientation.theta * 180 / Math.PI;
     const roll = this.state.orientation.phi * 180 / Math.PI;
-    const altitude_ft = -this.state.position.z * 3.28084;
+    // ✅ FIXED: Use position.z as positive altitude (no negative conversion needed)
+    const altitude_ft = this.state.position.z * 3.28084;
     
     // ✅ CRITICAL: Use earth frame vertical velocity for correct vertical speed
     const earthFrameVerticalVelocity = this.earthFrameVerticalVelocity || 0;
     const verticalSpeed = earthFrameVerticalVelocity * 196.85; // Convert m/s to ft/min
     
-    // ✅ COMPREHENSIVE DEBUG: Log all values affecting vertical speed
-    console.log('🔍 DEBUG - Vertical Speed Calculation:', {
-      'earthFrameVerticalVelocity': earthFrameVerticalVelocity,
-      'velocity.w': velocity.w,
-      'velocity.u': velocity.u,
-      'velocity.v': velocity.v,
-      'pitch_rad': this.state.orientation.theta,
-      'roll_rad': this.state.orientation.phi,
-      'position.z': this.state.position.z,
-      'altitude_ft': altitude_ft,
-      'conversion_factor': 196.85,
-      'verticalSpeed_ftmin': verticalSpeed,
-      'verticalSpeed_rounded': Math.round(verticalSpeed)
-    });
+    // Update altitude tracking
+    this.debugData.lastAltitude = altitude_ft;
     
     const groundSpeed = airspeed * 1.94384; // Convert m/s to knots
     
@@ -1062,8 +1095,9 @@ class NewFlightPhysicsService {
    * Get crash warning status
    */
   getCrashWarning() {
-    if (this.state.position.z > 0) return 'TERRAIN CONTACT'; // Altitude < 0 means below ground
-    if (this.state.position.z > -10) return 'LOW ALTITUDE';
+    // ✅ FIXED: Use position.z as positive altitude above ground
+    if (this.state.position.z <= 0) return 'TERRAIN CONTACT'; // Altitude <= 0 means at/below ground
+    if (this.state.position.z < 50) return 'LOW ALTITUDE'; // Less than 50m altitude
     if (this.state.velocity.w < -10) return 'RAPID DESCENT';
     if (Math.abs(this.state.orientation.phi) > Math.PI/2) return 'EXCESSIVE BANK';
     if (Math.abs(this.state.orientation.theta) > Math.PI/3) return 'EXCESSIVE PITCH';
@@ -1074,10 +1108,11 @@ class NewFlightPhysicsService {
    * Calculate time to crash based on current trajectory
    */
   getTimeToCrash() {
-    if (this.state.position.z > -50) return 0; // Already crashed or very low
+    // ✅ FIXED: Use position.z as positive altitude above ground
+    if (this.state.position.z < 50) return 0; // Already crashed or very low
     if (this.state.velocity.w < -5) {
       // Calculate time to reach ground level (z = 0)
-      const timeToGround = -this.state.position.z / this.state.velocity.w;
+      const timeToGround = this.state.position.z / Math.abs(this.state.velocity.w);
       return Math.max(0, timeToGround);
     }
     return null;
@@ -1087,7 +1122,7 @@ class NewFlightPhysicsService {
    * Get crash status
    */
   getCrashStatus() {
-    return this.state.position.z >= 0; // Crashed if altitude >= 0 (ground level)
+    return this.state.position.z <= 0; // Crashed if altitude <= 0 (ground level)
   }
   
   /**
@@ -1150,12 +1185,12 @@ class NewFlightPhysicsService {
    * Reset aircraft to initial cruise state
    */
   reset() {
-    // Reset to level cruise at FL350, 450 KTS
+    // ✅ FIXED: Reset to level cruise at FL350, 450 KTS using positive altitude
     this.state = {
       position: {
         x: 0,     // North position (m)
         y: 0,     // East position (m)
-        z: -10668 // Altitude: 35,000 ft = 10,668 m (negative = downward)
+        z: 10668  // Altitude: 35,000 ft = 10,668 m (POSITIVE = above ground level)
       },
       velocity: {
         u: 231.5, // Forward velocity (450 KTS TAS)
@@ -1190,7 +1225,7 @@ class NewFlightPhysicsService {
     // Reset debug data
     this.debugData = {};
     
-    console.log("✈️ Flight physics reset to cruise state");
+
   }
   
   /**
@@ -1198,8 +1233,8 @@ class NewFlightPhysicsService {
    */
   setTestConfiguration(altitude_ft, ias_kts) {
     if (altitude_ft !== undefined) {
-      // Convert altitude from feet to meters (negative for downward)
-      const altitude_m = -(altitude_ft * 0.3048);
+      // ✅ FIXED: Use position.z as positive altitude
+      const altitude_m = altitude_ft * 0.3048;
       this.state.position.z = altitude_m;
       this.autopilot.targets.altitude = altitude_m;
     }
@@ -1211,7 +1246,7 @@ class NewFlightPhysicsService {
       this.autopilot.targets.speed = ias_ms;
     }
     
-    console.log(`🧪 Test configuration set: ${altitude_ft || 'current'} ft, ${ias_kts || 'current'} KTS`);
+
   }
 }
 

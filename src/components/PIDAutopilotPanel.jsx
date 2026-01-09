@@ -26,8 +26,9 @@ const PIDAutopilotPanel = ({ physicsService, onAutopilotToggle }) => {
       setAutopilotStatus(status);
       
       // Update input displays
+      // ✅ FIXED: Use position.z as positive altitude (no negative conversion needed)
       setTargetInputs({
-        altitude: Math.round(-status.targets.altitude * 3.28084), // Convert to feet
+        altitude: Math.round(status.targets.altitude * 3.28084), // Convert to feet
         speed: Math.round(status.targets.speed * 1.94384), // Convert to knots
         heading: Math.round(status.targets.heading * 180/Math.PI) // Convert to degrees
       });
@@ -38,9 +39,9 @@ const PIDAutopilotPanel = ({ physicsService, onAutopilotToggle }) => {
   const updateTargets = () => {
     if (!physicsService) return;
     
-    // Convert inputs back to physics units
+    // ✅ FIXED: Use position.z as positive altitude (no negative conversion needed)
     const targets = {
-      altitude: -targetInputs.altitude / 3.28084, // Convert feet to meters (negative)
+      altitude: targetInputs.altitude / 3.28084, // Convert feet to meters
       speed: targetInputs.speed / 1.94384, // Convert knots to m/s
       heading: targetInputs.heading * Math.PI/180 // Convert degrees to radians
     };
@@ -237,7 +238,7 @@ const PIDAutopilotPanel = ({ physicsService, onAutopilotToggle }) => {
             <div className="bg-gray-600 rounded p-3">
               <div className="text-sm text-gray-300">Altitude Error</div>
               <div className="text-lg font-mono">
-                {(autopilotStatus.targets.altitude - (-35000 * 3.28084)).toFixed(0)} ft
+                {(autopilotStatus.targets.altitude - (35000 * 3.28084)).toFixed(0)} ft
               </div>
             </div>
             <div className="bg-gray-600 rounded p-3">

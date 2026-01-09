@@ -143,7 +143,8 @@ export function useAircraftPhysics(config = {}, autoStart = true) {
         yaw: currentControlsRef.current.yaw
       });
 
-      const altitude = -newState.position.z * 3.28084;
+      // ✅ FIXED: Use position.z as positive altitude (no negative conversion needed)
+      const altitude = newState.position.z * 3.28084;
       const airspeeds = physicsService.calculateAirspeeds();
       
       const trueAirspeed = isNaN(airspeeds?.trueAirspeed) ? 450 : airspeeds.trueAirspeed;
