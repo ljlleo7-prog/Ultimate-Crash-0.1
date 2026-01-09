@@ -91,7 +91,6 @@ export function useAircraftPhysics(config = {}, autoStart = true) {
   const startPhysics = () => {
     console.log('🎮 useAircraftPhysics: STARTING PHYSICS ANIMATION LOOP...');
     let lastTime = performance.now();
-    
     const animate = () => {
       const currentTime = performance.now();
       const dt = (currentTime - lastTime) / 1000;
@@ -186,7 +185,7 @@ export function useAircraftPhysics(config = {}, autoStart = true) {
         rudder: currentControlsRef.current.yaw * 180 / Math.PI,
         lift: physicsService.debugData?.lift || 0,
         drag: physicsService.debugData?.drag || 0,
-        thrust: (currentControlsRef.current.throttle * 117000 || 0),
+        thrust: physicsService.thrustForces.x || 0,
         weight: physicsService.debugData?.weight || 0,
         cg: {
           x: newState.position.x,

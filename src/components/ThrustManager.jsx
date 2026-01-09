@@ -81,8 +81,47 @@ const ThrustManager = ({ controlThrust, flightState }) => {
         background: '#333',
         borderRadius: '20px',
         margin: '0 auto',
-        border: '2px solid #555'
-      } },
+        border: '2px solid #555',
+        userSelect: 'none', // Prevent text selection during drag
+        cursor: 'grab'
+      },
+      onMouseDown: (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        
+        const leverElement = e.currentTarget;
+        const rect = leverElement.getBoundingClientRect();
+        
+        // Store initial position for more accurate drag calculation
+        const initialY = e.clientY;
+        const initialThrottle = displayThrottle;
+        
+        const handleMouseMove = (moveEvent) => {
+          moveEvent.preventDefault();
+          moveEvent.stopPropagation();
+          
+          const deltaY = moveEvent.clientY - initialY;
+          // Calculate throttle change based on drag distance
+          const newThrottle = Math.max(0, Math.min(100, initialThrottle - (deltaY / rect.height) * 100));
+          
+          setDisplayThrottle(newThrottle);
+          // Calculate delta from initial throttle for handleThrustControl
+          const throttleDelta = newThrottle - initialThrottle;
+          controlThrust(0, throttleDelta);
+        };
+        
+        const handleMouseUp = () => {
+          document.removeEventListener('mousemove', handleMouseMove);
+          document.removeEventListener('mouseup', handleMouseUp);
+          document.body.style.cursor = '';
+        };
+        
+        // Set cursor style during drag
+        document.body.style.cursor = 'grabbing';
+        
+        document.addEventListener('mousemove', handleMouseMove);
+        document.addEventListener('mouseup', handleMouseUp);
+      }},
         React.createElement('div', { style: {
           position: 'absolute',
           bottom: `${displayThrottle}%`,
@@ -104,7 +143,8 @@ const ThrustManager = ({ controlThrust, flightState }) => {
           border: '2px solid #000',
           borderRadius: '10px',
           transform: 'translateY(50%)',
-          cursor: 'pointer',
+          cursor: 'grab',
+          userSelect: 'none', // Prevent text selection
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',

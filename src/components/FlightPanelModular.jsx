@@ -121,19 +121,19 @@ const FlightPanelModular = ({ flightData, onActionRequest, aircraftModel }) => {
   // Control functions - Updated to use parent's physics service
   const controlPitch = (amount) => {
     if (onActionRequest) {
-      onActionRequest('control-pitch', amount);
+      onActionRequest('pitch', amount);
     }
   };
 
   const controlRoll = (amount) => {
     if (onActionRequest) {
-      onActionRequest('control-roll', amount);
+      onActionRequest('roll', amount);
     }
   };
 
   const controlThrust = (engineIndex, amount) => {
     if (onActionRequest) {
-      onActionRequest('control-thrust', { engineIndex, amount });
+      onActionRequest('throttle', amount);
     }
   };
 
@@ -183,7 +183,7 @@ const FlightPanelModular = ({ flightData, onActionRequest, aircraftModel }) => {
   };
 
   // Main render function
-  return React.createElement('div', { className: 'modern-flight-panel' },
+  return React.createElement('div', { className: 'modern-flight-panel', style: { userSelect: 'none' } },
     // Crash warning flash
     React.createElement(CrashWarningFlash, { flashActive, flashText }),
     

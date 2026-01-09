@@ -54,23 +54,27 @@ const FlightPosePanel = ({ flightState }) => {
       React.createElement('div', { className: 'artificial-horizon compressed' },
         React.createElement('div', { 
           className: 'horizon-container',
-          style: { transform: `rotate(${roll}deg)` }
+          style: { transform: `rotate(${-roll}deg)` } // Reverse roll direction for correct horizon reference
         },
-          // Sky and ground - both move in the same direction (corrected)
+          // Sky and ground - increased width and height for better coverage
           React.createElement('div', { 
             className: 'sky',
             style: { 
-              transform: `translateY(${pitch * 1.5}px)`, // FIXED: Removed negative sign
-              height: '1000px', // Long rectangular shape for more coverage
-              width: '100%'
+              transform: `translateY(${pitch * 3}px)`,
+              height: '300%', // Tall sky for better coverage
+              width: '200%',  // Wider sky for better roll coverage
+              top: '-250%',    // Center vertically
+              left: '-50%'     // Center horizontally
             } 
           }),
           React.createElement('div', { 
             className: 'ground',
             style: { 
-              transform: `translateY(${pitch * 1.5}px)`, // FIXED: Removed negative sign
-              height: '1000px', // Long rectangular shape for more coverage
-              width: '100%'
+              transform: `translateY(${pitch * 3}px)`,
+              height: '300%', // Tall ground for better coverage
+              width: '200%',  // Wider ground for better roll coverage
+              bottom: '-250%', // Center vertically
+              left: '-50%'     // Center horizontally
             } 
           }),
           

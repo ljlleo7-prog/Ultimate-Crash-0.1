@@ -39,24 +39,13 @@ const DraggableJoystick = ({ controlPitch, controlRoll, flightState }) => {
     if (now - lastControlTimeRef.current < 50) return; // 20 FPS max
     lastControlTimeRef.current = now;
     
-    // Calculate normalized position (0 to 1)
+    // Calculate normalized position (-1 to 1)
     const normalizedX = position.x / maxDistance;
     const normalizedY = position.y / maxDistance;
     
-    // Apply sensitivity curve: subtle in central 70%, more sensitive at edges
-    const applyCurve = (value) => {
-      const absValue = Math.abs(value);
-      if (absValue <= 0.35) { // Central 70% region (35% on each side)
-        // Subtle movement: cubic curve for fine control
-        return value * Math.pow(absValue, 0.5) * 0.3;
-      } else {
-        // More sensitive at edges: quadratic curve for stronger control
-        return value * Math.pow(absValue, 0.8) * 0.8;
-      }
-    };
-    
-    const pitchInput = -applyCurve(normalizedY);
-    const rollInput = applyCurve(normalizedX);
+    // Apply controls directly with conservative scaling to prevent overshooting
+    const pitchInput = -normalizedY * 0.3;
+    const rollInput = normalizedX * 0.3;
     
     // Apply controls continuously
     controlPitch(pitchInput);

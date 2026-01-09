@@ -103,7 +103,8 @@ class NewFlightPhysicsService {
         throttle: 0.55, // 55% thrust for cruise
         pitch: 0,       // Neutral elevator
         roll: 0,        // Neutral ailerons
-        yaw: 0          // Neutral rudder
+        yaw: 0,         // Neutral rudder
+        trim: 220000    // Initial trim wheel position (displays as 11 units)
       },
       // ✅ NEW: Control surfaces state with proper defaults
       flaps: 0,         // 0=UP, 1=TO, 2=LDG
@@ -204,11 +205,11 @@ class NewFlightPhysicsService {
       zeroLiftDragCoefficient: 0.025, // CD0
       inducedDragFactor: 0.04,   // k factor
       
-      // Control system
+      // Control system - more effective power levels
       controlPower: {
-        x: 0.01, // Roll power
-        y: 0.01, // Pitch power
-        z: 0.01  // Yaw power
+        x: 8000.0, // Roll power
+        y: 12000.0, // Pitch power - significantly increased for better responsiveness
+        z: 5000.0  // Yaw power
       },
       
       // Moment of inertia (kg⋅m²)
@@ -272,17 +273,20 @@ class NewFlightPhysicsService {
       this.updateAutopilotTargets(input.targets);
     }
     
+    // Update environment properties based on current altitude
+    this.updateEnvironmentProperties();
+    
     // Calculate control inputs (autopilot or manual)
     const controlInputs = this.autopilot.engaged ? 
       this.calculateAutopilotControls() : 
       this.applyManualControls(input);
     
     // Apply input smoothing to prevent control oscillations
-    this.state.controls.throttle = this.smoothInput(this.state.controls.throttle, controlInputs.throttle, 0.1);
-    this.state.controls.pitch = this.smoothInput(this.state.controls.pitch, controlInputs.pitch, 0.2);
-    this.state.controls.roll = this.smoothInput(this.state.controls.roll, controlInputs.roll, 0.2);
-    this.state.controls.yaw = this.smoothInput(this.state.controls.yaw, controlInputs.yaw, 0.1);
-    this.state.controls.trim = this.smoothInput(this.state.controls.trim, controlInputs.trim || 0, 0.05);
+    this.state.controls.throttle = this.smoothInput(this.state.controls.throttle, controlInputs.throttle, 0.5); // More responsive throttle
+    this.state.controls.pitch = this.smoothInput(this.state.controls.pitch, controlInputs.pitch, 0.4); // More responsive pitch
+    this.state.controls.roll = this.smoothInput(this.state.controls.roll, controlInputs.roll, 0.4); // More responsive roll
+    this.state.controls.yaw = this.smoothInput(this.state.controls.yaw, controlInputs.yaw, 0.3); // More responsive yaw
+    this.state.controls.trim = this.smoothInput(this.state.controls.trim, controlInputs.trim || 0, 0.05); // Keep trim slow
     
     // Calculate all forces and moments
     this.calculateAerodynamicForces();
@@ -291,10 +295,8 @@ class NewFlightPhysicsService {
     
     // Sum forces and integrate motion
     this.sumForcesAndMoments();
-    this.integrateMotion();
-    
-    // ✅ FIXED: Add missing position update - critical for earth frame velocities and position updates
-    this.updatePosition();
+    this.integrateMotion(this.dt);
+  
     
     // Store debug data for analysis
     if (this.autopilot.engaged) {
@@ -377,14 +379,31 @@ class NewFlightPhysicsService {
    */
   applyManualControls(input) {
     // Use input values, but apply safety limits
+    // Only use defaults if input values are explicitly undefined (not 0)
     return {
-      pitch: Math.max(this.autopilot.limits.minPitch, Math.min(this.autopilot.limits.maxPitch, input.pitch || 0)),
-      throttle: Math.max(this.autopilot.limits.minThrottle, Math.min(this.autopilot.limits.maxThrottle, input.throttle || 0.55)),
-      roll: Math.max(-0.5, Math.min(0.5, input.roll || 0)),
-      yaw: Math.max(-0.3, Math.min(0.3, input.yaw || 0))
+      pitch: Math.max(this.autopilot.limits.minPitch, Math.min(this.autopilot.limits.maxPitch, typeof input.pitch === 'undefined' ? 0 : input.pitch)),
+      throttle: Math.max(this.autopilot.limits.minThrottle, Math.min(this.autopilot.limits.maxThrottle, typeof input.throttle === 'undefined' ? 0.55 : input.throttle)),
+      roll: Math.max(-0.5, Math.min(0.5, typeof input.roll === 'undefined' ? 0 : input.roll)),
+      yaw: Math.max(-0.3, Math.min(0.3, typeof input.yaw === 'undefined' ? 0 : input.yaw))
     };
   }
   
+  /**
+   * Set trim control from cockpit
+   */
+  setTrim(trimValue) {
+    // Apply safety limits: trim typically ranges from -500,000 to +500,000
+    const trimmedValue = Math.max(-500000, Math.min(500000, trimValue || 0));
+    
+    // Smoothly apply trim change to avoid sudden jolts
+    this.state.controls.trim = this.smoothInput(this.state.controls.trim, trimmedValue, 0.1);
+    
+    // Log the change for debugging
+    if (this.debugMode) {
+      console.log(`Trim set to: ${trimValue} (displays as ${(trimValue / 20000).toFixed(1)} units)`);
+    }
+  }
+
   /**
    * Update autopilot targets
    */
@@ -612,10 +631,9 @@ class NewFlightPhysicsService {
     const trimSurfaceAreaRatio = this.aircraft.trimSurfaceAreaRatio || 0.12; // Default: 12% of wing area
     const trimEffectiveness = this.aircraft.trimEffectiveness || 0.1; // Tuned down to 10%
     
-    // ✅ COCKPIT TRIM CONTROL: Trim wheel setting from cockpit
-    // Initial cruise setting: 220,000 (displays as 11 units with 20,000 factor)
+    // ✅ COCKPIT TRIM CONTROL: Use trim wheel position from aircraft state
     // Display factor: trimControl / 20,000 = cockpit trim units
-    const trimControl = 220000; // Initial trim wheel position
+    const trimControl = this.state.controls.trim; // Trim wheel position from cockpit
     
     // ✅ FIXED: Define controlPowerY first to avoid reference error
     const controlPowerY = this.aircraft.controlPower?.y || 0.01;
@@ -633,15 +651,15 @@ class NewFlightPhysicsService {
     const trimMoment = controlPowerY * (input.pitch + elevatorTrim);
     const totalPitchingMomentWithTrim = aerodynamicPitchingMoment + trimMoment;
     
-    // ✅ FIXED: Calculate angular accelerations with proper trim integration
-    // Use the total pitching moment with trim effects for pitch acceleration
-    const pdot = (this.aircraft.controlPower.x || 0.01) * input.roll / rollInertia;
-    const qdot = totalPitchingMomentWithTrim / pitchInertia;
-    const rdot = (this.aircraft.controlPower.z || 0.01) * input.yaw / yawInertia;
+    // ✅ FIXED: Calculate control moments with consistent unit scaling
+    // Using extremely conservative control power values to prevent overshooting
+    const rollMoment = (this.aircraft.controlPower.x || 1000.0) * input.roll;
+    const pitchMoment = (this.aircraft.controlPower.y || 2000.0) * input.pitch;
+    const yawMoment = (this.aircraft.controlPower.z || 800.0) * input.yaw;
     
-    // ✅ CRITICAL FIX: Assign forces to class properties
+    // ✅ CRITICAL FIX: Assign forces and moments to class properties
     this.aeroForces = { x: Fx_total, y: Fy_total, z: Fz_total };
-    this.aeroMoments = { x: pdot, y: qdot, z: rdot };
+    this.aeroMoments = { x: rollMoment, y: pitchMoment, z: yawMoment };
     
     // Store debug data for analysis
     this.debugData = {
@@ -698,7 +716,7 @@ class NewFlightPhysicsService {
     
     return {
       forces: { x: Fx_total, y: Fy_total, z: Fz_total },
-      moments: { x: pdot, y: qdot, z: rdot },
+      moments: { x: rollMoment, y: pitchMoment, z: yawMoment },
       debug: this.debugData
     };
   }
@@ -747,6 +765,42 @@ class NewFlightPhysicsService {
     return {
       cl: cl + flapsCl,
       cd: cd + flapsCd
+    };
+  }
+  
+  /**
+   * Update environment properties based on current altitude
+   * Uses standard atmosphere model for accurate environmental calculations
+   */
+  updateEnvironmentProperties() {
+    // ✅ FIXED: Use position.z as positive altitude (no negative conversion needed)
+    const altitude_m = this.state.position.z; // Already positive for altitude above ground
+    
+    // Standard atmosphere calculations
+    const temperatureGradient = -0.0065; // K/m (standard lapse rate)
+    const temperatureSeaLevel = 288.15; // K (15°C)
+    const pressureSeaLevel = 101325; // Pa
+    const densitySeaLevel = 1.225; // kg/m³
+    
+    // Calculate temperature at altitude
+    const temperature = temperatureSeaLevel + temperatureGradient * altitude_m;
+    
+    // Calculate pressure at altitude (barometric formula)
+    const pressure = pressureSeaLevel * Math.pow(temperature / temperatureSeaLevel, -this.GRAVITY / (this.AIR_GAS_CONSTANT * temperatureGradient));
+    
+    // Calculate density at altitude
+    const density = pressure / (this.AIR_GAS_CONSTANT * temperature);
+    
+    // Calculate speed of sound at altitude
+    const speedOfSound = Math.sqrt(1.4 * this.AIR_GAS_CONSTANT * temperature);
+    
+    // Update environment properties
+    this.environment = {
+      ...this.environment,
+      density: isNaN(density) ? 0.379 : density,
+      pressure: isNaN(pressure) ? 23840 : pressure,
+      temperature: isNaN(temperature) ? 229 : temperature,
+      speedOfSound: isNaN(speedOfSound) ? 295 : speedOfSound
     };
   }
   
@@ -912,10 +966,10 @@ class NewFlightPhysicsService {
     this.state.angularRates.q += alphaY * this.dt;
     this.state.angularRates.r += alphaZ * this.dt;
     
-    // Apply damping
-    this.state.angularRates.p *= 0.992;
-    this.state.angularRates.q *= 0.992;
-    this.state.angularRates.r *= 0.992;
+    // Apply improved damping to angular rates
+    this.state.angularRates.p *= 0.996;  // Increased damping from 0.992
+    this.state.angularRates.q *= 0.996;  // Increased damping from 0.992
+    this.state.angularRates.r *= 0.996;  // Increased damping from 0.992
     
     // Update orientation using body rates
     const p = this.state.angularRates.p;

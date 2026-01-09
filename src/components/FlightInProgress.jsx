@@ -221,7 +221,9 @@ const FlightInProgress = () => {
         <FlightPanelModular
           flightData={flightData}
           onActionRequest={(action, payload) => {
-            console.log(`📡 UI Action: ${action}`, payload);
+            // Handle different payload types
+            const payloadStr = typeof payload === 'number' ? payload.toFixed(5) : JSON.stringify(payload);
+            console.log(`📡 UI Action: ${action} = ${payloadStr}`);
             debugControlChange(action, payload, 'FLIGHT_PANEL');
             
             // Handle specific actions
@@ -267,9 +269,7 @@ const FlightInProgress = () => {
         <div style={{ display: 'flex', gap: '10px', padding: '10px', background: 'rgba(0,0,0,0.8)', overflow: 'hidden' }}>
           {/* Thrust Manager - Lever Style */}
           <ThrustManager
-            thrust={throttleControl}
-            onThrustChange={handleThrustControl}
-            disabled={false}
+            controlThrust={handleThrustControl}
             flightState={flightData}
           />
           
