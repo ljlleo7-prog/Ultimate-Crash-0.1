@@ -4,22 +4,10 @@ import { useAircraftPhysics } from '../hooks/useAircraftPhysics';
 import ThrustManager from './ThrustManager.jsx';
 // Import SurfaceControls from components directory  
 import SurfaceControls from './SurfaceControls.jsx';
-import { controlDebug, debugControlChange, quickControlTest, checkControlStatus } from '../utils/ControlDebugTool.js';
 import FlightPanelModular from './FlightPanelModular';
-import FlightPhysicsDashboard from './FlightPhysicsDashboard.jsx';
 
 const FlightInProgress = () => {
-  // Initialize control debug tool and auto-start physics
-  useEffect(() => {
-    console.log('🎮 FlightInProgress: Initializing control synchronization');
-    controlDebug.enable();
-    
-    // Test control system after initialization
-    setTimeout(() => {
-      console.log('🔧 Running initial control test...');
-      quickControlTest();
-    }, 2000);
-  }, []);
+
 
   // Aircraft configuration for physics initialization
   const aircraftConfig = {
@@ -45,111 +33,36 @@ const FlightInProgress = () => {
 
   // Control state for UI components
   const [throttleControl, setThrottleControl] = useState(47); // Default 47% as mentioned by user
-  const [controlSyncStatus, setControlSyncStatus] = useState('INITIALIZING');
 
   // Handle thrust control from ThrustManager
   const handleThrustControl = (engine, delta) => {
     const newThrottle = Math.max(0, Math.min(100, throttleControl + delta));
     setThrottleControl(newThrottle);
     
-    // Log control change
-    debugControlChange('throttle', newThrottle, `THRUST_MANAGER_${engine}`);
-    
     // Send to physics engine using hook functions
     setThrottle(newThrottle);
-    
-    // Debug log
-    console.log(`🎮 Thrust Control: ${throttleControl}% → ${newThrottle}% (Engine ${engine})`);
   };
 
   // Handle surface control changes
   const handleFlapsControl = (position) => {
-    debugControlChange('flaps', position, 'SURFACE_CONTROLS');
     // Surface controls are handled differently - they're aircraft configuration
     // For now, we'll log the change but not directly set via physics hook
     console.log(`🛩️ Flaps control: ${position}`);
   };
 
   const handleGearControl = (position) => {
-    debugControlChange('gear', position, 'SURFACE_CONTROLS');
     // Landing gear is handled differently - it's an aircraft configuration
     console.log(`🔧 Gear control: ${position}`);
   };
 
   const handleAirBrakesControl = (position) => {
-    debugControlChange('airBrakes', position, 'SURFACE_CONTROLS');
     // Air brakes are handled differently - they're aircraft configuration  
     console.log(`🛑 Air brakes control: ${position}`);
   };
 
-  // Monitor control synchronization status
-  useEffect(() => {
-    if (flightData && physicsState) {
-      const status = checkControlStatus(flightData, physicsState);
-      setControlSyncStatus(status.status);
-      
-      // Log significant sync issues
-      if (status.issues.length > 0) {
-        console.warn('⚠️ Control Sync Issues:', status.issues);
-      }
-    }
-  }, [flightData, physicsState]);
 
-  // Debug render method
-  const debugRender = () => {
-    return (
-      <div style={{
-        position: 'fixed',
-        top: '10px',
-        left: '10px',
-        background: 'rgba(0,0,0,0.9)',
-        color: 'lime',
-        padding: '10px',
-        borderRadius: '5px',
-        fontSize: '12px',
-        fontFamily: 'monospace',
-        zIndex: 1000,
-        border: '1px solid #333',
-        maxWidth: '300px'
-      }}>
-        <div style={{ marginBottom: '5px', fontWeight: 'bold' }}>🎮 CONTROL STATUS</div>
-        <div>Sync: {controlSyncStatus}</div>
-        <div>Throttle: {throttleControl}% → {flightData?.throttle?.toFixed(1)}%</div>
-        <div>Flaps: {flightData?.flapsPosition} ({flightData?.flapsValue})</div>
-        <div>Gear: {flightData?.gearPosition} ({flightData?.gearValue})</div>
-        <div>Brakes: {flightData?.airBrakesPosition} ({flightData?.airBrakesValue})</div>
-        <div style={{ marginTop: '5px' }}>
-          <button 
-            onClick={() => quickControlTest()}
-            style={{
-              background: '#333',
-              color: 'lime',
-              border: '1px solid #555',
-              padding: '2px 6px',
-              fontSize: '10px',
-              cursor: 'pointer',
-              marginRight: '2px'
-            }}
-          >
-            TEST
-          </button>
-          <button 
-            onClick={() => controlDebug.clearLog()}
-            style={{
-              background: '#333',
-              color: 'lime',
-              border: '1px solid #555',
-              padding: '2px 6px',
-              fontSize: '10px',
-              cursor: 'pointer'
-            }}
-          >
-            CLEAR
-          </button>
-        </div>
-      </div>
-    );
-  };
+
+
 
   // Auto-start logic means we don't need a start button anymore
   // Show loading state briefly while physics initializes
@@ -213,9 +126,7 @@ const FlightInProgress = () => {
       overflow: 'hidden',
       display: 'flex'
     }}>
-      {/* Left Side - Control Debug Panel */}
-      {debugRender()}
-      
+
       {/* Center - Main Flight Panel */}
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
         <FlightPanelModular
@@ -224,7 +135,6 @@ const FlightInProgress = () => {
             // Handle different payload types
             const payloadStr = typeof payload === 'number' ? payload.toFixed(5) : JSON.stringify(payload);
             console.log(`📡 UI Action: ${action} = ${payloadStr}`);
-            debugControlChange(action, payload, 'FLIGHT_PANEL');
             
             // Handle specific actions
             switch (action) {
@@ -277,33 +187,7 @@ const FlightInProgress = () => {
         </div>
       </div>
       
-      {/* Right Side - Physics Debug Dashboard */}
-      <div style={{ 
-        width: '380px', 
-        background: 'rgba(0,0,0,0.9)', 
-        borderLeft: '2px solid #333',
-        overflowY: 'auto', /* Allow vertical scrolling */
-        overflowX: 'hidden' /* Hide horizontal scroll */
-      }}>
-        <FlightPhysicsDashboard
-          flightData={flightData}
-          physicsState={physicsState}
-          debugData={{
-            forces: {
-              lift: flightData.lift,
-              drag: flightData.drag,
-              thrust: flightData.thrust,
-              weight: flightData.weight
-            },
-            accelerations: {
-              horizontal: flightData.accelerationX,
-              vertical: flightData.accelerationY
-            }
-          }}
-          isInitialized={isInitialized}
-          aircraftConfig={aircraftConfig}
-        />
-      </div>
+
       
       {/* Crash/Reset Handling - Disabled for now */}
       {/* 

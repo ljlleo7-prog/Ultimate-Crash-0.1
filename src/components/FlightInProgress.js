@@ -3,20 +3,10 @@ import { useAircraftPhysics } from '../hooks/useAircraftPhysics';
 import ThrustManager from './ThrustManager';
 import FlightPanelModular from './FlightPanelModular';
 import SurfaceControls from './SurfaceControls';
-import { controlDebug, debugControlChange, quickControlTest, checkControlStatus } from '../utils/ControlDebugTool';
+
 
 const FlightInProgress = () => {
-  // Initialize control debug tool
-  useEffect(() => {
-    console.log('🎮 FlightInProgress: Initializing control synchronization');
-    controlDebug.enable();
-    
-    // Test control system on mount
-    setTimeout(() => {
-      console.log('🔧 Running initial control test...');
-      quickControlTest();
-    }, 1000);
-  }, []);
+
 
   const {
     flightData,

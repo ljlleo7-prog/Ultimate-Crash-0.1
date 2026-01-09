@@ -183,10 +183,10 @@ export function useAircraftPhysics(config = {}, autoStart = true) {
         elevator: currentControlsRef.current.pitch * 180 / Math.PI,
         aileron: currentControlsRef.current.roll * 180 / Math.PI,
         rudder: currentControlsRef.current.yaw * 180 / Math.PI,
-        lift: physicsService.debugData?.lift || 0,
-        drag: physicsService.debugData?.drag || 0,
+        lift: 0,
+        drag: 0,
         thrust: physicsService.thrustForces.x || 0,
-        weight: physicsService.debugData?.weight || 0,
+        weight: 0,
         cg: {
           x: newState.position.x,
           y: newState.position.y,
@@ -293,6 +293,6 @@ export function useAircraftPhysics(config = {}, autoStart = true) {
     setYaw,
     updatePhysics,
     resetAircraft,
-    debugData: physicsServiceRef.current?.debugData || {}
+
   };
 }

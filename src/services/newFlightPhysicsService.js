@@ -133,8 +133,7 @@ class NewFlightPhysicsService {
     // Earth frame velocity components
     this.earthFrameVerticalVelocity = 0; // m/s
 
-    // Debug data storage
-    this.debugData = {};
+
     
     // 🚁 PID AUTOPILOT SYSTEM
     this.autopilot = {
@@ -298,22 +297,7 @@ class NewFlightPhysicsService {
     this.integrateMotion(this.dt);
   
     
-    // Store debug data for analysis
-    if (this.autopilot.engaged) {
-      this.debugData.autopilot = {
-        engaged: true,
-        altitude_error: this.autopilot.targets.altitude - this.state.position.z,
-        speed_error: this.autopilot.targets.speed - Math.sqrt(
-          this.state.velocity.u * this.state.velocity.u + 
-          this.state.velocity.v * this.state.velocity.v + 
-          this.state.velocity.w * this.state.velocity.w
-        ),
-        pitch_command: controlInputs.pitch,
-        throttle_command: controlInputs.throttle
-      };
-    } else {
-      this.debugData.autopilot = { engaged: false };
-    }
+
     
     // Return updated state
     return this.getAircraftState();
@@ -398,10 +382,7 @@ class NewFlightPhysicsService {
     // Smoothly apply trim change to avoid sudden jolts
     this.state.controls.trim = this.smoothInput(this.state.controls.trim, trimmedValue, 0.1);
     
-    // Log the change for debugging
-    if (this.debugMode) {
-      console.log(`Trim set to: ${trimValue} (displays as ${(trimValue / 20000).toFixed(1)} units)`);
-    }
+
   }
 
   /**
@@ -569,10 +550,7 @@ class NewFlightPhysicsService {
     const Fy_aero = q * safeBeta * 0.1;                       // Side force from sideslip
     const Fz_aero = lift * cosAlpha + drag * sinAlpha;        // Lift upward component
     
-    // Debug: Show intermediate calculations
-    if (Math.abs(this.debugData.total_z) > weight * 0.5) {
 
-    }
     
     // Control surface effects
     const elevatorEffect = input.pitch * 0.001 * q * this.aircraft.wingArea;
@@ -661,54 +639,7 @@ class NewFlightPhysicsService {
     this.aeroForces = { x: Fx_total, y: Fy_total, z: Fz_total };
     this.aeroMoments = { x: rollMoment, y: pitchMoment, z: yawMoment };
     
-    // Store debug data for analysis
-    this.debugData = {
-      airspeed: airspeed,
-      alpha: safeAlpha,
-      angleOfAttack: safeAlpha * 180 / Math.PI, // Convert to degrees for display
-      cl: cl,
-      cd: cd,
-      lift: lift,
-      drag: drag,
-      liftForce: Fz_aero,
-      dragForce: Math.abs(Fx_aero),
-      netVertical: Fz_total + (this.gravityForces?.z || 0),
-      dynamicPressure: q,
-      requiredCL: requiredCL,
-      weight: weight,
-      // Enhanced aerodynamic moments debug
-      totalPitchingMoment: totalPitchingMoment,
-      aerodynamicPitchingMoment: aerodynamicPitchingMoment,
-      trimMoment: trimMoment,
-      totalPitchingMomentWithTrim: totalPitchingMomentWithTrim,
-      dragPitchingMoment: dragPitchingMoment,
-      liftPitchingMoment: liftPitchingMoment,
-      elevatorTrim: elevatorTrim,
-      momentArm: momentArm,
-      wingChord: wingChord,
-      // Debug force breakdown
-      lift_z: Fz_aero,
-      drag_z: drag * sinAlpha,
-      thrust_z: 0,
-      gravity_z: this.gravityForces?.z || 0,
-      total_z: Fz_total + (this.gravityForces?.z || 0),
-      // Detailed lift calculation
-      density: this.environment.density,
-      wingArea: this.aircraft.wingArea,
-      q_times_S: q * this.aircraft.wingArea,
-      cl_times_qS: cl * q * this.aircraft.wingArea,
-      // Intermediate calculations
-      cosAlpha: cosAlpha,
-      sinAlpha: sinAlpha,
-      fz_lift_component: lift * cosAlpha,
-      fz_drag_component: drag * sinAlpha,
-      // Flight path and orientation
-      flightPathAngle: flightPathAngle * 180 / Math.PI, // Convert to degrees
-      pitchAngle: this.state.orientation.theta * 180 / Math.PI // Convert to degrees
-    };
-    
-    // Force balance validation (for future debugging if needed)
-    const forceBalancePercent = Math.abs(this.debugData.total_z) / weight * 100;
+
     
 
     
@@ -716,8 +647,7 @@ class NewFlightPhysicsService {
     
     return {
       forces: { x: Fx_total, y: Fy_total, z: Fz_total },
-      moments: { x: rollMoment, y: pitchMoment, z: yawMoment },
-      debug: this.debugData
+      moments: { x: rollMoment, y: pitchMoment, z: yawMoment }
     };
   }
   
@@ -1061,8 +991,7 @@ class NewFlightPhysicsService {
     const earthFrameVerticalVelocity = this.earthFrameVerticalVelocity || 0;
     const verticalSpeed = earthFrameVerticalVelocity * 196.85; // Convert m/s to ft/min
     
-    // Update altitude tracking
-    this.debugData.lastAltitude = altitude_ft;
+
     
     const groundSpeed = airspeed * 1.94384; // Convert m/s to knots
     
@@ -1135,7 +1064,6 @@ class NewFlightPhysicsService {
       aeroForces: { ...this.aeroForces },
       thrustForces: { ...this.thrustForces },
       gravityForces: { ...this.gravityForces },
-      debug: { ...this.debugData },
       
       // Environmental data
       density: airspeeds.density,
@@ -1276,8 +1204,7 @@ class NewFlightPhysicsService {
     // Reset PID controllers
     Object.values(this.pidControllers).forEach(controller => controller.reset());
     
-    // Reset debug data
-    this.debugData = {};
+
     
 
   }

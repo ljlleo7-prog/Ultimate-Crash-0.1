@@ -15,8 +15,7 @@ import CentralPanel from './CentralPanel';
 // **NEW: Import Control Surface Panel**
 import ControlSurfacePanel from './ControlSurfacePanel';
 
-// **NEW: Import Autopilot Debug Panel**
-import AutopilotDebugPanel from './AutopilotDebugPanel';
+
 
 // Crash Warning Flash Component - MOVED OUTSIDE main component
 const CrashWarningFlash = ({ flashActive, flashText, onAlertComplete }) => {
@@ -87,160 +86,7 @@ const CrashWarningFlash = ({ flashActive, flashText, onAlertComplete }) => {
   }, flashText);
 };
 
-// Physics Debug Panel Component
-const PhysicsDebugPanel = ({ flightPhysicsRef }) => {
-  const [debugInfo, setDebugInfo] = useState(null);
-  const [showDebug, setShowDebug] = useState(false);
 
-  useEffect(() => {
-    if (!showDebug) return;
-    
-    const interval = setInterval(() => {
-      if (flightPhysicsRef.current) {
-        const info = flightPhysicsRef.current.getPhysicsDebugInfo();
-        setDebugInfo(info);
-      }
-    }, 500); // Update every 500ms
-    
-    return () => clearInterval(interval);
-  }, [showDebug, flightPhysicsRef]);
-
-  if (!showDebug) {
-    return (
-      <button 
-        onClick={() => setShowDebug(true)}
-        style={{
-          position: 'fixed',
-          top: '10px',
-          right: '10px',
-          zIndex: 1000,
-          background: '#333',
-          color: 'white',
-          border: 'none',
-          padding: '5px 10px',
-          borderRadius: '3px',
-          cursor: 'pointer'
-        }}
-      >
-        Show Physics Debug
-      </button>
-    );
-  }
-
-  return (
-    <div style={{
-      position: 'fixed',
-      top: '10px',
-      right: '10px',
-      zIndex: 1000,
-      background: 'rgba(0, 0, 0, 0.8)',
-      color: 'white',
-      padding: '10px',
-      borderRadius: '5px',
-      fontFamily: 'monospace',
-      fontSize: '12px',
-      maxWidth: '300px'
-    }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
-        <h3 style={{ margin: 0 }}>Physics Debug</h3>
-        <button 
-          onClick={() => setShowDebug(false)}
-          style={{
-            background: '#666',
-            color: 'white',
-            border: 'none',
-            padding: '2px 6px',
-            borderRadius: '3px',
-            cursor: 'pointer'
-          }}
-        >
-          Hide
-        </button>
-      </div>
-      
-      {debugInfo && (
-        <div>
-          <div style={{ marginBottom: '8px' }}>
-            <strong>Forces (N):</strong><br/>
-            Lift: {debugInfo.forces.lift}<br/>
-            Thrust: {debugInfo.forces.thrust}<br/>
-            Drag: {debugInfo.forces.drag}<br/>
-            Gravity: {debugInfo.forces.gravity}
-          </div>
-          
-          <div style={{ marginBottom: '8px' }}>
-            <strong>Ratios:</strong><br/>
-            Lift/Weight: {debugInfo.ratios.liftWeight}<br/>
-            Thrust/Drag: {debugInfo.ratios.thrustDrag}
-          </div>
-          
-          <div style={{ marginBottom: '8px' }}>
-            <strong>Accelerations:</strong><br/>
-            Horizontal: {debugInfo.accelerations.horizontal} kts/s<br/>
-            Vertical: {debugInfo.accelerations.vertical} ft/s²
-          </div>
-          
-          <div style={{ marginBottom: '8px' }}>
-            <strong>Velocities:</strong><br/>
-            Horizontal: {debugInfo.velocities.horizontal} kts<br/>
-            Vertical: {debugInfo.velocities.vertical} ft/s
-          </div>
-          
-          <div>
-            <strong>Environment:</strong><br/>
-            Air Density: {debugInfo.airDensity} kg/m³<br/>
-            Angle of Attack: {debugInfo.angleOfAttack}°
-          </div>
-        </div>
-      )}
-      
-      <div style={{ marginTop: '10px', display: 'flex', gap: '5px' }}>
-        <button 
-          onClick={() => flightPhysicsRef.current.setDebugConditions(35000, 250, 2, 85)}
-          style={{
-            background: '#444',
-            color: 'white',
-            border: 'none',
-            padding: '2px 6px',
-            borderRadius: '3px',
-            cursor: 'pointer',
-            fontSize: '10px'
-          }}
-        >
-          Cruise
-        </button>
-        <button 
-          onClick={() => flightPhysicsRef.current.setDebugConditions(10000, 180, 5, 90)}
-          style={{
-            background: '#444',
-            color: 'white',
-            border: 'none',
-            padding: '2px 6px',
-            borderRadius: '3px',
-            cursor: 'pointer',
-            fontSize: '10px'
-          }}
-        >
-          Climb
-        </button>
-        <button 
-          onClick={() => flightPhysicsRef.current.setDebugConditions(5000, 140, -2, 70)}
-          style={{
-            background: '#444',
-            color: 'white',
-            border: 'none',
-            padding: '2px 6px',
-            borderRadius: '3px',
-            cursor: 'pointer',
-            fontSize: '10px'
-          }}
-        >
-          Descent
-        </button>
-      </div>
-    </div>
-  );
-};
 
 // Main FlightPanel component
 const FlightPanel = ({ onActionRequest, aircraftModel, flightData }) => {
@@ -388,40 +234,7 @@ const FlightPanel = ({ onActionRequest, aircraftModel, flightData }) => {
     // Crash panel (if crashed)
     React.createElement(CrashPanel, { showCrashPanel, resetFlight }),
     
-    // **FIXED: ADD TEST BUTTONS**
-    React.createElement('div', { className: 'test-controls', style: { 
-      position: 'absolute', 
-      top: '10px', 
-      right: '10px', 
-      zIndex: 1000,
-      display: 'flex',
-      gap: '10px'
-    } },
-      React.createElement('button', {
-        onClick: () => setTestConfiguration(3000, 190),
-        style: {
-          padding: '8px 12px',
-          background: '#3b82f6',
-          color: 'white',
-          border: 'none',
-          borderRadius: '4px',
-          cursor: 'pointer',
-          fontSize: '12px'
-        }
-      }, 'Test: 3000ft, 190kts'),
-      React.createElement('button', {
-        onClick: () => setTestConfiguration(35000, 250),
-        style: {
-          padding: '8px 12px',
-          background: '#10b981',
-          color: 'white',
-          border: 'none',
-          borderRadius: '4px',
-          cursor: 'pointer',
-          fontSize: '12px'
-        }
-      }, 'Test: 35000ft, 250kts')
-    ),
+
     
     // Physics Debug Panel - REMOVED since flightPhysicsRef is no longer available
     // React.createElement(PhysicsDebugPanel, { flightPhysicsRef }),
