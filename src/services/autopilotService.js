@@ -5,13 +5,16 @@
  */
 
 class AutopilotService {
-  constructor(flightPhysicsService) {
-    this.flightPhysics = flightPhysicsService;
+  /**
+   * Constructor - Updated to work with NewFlightPhysicsService
+   */
+  constructor(flightPhysics, options = {}) {
+    this.flightPhysics = flightPhysics; // NewFlightPhysicsService instance
     this.enabled = false;
     
-    // Target flight conditions
-    this.targetAltitude = 35000; // feet
-    this.targetAirspeed = 460; // KTS TAS
+    // Target values (cruise flight)
+    this.targetAltitude = options.targetAltitude || 35000; // feet
+    this.targetAirspeed = options.targetAirspeed || 450; // knots
     
     // PID Controllers - Ultra-conservative gains to prevent extreme attitudes
     this.altitudePID = {
@@ -92,10 +95,12 @@ class AutopilotService {
   update(deltaTime = 0.016) {
     if (!this.enabled) return;
     
-    // Get current flight state
-    const flightState = this.flightPhysics.getFlightState();
-    const currentAltitude = flightState.altitude;
-    const currentAirspeed = flightState.airspeed;
+    // Get current flight state (updated to use NewFlightPhysicsService interface)
+    const flightState = this.flightPhysics.getAircraftState();
+    
+    // Extract current values
+    const currentAltitude = flightState.altitude_ft;
+    const currentAirspeed = flightState.airspeed_kts;
     
     // Calculate errors (target - current)
     const altitudeError = this.targetAltitude - currentAltitude;
@@ -119,7 +124,8 @@ class AutopilotService {
                                       0.1, 0.95); // Keep throttle in reasonable range
     
     // Apply autopilot outputs to flight physics
-    this.flightPhysics.state.controls.elevator = limitedElevator;
+    // Map elevator to pitch (NewFlightPhysicsService uses 'pitch' not 'elevator')
+    this.flightPhysics.state.controls.pitch = limitedElevator;
     this.flightPhysics.state.controls.throttle = limitedThrottle;
     
     // Update current outputs for rate limiting
@@ -129,9 +135,11 @@ class AutopilotService {
     // Update stability metrics
     this.updateStabilityMetrics(altitudeError, airspeedError, limitedElevator, rateLimitedThrottle);
     
-    // Log status occasionally
-    if (Math.floor(this.flightPhysics.time * 10) % 10 === 0) {
+    // Log status occasionally (use counter instead of flightPhysics.time)
+    this.logCounter = (this.logCounter || 0) + 1;
+    if (this.logCounter % 10 === 0) {
       this.logStatus(currentAltitude, currentAirspeed, altitudeError, airspeedError, limitedElevator, rateLimitedThrottle);
+      this.logCounter = 0;
     }
   }
   
@@ -237,13 +245,15 @@ class AutopilotService {
     
     console.log(`🤖 Autopilot: Alt ${Math.round(currentAltitude)}ft (${Math.round(altitudeError)}ft err), ` +
                 `Speed ${Math.round(currentAirspeed)} KTS (${Math.round(airspeedError)} KTS err), ` +
-                `Elev ${(elevatorTrim * 100).toFixed(1)}%, Throttle ${((this.flightPhysics.state.controls.throttle) * 100).toFixed(1)}%`);
+                `Elev ${(limitedElevator * 100).toFixed(1)}%, Throttle ${((this.flightPhysics.state.controls.throttle) * 100).toFixed(1)}%`);
   }
   
   /**
    * Get current autopilot status for display
    */
   getStatus() {
+    const flightState = this.flightPhysics.getAircraftState();
+    
     return {
       enabled: this.enabled,
       targets: {
@@ -251,12 +261,12 @@ class AutopilotService {
         airspeed: this.targetAirspeed
       },
       current: {
-        altitude: this.flightPhysics.getFlightState().altitude,
-        airspeed: this.flightPhysics.getFlightState().airspeed
+        altitude: flightState.altitude_ft,
+        airspeed: flightState.airspeed_kts
       },
       errors: {
-        altitude: this.targetAltitude - this.flightPhysics.getFlightState().altitude,
-        airspeed: this.targetAirspeed - this.flightPhysics.getFlightState().airspeed
+        altitude: this.targetAltitude - flightState.altitude_ft,
+        airspeed: this.targetAirspeed - flightState.airspeed_kts
       },
       controls: {
         elevatorTrim: this.currentOutputs.elevatorTrim,

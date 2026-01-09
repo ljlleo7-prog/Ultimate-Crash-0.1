@@ -98,11 +98,11 @@ const FlightPhysicsDashboard = ({
         >
           <div className="text-center">
             <div className="text-sm text-gray-400 mb-2">AIRSPEED</div>
-            <div className={`text-3xl font-bold ${getAirspeedColor(flightData.airspeed)}`}>
-              {formatAirspeed(flightData.airspeed)}
+            <div className={`text-3xl font-bold ${getAirspeedColor(flightData.indicatedAirspeed)}`}>
+              {formatAirspeed(flightData.indicatedAirspeed)}
             </div>
             <div className="mt-2 flex justify-between text-xs text-gray-500">
-              <span>{Math.round(flightData.airspeed * 0.514444)} m/s</span>
+              <span>{Math.round(flightData.indicatedAirspeed * 0.514444)} m/s</span>
               <span>IAS</span>
             </div>
           </div>

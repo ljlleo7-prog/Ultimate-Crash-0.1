@@ -1,6 +1,5 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect } from 'react';
 import './FlightPanel.css';
-import FlightPhysicsService from '../services/flightPhysicsService';
 
 // Import modular components
 import CrashWarningFlash from './CrashWarningFlash';
@@ -11,21 +10,23 @@ import ModernAutopilotModule from './ModernAutopilotModule';
 import FlightPosePanel from './FlightPosePanel';
 import NavigationPanel from './NavigationPanel';
 import CentralPanel from './CentralPanel';
+import SurfaceControls from './SurfaceControls';
 
 const FlightPanelModular = ({ flightData, onActionRequest, aircraftModel }) => {
+  // Use flightData from parent component instead of creating own physics service
   const [flightState, setFlightState] = useState({
     // Navigation
-    heading: 270,
-    trueAirspeed: 450,
-    groundSpeed: 430,
-    indicatedAirspeed: 280,
+    heading: flightData?.heading || 270,
+    trueAirspeed: flightData?.airspeed || 450,
+    groundSpeed: flightData?.airspeed || 430,
+    indicatedAirspeed: flightData?.indicatedAirspeed || 280,
     radioFreq: 121.5,
     
     // Flight Pose
-    pitch: 2.5,
-    roll: 0.5,
-    verticalSpeed: 1200,
-    altitude: 35000,
+    pitch: flightData?.pitch || 2.5,
+    roll: flightData?.roll || 0.5,
+    verticalSpeed: flightData?.verticalSpeed || 1200,
+    altitude: flightData?.altitude || 35000,
     altimeter: 29.92,
     
     // Engine
@@ -56,6 +57,11 @@ const FlightPanelModular = ({ flightData, onActionRequest, aircraftModel }) => {
       altitude: 35000
     },
     
+    // Surface Controls State
+    flapsPosition: 'up',
+    gearPosition: 'up',
+    airBrakesPosition: 'up',
+    
     // Central Display
     flightPhase: 'CRUISE',
     nextWaypoint: 'WPT3',
@@ -67,118 +73,103 @@ const FlightPanelModular = ({ flightData, onActionRequest, aircraftModel }) => {
     timeToCrash: null,
     hasCrashed: false
   });
+  
+  // Update flightState when flightData changes
+  useEffect(() => {
+    if (flightData) {
+      setFlightState(prevState => ({
+        ...prevState,
+        // Navigation
+        heading: flightData.heading,
+        trueAirspeed: flightData.airspeed,
+        groundSpeed: flightData.airspeed,
+        indicatedAirspeed: flightData.indicatedAirspeed || 0, // FIXED: Ensure IAS is always a number
+        radioFreq: prevState.radioFreq,
+        
+        // Flight Pose
+        pitch: flightData.pitch || 0, // FIXED: Ensure pitch is always a number
+        roll: flightData.roll || 0, // FIXED: Ensure roll is always a number
+        verticalSpeed: flightData.verticalSpeed || 0, // FIXED: Ensure vertical speed is always a number
+        altitude: flightData.altitude || 0, // FIXED: Ensure altitude is always a number
+        altimeter: prevState.altimeter,
+        
+        // Engine
+        engineN1: prevState.engineN1,
+        engineN2: prevState.engineN2,
+        engineEGT: prevState.engineEGT,
+        fuel: prevState.fuel,
+        
+        // Systems
+        hydraulicPressure: prevState.hydraulicPressure,
+        circuitBreakers: prevState.circuitBreakers,
+        alarms: prevState.alarms,
+        
+        // Autopilot - Update from physics service status
+        autopilot: flightData.autopilotEngaged || false, // ✅ Use physics service status
+        flightDirector: prevState.flightDirector,
+        altitudeHold: prevState.altitudeHold,
+        headingHold: prevState.headingHold,
+        autopilotTargets: prevState.autopilotTargets
+      }));
+    }
+  }, [flightData]);
 
-  const flightPhysicsRef = useRef(new FlightPhysicsService(aircraftModel));
   const [flashActive, setFlashActive] = useState(false);
   const [flashText, setFlashText] = useState('');
   const [showCrashPanel, setShowCrashPanel] = useState(false);
 
-  // Dynamic updates with realistic flight physics
-  useEffect(() => {
-    const interval = setInterval(() => {
-      if (!flightState.hasCrashed) {
-        // Call the physics service update method
-        const updatedState = flightPhysicsRef.current.update();
-        
-        // Update the flight state with real physics data
-        setFlightState(prevState => ({
-          ...prevState,
-          // Navigation
-          heading: updatedState.heading,
-          trueAirspeed: updatedState.trueAirspeed,
-          groundSpeed: updatedState.groundSpeed,
-          indicatedAirspeed: updatedState.indicatedAirspeed,
-          
-          // Flight Pose
-          pitch: updatedState.pitch,
-          roll: updatedState.roll,
-          verticalSpeed: updatedState.verticalSpeed,
-          altitude: updatedState.altitude,
-          
-          // Engine - separate parameters for each engine
-          engineN1: updatedState.engineN1,
-          engineN2: updatedState.engineN2,
-          engineEGT: updatedState.engineEGT,
-          fuel: updatedState.fuel,
-          
-          // Systems
-          hydraulicPressure: updatedState.hydraulicPressure,
-          
-          // Autopilot
-          autopilot: updatedState.autopilot,
-          
-          // Crash Detection
-          crashWarning: updatedState.crashWarning,
-          timeToCrash: updatedState.timeToCrash,
-          hasCrashed: updatedState.hasCrashed,
-          alarms: updatedState.alarms || []
-        }));
-        
-        // Handle crash warnings
-        if (updatedState.crashWarning) {
-          setFlashActive(true);
-          setFlashText(updatedState.crashWarning);
-          
-          if (updatedState.crashWarning === 'CRASHED') {
-            setShowCrashPanel(true);
-          }
-        } else {
-          setFlashActive(false);
-        }
-      }
-    }, 100); // Update every 100ms for smooth physics
-    
-    return () => clearInterval(interval);
-  }, [flightState.hasCrashed]);
-
-  // Control functions
+  // Control functions - Updated to use parent's physics service
   const controlPitch = (amount) => {
-    flightPhysicsRef.current.controlPitch(amount);
-    // Immediately update flight state to reflect changes
-    const updatedState = flightPhysicsRef.current.update();
-    setFlightState(prevState => ({
-      ...prevState,
-      pitch: updatedState.pitch,
-      roll: updatedState.roll
-    }));
+    if (onActionRequest) {
+      onActionRequest('control-pitch', amount);
+    }
   };
 
   const controlRoll = (amount) => {
-    flightPhysicsRef.current.controlRoll(amount);
-    // Immediately update flight state to reflect changes
-    const updatedState = flightPhysicsRef.current.update();
-    setFlightState(prevState => ({
-      ...prevState,
-      pitch: updatedState.pitch,
-      roll: updatedState.roll
-    }));
+    if (onActionRequest) {
+      onActionRequest('control-roll', amount);
+    }
   };
 
   const controlThrust = (engineIndex, amount) => {
-    flightPhysicsRef.current.controlThrust(engineIndex, amount);
+    if (onActionRequest) {
+      onActionRequest('control-thrust', { engineIndex, amount });
+    }
   };
 
   const toggleAutopilot = () => {
-    flightPhysicsRef.current.toggleAutopilot();
-    setFlightState(prevState => ({
-      ...prevState,
-      autopilot: !prevState.autopilot
-    }));
+    if (onActionRequest) {
+      onActionRequest('toggle-autopilot');
+    }
   };
 
   const setAutopilotTargets = (targets) => {
-    flightPhysicsRef.current.setAutopilotTargets(targets);
-    setFlightState(prevState => ({
-      ...prevState,
-      autopilotTargets: targets
-    }));
+    if (onActionRequest) {
+      onActionRequest('set-autopilot-targets', targets);
+    }
+  };
+
+  const controlFlaps = (position) => {
+    if (onActionRequest) {
+      onActionRequest('control-flaps', position);
+    }
+  };
+
+  const controlAirBrakes = (position) => {
+    if (onActionRequest) {
+      onActionRequest('control-airbrakes', position);
+    }
+  };
+
+  const controlGear = (position) => {
+    if (onActionRequest) {
+      onActionRequest('control-gear', position);
+    }
   };
 
   const resetFlight = () => {
-    flightPhysicsRef.current.resetFlight();
-    setShowCrashPanel(false);
-    setFlashActive(false);
-    setFlashText('');
+    // TODO: Implement control through parent component
+    console.log('Reset flight requested');
     
     // Call parent's reset function to roll back to flight initiation
     if (onActionRequest) {
@@ -186,19 +177,9 @@ const FlightPanelModular = ({ flightData, onActionRequest, aircraftModel }) => {
     }
   };
 
-  // **FIXED: ADD TEST CONFIGURATION FUNCTION**
   const setTestConfiguration = (altitude, ias) => {
-    flightPhysicsRef.current.setTestConfiguration(altitude, ias);
-    setFlightState(prevState => ({
-      ...prevState,
-      altitude,
-      indicatedAirspeed: ias,
-      verticalSpeed: 0,
-      pitch: altitude < 10000 ? 3 : 2,
-      roll: 0,
-      autopilot: false
-    }));
-    console.log(`Test configuration set: ${altitude}ft, ${ias}kts IAS`);
+    // TODO: Implement control through parent component
+    console.log('Test configuration requested:', altitude, 'ft,', ias, 'kts IAS');
   };
 
   // Main render function
@@ -270,7 +251,15 @@ const FlightPanelModular = ({ flightData, onActionRequest, aircraftModel }) => {
         React.createElement(DraggableJoystick, { controlPitch, controlRoll, flightState }),
         React.createElement(ThrustManager, { controlThrust, flightState })
       )
-    )
+    ),
+    
+    // Surface Controls (Flaps, Gear, Airbrakes) - New Lever-Style Component
+    React.createElement(SurfaceControls, {
+      controlFlaps,
+      controlGear,
+      controlAirBrakes,
+      flightState
+    })
   );
 };
 

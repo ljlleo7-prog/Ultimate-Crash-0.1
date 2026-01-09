@@ -2,8 +2,12 @@ import React from 'react';
 
 // Central Panel Component
 const CentralPanel = ({ flightState }) => {
-  // FIXED: Add safety check for undefined alarms
+  // FIXED: Add safety checks for all properties
   const alarms = flightState.alarms || [];
+  const engineN1 = flightState.engineN1 || [0, 0];
+  const engineN2 = flightState.engineN2 || [0, 0];
+  const engineEGT = flightState.engineEGT || [0, 0];
+  const fuel = flightState.fuel || 0;
   
   return React.createElement('div', { className: 'central-panel' },
     React.createElement('h3', null, 'Engine & Systems'),
@@ -13,17 +17,17 @@ const CentralPanel = ({ flightState }) => {
       React.createElement('div', { className: 'engine-group' },
         React.createElement('h4', null, 'Engine 1'),
         React.createElement('div', { className: 'engine-data' },
-          React.createElement('span', null, `N1: ${flightState.engineN1[0].toFixed(1)}%`),
-          React.createElement('span', null, `N2: ${flightState.engineN2[0].toFixed(1)}%`),
-          React.createElement('span', null, `EGT: ${flightState.engineEGT[0].toFixed(0)}°`)
+          React.createElement('span', null, `N1: ${(engineN1[0] || 0).toFixed(1)}%`),
+          React.createElement('span', null, `N2: ${(engineN2[0] || 0).toFixed(1)}%`),
+          React.createElement('span', null, `EGT: ${(engineEGT[0] || 0).toFixed(0)}°`)
         )
       ),
       React.createElement('div', { className: 'engine-group' },
         React.createElement('h4', null, 'Engine 2'),
         React.createElement('div', { className: 'engine-data' },
-          React.createElement('span', null, `N1: ${flightState.engineN1[1].toFixed(1)}%`),
-          React.createElement('span', null, `N2: ${flightState.engineN2[1].toFixed(1)}%`),
-          React.createElement('span', null, `EGT: ${flightState.engineEGT[1].toFixed(0)}°`)
+          React.createElement('span', null, `N1: ${(engineN1[1] || 0).toFixed(1)}%`),
+          React.createElement('span', null, `N2: ${(engineN2[1] || 0).toFixed(1)}%`),
+          React.createElement('span', null, `EGT: ${(engineEGT[1] || 0).toFixed(0)}°`)
         )
       )
     ),
@@ -31,7 +35,7 @@ const CentralPanel = ({ flightState }) => {
     // Fuel
     React.createElement('div', { className: 'fuel-display' },
       React.createElement('span', { className: 'label' }, 'FUEL'),
-      React.createElement('span', { className: 'value' }, `${flightState.fuel.toFixed(0)}kg`)
+      React.createElement('span', { className: 'value' }, `${fuel.toFixed(0)}kg`)
     ),
     
     // Error Log

@@ -1,379 +1,269 @@
 import React, { useState, useEffect } from 'react';
-import FlightPanel from './FlightPanel.jsx';
-import FlightPhysicsDashboard from './FlightPhysicsDashboard.jsx';
-import PIDAutopilotPanel from './PIDAutopilotPanel.jsx';
-import { useAircraftPhysics } from '../hooks/useAircraftPhysics.js';
+import { useAircraftPhysics } from '../hooks/useAircraftPhysics';
+import ThrustManager from './ThrustManager';
+import FlightPanelModular from './FlightPanelModular';
+import SurfaceControls from './SurfaceControls';
+import { controlDebug, debugControlChange, quickControlTest, checkControlStatus } from '../utils/ControlDebugTool';
 
-const FlightInProgress = ({
-  callsign, aircraftModel, difficulty, selectedDeparture, selectedArrival, flightPlan,
-  airline, pax, payload, fuelReserve, cruiseHeight, useRandomTime, timeZulu, useRandomSeason, season,
-  handleResetFlight, formatDistance, formatFlightTime, formatFuel,
-  weatherData, failureType, crewCount
-}) => {
-  // ✅ INTEGRATE REAL PHYSICS ENGINE
-  const [aircraftConfig, setAircraftConfig] = useState(null);
-  const [physicsEnabled, setPhysicsEnabled] = useState(true);
-  const [controlInputs, setControlInputs] = useState({
-    throttle: 47, // Start at cruise power
-    pitch: 3.0,   // +3° pitch for cruise
-    roll: 0,
-    yaw: 0
-  });
-
-  // ✅ INITIALIZE AIRCRAFT CONFIGURATION
+const FlightInProgress = () => {
+  // Initialize control debug tool
   useEffect(() => {
-    if (aircraftModel) {
-      // Load aircraft configuration from database
-      const config = {
-        model: aircraftModel,
-        mass: 73300, // Boeing 737-800 typical operating weight
-        payload: payload || 15000,
-        fuelWeight: fuelReserve ? fuelReserve * 26020 : 0.7 * 26020 // 70% fuel
-      };
-      setAircraftConfig(config);
-      console.log('🛩️ FlightInProgress: Aircraft config loaded:', config);
-    }
-  }, [aircraftModel, payload, fuelReserve]);
+    console.log('🎮 FlightInProgress: Initializing control synchronization');
+    controlDebug.enable();
+    
+    // Test control system on mount
+    setTimeout(() => {
+      console.log('🔧 Running initial control test...');
+      quickControlTest();
+    }, 1000);
+  }, []);
 
-  // ✅ PHYSICS ENGINE HOOK INTEGRATION
   const {
-    flightData: physicsFlightData,
+    flightData,
     physicsState,
     isInitialized,
     error,
-    debugData,
-    setThrottle,
-    setPitch,
-    setRoll,
-    setYaw,
-    resetAircraft
-  } = useAircraftPhysics(aircraftConfig, physicsEnabled);
+    isCrashed,
+    resetToInitiation,
+    initializePhysics
+  } = useAircraftPhysics();
 
-  // ✅ UPDATE CONTROL INPUTS
-  const handleControlChange = (controlType, value) => {
-    const newInputs = { ...controlInputs };
-    newInputs[controlType] = value;
-    setControlInputs(newInputs);
+  // Control state for UI components
+  const [throttleControl, setThrottleControl] = useState(47); // Default 47% as mentioned by user
+  const [controlSyncStatus, setControlSyncStatus] = useState('INITIALIZING');
+
+  // Handle thrust control from ThrustManager
+  const handleThrustControl = (engine, delta) => {
+    const newThrottle = Math.max(0, Math.min(100, throttleControl + delta));
+    setThrottleControl(newThrottle);
     
-    // Apply to physics engine
-    switch (controlType) {
-      case 'throttle':
-        setThrottle(value);
-        break;
-      case 'pitch':
-        setPitch(value);
-        break;
-      case 'roll':
-        setRoll(value);
-        break;
-      case 'yaw':
-        setYaw(value);
-        break;
+    // Log control change
+    debugControlChange('throttle', newThrottle, `THRUST_MANAGER_${engine}`);
+    
+    // Send to physics via control system
+    if (window.flightControlAPI) {
+      window.flightControlAPI.throttle = newThrottle / 100;
     }
   };
 
-  // ✅ HANDLE PHYSICS RESET
-  const handlePhysicsReset = () => {
-    resetAircraft();
-    setControlInputs({
-      throttle: 47,
-      pitch: 3.0,
-      roll: 0,
-      yaw: 0
-    });
+  // Handle surface control changes
+  const handleFlapsControl = (position) => {
+    debugControlChange('flaps', position, 'SURFACE_CONTROLS');
+    if (window.flightControlAPI) {
+      window.flightControlAPI.flaps = position === 'down' ? 1 : 0;
+    }
   };
 
-  // ✅ GENERATE RANDOM TIME/SEASON
-  const generateRandomTime = () => {
-    const hours = Math.floor(Math.random() * 24).toString().padStart(2, '0');
-    const minutes = Math.floor(Math.random() * 60).toString().padStart(2, '0');
-    return `${hours}:${minutes}Z`;
+  const handleGearControl = (position) => {
+    debugControlChange('gear', position, 'SURFACE_CONTROLS');
+    if (window.flightControlAPI) {
+      window.flightControlAPI.gear = position === 'down';
+    }
   };
 
-  const generateRandomSeason = () => {
-    const seasons = ['Spring', 'Summer', 'Autumn', 'Winter'];
-    return seasons[Math.floor(Math.random() * seasons.length)];
+  const handleAirBrakesControl = (position) => {
+    debugControlChange('airBrakes', position, 'SURFACE_CONTROLS');
+    if (window.flightControlAPI) {
+      window.flightControlAPI.airBrakes = position === 'down' ? 1 : 0;
+    }
   };
 
-  // ✅ FALLBACK FLIGHT DATA (when physics not initialized)
-  const fallbackFlightData = {
-    heading: 245,
-    trueAirspeed: 480,
-    groundSpeed: 465,
-    indicatedAirspeed: 250,
-    radioFreq: 121.5,
-    pitch: 2.5,
-    roll: 0.5,
-    verticalSpeed: 1200,
-    altitude: 28000,
-    altimeter: 29.92,
-    engineN1: [89.2, 88.7],
-    engineN2: [95.1, 94.8],
-    engineEGT: [625, 618],
-    fuel: 8500,
-    hydraulicPressure: 2950,
-    circuitBreakers: {
-      engine1: true,
-      engine2: true,
-      hydraulics: true,
-      electrical: true,
-      instruments: true
-    },
-    alarms: [],
-    autopilot: true,
-    flightDirector: true,
-    altitudeHold: true,
-    headingHold: true,
-    flightPhase: 'CLIMB',
-    nextWaypoint: selectedArrival ? selectedArrival.iata : 'DEST',
-    distanceToWaypoint: flightPlan ? flightPlan.distance.nauticalMiles : 0,
-    timeToWaypoint: flightPlan ? flightPlan.time : 0
+  // Monitor control synchronization status
+  useEffect(() => {
+    if (flightData && physicsState) {
+      const status = checkControlStatus(flightData, physicsState);
+      setControlSyncStatus(status.status);
+      
+      // Log significant sync issues
+      if (status.issues.length > 0) {
+        console.warn('⚠️ Control Sync Issues:', status.issues);
+      }
+    }
+  }, [flightData, physicsState]);
+
+  // Debug render method
+  const debugRender = () => {
+    return (
+      <div style={{
+        position: 'fixed',
+        top: '10px',
+        left: '10px',
+        background: 'rgba(0,0,0,0.9)',
+        color: 'lime',
+        padding: '10px',
+        borderRadius: '5px',
+        fontSize: '12px',
+        fontFamily: 'monospace',
+        zIndex: 1000,
+        border: '1px solid #333',
+        maxWidth: '300px'
+      }}>
+        <div style={{ marginBottom: '5px', fontWeight: 'bold' }}>🎮 CONTROL STATUS</div>
+        <div>Sync: {controlSyncStatus}</div>
+        <div>Throttle: {throttleControl}% → {flightData?.throttle?.toFixed(1)}%</div>
+        <div>Flaps: {flightData?.flapsPosition} ({flightData?.flapsValue})</div>
+        <div>Gear: {flightData?.gearPosition} ({flightData?.gearValue})</div>
+        <div>Brakes: {flightData?.airBrakesPosition} ({flightData?.airBrakesValue})</div>
+        <div style={{ marginTop: '5px' }}>
+          <button 
+            onClick={() => quickControlTest()}
+            style={{
+              background: '#333',
+              color: 'lime',
+              border: '1px solid #555',
+              padding: '2px 6px',
+              fontSize: '10px',
+              cursor: 'pointer',
+              marginRight: '2px'
+            }}
+          >
+            TEST
+          </button>
+          <button 
+            onClick={() => controlDebug.clearLog()}
+            style={{
+              background: '#333',
+              color: 'lime',
+              border: '1px solid #555',
+              padding: '2px 6px',
+              fontSize: '10px',
+              cursor: 'pointer'
+            }}
+          >
+            CLEAR
+          </button>
+        </div>
+      </div>
+    );
   };
 
-  // ✅ USE PHYSICS DATA OR FALLBACK
-  const activeFlightData = isInitialized && physicsFlightData ? physicsFlightData : fallbackFlightData;
+  if (!isInitialized) {
+    return (
+      <div style={{
+        display: 'flex',
+        justifyContent: 'center',
+        alignItems: 'center',
+        height: '100vh',
+        background: '#0a0a0a',
+        color: 'white'
+      }}>
+        <div style={{ textAlign: 'center' }}>
+          <div style={{ fontSize: '24px', marginBottom: '20px' }}>✈️ Flight Initialization</div>
+          <button 
+            onClick={initializePhysics}
+            style={{
+              background: '#1e40af',
+              color: 'white',
+              border: 'none',
+              padding: '15px 30px',
+              borderRadius: '8px',
+              fontSize: '16px',
+              cursor: 'pointer'
+            }}
+          >
+            Start Flight Simulation
+          </button>
+          {error && (
+            <div style={{ color: 'red', marginTop: '10px' }}>
+              Error: {error}
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  }
 
-  return React.createElement('div', { className: 'App' }, [
-    // ✅ HEADER WITH PHYSICS STATUS
-    React.createElement('header', { key: 'header', className: 'app-header' }, [
-      React.createElement('h1', { key: 'title' }, 'Flight in Progress - ', callsign || 'Unnamed Flight'),
-      React.createElement('p', { key: 'subtitle' }, 'Difficulty: ', difficulty.toUpperCase(), ' | Aircraft: ', aircraftModel),
-      React.createElement('div', { key: 'physics-status', className: 'physics-status' }, [
-        React.createElement('span', { 
-          key: 'physics-indicator',
-          className: `physics-indicator ${isInitialized ? 'active' : 'inactive'}`,
-          style: { 
-            color: isInitialized ? '#10B981' : '#EF4444',
-            fontSize: '0.9em',
-            marginLeft: '10px'
+  return (
+    <div style={{
+      position: 'relative',
+      width: '100vw',
+      height: '100vh',
+      background: '#0a0a0a',
+      overflow: 'hidden'
+    }}>
+      {/* Control Debug Panel */}
+      {debugRender()}
+      
+      {/* Main Flight Panel */}
+      <FlightPanelModular
+        flightData={flightData}
+        onActionRequest={(action, payload) => {
+          console.log(`📡 UI Action: ${action}`, payload);
+          debugControlChange(action, payload, 'FLIGHT_PANEL');
+          
+          // Handle specific actions
+          switch (action) {
+            case 'throttle':
+              handleThrustControl(0, payload); // Engine 1
+              break;
+            case 'flaps':
+              handleFlapsControl(payload);
+              break;
+            case 'airBrakes':
+              handleAirBrakesControl(payload);
+              break;
+            case 'gear':
+              handleGearControl(payload);
+              break;
+            default:
+              console.log('Unhandled action:', action);
           }
-        }, isInitialized ? '🛩️ PHYSICS ACTIVE' : '⚠️ PHYSICS OFFLINE'),
-        React.createElement('button', { 
-          key: 'physics-reset-btn',
-          onClick: handlePhysicsReset,
-          style: { 
-            marginLeft: '10px',
-            padding: '5px 10px',
-            backgroundColor: '#3B82F6',
-            color: 'white',
-            border: 'none',
-            borderRadius: '4px',
-            cursor: 'pointer'
-          }
-        }, 'Reset Physics')
-      ]),
-      React.createElement('button', { 
-        key: 'reset-btn',
-        onClick: handleResetFlight, 
-        className: 'reset-btn',
-        style: {
-          marginLeft: '10px',
-          padding: '5px 10px',
-          backgroundColor: '#EF4444',
+        }}
+      />
+      
+      {/* Thrust Manager - Lever Style */}
+      <ThrustManager
+        thrust={throttleControl}
+        onThrustChange={handleThrustControl}
+        disabled={isCrashed}
+        flightState={flightData}
+      />
+      
+      {/* Surface Controls - Lever Style with Physics Sync */}
+      <SurfaceControls
+        controlFlaps={handleFlapsControl}
+        controlGear={handleGearControl}
+        controlAirBrakes={handleAirBrakesControl}
+        flightState={flightData}
+      />
+      
+      {/* Crash/Reset Handling */}
+      {isCrashed && (
+        <div style={{
+          position: 'fixed',
+          top: '50%',
+          left: '50%',
+          transform: 'translate(-50%, -50%)',
+          background: 'rgba(220, 38, 38, 0.95)',
           color: 'white',
-          border: 'none',
-          borderRadius: '4px',
-          cursor: 'pointer'
-        }
-      }, 'Reset Flight')
-    ]),
-
-    React.createElement('main', { key: 'main', className: 'app-main' }, [
-      React.createElement('div', { key: 'flight-progress', className: 'flight-in-progress' }, [
-        React.createElement('div', { key: 'summary', className: 'flight-summary' }, [
-          React.createElement('div', { key: 'route', className: 'summary-item' }, [
-            React.createElement('strong', { key: 'route-label' }, 'Route:'),
-            ' ', selectedDeparture.iata, ' → ', selectedArrival.iata
-          ]),
-          React.createElement('div', { key: 'distance', className: 'summary-item' }, [
-            React.createElement('strong', { key: 'distance-label' }, 'Distance:'),
-            ' ', flightPlan ? formatDistance(flightPlan.distance.nauticalMiles) : 'Calculating...'
-          ]),
-          React.createElement('div', { key: 'time', className: 'summary-item' }, [
-            React.createElement('strong', { key: 'time-label' }, 'Flight Time:'),
-            ' ', flightPlan ? formatFlightTime(flightPlan.time) : 'Calculating...'
-          ]),
-          React.createElement('div', { key: 'fuel', className: 'summary-item' }, [
-            React.createElement('strong', { key: 'fuel-label' }, 'Fuel:'),
-            ' ', flightPlan ? formatFuel(flightPlan.fuel) : 'Calculating...'
-          ])
-        ]),
-        
-        // ✅ INTEGRATED FLIGHT PHYSICS DASHBOARD
-        React.createElement(FlightPhysicsDashboard, {
-          key: 'physics-dashboard',
-          flightData: activeFlightData,
-          physicsState: physicsState,
-          debugData: debugData,
-          isInitialized: isInitialized,
-          aircraftConfig: aircraftConfig
-        }),
-        
-        // ✅ PID AUTOPILOT CONTROL PANEL
-        React.createElement(PIDAutopilotPanel, {
-          key: 'pid-autopilot',
-          physicsService: physicsState,
-          onAutopilotToggle: (enabled) => {
-            console.log('Autopilot toggled:', enabled);
-          }
-        }),
-        
-        // Flight Panel Cockpit Display (using physics data)
-        React.createElement(FlightPanel, {
-          key: 'cockpit-display',
-          flightData: activeFlightData,
-          aircraftModel: aircraftModel,
-          onActionRequest: (action) => {
-            console.log('Action requested:', action);
-            if (action === 'reset-to-initiation') {
-              handleResetFlight();
-            }
-          }
-        }),
-        
-        // ✅ PHYSICS CONTROL PANEL
-        React.createElement('div', { key: 'physics-controls', className: 'physics-controls', style: {
-          marginTop: '20px',
-          padding: '20px',
-          backgroundColor: '#1F2937',
-          borderRadius: '8px',
-          border: '1px solid #374151'
-        }}, [
-          React.createElement('h3', { key: 'controls-title', style: { color: '#60A5FA', marginBottom: '15px' } }, '🎮 Physics Controls'),
-          
-          // Throttle Control
-          React.createElement('div', { key: 'throttle-control', style: { marginBottom: '15px' }}, [
-            React.createElement('label', { 
-              key: 'throttle-label',
-              style: { color: '#D1D5DB', display: 'block', marginBottom: '5px' }
-            }, `Throttle: ${controlInputs.throttle}%`),
-            React.createElement('input', {
-              key: 'throttle-slider',
-              type: 'range',
-              min: '0',
-              max: '100',
-              value: controlInputs.throttle,
-              onChange: (e) => handleControlChange('throttle', parseInt(e.target.value)),
-              style: { width: '100%' }
-            })
-          ]),
-          
-          // Pitch Control
-          React.createElement('div', { key: 'pitch-control', style: { marginBottom: '15px' }}, [
-            React.createElement('label', { 
-              key: 'pitch-label',
-              style: { color: '#D1D5DB', display: 'block', marginBottom: '5px' }
-            }, `Pitch: ${controlInputs.pitch.toFixed(1)}°`),
-            React.createElement('input', {
-              key: 'pitch-slider',
-              type: 'range',
-              min: '-20',
-              max: '20',
-              step: '0.1',
-              value: controlInputs.pitch,
-              onChange: (e) => handleControlChange('pitch', parseFloat(e.target.value)),
-              style: { width: '100%' }
-            })
-          ]),
-          
-          // Roll Control
-          React.createElement('div', { key: 'roll-control', style: { marginBottom: '15px' }}, [
-            React.createElement('label', { 
-              key: 'roll-label',
-              style: { color: '#D1D5DB', display: 'block', marginBottom: '5px' }
-            }, `Roll: ${controlInputs.roll.toFixed(1)}°`),
-            React.createElement('input', {
-              key: 'roll-slider',
-              type: 'range',
-              min: '-45',
-              max: '45',
-              step: '0.1',
-              value: controlInputs.roll,
-              onChange: (e) => handleControlChange('roll', parseFloat(e.target.value)),
-              style: { width: '100%' }
-            })
-          ]),
-          
-          // Yaw Control
-          React.createElement('div', { key: 'yaw-control', style: { marginBottom: '15px' }}, [
-            React.createElement('label', { 
-              key: 'yaw-label',
-              style: { color: '#D1D5DB', display: 'block', marginBottom: '5px' }
-            }, `Yaw: ${controlInputs.yaw.toFixed(1)}°`),
-            React.createElement('input', {
-              key: 'yaw-slider',
-              type: 'range',
-              min: '-15',
-              max: '15',
-              step: '0.1',
-              value: controlInputs.yaw,
-              onChange: (e) => handleControlChange('yaw', parseFloat(e.target.value)),
-              style: { width: '100%' }
-            })
-          ])
-        ]),
-        
-        React.createElement('div', { key: 'details', className: 'flight-details' }, [
-          React.createElement('h3', { key: 'params-title' }, 'Flight Parameters'),
-          React.createElement('div', { key: 'params-grid', className: 'parameters-grid' }, [
-            React.createElement('div', { key: 'airline', className: 'param-item' }, [
-              React.createElement('strong', { key: 'airline-label' }, 'Airline:'),
-              ' ', airline || 'Not specified'
-            ]),
-            React.createElement('div', { key: 'callsign', className: 'param-item' }, [
-              React.createElement('strong', { key: 'callsign-label' }, 'Callsign:'),
-              ' ', callsign || 'Not specified'
-            ]),
-            React.createElement('div', { key: 'pax', className: 'param-item' }, [
-              React.createElement('strong', { key: 'pax-label' }, 'PAX:'),
-              ' ', pax
-            ]),
-            React.createElement('div', { key: 'payload', className: 'param-item' }, [
-              React.createElement('strong', { key: 'payload-label' }, 'Payload:'),
-              ' ', payload, ' kg'
-            ]),
-            React.createElement('div', { key: 'fuel-reserve', className: 'param-item' }, [
-              React.createElement('strong', { key: 'fuel-reserve-label' }, 'Fuel Reserve:'),
-              ' ', fuelReserve * 100, '%'
-            ]),
-            React.createElement('div', { key: 'cruise', className: 'param-item' }, [
-              React.createElement('strong', { key: 'cruise-label' }, 'Cruise Height:'),
-              ' ', cruiseHeight, ' ft'
-            ]),
-            React.createElement('div', { key: 'time-zulu', className: 'param-item' }, [
-              React.createElement('strong', { key: 'time-zulu-label' }, 'Time (Zulu):'),
-              ' ', useRandomTime ? generateRandomTime() : timeZulu
-            ]),
-            React.createElement('div', { key: 'season', className: 'param-item' }, [
-              React.createElement('strong', { key: 'season-label' }, 'Season:'),
-              ' ', useRandomSeason ? generateRandomSeason() : season
-            ])
-          ])
-        ]),
-        
-        // Weather and Failure Conditions Display
-        React.createElement('div', { key: 'conditions', className: 'conditions-display' }, [
-          React.createElement('h3', { key: 'conditions-title' }, 'Weather & Failure Conditions'),
-          React.createElement('div', { key: 'conditions-grid', className: 'conditions-grid' }, [
-            React.createElement('div', { key: 'weather', className: 'condition-item' }, [
-              React.createElement('strong', { key: 'weather-label' }, 'Weather:'),
-              ' ', weatherData?.type ? weatherData.type.charAt(0).toUpperCase() + weatherData.type.slice(1) : 'Clear',
-              weatherData?.windSpeed ? `, Wind: ${weatherData.windSpeed} kts` : '',
-              weatherData?.visibility ? `, Visibility: ${weatherData.visibility} mi` : ''
-            ]),
-            React.createElement('div', { key: 'failure', className: 'condition-item' }, [
-              React.createElement('strong', { key: 'failure-label' }, 'Failure Type:'),
-              ' ', failureType ? failureType.split('_').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ') : 'None'
-            ]),
-            React.createElement('div', { key: 'crew', className: 'condition-item' }, [
-              React.createElement('strong', { key: 'crew-label' }, 'Crew Count:'),
-              ' ', crewCount || 2
-            ])
-          ])
-        ])
-      ])
-    ])
-  ]);
+          padding: '30px',
+          borderRadius: '15px',
+          textAlign: 'center',
+          zIndex: 1000,
+          border: '3px solid #dc2626'
+        }}>
+          <div style={{ fontSize: '24px', marginBottom: '15px' }}>💥 Flight Ended</div>
+          <div style={{ marginBottom: '20px' }}>
+            Aircraft has crashed. Reset to start a new flight?
+          </div>
+          <button
+            onClick={resetToInitiation}
+            style={{
+              background: '#dc2626',
+              color: 'white',
+              border: 'none',
+              padding: '12px 25px',
+              borderRadius: '8px',
+              fontSize: '16px',
+              cursor: 'pointer'
+            }}
+          >
+            Reset Flight
+          </button>
+        </div>
+      )}
+    </div>
+  );
 };
 
 export default FlightInProgress;

@@ -123,14 +123,14 @@ class DynamicAircraftSimulation {
     this.physics.state.velocity.v = 0;
     this.physics.state.velocity.w = 0;
     this.physics.state.orientation.phi = 0;      // Level roll
-    this.physics.state.orientation.theta = 3.0 * Math.PI/180; // +3.0° pitch
+    this.physics.state.orientation.theta = 0.0;  // Initial pitch 0° - dynamic pitch based on torque calculations
     this.physics.state.orientation.psi = 0;       // Level heading
     this.physics.state.controls.throttle = 0.47; // Balanced cruise thrust
     
     console.log('✅ Initial State Set:');
     console.log(`   Altitude: 35,000 ft`);
     console.log(`   TAS: 450 KTS`);
-    console.log(`   Pitch: +3.0°`);
+    console.log(`   Pitch: 0.0°`);
     console.log(`   Throttle: 47%`);
     
     // Reset flight data

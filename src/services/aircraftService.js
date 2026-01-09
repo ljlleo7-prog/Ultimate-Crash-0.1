@@ -97,8 +97,8 @@ class AircraftService {
         model.toLowerCase().includes(aircraft.model.toLowerCase())
       )
     ).map(aircraft => ({
-      value: aircraft.model,
-      label: `${aircraft.manufacturer} ${aircraft.model}`,
+      model: aircraft.model,
+      manufacturer: aircraft.manufacturer,
       iata: aircraft.iata,
       icao: aircraft.icao
     }));

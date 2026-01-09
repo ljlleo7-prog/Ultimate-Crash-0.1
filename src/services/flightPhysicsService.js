@@ -20,7 +20,7 @@ class FlightPhysicsService {
       radioFreq: 121.5,
       
       // Flight dynamics
-      pitch: 2.5, // degrees
+      pitch: 0.0, // Initial pitch 0° - dynamic pitch based on torque calculations
       roll: 0.5, // degrees
       yaw: 0, // degrees
       
@@ -106,7 +106,12 @@ class FlightPhysicsService {
 
   // Load aircraft parameters from database
   loadAircraftParameters(model) {
-    if (!model) return null;
+    // Always return valid parameters, even for unknown models
+    if (!model) {
+      // Default Boeing 737-800 parameters for unknown/null models
+      console.warn('No aircraft model provided, using default Boeing 737-800 parameters');
+      return this.getDefaultAircraftParameters();
+    }
     
     try {
       // Use fetch instead of require for ES modules
@@ -135,24 +140,39 @@ class FlightPhysicsService {
           engineCount: 2
         };
       }
+      
+      // For any other model, also return default parameters but log it
+      console.warn(`Aircraft model '${model}' not found in database, using default Boeing 737-800 parameters`);
+      return this.getDefaultAircraftParameters();
+      
     } catch (error) {
       console.warn('Failed to load aircraft parameters for', model, error);
+      return this.getDefaultAircraftParameters();
     }
-    
-    // Default parameters for unknown aircraft
+  }
+
+  // Get default aircraft parameters (Boeing 737-800)
+  getDefaultAircraftParameters() {
     return {
-      mass: 65000,
-      wingArea: 125,
-      wingSpan: 35,
-      aspectRatio: 9,
+      // Basic parameters
+      mass: 65000, // kg (operating weight)
+      wingArea: 125, // m²
+      wingSpan: 35.8, // m
+      aspectRatio: 9.45,
+      
+      // Aerodynamic characteristics
       maxLiftCoefficient: 1.5,
       zeroLiftDragCoefficient: 0.02,
-      liftCurveSlope: 5.7,
-      stallAngle: 15,
-      stallSpeed: 125,
-      cruiseSpeed: 450,
+      liftCurveSlope: 5.7, // per radian
+      stallAngle: 15, // degrees
+      
+      // Performance parameters
+      stallSpeed: 125, // knots
+      cruiseSpeed: 450, // knots
       maxOperatingMach: 0.82,
-      maxThrust: 240000,
+      
+      // Engine parameters - CFM56-7B engines
+      maxThrust: 120000, // N per engine (total: 240,000 N for 2 engines)
       engineCount: 2
     };
   }
@@ -240,6 +260,12 @@ class FlightPhysicsService {
   // Calculate aerodynamic forces and moments
   calculateAerodynamicForces(atmosphere) {
     const { density, speedOfSound } = atmosphere;
+    
+    // Ensure aircraft parameters are loaded
+    if (!this.aircraftParams) {
+      this.aircraftParams = this.loadAircraftParameters(this.aircraftModel);
+    }
+    
     const { wingArea } = this.aircraftParams;
     
     // Dynamic pressure already calculated

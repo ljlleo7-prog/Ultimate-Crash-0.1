@@ -20,8 +20,8 @@ class RandomFlightService {
   }
 
   // Get random aircraft that can handle the distance
-  getRandomAircraftForDistance(distanceNauticalMiles) {
-    const allAircraft = aircraftService.getAllAircraft();
+  async getRandomAircraftForDistance(distanceNauticalMiles) {
+    const allAircraft = await aircraftService.getAllAircraft();
     const suitableAircraft = allAircraft.filter(aircraft => {
       const maxRange = aircraft.range || 0;
       // Add 20% safety margin for fuel reserves
@@ -39,7 +39,7 @@ class RandomFlightService {
   }
 
   // Get random airports with distance validation
-  getRandomAirports() {
+  async getRandomAirports() {
     const allAirports = airportService.getAllAirports();
     
     // Try up to 10 times to find valid airports
@@ -92,11 +92,11 @@ class RandomFlightService {
   }
 
   // Generate random flight parameters
-  generateRandomFlightParameters() {
+  async generateRandomFlightParameters() {
     const airline = this.getRandomAirline();
     const callsign = this.generateRandomCallsign(airline);
-    const { departure, arrival, distance } = this.getRandomAirports();
-    const aircraft = this.getRandomAircraftForDistance(distance.nauticalMiles);
+    const { departure, arrival, distance } = await this.getRandomAirports();
+    const aircraft = await this.getRandomAircraftForDistance(distance.nauticalMiles);
     
     // Calculate realistic payload based on aircraft capacity
     const maxPax = aircraft.passengers || 180;

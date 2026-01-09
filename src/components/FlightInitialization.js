@@ -38,9 +38,9 @@ const FlightInitialization = ({
   };
 
   // Handle random flight initialization
-  const handleRandomInitialize = () => {
+  const handleRandomInitialize = async () => {
     try {
-      const randomParams = randomFlightService.generateRandomFlightParameters();
+      const randomParams = await randomFlightService.generateRandomFlightParameters();
       
       // Update all state variables with random parameters
       setAirline(randomParams.airline);

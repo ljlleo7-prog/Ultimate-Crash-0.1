@@ -6,17 +6,27 @@ import { airportService } from './services/airportService';
 import { calculateDistance, calculateFlightPlan, formatDistance, formatFlightTime, formatFuel } from './utils/distanceCalculator';
 import AirportSearchInput from './components/AirportSearchInput.js';
 import FlightInitialization from './components/FlightInitialization.js';
-import FlightInProgress from './components/FlightInProgress.js';
+import FlightInProgress from './components/FlightInProgress.jsx';
 import { FadeOverlay, CinematicReview } from './components/CinematicComponents.js';
 
 function App() {
+  // Add development mode flag
+  const [devMode, setDevMode] = useState(false);
+  
+  // Development mode bypass - directly initialize flight
+  const handleDevStart = () => {
+    console.log('🚀 Development Mode: Starting flight simulation directly');
+    setFlightInitialized(true);
+    setCinematicPhase('none');
+  };
+  
   // Flight initialization state
   const [difficulty, setDifficulty] = useState('rookie');
-  const [airline, setAirline] = useState('');
-  const [callsign, setCallsign] = useState('');
-  const [aircraftModel, setAircraftModel] = useState('');
-  const [pax, setPax] = useState(0);
-  const [payload, setPayload] = useState(0);
+  const [airline, setAirline] = useState('Test Airline');
+  const [callsign, setCallsign] = useState('TEST001');
+  const [aircraftModel, setAircraftModel] = useState('B737-800');
+  const [pax, setPax] = useState(150);
+  const [payload, setPayload] = useState(20000);
   const [fuelReserve, setFuelReserve] = useState(0.1);
   const [cruiseHeight, setCruiseHeight] = useState(35000);
   const [timeZulu, setTimeZulu] = useState('');
@@ -65,17 +75,21 @@ function App() {
 
   // Calculate flight plan when airports and aircraft are selected
   useEffect(() => {
-    if (selectedDeparture && selectedArrival && aircraftModel) {
-      try {
-        const plan = calculateFlightPlan(selectedDeparture, selectedArrival, aircraftModel, payload);
-        setFlightPlan(plan);
-      } catch (error) {
-        console.error('Error calculating flight plan:', error);
+    const calculateFlightPlanAsync = async () => {
+      if (selectedDeparture && selectedArrival && aircraftModel) {
+        try {
+          const plan = await calculateFlightPlan(selectedDeparture, selectedArrival, aircraftModel, payload);
+          setFlightPlan(plan);
+        } catch (error) {
+          console.error('Error calculating flight plan:', error);
+          setFlightPlan(null);
+        }
+      } else {
         setFlightPlan(null);
       }
-    } else {
-      setFlightPlan(null);
-    }
+    };
+    
+    calculateFlightPlanAsync();
   }, [selectedDeparture, selectedArrival, aircraftModel, payload]);
 
   const handleSearch = (query) => {
@@ -173,7 +187,38 @@ function App() {
   return React.createElement('div', { className: 'App' },
     React.createElement('header', { className: 'app-header' },
       React.createElement('h1', null, 'Ultimate Crash - Flight Initialization'),
-      React.createElement('p', null, 'Configure your flight parameters and select difficulty level')
+      React.createElement('p', null, 'Configure your flight parameters and select difficulty level'),
+      // Development mode toggle
+      React.createElement('div', { className: 'dev-mode-toggle', style: { marginTop: '10px' } },
+        React.createElement('button', {
+          onClick: () => setDevMode(!devMode),
+          style: {
+            backgroundColor: devMode ? '#ff6b6b' : '#4ecdc4',
+            color: 'white',
+            border: 'none',
+            padding: '8px 16px',
+            borderRadius: '4px',
+            cursor: 'pointer',
+            fontSize: '12px'
+          }
+        }, devMode ? '🔧 Dev Mode: ON' : '🔧 Dev Mode: OFF')
+      ),
+      // Development mode quick start button
+      devMode && React.createElement('div', { className: 'dev-start', style: { marginTop: '10px' } },
+        React.createElement('button', {
+          onClick: handleDevStart,
+          style: {
+            backgroundColor: '#ff4757',
+            color: 'white',
+            border: 'none',
+            padding: '12px 24px',
+            borderRadius: '6px',
+            cursor: 'pointer',
+            fontSize: '14px',
+            fontWeight: 'bold'
+          }
+        }, '🚀 Quick Start Physics Test')
+      )
     ),
 
     React.createElement('main', { className: 'app-main' },

@@ -33,9 +33,9 @@ function calculateFlightTime(distance, averageSpeed = 450) {
 }
 
 // Enhanced fuel calculation with aircraft-specific parameters
-function calculateFuelConsumption(distance, aircraftModel, payload = 0, reserves = 0.1) {
+async function calculateFuelConsumption(distance, aircraftModel, payload = 0, reserves = 0.1) {
   try {
-    const fuelData = aircraftService.calculateFuelRequirements(aircraftModel, distance, payload, reserves);
+    const fuelData = await aircraftService.calculateFuelRequirements(aircraftModel, distance, payload, reserves);
     return fuelData;
   } catch (error) {
     // Fallback to generic calculation if aircraft not found
@@ -65,7 +65,7 @@ function calculateFuelConsumption(distance, aircraftModel, payload = 0, reserves
 }
 
 // Calculate complete flight plan with aircraft-specific data
-function calculateFlightPlan(departureAirport, arrivalAirport, aircraftModel, payload = 0) {
+async function calculateFlightPlan(departureAirport, arrivalAirport, aircraftModel, payload = 0) {
   if (!departureAirport || !arrivalAirport) {
     throw new Error('Both departure and arrival airports are required');
   }
@@ -78,11 +78,11 @@ function calculateFlightPlan(departureAirport, arrivalAirport, aircraftModel, pa
   );
 
   const flightTime = calculateFlightTime(distance);
-  const fuelData = calculateFuelConsumption(distance, aircraftModel, payload);
+  const fuelData = await calculateFuelConsumption(distance, aircraftModel, payload);
   
   // Get aircraft performance data
-  const aircraft = aircraftService.getAircraftByModel(aircraftModel);
-  const performance = aircraft ? aircraftService.calculateFlightPerformance(aircraftModel, distance, payload) : null;
+  const aircraft = await aircraftService.getAircraftByModel(aircraftModel);
+  const performance = aircraft ? await aircraftService.calculateFlightPerformance(aircraftModel, distance, payload) : null;
 
   return {
     departure: {
@@ -117,7 +117,7 @@ function calculateFlightPlan(departureAirport, arrivalAirport, aircraftModel, pa
       maxPassengers: aircraft.maxPassengers
     } : null,
     performance: performance ? performance.performance : null,
-    validation: performance ? aircraftService.validateRoute(aircraftModel, distance, payload) : null
+    validation: performance ? await aircraftService.validateRoute(aircraftModel, distance, payload) : null
   };
 }
 
@@ -136,6 +136,9 @@ function formatFlightTime(flightTime) {
 
 // Format fuel consumption for display
 function formatFuel(fuelData) {
+  if (!fuelData || !fuelData.totalFuel) {
+    return 'Calculating...';
+  }
   return `${fuelData.totalFuel.toLocaleString()} kg`;
 }
 
