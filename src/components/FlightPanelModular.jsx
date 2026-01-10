@@ -139,9 +139,16 @@ const FlightPanelModular = ({ flightData, onActionRequest, aircraftModel }) => {
     }
   };
 
-  const controlThrust = (engineIndex, amount) => {
+  const controlThrust = (engineIndex, throttleValue) => {
+    // ✅ CLEAN ARCHITECTURE: Pass throttle in 0-1 range to parent
+    console.log('📡 FlightPanelModular: Thrust control:', {
+      engineIndex,
+      throttleValue,
+      percentage: (throttleValue * 100).toFixed(1) + '%'
+    });
+    
     if (onActionRequest) {
-      onActionRequest('throttle', amount);
+      onActionRequest('throttle', throttleValue); // Already in 0-1 range
     }
   };
 

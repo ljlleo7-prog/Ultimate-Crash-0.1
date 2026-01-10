@@ -258,13 +258,25 @@ export function useAircraftPhysics(config = {}, autoStart = true) {
       console.error('⚠️ Attempting to set throttle to NaN:', value);
       return;
     }
-    const normalizedThrottle = Math.max(0, Math.min(1, value / 100));
-    currentControlsRef.current = { ...currentControlsRef.current, throttle: normalizedThrottle };
+    // ✅ FIXED: Don't divide by 100 - value is already in 0-1 range from new ThrustManager
+    const normalizedThrottle = Math.max(0, Math.min(1, value));
+    console.log('🎯 useAircraftPhysics: setThrottle:', {
+      input: value,
+      normalized: normalizedThrottle,
+      percentage: (normalizedThrottle * 100).toFixed(1) + '%'
+    });
+    // Single throttle control for backward compatibility
+    currentControlsRef.current = { 
+      ...currentControlsRef.current, 
+      throttle: normalizedThrottle
+    };
   }, []);
+
+
 
   const setPitch = useCallback((value) => {
     const normalizedValue = Math.abs(value) <= 1 ? value : value / 100;
-    currentControlsRef.current = { ...currentControlsRef.current, pitch: normalizedValue * Math.PI / 2 };
+    currentControlsRef.current = { ...currentControlsRef.current, pitch: normalizedValue * Math.PI / 180 };
   }, []);
 
   const setRoll = useCallback((value) => {
@@ -301,7 +313,8 @@ export function useAircraftPhysics(config = {}, autoStart = true) {
     }
     
     currentControlsRef.current = {
-      throttle: 0.47,
+      throttle: 0.47, // Legacy
+      engineThrottles: [0.47, 0.47], // Both engines at 47% idle
       pitch: 0,
       roll: 0,
       yaw: 0
@@ -315,7 +328,8 @@ export function useAircraftPhysics(config = {}, autoStart = true) {
       pitch: 0.0,
       roll: 0,
       heading: 0,
-      throttle: 47,
+      throttle: 47, // Legacy
+      engineThrottles: [47, 47], // Both engines at 47% idle
       elevator: 0,
       aileron: 0,
       rudder: 0,

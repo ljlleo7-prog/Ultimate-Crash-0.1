@@ -34,23 +34,24 @@ const FlightInProgress = () => {
   // Control state for UI components
   const [throttleControl, setThrottleControl] = useState(47); // Default 47% as mentioned by user
 
-  // Handle thrust control from ThrustManager
-  const handleThrustControl = (engine, newThrottleValue) => {
-    // Handle both delta values and direct throttle values
-    let newThrottle;
+  // ✅ CLEAN ARCHITECTURE: Single throttle control handler (reverted for responsiveness)
+  const handleThrustControl = (engineIndex, throttleValue) => {
+    console.log('🎯 FlightInProgress: Single throttle control received:', {
+      engineIndex,
+      throttleValue,
+      percentage: (throttleValue * 100).toFixed(1) + '%'
+    });
     
-    if (newThrottleValue < 1 && newThrottleValue > -1) {
-      // This is a direct throttle value from physics engine (0-1)
-      newThrottle = newThrottleValue * 100;
-    } else {
-      // This is a delta or direct percentage value
-      newThrottle = Math.max(0, Math.min(100, newThrottleValue));
-    }
+    // throttleValue is already in 0-1 range from ThrustManager
+    const validatedThrottle = Math.max(0, Math.min(1, throttleValue));
     
-    setThrottleControl(newThrottle);
+    // Update local display state
+    setThrottleControl(validatedThrottle * 100);
     
-    // Send to physics engine as 0-1 range (convert percentage to 0-1)
-    setThrottle(newThrottle / 100);
+    // Send directly to physics engine (0-1 range)
+    setThrottle(validatedThrottle);
+    
+    console.log('🚀 FlightInProgress: Single throttle sent to physics:', validatedThrottle);
   };
 
   // Handle surface control changes
@@ -148,8 +149,8 @@ const FlightInProgress = () => {
             // Handle specific actions
             switch (action) {
               case 'throttle':
-                // FlightPanelModular sends throttle in 0-1 range, convert to percentage for display
-                handleThrustControl(0, payload * 100); // Engine 1
+                // FlightPanelModular sends throttle in 0-1 range, pass directly to physics
+                handleThrustControl(0, payload); // Engine 1, throttle in 0-1 range
                 console.log(`📡 FlightPanel Action: ${action} = ${payload}`);
                 break;
               case 'flaps':
