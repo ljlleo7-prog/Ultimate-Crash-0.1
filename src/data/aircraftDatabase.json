@@ -32,7 +32,7 @@
       "inducedDragFactor": 0.040,
       "basicLiftCoefficient": 0.5,
       "horizontalStabilizerArea": 25,
-      "horizontalStabilizerCL": -0.05,
+      "horizontalStabilizerCL": -0.1,
       "horizontalStabilizerMomentArm": 12.5,
       "aerodynamicCenterPosition": 0.25,
       "centerOfGravityPosition": 0.15,
@@ -41,6 +41,17 @@
         "x": 1.2,
         "y": 1.5,
         "z": 1.0
+      },
+      "specificFuelConsumption": 0.000021,
+      "elevatorEffectiveness": 0.00105,
+      "aileronEffectiveness": 0.00052,
+      "rudderEffectiveness": 0.00031,
+      "sideForceCoefficient": 0.00021,
+      "initialCruiseThrottle": 0.56,
+      "pidParameters": {
+        "altitude": { "Kp": 0.00082, "Ki": 0.000105, "Kd": 0.0021, "min": -0.31, "max": 0.31 },
+        "speed": { "Kp": 0.52, "Ki": 0.052, "Kd": 0.105, "min": -0.52, "max": 0.52 },
+        "heading": { "Kp": 0.82, "Ki": 0.105, "Kd": 0.31, "min": -0.52, "max": 0.52 }
       },
       "momentOfInertiaRoll": 30000,
       "momentOfInertiaPitch": 50000,
@@ -88,6 +99,17 @@
         "y": 1.5,
         "z": 1.0
       },
+      "specificFuelConsumption": 0.000020,
+      "elevatorEffectiveness": 0.00102,
+      "aileronEffectiveness": 0.00051,
+      "rudderEffectiveness": 0.00030,
+      "sideForceCoefficient": 0.00020,
+      "initialCruiseThrottle": 0.55,
+      "pidParameters": {
+        "altitude": { "Kp": 0.00081, "Ki": 0.000102, "Kd": 0.0020, "min": -0.30, "max": 0.30 },
+        "speed": { "Kp": 0.51, "Ki": 0.051, "Kd": 0.102, "min": -0.51, "max": 0.51 },
+        "heading": { "Kp": 0.81, "Ki": 0.102, "Kd": 0.30, "min": -0.51, "max": 0.51 }
+      },
       "momentOfInertiaRoll": 32000,
       "momentOfInertiaPitch": 52000,
       "momentOfInertiaYaw": 85000
@@ -133,6 +155,17 @@
         "x": 1.2,
         "y": 1.5,
         "z": 1.0
+      },
+      "specificFuelConsumption": 0.000017,
+      "elevatorEffectiveness": 0.00088,
+      "aileronEffectiveness": 0.00044,
+      "rudderEffectiveness": 0.00026,
+      "sideForceCoefficient": 0.00017,
+      "initialCruiseThrottle": 0.51,
+      "pidParameters": {
+        "altitude": { "Kp": 0.00068, "Ki": 0.000088, "Kd": 0.0017, "min": -0.27, "max": 0.27 },
+        "speed": { "Kp": 0.44, "Ki": 0.044, "Kd": 0.088, "min": -0.44, "max": 0.44 },
+        "heading": { "Kp": 0.74, "Ki": 0.088, "Kd": 0.26, "min": -0.44, "max": 0.44 }
       },
       "momentOfInertiaRoll": 180000,
       "momentOfInertiaPitch": 250000,
@@ -410,6 +443,17 @@
         "y": 1.5,
         "z": 1.0
       },
+      "specificFuelConsumption": 0.000019,
+      "elevatorEffectiveness": 0.00095,
+      "aileronEffectiveness": 0.00047,
+      "rudderEffectiveness": 0.00028,
+      "sideForceCoefficient": 0.00019,
+      "initialCruiseThrottle": 0.53,
+      "pidParameters": {
+        "altitude": { "Kp": 0.00075, "Ki": 0.000095, "Kd": 0.0019, "min": -0.29, "max": 0.29 },
+        "speed": { "Kp": 0.47, "Ki": 0.047, "Kd": 0.095, "min": -0.47, "max": 0.47 },
+        "heading": { "Kp": 0.77, "Ki": 0.095, "Kd": 0.28, "min": -0.47, "max": 0.47 }
+      },
       "momentOfInertiaRoll": 150000,
       "momentOfInertiaPitch": 210000,
       "momentOfInertiaYaw": 280000
@@ -456,6 +500,17 @@
         "y": 1.5,
         "z": 1.0
       },
+      "specificFuelConsumption": 0.000018,
+      "elevatorEffectiveness": 0.0009,
+      "aileronEffectiveness": 0.00045,
+      "rudderEffectiveness": 0.00027,
+      "sideForceCoefficient": 0.00018,
+      "initialCruiseThrottle": 0.52,
+      "pidParameters": {
+        "altitude": { "Kp": 0.0007, "Ki": 0.00009, "Kd": 0.0018, "min": -0.28, "max": 0.28 },
+        "speed": { "Kp": 0.45, "Ki": 0.045, "Kd": 0.09, "min": -0.45, "max": 0.45 },
+        "heading": { "Kp": 0.75, "Ki": 0.09, "Kd": 0.27, "min": -0.45, "max": 0.45 }
+      },
       "momentOfInertiaRoll": 220000,
       "momentOfInertiaPitch": 320000,
       "momentOfInertiaYaw": 390000
@@ -492,7 +547,7 @@
       "inducedDragFactor": 0.041,
       "basicLiftCoefficient": 0.24,
       "horizontalStabilizerArea": 35,
-      "horizontalStabilizerCL": -0.05,
+      "horizontalStabilizerCL": -0.1,
       "horizontalStabilizerMomentArm": 14.0,
       "aerodynamicCenterPosition": 0.25,
       "centerOfGravityPosition": 0.15,
@@ -501,6 +556,17 @@
         "x": 1.2,
         "y": 1.5,
         "z": 1.0
+      },
+      "specificFuelConsumption": 0.00002,
+      "elevatorEffectiveness": 0.001,
+      "aileronEffectiveness": 0.0005,
+      "rudderEffectiveness": 0.0003,
+      "sideForceCoefficient": 0.0002,
+      "initialCruiseThrottle": 0.55,
+      "pidParameters": {
+        "altitude": { "Kp": 0.0008, "Ki": 0.0001, "Kd": 0.002, "min": -0.3, "max": 0.3 },
+        "speed": { "Kp": 0.5, "Ki": 0.05, "Kd": 0.1, "min": -0.5, "max": 0.5 },
+        "heading": { "Kp": 0.8, "Ki": 0.1, "Kd": 0.3, "min": -0.5, "max": 0.5 }
       },
       "momentOfInertiaRoll": 42000,
       "momentOfInertiaPitch": 65000,

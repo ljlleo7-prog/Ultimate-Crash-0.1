@@ -14,8 +14,8 @@ const ThrustManager = ({ controlThrust, flightState }) => {
     if (flightState.throttle !== undefined) {
       setDisplayThrottle(prev => ({
         ...prev,
-        e1: flightState.throttle,
-        e2: flightState.throttle
+        e1: flightState.throttle * 100,
+        e2: flightState.throttle * 100
       }));
     }
   }, [flightState.throttle]);
@@ -41,11 +41,14 @@ const ThrustManager = ({ controlThrust, flightState }) => {
       const newThrottle = Math.max(0, Math.min(100, prev[engineKey] + delta));
       const updatedThrottle = {
         ...prev,
-        [engineKey]: newThrottle
+        [engineKey]: newThrottle,
+        // Sync other engine with damping
+        e1: engineIndex === 1 ? Math.max(0, Math.min(100, prev.e1 + delta * 0.8)) : newThrottle,
+        e2: engineIndex === 0 ? Math.max(0, Math.min(100, prev.e2 + delta * 0.8)) : newThrottle
       };
       
       // Send throttle as percentage (0-100) to physics engine
-      controlThrust(engineIndex, newThrottle);
+      controlThrust(newThrottle);
       
       return updatedThrottle;
     });
@@ -60,7 +63,7 @@ const ThrustManager = ({ controlThrust, flightState }) => {
     }));
     
     // Send throttle as percentage (0-100) to physics engine
-    controlThrust(engineIndex, newThrottle);
+    controlThrust(newThrottle);
   };
   
   // Helper function to create throttle lever for each engine

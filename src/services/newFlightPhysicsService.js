@@ -65,6 +65,32 @@ class PIDController {
  */
 
 class NewFlightPhysicsService {
+  // HARDCODED DEFAULT PARAMETERS
+  static DEFAULT_ENVIRONMENT = {
+    DENSITY: 0.379,     // kg/m³ at FL350
+    PRESSURE: 23840,   // Pa at FL350
+    TEMPERATURE: 229,   // K at FL350
+    SPEED_OF_SOUND: 295 // m/s at FL350
+  };
+
+  static DEFAULT_CONTROLS = {
+    THROTTLE: 0.55, // 55% thrust for cruise
+    TRIM: 20       // Initial trim wheel position (displays as 11 units)
+  };
+
+  static DEFAULT_AUTOPILOT_LIMITS = {
+    MAX_PITCH: 15 * Math.PI/180, // ±15° pitch limit
+    MIN_PITCH: -5 * Math.PI/180, // Don't allow nose-down beyond -5°
+    MAX_THROTTLE: 0.95,         // 95% max thrust
+    MIN_THROTTLE: 0.20          // 20% min thrust
+  };
+
+  static DEFAULT_PID_PARAMETERS = {
+    ALTITUDE: { Kp: 0.0008, Ki: 0.0001, Kd: 0.002, min: -0.3, max: 0.3 },
+    SPEED: { Kp: 0.5, Ki: 0.05, Kd: 0.1, min: -0.5, max: 0.5 },
+    HEADING: { Kp: 0.8, Ki: 0.1, Kd: 0.3, min: -0.5, max: 0.5 }
+  };
+
   constructor(aircraft) {
     this.aircraft = this.validateAircraftData(aircraft);
     
@@ -100,24 +126,25 @@ class NewFlightPhysicsService {
         r: 0  // Yaw rate
       },
       controls: {
-        throttle: 0.55, // 55% thrust for cruise
+        throttle: this.aircraft.initialCruiseThrottle || NewFlightPhysicsService.DEFAULT_CONTROLS.THROTTLE, // 55% thrust for cruise
         pitch: 0,       // Neutral elevator
         roll: 0,        // Neutral ailerons
         yaw: 0,         // Neutral rudder
-        trim: 10   // Initial trim wheel position (displays as 11 units)
+        trim: NewFlightPhysicsService.DEFAULT_CONTROLS.TRIM   // Initial trim wheel position (displays as 11 units)
       },
       // ✅ NEW: Control surfaces state with proper defaults
       flaps: 0,         // 0=UP, 1=TO, 2=LDG
       airBrakes: 0,     // 0=RETRACTED, 1=EXTENDED
-      gear: false       // Landing gear
+      gear: false,       // Landing gear
+      fuel: this.aircraft.fuelWeight || 2000 // Use flight plan fuel load or default to 2000kg
     };
     
-    // Environment parameters (cruise altitude)
+    // Environment parameters (will be updated dynamically based on altitude)
     this.environment = {
-      density: 0.379,     // kg/m³ at FL350
-      pressure: 23840,   // Pa at FL350
-      temperature: 229,   // K at FL350
-      speedOfSound: 295, // m/s at FL350
+      density: NewFlightPhysicsService.DEFAULT_ENVIRONMENT.DENSITY,     // kg/m³ at FL350
+      pressure: NewFlightPhysicsService.DEFAULT_ENVIRONMENT.PRESSURE,   // Pa at FL350
+      temperature: NewFlightPhysicsService.DEFAULT_ENVIRONMENT.TEMPERATURE,   // K at FL350
+      speedOfSound: NewFlightPhysicsService.DEFAULT_ENVIRONMENT.SPEED_OF_SOUND, // m/s at FL350
       wind: { x: 0, y: 0, z: 0 }
     };
     
@@ -145,35 +172,36 @@ class NewFlightPhysicsService {
         heading: 0        // 0° (North)
       },
       limits: {
-        maxPitch: 15 * Math.PI/180, // ±15° pitch limit
-        minPitch: -5 * Math.PI/180, // Don't allow nose-down beyond -5°
-        maxThrottle: 0.95,         // 95% max thrust
-        minThrottle: 0.20          // 20% min thrust
+        maxPitch: NewFlightPhysicsService.DEFAULT_AUTOPILOT_LIMITS.MAX_PITCH, // ±15° pitch limit
+        minPitch: NewFlightPhysicsService.DEFAULT_AUTOPILOT_LIMITS.MIN_PITCH, // Don't allow nose-down beyond -5°
+        maxThrottle: NewFlightPhysicsService.DEFAULT_AUTOPILOT_LIMITS.MAX_THROTTLE,         // 95% max thrust
+        minThrottle: NewFlightPhysicsService.DEFAULT_AUTOPILOT_LIMITS.MIN_THROTTLE          // 20% min thrust
       }
     };
     
     // Initialize PID Controllers with tuned parameters
+    const pidParams = this.aircraft.pidParameters || NewFlightPhysicsService.DEFAULT_PID_PARAMETERS;
     this.pidControllers = {
       altitude: new PIDController(
-        0.0008, // Kp - altitude error to pitch response
-        0.0001, // Ki - eliminate steady-state error
-        0.002,  // Kd - damping for smooth control
-        -0.3,   // min pitch
-        0.3     // max pitch
+        pidParams.ALTITUDE.Kp, // Kp - altitude error to pitch response
+        pidParams.ALTITUDE.Ki, // Ki - eliminate steady-state error
+        pidParams.ALTITUDE.Kd,  // Kd - damping for smooth control
+        pidParams.ALTITUDE.min,   // min pitch
+        pidParams.ALTITUDE.max     // max pitch
       ),
       speed: new PIDController(
-        0.5,    // Kp - speed error to throttle response
-        0.05,   // Ki - eliminate steady-state error
-        0.1,    // Kd - damping for smooth response
-        -0.5,   // min throttle change
-        0.5     // max throttle change
+        pidParams.SPEED.Kp,    // Kp - speed error to throttle response
+        pidParams.SPEED.Ki,   // Ki - eliminate steady-state error
+        pidParams.SPEED.Kd,    // Kd - damping for smooth response
+        pidParams.SPEED.min,   // min throttle change
+        pidParams.SPEED.max     // max throttle change
       ),
       heading: new PIDController(
-        0.8,    // Kp - heading error to roll response
-        0.1,    // Ki - eliminate steady-state error
-        0.3,    // Kd - damping
-        -0.5,   // min roll
-        0.5     // max roll
+        pidParams.HEADING.Kp,    // Kp - heading error to roll response
+        pidParams.HEADING.Ki,    // Ki - eliminate steady-state error
+        pidParams.HEADING.Kd,    // Kd - damping
+        pidParams.HEADING.min,   // min roll
+        pidParams.HEADING.max     // max roll
       )
     };
     
@@ -358,7 +386,7 @@ class NewFlightPhysicsService {
     const limitedRoll = Math.max(-0.5, Math.min(0.5, rollCommand));
     
     // Add small coordination inputs for smooth flight
-    const yawCoordination = -rollCommand * 0.1; // Coordinated turn
+    const yawCoordination = -rollCommand * (this.aircraft.yawCoordinationFactor || 0.1); // Coordinated turn
     
     return {
       pitch: limitedPitch,
@@ -562,15 +590,15 @@ class NewFlightPhysicsService {
     // - Small lift forward component for cruise efficiency
     // - Horizontal stabilizer provides downforce (-Z component)
     const Fx_aero = lift * sinAlpha - drag * cosAlpha;        // Net forward force
-    const Fy_aero = q * safeBeta * 0.1;                       // Side force from sideslip
+    const Fy_aero = q * safeBeta * (this.aircraft.sideForceCoefficient || 0.1); // Side force from sideslip
     const Fz_aero = (lift * cosAlpha + drag * sinAlpha) - stabilizerDownforce; // Net upward force (including stabilizer downforce)
     
 
     
     // Control surface effects
-    const elevatorEffect = input.pitch * 0.001 * q * this.aircraft.wingArea;
-    const aileronEffect = input.roll * 0.0005 * q * this.aircraft.wingArea;
-    const rudderEffect = input.yaw * 0.0003 * q * this.aircraft.wingArea;
+    const elevatorEffect = input.pitch * (this.aircraft.elevatorEffectiveness || 0.001) * q * this.aircraft.wingArea;
+    const aileronEffect = input.roll * (this.aircraft.aileronEffectiveness || 0.0005) * q * this.aircraft.wingArea;
+    const rudderEffect = input.yaw * (this.aircraft.rudderEffectiveness || 0.0003) * q * this.aircraft.wingArea;
     
     // TOTAL FORCES in aircraft body frame
     const Fx_total = Fx_aero + elevatorEffect;
@@ -1149,8 +1177,9 @@ class NewFlightPhysicsService {
       Math.min(900, Math.max(400, baseEGT + vibrationEGT[1]))
     ];
     
-    // Simulate fuel consumption
-    const fuelFlow = throttle * 0.5; // kg/s
+    // Simulate fuel consumption using engine performance curves
+    const totalThrust = throttle * this.aircraft.engineCount * this.aircraft.maxThrustPerEngine;
+    const fuelFlow = totalThrust * (this.aircraft.specificFuelConsumption || 0.00002); // kg/N/s
     this.state.fuel = Math.max(0, (this.state.fuel || 100) - fuelFlow * this.dt);
     
     return {

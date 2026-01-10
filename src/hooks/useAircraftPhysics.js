@@ -225,7 +225,11 @@ export function useAircraftPhysics(config = {}, autoStart = true) {
         gearPosition: gearPosition,
         flapsValue: flapsState,
         airBrakesValue: airBrakesState,
-        gearValue: gearState
+        gearValue: gearState,
+        engineN1: newState.engineN1,
+        engineN2: newState.engineN2,
+        engineEGT: newState.engineEGT,
+        fuel: newState.fuel
       };
 
       setFlightData(newFlightData);
@@ -239,7 +243,8 @@ export function useAircraftPhysics(config = {}, autoStart = true) {
   }, [isInitialized]);
 
   const setThrottle = useCallback((value) => {
-    currentControlsRef.current = { ...currentControlsRef.current, throttle: value / 100 };
+    const normalizedThrottle = Math.max(0, Math.min(1, value / 100));
+    currentControlsRef.current = { ...currentControlsRef.current, throttle: normalizedThrottle };
   }, []);
 
   const setPitch = useCallback((value) => {
