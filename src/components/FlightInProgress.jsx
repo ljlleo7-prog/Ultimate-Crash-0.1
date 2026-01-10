@@ -1,10 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAircraftPhysics } from '../hooks/useAircraftPhysics';
-// Import ThrustManager from components directory
-import ThrustManager from './ThrustManager.jsx';
-// Import SurfaceControls from components directory  
-import SurfaceControls from './SurfaceControls.jsx';
 import FlightPanelModular from './FlightPanelModular';
+import IntegratedControlPanel from './IntegratedControlPanel';
 
 const FlightInProgress = () => {
 
@@ -28,36 +25,48 @@ const FlightInProgress = () => {
     setThrottle,
     setPitch,
     setRoll,
-    setYaw
+    setYaw,
+    setFlaps,
+    setAirBrakes,
+    setGear
   } = useAircraftPhysics(aircraftConfig, true);
 
   // Control state for UI components
   const [throttleControl, setThrottleControl] = useState(47); // Default 47% as mentioned by user
 
   // Handle thrust control from ThrustManager
-  const handleThrustControl = (engine, delta) => {
-    const newThrottle = Math.max(0, Math.min(100, throttleControl + delta));
+  const handleThrustControl = (engine, newThrottleValue) => {
+    // Handle both delta values and direct throttle values
+    let newThrottle;
+    
+    if (newThrottleValue < 1 && newThrottleValue > -1) {
+      // This is a direct throttle value from physics engine (0-1)
+      newThrottle = newThrottleValue * 100;
+    } else {
+      // This is a delta or direct percentage value
+      newThrottle = Math.max(0, Math.min(100, newThrottleValue));
+    }
+    
     setThrottleControl(newThrottle);
     
-    // Send to physics engine using hook functions
+    // Send to physics engine using hook functions (0-1)
     setThrottle(newThrottle);
   };
 
   // Handle surface control changes
   const handleFlapsControl = (position) => {
-    // Surface controls are handled differently - they're aircraft configuration
-    // For now, we'll log the change but not directly set via physics hook
     console.log(`🛩️ Flaps control: ${position}`);
+    setFlaps(position);
   };
 
   const handleGearControl = (position) => {
-    // Landing gear is handled differently - it's an aircraft configuration
     console.log(`🔧 Gear control: ${position}`);
+    setGear(position);
   };
 
   const handleAirBrakesControl = (position) => {
-    // Air brakes are handled differently - they're aircraft configuration  
     console.log(`🛑 Air brakes control: ${position}`);
+    setAirBrakes(position);
   };
 
 
@@ -175,15 +184,15 @@ const FlightInProgress = () => {
           }}
         />
         
-        {/* Control Panels at Bottom */}
-        <div style={{ display: 'flex', gap: '10px', padding: '10px', background: 'rgba(0,0,0,0.8)', overflow: 'hidden' }}>
-          {/* Thrust Manager - Lever Style */}
-          <ThrustManager
+        {/* Integrated Control Panel at Bottom */}
+        <div style={{ padding: '10px', overflow: 'hidden' }}>
+          <IntegratedControlPanel
             controlThrust={handleThrustControl}
+            controlFlaps={handleFlapsControl}
+            controlGear={handleGearControl}
+            controlAirBrakes={handleAirBrakesControl}
             flightState={flightData}
           />
-          
-          {/* REMOVE SurfaceControls - Duplicate controls already in FlightPanelModular */}
         </div>
       </div>
       

@@ -104,7 +104,7 @@ class NewFlightPhysicsService {
         pitch: 0,       // Neutral elevator
         roll: 0,        // Neutral ailerons
         yaw: 0,         // Neutral rudder
-        trim: 220000    // Initial trim wheel position (displays as 11 units)
+        trim: 10   // Initial trim wheel position (displays as 11 units)
       },
       // ✅ NEW: Control surfaces state with proper defaults
       flaps: 0,         // 0=UP, 1=TO, 2=LDG
@@ -203,12 +203,18 @@ class NewFlightPhysicsService {
       liftCurveSlope: 5.7,       // per radian
       zeroLiftDragCoefficient: 0.025, // CD0
       inducedDragFactor: 0.04,   // k factor
+      basicLiftCoefficient: 0.5, // Basic CL for clean airfoil at 0 AoA
+      
+      // Horizontal stabilizer properties (fallbacks)
+      horizontalStabilizerArea: 25, // m² (approx 20% of wing area)
+      horizontalStabilizerCL: -0.15, // Negative CL for downforce at 0 AoA
+      horizontalStabilizerMomentArm: 12.5, // Moment arm from CG to stabilizer in meters
       
       // Control system - more effective power levels
       controlPower: {
-        x: 8000.0, // Roll power
-        y: 12000.0, // Pitch power - significantly increased for better responsiveness
-        z: 5000.0  // Yaw power
+        x: 1.2, // Roll power
+        y: 1.5, // Pitch power
+        z: 1.0  // Yaw power
       },
       
       // Moment of inertia (kg⋅m²)
@@ -222,10 +228,12 @@ class NewFlightPhysicsService {
     
     // Ensure physics properties are numbers
     const numericProps = [
-      'wingArea', 'wingSpan', 'maxLiftCoefficient', 'emptyWeight',
-      'fuelWeight', 'payloadWeight', 'mass', 'engineCount', 'maxThrustPerEngine',
-      'liftCurveSlope', 'zeroLiftDragCoefficient', 'inducedDragFactor',
-      'momentOfInertiaRoll', 'momentOfInertiaPitch', 'momentOfInertiaYaw'
+      'wingArea', 'wingSpan', 'maxLiftCoefficient', 'basicLiftCoefficient',
+      'emptyWeight', 'fuelWeight', 'payloadWeight', 'mass', 'engineCount', 
+      'maxThrustPerEngine', 'liftCurveSlope', 'zeroLiftDragCoefficient', 
+      'inducedDragFactor', 'momentOfInertiaRoll', 'momentOfInertiaPitch', 
+      'momentOfInertiaYaw', 'horizontalStabilizerArea', 'horizontalStabilizerCL',
+      'horizontalStabilizerMomentArm', 'controlPower'
     ];
     
     numericProps.forEach(prop => {
@@ -252,7 +260,9 @@ class NewFlightPhysicsService {
    * Main physics update step with PID autopilot integration
    * Applies input smoothing, autopilot control, and integrates all forces
    */
-  update(input = {}) {
+  update(input = {}, dt = null) {
+    // Use provided time step if available, otherwise use internal dt
+    const timeStep = dt || this.dt;
     // Handle reset input
     if (input.reset) {
       this.reset();
@@ -294,7 +304,7 @@ class NewFlightPhysicsService {
     
     // Sum forces and integrate motion
     this.sumForcesAndMoments();
-    this.integrateMotion(this.dt);
+    this.integrateMotion(timeStep);
   
     
 
@@ -319,19 +329,19 @@ class NewFlightPhysicsService {
     const pitchCommand = this.pidControllers.altitude.calculate(
       this.autopilot.targets.altitude, 
       currentAltitude, 
-      this.dt
+      timeStep
     );
     
     const throttleCommand = this.pidControllers.speed.calculate(
       this.autopilot.targets.speed, 
       currentSpeed, 
-      this.dt
+      timeStep
     );
     
     const rollCommand = this.pidControllers.heading.calculate(
       this.autopilot.targets.heading, 
       currentHeading, 
-      this.dt
+      timeStep
     );
     
     // ✅ FIXED: Apply control limits properly
@@ -496,22 +506,21 @@ class NewFlightPhysicsService {
     const safeAlpha = Math.max(-Math.PI/3, Math.min(Math.PI/3, alpha)); // ±60° limit
     const safeBeta = Math.max(-Math.PI/4, Math.min(Math.PI/4, beta)); // ±45° limit
     
-    // ✅ FIXED: Calculate proper CL for cruise conditions
-    // For 737-800 at 450 KTS, 35,000 ft: Need CL ≈ 0.49 to balance weight
-    // CL = Weight / (0.5 * ρ * V² * S)
-    const weight = this.aircraft.mass * this.GRAVITY;
-    const requiredCL = weight / (q * this.aircraft.wingArea); // Required CL to balance weight
+    // ✅ FIXED: Use basic lift coefficient from aircraft database instead of dynamic calculation
+    // Start with basic CL for clean airfoil at 0 AoA
+    let cl = this.aircraft.basicLiftCoefficient;
     
-    // Base cruise lift coefficient for 737 at FL350
-    let cl = Math.max(0.1, Math.min(this.aircraft.maxLiftCoefficient, requiredCL));
+    // Adjust CL based on angle of attack
+    // SafeAlpha is in radians, convert to degrees for more intuitive calculations
+    const aoaDegrees = safeAlpha * (180 / Math.PI);
     
-    // Adjust CL based on angle of attack 
     // For cruise flight: +3° pitch, level flight path → +3° AoA → positive lift
-    const aoaInfluence = this.aircraft.liftCurveSlope * (safeAlpha + 0.05); // +5° offset for cruise
-    cl = cl + (aoaInfluence * 0.05); // Add AoA influence
+    // Apply AoA influence using lift curve slope
+    const aoaInfluence = this.aircraft.liftCurveSlope * safeAlpha;
+    cl += aoaInfluence;
     
-    // Ensure reasonable cruise lift (must balance weight)
-    cl = Math.max(0.3, Math.min(this.aircraft.maxLiftCoefficient, cl));
+    // Ensure CL stays within reasonable limits
+    cl = Math.max(0, Math.min(this.aircraft.maxLiftCoefficient, cl));
     
     // ✅ ENHANCED: Drag coefficient with proper AoA effect
     // Cd = Cd₀ + k·Cl² + Cd_alpha·|α| (drag increases with AoA magnitude)
@@ -521,7 +530,7 @@ class NewFlightPhysicsService {
     
     let cd = this.aircraft.zeroLiftDragCoefficient + 
              this.aircraft.inducedDragFactor * cl * cl + 
-             cdAlpha * Math.abs(safeAlpha) + // Linear increase with AoA magnitude
+             cdAlpha * safeAlpha * safeAlpha + // Linear increase with AoA magnitude
              frontalAreaFactor * Math.abs(Math.sin(safeAlpha)); // Head-on area effect
     
     // ✅ NEW: Apply flaps and airbrake effects
@@ -534,8 +543,13 @@ class NewFlightPhysicsService {
     cd = airbrakeResult.cd;
     
     // Calculate aerodynamic forces
-    const lift = q * cl * this.aircraft.wingArea; // ✅ FIXED: Missing wing area factor!
-    const drag = q * cd * this.aircraft.wingArea; // ✅ FIXED: Include wing area for drag too
+    const lift = q * cl * this.aircraft.wingArea; // Main wing lift
+    const drag = q * cd * this.aircraft.wingArea; // Main wing drag
+    
+    // ✅ NEW: Calculate horizontal stabilizer downforce
+    const stabilizerLift = q * this.aircraft.horizontalStabilizerCL * this.aircraft.horizontalStabilizerArea;
+    // Stabilizer lift is negative (downforce), so we'll apply it as a downward force
+    const stabilizerDownforce = -stabilizerLift;
     
     // ✅ AERODYNAMIC FORCES: Lift acts perpendicular to flight path, drag along flight path
     // Body frame: X=forward, Y=right, Z=upward
@@ -546,9 +560,10 @@ class NewFlightPhysicsService {
     // - Lift has +Z component (upward) to balance weight
     // - Drag has -X component (opposing motion)  
     // - Small lift forward component for cruise efficiency
+    // - Horizontal stabilizer provides downforce (-Z component)
     const Fx_aero = lift * sinAlpha - drag * cosAlpha;        // Net forward force
     const Fy_aero = q * safeBeta * 0.1;                       // Side force from sideslip
-    const Fz_aero = lift * cosAlpha + drag * sinAlpha;        // Lift upward component
+    const Fz_aero = (lift * cosAlpha + drag * sinAlpha) - stabilizerDownforce; // Net upward force (including stabilizer downforce)
     
 
     
@@ -567,18 +582,17 @@ class NewFlightPhysicsService {
     // when the aerodynamic center (AC) is offset from the center of gravity (CG)
     
     // Aerodynamic center is typically at 25% chord for subsonic aircraft
-    const aerocenterPosition = 0.25; // 25% chord from leading edge
+    
     const wingChord = this.aircraft.wingArea / this.aircraft.wingSpan; // Approximate chord length
-    const momentArm = wingChord * aerocenterPosition; // Distance from CG to aerocenter
     
     // ✅ ENHANCED: Realistic pitching moments with separate application points
     // Lift acts through AC (25% chord) → creates nose-down moment (negative)
     // Drag acts through drag center (typically more aft) → creates nose-up moment (positive)
     
-    // ✅ ENHANCED: Separate moment arm calculations
-    const acPosition = 0.25; // Aerodynamic center at 25% chord
-    const cgPosition = 0.35; // Center of gravity at 35% chord
-    const dragCenterPosition = 0.75; // Drag center much further aft (75% chord) for stronger moment
+    // ✅ ENHANCED: Separate moment arm calculations using aircraft-specific values from database
+    const acPosition = this.aircraft.aerodynamicCenterPosition || 0.25; // Aerodynamic center position
+    const cgPosition = this.aircraft.centerOfGravityPosition || 0.15; // Center of gravity position
+    const dragCenterPosition = this.aircraft.dragCenterPosition || 0.75; // Drag center position
     
     // Lift moment arm: AC to CG (lift acts through AC)
     const liftMomentArm = wingChord * (cgPosition - acPosition); // AC behind CG = negative moment
@@ -589,20 +603,24 @@ class NewFlightPhysicsService {
     
     // ✅ ENHANCED: Lift-induced pitching moment (LIFT THROUGH AC)
     // Lift acting through AC (behind CG) creates nose-down moment (negative)
-    const liftPitchingMoment = -lift * liftMomentArm;
+    const liftPitchingMoment = lift * liftMomentArm;
     
     // ✅ CORRECT PHYSICS: Drag-induced pitching moment
     // Drag acts along flight path through drag center
     // For level flight: drag creates nose-up moment when flight path angle > 0
-    const dragPitchingMoment = drag * dragMomentArm * Math.sin(flightPathAngle) * (1 + Math.abs(safeAlpha) * 3);
+    const dragPitchingMoment = drag * dragMomentArm * Math.sin(flightPathAngle) * (1 + Math.abs(safeAlpha));
     
-    // ✅ TOTAL AERODYNAMIC PITCHING MOMENT
-    const totalPitchingMoment = liftPitchingMoment + dragPitchingMoment;
+    // ✅ NEW: Horizontal stabilizer pitching moment
+    // Stabilizer is located aft of CG, so its downforce creates a nose-up moment
+    const stabilizerPitchingMoment = stabilizerDownforce * this.aircraft.horizontalStabilizerMomentArm;
+    
+    // ✅ TOTAL AERODYNAMIC PITCHING MOMENT including stabilizer
+    const totalPitchingMoment = liftPitchingMoment + dragPitchingMoment + stabilizerPitchingMoment;
     
     // ✅ FIXED: Proper elevator trim calculation with aircraft parameters
-    // Trim should counteract the AERODYNAMIC pitching moment (lift + drag)
+    // Trim should counteract the AERODYNAMIC pitching moment (lift + drag + stabilizer)
     // NOT the total moment that includes trim effects (circular dependency)
-    const aerodynamicPitchingMoment = liftPitchingMoment + dragPitchingMoment;
+    const aerodynamicPitchingMoment = liftPitchingMoment + dragPitchingMoment + stabilizerPitchingMoment;
     
     // ✅ ENHANCED: Parameterized trim calculation
     // Use aircraft-specific control surface parameters (default to realistic values)
@@ -614,7 +632,7 @@ class NewFlightPhysicsService {
     const trimControl = this.state.controls.trim; // Trim wheel position from cockpit
     
     // ✅ FIXED: Define controlPowerY first to avoid reference error
-    const controlPowerY = this.aircraft.controlPower?.y || 0.01;
+    const controlPowerY = this.aircraft.controlPower?.y || 1.5;
     
     // Convert trim control to elevator deflection
     // elevatorTrim represents the deflection angle needed to generate the trim moment
@@ -626,14 +644,14 @@ class NewFlightPhysicsService {
     const yawInertia = Math.max(1000, this.aircraft.momentOfInertiaYaw || 20000);
     
     // ✅ ENHANCED: Calculate total pitching moment including trim effects
-    const trimMoment = controlPowerY * (input.pitch + elevatorTrim);
+    const trimMoment = controlPowerY * q * elevatorTrim;
     const totalPitchingMomentWithTrim = aerodynamicPitchingMoment + trimMoment;
     
     // ✅ FIXED: Calculate control moments with consistent unit scaling
-    // Using extremely conservative control power values to prevent overshooting
-    const rollMoment = (this.aircraft.controlPower.x || 1000.0) * input.roll;
-    const pitchMoment = (this.aircraft.controlPower.y || 2000.0) * input.pitch;
-    const yawMoment = (this.aircraft.controlPower.z || 800.0) * input.yaw;
+    // Multiply by dynamic pressure (q) for realistic moment generation
+    const rollMoment = (this.aircraft.controlPower.x || 1.2) * q * input.roll;
+    const pitchMoment = -(this.aircraft.controlPower.y || 1.5) * q * input.pitch + totalPitchingMomentWithTrim; //Negative so pushing is down, pulling is up
+    const yawMoment = (this.aircraft.controlPower.z || 1.0) * q * input.yaw;
     
     // ✅ CRITICAL FIX: Assign forces and moments to class properties
     this.aeroForces = { x: Fx_total, y: Fy_total, z: Fz_total };
@@ -656,11 +674,40 @@ class NewFlightPhysicsService {
    */
   calculatePropulsionForces() {
     const throttle = Math.max(0, Math.min(1, this.state.controls.throttle));
+    const altitude_m = this.state.position.z;
     
-    // Real thrust derating with altitude
+    // Use engine performance curve parameters from aircraft database
+    const enginePerf = this.aircraft.enginePerformance || {};
+    const n1Curve = enginePerf.n1Curve || {};
+    
+    // Default values if not in database
+    const altitudeBreakpoint = n1Curve.altitudeBreakpoint || 10000;
+    const lowAltitudeSlope = n1Curve.lowAltitudeSlope || -0.0001;
+    const highAltitudeSlope = n1Curve.highAltitudeSlope || -0.0003;
+    const thrustExponent = n1Curve.thrustExponent || 1.1;
+    
+    // Calculate altitude-based derating
+    let altitudeFactor;
+    if (altitude_m <= altitudeBreakpoint) {
+      // Low altitude: gradual derating
+      altitudeFactor = 1 + (altitude_m * lowAltitudeSlope);
+    } else {
+      // High altitude: steeper derating
+      const lowAltFactor = 1 + (altitudeBreakpoint * lowAltitudeSlope);
+      const highAltDifference = altitude_m - altitudeBreakpoint;
+      altitudeFactor = lowAltFactor + (highAltDifference * highAltitudeSlope);
+    }
+    
+    // Ensure altitude factor doesn't go below 0
+    altitudeFactor = Math.max(0, altitudeFactor);
+    
+    // Add density-based derating for realism
     const densityRatio = this.environment.density / this.AIR_DENSITY_SLA;
-    const altitudeDerating = Math.pow(densityRatio, 0.7);
-    const maxThrustAtAltitude = this.aircraft.maxThrustPerEngine * altitudeDerating;
+    const densityFactor = Math.pow(densityRatio, 0.7);
+    
+    // Combine factors with thrust exponent for non-linear behavior
+    const totalDerating = Math.pow(altitudeFactor * densityFactor, thrustExponent);
+    const maxThrustAtAltitude = this.aircraft.maxThrustPerEngine * totalDerating;
     
     const totalThrust = throttle * this.aircraft.engineCount * maxThrustAtAltitude;
     
@@ -1002,15 +1049,105 @@ class NewFlightPhysicsService {
     const throttle = this.state.controls.throttle || 0.55;
     
     // Realistic engine behavior: At FL350, engines run at higher N1/N2 even at lower throttle
-    // Cruise at FL350 typically requires ~85-90% N1 for 737-800
-    const altitudeFactor = Math.min(1, Math.max(0, (35000 - altitude_ft) / 35000)); // 1 at sea level, 0 at FL350
-    const baseN1 = 85 + (throttle - 0.55) * 30; // Base 85% at 55% throttle, scale by throttle
-    const baseN2 = 90 + (throttle - 0.55) * 25; // Base 90% at 55% throttle, scale by throttle
+    // Get engine performance parameters from database
+    const enginePerf = this.aircraft.enginePerformance || {};
+    const minN1Idle = enginePerf.minN1Idle || 22;
+    const n2Base = enginePerf.n2Base || 95;
+    const egtBase = enginePerf.egtBase || 500;
+    const vibrationAmplitude = enginePerf.vibrationAmplitude || 0.5;
     
-    // Apply altitude factor (lower N1/N2 at lower altitude for same throttle)
-    const engineN1 = [Math.min(100, Math.max(50, baseN1 - altitudeFactor * 40)), Math.min(100, Math.max(50, baseN1 - altitudeFactor * 40))];
-    const engineN2 = [Math.min(100, Math.max(60, baseN2 - altitudeFactor * 30)), Math.min(100, Math.max(60, baseN2 - altitudeFactor * 30))];
-    const engineEGT = [throttle * 800 + 400, throttle * 800 + 400]; // EGT in °F
+    // Get engine performance curve parameters
+    const n1Curve = enginePerf.n1Curve || {};
+    const altitudeBreakpoint = n1Curve.altitudeBreakpoint || 12000;
+    const lowAltitudeSlope = n1Curve.lowAltitudeSlope || -0.0001;
+    const highAltitudeSlope = n1Curve.highAltitudeSlope || -0.0003;
+    
+    // Calculate altitude for derating (in meters)
+    const altitude_m = this.state.position.z;
+    
+    // Calculate altitude-based derating for engine parameters
+    let altitudeFactor;
+    if (altitude_m <= altitudeBreakpoint) {
+      // Low altitude: gradual derating
+      altitudeFactor = 1 + (altitude_m * lowAltitudeSlope);
+    } else {
+      // High altitude: steeper derating (much faster above breakpoint)
+      const lowAltFactor = 1 + (altitudeBreakpoint * lowAltitudeSlope);
+      const highAltDifference = altitude_m - altitudeBreakpoint;
+      altitudeFactor = lowAltFactor + (highAltDifference * highAltitudeSlope);
+    }
+    
+    // Ensure altitude factor doesn't go below 0
+    altitudeFactor = Math.max(0, altitudeFactor);
+    
+    // Add density-based derating for realism (affects engine performance)
+    const densityRatio = this.environment.density / this.AIR_DENSITY_SLA;
+    const densityFactor = Math.pow(densityRatio, 0.7);
+    
+    // Combine factors for total engine performance derating
+    const totalEngineDerating = altitudeFactor * densityFactor;
+    
+    // More realistic N1 calculation with non-linear relationship and altitude derating
+    // N1 increases rapidly at low throttle, then more slowly at higher throttle
+    let baseN1;
+    if (throttle < 0.2) {
+      // Idle to low throttle range - limited derating to maintain idle stability
+      const idleDerating = Math.max(0.9, totalEngineDerating); // Don't derate idle too much
+      baseN1 = minN1Idle + ((throttle / 0.2) * (65 - minN1Idle)) * idleDerating;
+    } else if (throttle < 0.6) {
+      // Medium throttle range (climb/cruise)
+      baseN1 = minN1Idle + ((65 - minN1Idle) + ((throttle - 0.2) / 0.4) * (90 - 65)) * totalEngineDerating;
+    } else {
+      // High throttle range (takeoff) - full derating effect
+      const maxPossibleN1 = 100;
+      const highThrottleN1 = minN1Idle + ((90 - minN1Idle) + ((throttle - 0.6) / 0.4) * (maxPossibleN1 - 90));
+      baseN1 = highThrottleN1 * totalEngineDerating;
+    }
+    
+    // Ensure baseN1 stays within realistic limits
+    baseN1 = Math.max(minN1Idle, Math.min(100, baseN1));
+    
+    // N2 has a more linear relationship but with altitude derating
+    // N2 typically has less altitude dependency than N1
+    const n2Derating = Math.pow(totalEngineDerating, 0.5); // Less altitude effect on N2
+    const baseN2 = n2Base - 20 + (throttle * 25) * n2Derating;
+    
+    // EGT increases with throttle and decreases with altitude (cooler at altitude)
+    // More complex relationship: increases with throttle but decreases with air density
+    const egtAltitudeFactor = Math.max(0.7, 1 + (altitude_m * -0.00005)); // EGT decreases with altitude
+    const baseEGT = egtBase + (Math.pow(throttle, 1.5) * 400) * egtAltitudeFactor;
+    
+    // Generate random vibrations for each engine (different values for realism)
+    const vibrationN1 = [
+      (Math.random() - 0.5) * vibrationAmplitude,
+      (Math.random() - 0.5) * vibrationAmplitude
+    ];
+    
+    const vibrationN2 = [
+      (Math.random() - 0.5) * (vibrationAmplitude * 0.8),
+      (Math.random() - 0.5) * (vibrationAmplitude * 0.8)
+    ];
+    
+    const vibrationEGT = [
+      (Math.random() - 0.5) * (vibrationAmplitude * 10),
+      (Math.random() - 0.5) * (vibrationAmplitude * 10)
+    ];
+    
+    // Calculate final values with vibrations and limits
+    const engineN1 = [
+      Math.min(100, Math.max(minN1Idle, baseN1 + vibrationN1[0])),
+      Math.min(100, Math.max(minN1Idle, baseN1 + vibrationN1[1]))
+    ];
+    
+    const engineN2 = [
+      Math.min(100, Math.max(50, baseN2 + vibrationN2[0])),
+      Math.min(100, Math.max(50, baseN2 + vibrationN2[1]))
+    ];
+    
+    const engineEGT = [
+      Math.min(900, Math.max(400, baseEGT + vibrationEGT[0])),
+      Math.min(900, Math.max(400, baseEGT + vibrationEGT[1]))
+    ];
     
     // Simulate fuel consumption
     const fuelFlow = throttle * 0.5; // kg/s
@@ -1037,6 +1174,11 @@ class NewFlightPhysicsService {
       
       // Systems
       hydraulicPressure: 3000,
+      
+      // Control surfaces
+      flaps: this.state.flaps,
+      airBrakes: this.state.airBrakes,
+      gear: this.state.gear,
       
       // Autopilot
       autopilot: this.getAutopilotStatus(),

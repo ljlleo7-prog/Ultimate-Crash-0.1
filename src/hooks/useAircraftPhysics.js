@@ -1,5 +1,6 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
 import NewFlightPhysicsService from '../services/newFlightPhysicsService.js';
+import { loadAircraftData } from '../services/aircraftService.js';
 
 export function useAircraftPhysics(config = {}, autoStart = true) {
   console.log('🎮 useAircraftPhysics: HOOK CALLED', {
@@ -62,16 +63,43 @@ export function useAircraftPhysics(config = {}, autoStart = true) {
   useEffect(() => {
     console.log('🎮 useAircraftPhysics: INITIALIZING PHYSICS SERVICE...');
     
-    try {
-      const service = new NewFlightPhysicsService();
-      console.log('🎮 useAircraftPhysics: PHYSICS SERVICE CREATED', service);
-      physicsServiceRef.current = service;
-      setIsInitialized(true);
-      console.log('🎮 useAircraftPhysics: PHYSICS SERVICE INITIALIZED SUCCESSFULLY');
-    } catch (err) {
-      console.error('🎮 useAircraftPhysics: PHYSICS SERVICE INITIALIZATION FAILED', err);
-      setError(err.message);
+    async function initializePhysics() {
+      try {
+        // Load aircraft data from database
+        const aircraftDatabase = await loadAircraftData();
+        console.log('🎮 useAircraftPhysics: AIRCRAFT DATABASE LOADED, found', aircraftDatabase?.length || 0, 'aircraft');
+        
+        // Get the first aircraft from the database (can be configurable later)
+        const defaultAircraft = aircraftDatabase?.[0] || {};
+        console.log('🎮 useAircraftPhysics: DEFAULT AIRCRAFT DATA:', {
+          model: defaultAircraft?.model,
+          basicLiftCoefficient: defaultAircraft?.basicLiftCoefficient,
+          horizontalStabilizerArea: defaultAircraft?.horizontalStabilizerArea,
+          horizontalStabilizerCL: defaultAircraft?.horizontalStabilizerCL,
+          horizontalStabilizerMomentArm: defaultAircraft?.horizontalStabilizerMomentArm
+        });
+        
+        // Initialize physics service with aircraft data from database
+        const service = new NewFlightPhysicsService(defaultAircraft);
+        console.log('🎮 useAircraftPhysics: PHYSICS SERVICE CREATED');
+        console.log('🎮 useAircraftPhysics: AIRCRAFT DATA IN PHYSICS SERVICE:', {
+          basicLiftCoefficient: service?.aircraft?.basicLiftCoefficient,
+          horizontalStabilizerArea: service?.aircraft?.horizontalStabilizerArea,
+          horizontalStabilizerCL: service?.aircraft?.horizontalStabilizerCL,
+          horizontalStabilizerMomentArm: service?.aircraft?.horizontalStabilizerMomentArm
+        });
+        
+        physicsServiceRef.current = service;
+        setIsInitialized(true);
+        console.log('🎮 useAircraftPhysics: PHYSICS SERVICE INITIALIZED SUCCESSFULLY WITH DATABASE DATA');
+      } catch (err) {
+        console.error('🎮 useAircraftPhysics: PHYSICS SERVICE INITIALIZATION FAILED', err);
+        console.error('🎮 useAircraftPhysics: ERROR STACK:', err.stack);
+        setError(err.message);
+      }
     }
+    
+    initializePhysics();
   }, []);
 
   useEffect(() => {
@@ -140,7 +168,7 @@ export function useAircraftPhysics(config = {}, autoStart = true) {
         pitch: currentControlsRef.current.pitch,
         roll: currentControlsRef.current.roll,
         yaw: currentControlsRef.current.yaw
-      });
+      }, timeStep);
 
       // ✅ FIXED: Use position.z as positive altitude (no negative conversion needed)
       const altitude = newState.position.z * 3.28084;
@@ -228,6 +256,25 @@ export function useAircraftPhysics(config = {}, autoStart = true) {
     currentControlsRef.current = { ...currentControlsRef.current, yaw: value * Math.PI / 180 };
   }, []);
 
+  // Control surface setters
+  const setFlaps = useCallback((value) => {
+    if (physicsServiceRef.current) {
+      physicsServiceRef.current.setFlaps(value);
+    }
+  }, []);
+
+  const setAirBrakes = useCallback((value) => {
+    if (physicsServiceRef.current) {
+      physicsServiceRef.current.setAirBrakes(value);
+    }
+  }, []);
+
+  const setGear = useCallback((value) => {
+    if (physicsServiceRef.current) {
+      physicsServiceRef.current.setGear(value);
+    }
+  }, []);
+
   const resetAircraft = useCallback(() => {
     if (physicsServiceRef.current) {
       physicsServiceRef.current.reset();
@@ -291,8 +338,10 @@ export function useAircraftPhysics(config = {}, autoStart = true) {
     setPitch,
     setRoll,
     setYaw,
+    setFlaps,
+    setAirBrakes,
+    setGear,
     updatePhysics,
-    resetAircraft,
-
+    resetAircraft
   };
 }

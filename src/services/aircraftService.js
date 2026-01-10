@@ -1,14 +1,15 @@
 // Aircraft Service for Ultimate Crash Simulation
 // Provides aircraft-specific performance data for fuel calculations
 
-// Load aircraft database using dynamic import
+// Import aircraft database directly
+import aircraftData from '../data/aircraftDatabase.json';
+
+// Load aircraft database
 let aircraftDatabase = null;
 
 async function loadAircraftData() {
   if (!aircraftDatabase) {
-    const response = await fetch('/src/data/aircraftDatabase.json');
-    const data = await response.json();
-    aircraftDatabase = data.aircraft;
+    aircraftDatabase = aircraftData.aircraft;
   }
   return aircraftDatabase;
 }
@@ -369,3 +370,6 @@ class AircraftService {
 // Create and export a singleton instance
 const aircraftService = new AircraftService();
 export default aircraftService;
+
+// Export the loadAircraftData function for use in other modules
+export { loadAircraftData };

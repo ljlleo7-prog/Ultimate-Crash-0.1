@@ -94,10 +94,10 @@ const FlightPanelModular = ({ flightData, onActionRequest, aircraftModel }) => {
         altimeter: prevState.altimeter,
         
         // Engine
-        engineN1: prevState.engineN1,
-        engineN2: prevState.engineN2,
-        engineEGT: prevState.engineEGT,
-        fuel: prevState.fuel,
+        engineN1: flightData.engineN1 || prevState.engineN1,
+        engineN2: flightData.engineN2 || prevState.engineN2,
+        engineEGT: flightData.engineEGT || prevState.engineEGT,
+        fuel: flightData.fuel || prevState.fuel,
         
         // Systems
         hydraulicPressure: prevState.hydraulicPressure,
