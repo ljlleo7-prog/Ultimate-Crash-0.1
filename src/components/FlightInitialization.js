@@ -23,7 +23,8 @@ const FlightInitialization = ({
   crewCount, setCrewCount,
   aircraftSuggestions,
   handleInitializeFlight,
-  handleSearch
+  handleSearch,
+  physicsModel, setPhysicsModel
 }) => {
   
   const generateRandomTime = () => {
@@ -183,6 +184,49 @@ const FlightInitialization = ({
     }
   };
 
+  // Get available physics models based on difficulty
+  const getAvailablePhysicsModels = () => {
+    switch (difficulty) {
+      case 'rookie':
+        return ['imaginary']; // Only imaginary model for rookies
+      case 'amateur':
+        return ['imaginary']; // Only imaginary model for amateurs
+      case 'intermediate':
+      case 'advanced':
+        return ['imaginary', 'realistic']; // Both models for middle difficulties
+      case 'pro':
+      case 'devil':
+        return ['realistic']; // Only realistic model for professionals and devil
+      default:
+        return ['imaginary']; // Default to imaginary
+    }
+  };
+
+  // Get default physics model based on difficulty
+  const getDefaultPhysicsModel = () => {
+    switch (difficulty) {
+      case 'rookie':
+      case 'amateur':
+        return 'imaginary';
+      case 'intermediate':
+      case 'advanced':
+        return 'imaginary'; // Default to imaginary for middle difficulties
+      case 'pro':
+      case 'devil':
+        return 'realistic';
+      default:
+        return 'imaginary';
+    }
+  };
+
+  // Handle difficulty change - update physics model to default if needed
+  React.useEffect(() => {
+    const availableModels = getAvailablePhysicsModels();
+    if (!availableModels.includes(physicsModel)) {
+      setPhysicsModel(getDefaultPhysicsModel());
+    }
+  }, [difficulty, physicsModel, setPhysicsModel]);
+
   return React.createElement('div', { className: 'flight-initialization' },
     React.createElement('div', { className: 'difficulty-section' },
       React.createElement('h2', null, 'Difficulty Level'),
@@ -193,6 +237,21 @@ const FlightInitialization = ({
             className: `difficulty-btn ${level} ${difficulty === level ? 'active' : ''}`,
             onClick: () => setDifficulty(level)
           }, level.toUpperCase())
+        )
+      ),
+      // Physics model selection
+      React.createElement('div', { className: 'physics-model-section' },
+        React.createElement('label', null, 'Physics Model:'),
+        React.createElement('select', {
+          value: physicsModel,
+          onChange: (e) => setPhysicsModel(e.target.value),
+          className: 'physics-model-select'
+        },
+          getAvailablePhysicsModels().map((model) =>
+            React.createElement('option', { key: model, value: model },
+              model.charAt(0).toUpperCase() + model.slice(1)
+            )
+          )
         )
       )
     ),

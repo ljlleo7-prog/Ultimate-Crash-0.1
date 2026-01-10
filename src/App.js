@@ -58,6 +58,7 @@ function App() {
   const [crewCount, setCrewCount] = useState(2);
   const [simulationStarted, setSimulationStarted] = useState(false);
   const [cinematicPhase, setCinematicPhase] = useState('none');
+  const [physicsModel, setPhysicsModel] = useState('imaginary'); // Default to imaginary model
 
   // Load popular aircraft models
   useEffect(() => {
@@ -180,7 +181,8 @@ function App() {
       formatFuel: formatFuel,
       weatherData: weatherData,
       failureType: failureType,
-      crewCount: crewCount
+      crewCount: crewCount,
+      physicsModel: physicsModel
     });
   }
 
@@ -265,7 +267,9 @@ function App() {
         setCrewCount: setCrewCount,
         aircraftSuggestions: aircraftSuggestions,
         handleInitializeFlight: handleInitializeFlight,
-        handleSearch: handleSearch
+        handleSearch: handleSearch,
+        physicsModel: physicsModel,
+        setPhysicsModel: setPhysicsModel
       })
     )
   );

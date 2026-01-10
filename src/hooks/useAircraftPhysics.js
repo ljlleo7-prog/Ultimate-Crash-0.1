@@ -1,8 +1,9 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
 import NewFlightPhysicsService from '../services/newFlightPhysicsService.js';
+import SimpleFlightPhysicsService from '../services/SimpleFlightPhysicsService.js';
 import { loadAircraftData } from '../services/aircraftService.js';
 
-export function useAircraftPhysics(config = {}, autoStart = true) {
+export function useAircraftPhysics(config = {}, autoStart = true, model = 'realistic') {
   console.log('🎮 useAircraftPhysics: HOOK CALLED', {
     config,
     autoStart,
@@ -104,8 +105,10 @@ export function useAircraftPhysics(config = {}, autoStart = true) {
           thrust: defaultAircraft.maxThrustPerEngine || 0
         });
         
-        // Initialize physics service with aircraft data from database
-        const service = new NewFlightPhysicsService(defaultAircraft);
+        // Initialize appropriate physics service based on selected model
+        const service = model === 'imaginary' ? 
+          new SimpleFlightPhysicsService(defaultAircraft) : 
+          new NewFlightPhysicsService(defaultAircraft);
         console.log('🎮 useAircraftPhysics: PHYSICS SERVICE CREATED');
         console.log('🎮 useAircraftPhysics: AIRCRAFT DATA IN PHYSICS SERVICE:', {
           basicLiftCoefficient: service?.aircraft?.basicLiftCoefficient,
@@ -125,7 +128,7 @@ export function useAircraftPhysics(config = {}, autoStart = true) {
     }
     
     initializePhysics();
-  }, []);
+  }, [model]);
 
   useEffect(() => {
     console.log('🎮 useAircraftPhysics: AUTO-START EFFECT TRIGGERED', {

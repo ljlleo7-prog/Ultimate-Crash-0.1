@@ -3,7 +3,31 @@ import { useAircraftPhysics } from '../hooks/useAircraftPhysics';
 import FlightPanelModular from './FlightPanelModular';
 import IntegratedControlPanel from './IntegratedControlPanel';
 
-const FlightInProgress = () => {
+const FlightInProgress = ({ 
+  callsign, 
+  aircraftModel, 
+  difficulty, 
+  selectedDeparture, 
+  selectedArrival, 
+  flightPlan, 
+  airline, 
+  pax, 
+  payload, 
+  fuelReserve, 
+  cruiseHeight, 
+  useRandomTime, 
+  timeZulu, 
+  useRandomSeason, 
+  season, 
+  handleResetFlight, 
+  formatDistance, 
+  formatFlightTime, 
+  formatFuel, 
+  weatherData, 
+  failureType, 
+  crewCount, 
+  physicsModel = 'imaginary' 
+}) => {
 
 
   // Aircraft configuration for physics initialization
@@ -29,7 +53,7 @@ const FlightInProgress = () => {
     setFlaps,
     setAirBrakes,
     setGear
-  } = useAircraftPhysics(aircraftConfig, true);
+  } = useAircraftPhysics(aircraftConfig, true, physicsModel);
 
   // Control state for UI components
   const [throttleControl, setThrottleControl] = useState(47); // Default 47% as mentioned by user
