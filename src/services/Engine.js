@@ -156,27 +156,29 @@ export class Engine {
    */
   calculateNormalParameters(throttle) {
     const nominal = this.nominalParameters;
+    const altitude_m = this.environmentalFactors.altitude || 0;
+    const airDensity = this.environmentalFactors.airDensity || 1.225;
     
-    // N1 calculation with smooth curve
-    let baseN1;
-    if (throttle <= 0.05) {
-      baseN1 = nominal.n1Idle;
-    } else if (throttle >= 0.95) {
-      baseN1 = nominal.n1Max;
-    } else {
-      const normalizedThrottle = (throttle - 0.05) / (0.95 - 0.05);
-      const curveExponent = 0.7;
-      const curveValue = Math.pow(normalizedThrottle, curveExponent);
-      baseN1 = nominal.n1Idle + curveValue * (nominal.n1Max - nominal.n1Idle);
-    }
+    // Sea-level values at current throttle
+    const N10 = nominal.n1Idle + (Math.pow(throttle, 0.7) * (nominal.n1Max - nominal.n1Idle));
+    const N20 = nominal.n2Base + (Math.pow(throttle, 0.9) * 10);
     
-    // N2 calculation (slower response than N1)
-    const n2Response = 0.85; // N2 responds slower than N1
-    baseN1 = Math.max(nominal.n1Idle, Math.min(nominal.n1Max, baseN1));
+    // A — Exponential Decay (Density-Scaled) for N1 - REDUCED DECAY RATE
+    const kN1 = 0.00002; // Decay coefficient for N1 - reduced from 0.0001
+    const N1_h = N10 * Math.exp(-kN1 * altitude_m);
     
-    let baseN2 = nominal.n2Base + (throttle * 10 * n2Response); // N2 varies with throttle
+    // Clamp N1 to reasonable limits
+    let baseN1 = Math.max(nominal.n1Idle, Math.min(nominal.n1Max, N1_h));
     
-    // EGT calculation (exponential with throttle)
+    // B — Modified Exponential for N2 - REDUCED DECAY RATE
+    const kN2 = 0.00001; // Decay coefficient for N2 - reduced from 0.00005
+    const cN2 = 0.3; // Change limit factor for N2 - reduced from 0.5
+    const N2_h = N20 * (1 - cN2 * (1 - Math.exp(-kN2 * altitude_m)));
+    
+    // Clamp N2 to reasonable limits
+    let baseN2 = Math.max(50, Math.min(100, N2_h));
+    
+    // EGT calculation (exponential with throttle, modified for altitude)
     let baseEGT;
     if (throttle <= 0.05) {
       baseEGT = nominal.egtIdle;
@@ -185,13 +187,19 @@ export class Engine {
       baseEGT = nominal.egtIdle + egtCurve * (nominal.egtMax - nominal.egtIdle);
     }
     
-    // Thrust calculation with efficiency factors
-    const efficiency = 0.85 + 0.1 * Math.sin(throttle * Math.PI);
-    const airDensityFactor = Math.pow(this.environmentalFactors.airDensity / 1.225, 0.7);
-    const baseThrust = (this.maxThrust * throttle) * efficiency * airDensityFactor;
+    // B — Power Law Thrust (Non-Linear) - IMPROVED ALTITUDE PERFORMANCE
+    const d = 1.0; // Exponent for power law thrust (reduced for better altitude performance)
+    const airDensity0 = 1.225; // Sea-level air density (kg/m³)
+    const baseThrustSeaLevel = this.maxThrust * Math.pow(throttle, 1.1); // Base thrust at sea level
     
-    // Fuel flow (approximate - increases with throttle)
-    const baseFuelFlow = 0.3 + (throttle * 2.0); // kg/s
+    // Calculate thrust with improved altitude efficiency using a more realistic lapse rate
+    const densityRatio = airDensity / airDensity0;
+    // Linear thrust lapse with minimum efficiency floor (more realistic for turbofans)
+    const thrustLapseFactor = Math.max(0.3, 0.85 * densityRatio + 0.15);
+    const baseThrust = baseThrustSeaLevel * thrustLapseFactor;
+    
+    // Fuel flow (scaled with thrust)
+    const baseFuelFlow = 0.3 + (baseThrust / this.maxThrust) * 2.0; // kg/s
     
     return [baseN1, baseN2, baseEGT, baseThrust, baseFuelFlow];
   }

@@ -69,10 +69,6 @@ class PIDController {
  * - Scalable multi-engine system with failure handling
  */
 
-// Import the new multi-engine system
-import { PropulsionManager } from './PropulsionManager.js';
-import { ParameterValidator } from '../utils/ParameterValidator.js';
-
 class NewFlightPhysicsService {
   // HARDCODED DEFAULT PARAMETERS
   static DEFAULT_ENVIRONMENT = {
@@ -84,7 +80,7 @@ class NewFlightPhysicsService {
 
   static DEFAULT_CONTROLS = {
     THROTTLE: 0.55, // 55% thrust for cruise
-    TRIM: 20       // Initial trim wheel position (displays as 11 units)
+    TRIM: 20     // Initial trim wheel position (displays as 11 units)
   };
 
   static DEFAULT_AUTOPILOT_LIMITS = {
@@ -136,7 +132,7 @@ class NewFlightPhysicsService {
       },
       orientation: {
         phi: 0,   // Roll angle (0° = level)
-        theta: 0.0, // Initial pitch 0° - dynamic pitch based on torque calculations
+        theta: 0.05, // Initial pitch 0° - dynamic pitch based on torque calculations
         psi: 0    // Yaw: 0° (flying North)
       },
       angularRates: {
@@ -729,13 +725,13 @@ class NewFlightPhysicsService {
     const quadraticRoll = input.roll * Math.abs(input.roll); // Quadratic curve for roll
     
     // ✅ MAGNIFIED: Increased pitch control authority by 3x to counteract strong natural pitching moments
-    const pitchMagnification = 300.0; // Increased from 1.0 to 3.0
+    const pitchMagnification = 100000.0; // Increased from 1.0 to 3.0
     const rollMagnification = 1.5; // Moderate increase for roll control
     
     // ✅ FIXED: Calculate control moments with consistent unit scaling
     // Multiply by dynamic pressure (q) for realistic moment generation
     const rollMoment = (this.aircraft.controlPower.x || 1.2) * q * quadraticRoll * rollMagnification;
-    const pitchMoment = -(this.aircraft.controlPower.y || 1.5) * q * quadraticPitch * pitchMagnification + totalPitchingMomentWithTrim; //Negative so pushing is down, pulling is up
+    const pitchMoment = -(this.aircraft.controlPower.y || 1.5) * q * quadraticPitch * pitchMagnification + totalPitchingMomentWithTrim/2; //Negative so pushing is down, pulling is up
     const yawMoment = (this.aircraft.controlPower.z || 1.0) * q * input.yaw;
     
     // ✅ CRITICAL FIX: Assign forces and moments to class properties
@@ -1161,8 +1157,10 @@ class NewFlightPhysicsService {
     const airspeeds = this.calculateAirspeeds();
     
     // Simulate engine parameters based on separate throttles and altitude
-    const engineThrottle0 = Math.max(0, Math.min(1, this.state.controls.engineThrottles[0] || 0.47));
-    const engineThrottle1 = Math.max(0, Math.min(1, this.state.controls.engineThrottles[1] || 0.47));
+    const engineThrottle0 = Math.max(0, Math.min(1, 
+      (this.state.controls.engineThrottles && this.state.controls.engineThrottles[0]) || this.state.controls.throttle || 0.47));
+    const engineThrottle1 = Math.max(0, Math.min(1, 
+      (this.state.controls.engineThrottles && this.state.controls.engineThrottles[1]) || this.state.controls.throttle || 0.47));
     
     // Add debug logging to track throttle values
     if (isNaN(engineThrottle0) || isNaN(engineThrottle1)) {
@@ -1182,114 +1180,62 @@ class NewFlightPhysicsService {
       this.lastThrottleValue = engineThrottle0; // Update for engine 0 tracking
     }
     
-    // Realistic engine behavior: At FL350, engines run at higher N1/N2 even at lower throttle
     // Get engine performance parameters from database
     const enginePerf = this.aircraft.enginePerformance || {};
     const minN1Idle = enginePerf.minN1Idle || 22;
     const maxN1 = enginePerf.maxN1 || 100;
-    const n2Base = enginePerf.n2Base || 95;
-    const egtBase = enginePerf.egtBase || 500;
-    const vibrationAmplitude = enginePerf.vibrationAmplitude || 0.5;
+    
+    // Get engine parameters from propulsion manager (uses new formulas)
+    const engineData = this.propulsionManager.getEngineData();
     
     // Add debug logging for engine parameters
-    if (!this.aircraft.enginePerformance) {
-      console.warn('⚠️ No engine performance parameters found in aircraft database:', this.aircraft.model);
+    if (engineData.length === 0) {
+      console.warn('⚠️ No engine data available from propulsion manager:', this.aircraft.model);
     }
     
-    // Get engine performance curve parameters
-    const n1Curve = enginePerf.n1Curve || {};
-    const altitudeBreakpoint = n1Curve.altitudeBreakpoint || 12000;
-    const lowAltitudeSlope = n1Curve.lowAltitudeSlope || -0.0001;
-    const highAltitudeSlope = n1Curve.highAltitudeSlope || -0.0003;
+    // For display purposes, use the first engine's data (or fallback values)
+    const firstEngine = engineData[0] || {};
+    const secondEngine = engineData[1] || {};
     
-    // Calculate altitude for derating (in meters)
-    const altitude_m = this.state.position.z;
+    // Generate final values with realistic vibrations
+    const localVibrationScale = 2;
+    const engine1N1 = Math.min(100, Math.max(minN1Idle, (firstEngine.n1 || minN1Idle) + (Math.random() - 0.5) * localVibrationScale));
+    const engine2N1 = Math.min(100, Math.max(minN1Idle, (secondEngine.n1 || minN1Idle) + (Math.random() - 0.5) * localVibrationScale + (Math.random() - 0.5) * 1.5));
     
-    // Calculate altitude-based derating for engine parameters
-    let altitudeFactor;
-    if (altitude_m <= altitudeBreakpoint) {
-      // Low altitude: gradual derating
-      altitudeFactor = 1 + (altitude_m * lowAltitudeSlope);
-    } else {
-      // High altitude: steeper derating (much faster above breakpoint)
-      const lowAltFactor = 1 + (altitudeBreakpoint * lowAltitudeSlope);
-      const highAltDifference = altitude_m - altitudeBreakpoint;
-      altitudeFactor = lowAltFactor + (highAltDifference * highAltitudeSlope);
-    }
+    const engine1N2 = Math.min(100, Math.max(50, (firstEngine.n2 || 70) + (Math.random() - 0.5) * (localVibrationScale * 0.8)));
+    const engine2N2 = Math.min(100, Math.max(50, (secondEngine.n2 || 70) + (Math.random() - 0.5) * (localVibrationScale * 0.8) + (Math.random() - 0.5) * 2.0));
     
-    // Ensure altitude factor doesn't go below 0
-    altitudeFactor = Math.max(0, altitudeFactor);
-    
-    // Add density-based derating for realism (affects engine performance)
-    const densityRatio = this.environment.density / this.AIR_DENSITY_SLA;
-    const densityFactor = Math.pow(densityRatio, 0.7);
-    
-    // Combine factors for total engine performance derating
-    let totalEngineDerating = altitudeFactor * densityFactor;
-    
-    // Add debug logging for derating factors
-    if (isNaN(totalEngineDerating)) {
-      console.error('⚠️ Total engine derating is NaN:', {
-        altitudeFactor,
-        densityFactor,
-        densityRatio,
-        environmentDensity: this.environment.density,
-        AIR_DENSITY_SLA: this.AIR_DENSITY_SLA
-      });
-      totalEngineDerating = 1; // Fallback to no derating
-    }
-    
-    // ✅ IMPROVED: Single N1 calculation for display purposes
-    // Calculate display N1 based on throttle (for UI display)
-    const displayN1 = baseN1; // Use the same N1 calculation for display
-    const baseN2 = n2Base + (baseN1 - minN1Idle) * 0.95; // N2 slightly lower than N1
-    
-    // Add debug logging for N2 calculation
-    if (isNaN(baseN2)) {
-      console.error('⚠️ Base N2 is NaN:', {
-        n2Base,
-        baseN1,
-        minN1Idle
-      });
-    }
-    
-    // EGT increases with throttle and decreases with altitude (cooler at altitude)
-    const egtAltitudeFactor = Math.max(0.7, 1 + (altitude_m * -0.00005)); // EGT decreases with altitude
-    let baseEGT = egtBase + (Math.pow(throttle, 1.5) * 400) * egtAltitudeFactor;
-    
-    // Add debug logging for EGT calculation
-    if (isNaN(baseEGT)) {
-      console.error('⚠️ Base EGT is NaN:', {
-        egtBase,
-        throttle,
-        egtAltitudeFactor,
-        altitude_m
-      });
-      baseEGT = egtBase;
-    }
-    
-    // Generate random vibrations for realism
-     const localVibrationScale = 2; // Slight vibration for realism
-     
-     // Calculate final values with vibrations and limits
-     const engineN1 = Math.min(100, Math.max(minN1Idle, displayN1 + (Math.random() - 0.5) * localVibrationScale));
-     const engineN2 = Math.min(100, Math.max(50, baseN2 + (Math.random() - 0.5) * (localVibrationScale * 0.8)));
-     const engineEGT = Math.min(900, Math.max(400, baseEGT + (Math.random() - 0.5) * (localVibrationScale * 10)));
+    const engine1EGT = Math.min(900, Math.max(400, (firstEngine.egt || 500) + (Math.random() - 0.5) * (localVibrationScale * 10)));
+    const engine2EGT = Math.min(900, Math.max(400, (secondEngine.egt || 500) + (Math.random() - 0.5) * (localVibrationScale * 10) + (Math.random() - 0.5) * 30));
     
     // Return engine parameters as arrays for backward compatibility
     const engineParams = {
-      n1: [engineN1],
-      n2: [engineN2],
-      egt: [engineEGT]
+      n1: [engine1N1, engine2N1],
+      n2: [engine1N2, engine2N2],
+      egt: [engine1EGT, engine2EGT]
     };
     
     // Simulate fuel consumption using engine performance curves
+     const throttle = this.state.controls.throttle || 0.47; // Use main throttle for display
+     const altitude_m = this.state.position.z; // Altitude in meters
      const totalThrust = throttle * this.aircraft.engineCount * this.aircraft.maxThrustPerEngine;
-     const fuelFlow = totalThrust * (this.aircraft.specificFuelConsumption || 0.00002); // kg/N/s
+     
+     // ✅ FIXED: More realistic fuel consumption calculation
+     // Account for altitude efficiency effects and use more realistic SFC values
+     // Typical SFC for modern turbofans at cruise: ~0.000015 kg/N/s
+     const baseSFC = this.aircraft.specificFuelConsumption || 0.000015; // kg/N/s
+     const altitudeEfficiencyFactor = Math.max(0.5, 1 - (altitude_m * 0.00003)); // Less efficient at higher altitude
+     const fuelFlow = totalThrust * baseSFC * altitudeEfficiencyFactor; // kg/s
     
     // Add fuel flow logging
     if (fuelFlow > 0.1) {
-      console.log('⛽ Fuel flow rate:', fuelFlow.toFixed(3), 'kg/s');
+      console.log('⛽ Fuel flow rate:', fuelFlow.toFixed(3), 'kg/s', {
+        throttle: (throttle * 100).toFixed(1) + '%',
+        totalThrust: totalThrust.toFixed(0) + ' N',
+        baseSFC: (baseSFC * 1000000).toFixed(1) + ' g/kN/s',
+        altitudeEfficiency: altitudeEfficiencyFactor.toFixed(2),
+        altitude: (altitude_m * 3.28084).toFixed(0) + ' ft'
+      });
     }
     
     this.state.fuel = Math.max(0, (this.state.fuel !== undefined ? this.state.fuel : 100) - fuelFlow * this.dt);
@@ -1308,9 +1254,9 @@ class NewFlightPhysicsService {
       altitude: altitude_ft,
       
       // Engine - arrays for each engine
-      engineN1: engineN1,
-      engineN2: engineN2,
-      engineEGT: engineEGT,
+      engineN1: engineParams.n1,
+      engineN2: engineParams.n2,
+      engineEGT: engineParams.egt,
       fuel: this.state.fuel !== undefined ? this.state.fuel : 100,
       
       // Systems

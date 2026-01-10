@@ -32,7 +32,7 @@
       "inducedDragFactor": 0.040,
       "basicLiftCoefficient": 0.5,
       "horizontalStabilizerArea": 25,
-      "horizontalStabilizerCL": -0.1,
+      "horizontalStabilizerCL": -0.09,
       "horizontalStabilizerMomentArm": 12.5,
       "aerodynamicCenterPosition": 0.25,
       "centerOfGravityPosition": 0.15,

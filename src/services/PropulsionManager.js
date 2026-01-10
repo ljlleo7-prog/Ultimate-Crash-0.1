@@ -409,6 +409,23 @@ export class PropulsionManager {
   }
   
   /**
+   * Get engine data for display purposes
+   */
+  getEngineData() {
+    return this.engines.map(engine => {
+      const status = engine.getStatus();
+      return {
+        n1: status.n1,
+        n2: status.n2,
+        egt: status.egt,
+        thrust: status.thrust,
+        fuelFlow: status.fuelFlow,
+        isRunning: status.isRunning
+      };
+    });
+  }
+  
+  /**
    * Get propulsion forces for physics engine
    */
   getPropulsionForces() {

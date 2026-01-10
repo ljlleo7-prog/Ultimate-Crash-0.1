@@ -52,9 +52,9 @@ const ThrustManager = ({ controlThrust, flightState }) => {
   
   // ✅ ENHANCED: Engine parameters display (single engine)
   const getEngineParams = useCallback(() => {
-    const n1 = flightState?.engineN1 || 22; // Default idle N1
-    const n2 = flightState?.engineN2 || 45;
-    const egt = flightState?.engineEGT || 400;
+    const n1 = Number(flightState?.engineN1) || 22; // Default idle N1
+    const n2 = Number(flightState?.engineN2) || 45;
+    const egt = Number(flightState?.engineEGT) || 400;
     
     return { n1, n2, egt };
   }, [flightState]);
@@ -261,13 +261,13 @@ const ThrustManager = ({ controlThrust, flightState }) => {
           },
             React.createElement('div', {
               style: { color: '#00ff00' }
-            }, `N1: ${engineParams.n1.toFixed(1)}%`),
+            }, `N1: ${(engineParams?.n1 || 0).toFixed(1)}%`),
             React.createElement('div', {
               style: { color: '#00ff00' }
-            }, `N2: ${engineParams.n2.toFixed(1)}%`),
+            }, `N2: ${(engineParams?.n2 || 0).toFixed(1)}%`),
             React.createElement('div', {
               style: { color: '#ffaa00' }
-            }, `EGT: ${engineParams.egt.toFixed(0)}°C`)
+            }, `EGT: ${(engineParams?.egt || 0).toFixed(0)}°C`)
           )
         )
       ),

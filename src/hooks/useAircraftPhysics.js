@@ -65,18 +65,43 @@ export function useAircraftPhysics(config = {}, autoStart = true) {
     
     async function initializePhysics() {
       try {
-        // Load aircraft data from database
-        const aircraftDatabase = await loadAircraftData();
-        console.log('🎮 useAircraftPhysics: AIRCRAFT DATABASE LOADED, found', aircraftDatabase?.length || 0, 'aircraft');
+        // Load aircraft data from database with comprehensive error handling
+        let aircraftDatabase;
+        try {
+          aircraftDatabase = await loadAircraftData();
+          console.log('🎮 useAircraftPhysics: AIRCRAFT DATABASE LOADED:', {
+            isArray: Array.isArray(aircraftDatabase),
+            length: aircraftDatabase?.length || 0,
+            type: typeof aircraftDatabase,
+            hasLength: 'length' in aircraftDatabase
+          });
+        } catch (dbError) {
+          console.error('❌ Failed to load aircraft database:', dbError);
+          aircraftDatabase = null;
+        }
         
         // Get the first aircraft from the database (can be configurable later)
-        const defaultAircraft = aircraftDatabase?.[0] || {};
+        const defaultAircraft = (aircraftDatabase && Array.isArray(aircraftDatabase) && aircraftDatabase.length > 0) 
+          ? aircraftDatabase[0] 
+          : {
+              name: 'Boeing 737-800',
+              mass: 41410,
+              maxThrustPerEngine: 85000,
+              engineCount: 2,
+              emptyWeight: 41410,
+              fuelWeight: 21800,
+              payloadWeight: 8000,
+              wingArea: 124.6,
+              liftCurveSlope: 5.7,
+              maxLiftCoefficient: 1.4,
+              dragPolar: { cd0: 0.02, k: 0.04 },
+              maxThrust: 170000,
+              engineConfiguration: 'twin'
+            };
         console.log('🎮 useAircraftPhysics: DEFAULT AIRCRAFT DATA:', {
-          model: defaultAircraft?.model,
-          basicLiftCoefficient: defaultAircraft?.basicLiftCoefficient,
-          horizontalStabilizerArea: defaultAircraft?.horizontalStabilizerArea,
-          horizontalStabilizerCL: defaultAircraft?.horizontalStabilizerCL,
-          horizontalStabilizerMomentArm: defaultAircraft?.horizontalStabilizerMomentArm
+          name: defaultAircraft.name || 'Unknown Aircraft',
+          mass: defaultAircraft.mass || 0,
+          thrust: defaultAircraft.maxThrustPerEngine || 0
         });
         
         // Initialize physics service with aircraft data from database
@@ -237,10 +262,10 @@ export function useAircraftPhysics(config = {}, autoStart = true) {
         flapsValue: flapsState,
         airBrakesValue: airBrakesState,
         gearValue: gearState,
-        engineN1: newState.engineN1,
-        engineN2: newState.engineN2,
-        engineEGT: newState.engineEGT,
-        fuel: newState.fuel
+        engineN1: newState.engineN1 !== undefined ? newState.engineN1 : [22, 22],
+        engineN2: newState.engineN2 !== undefined ? newState.engineN2 : [45, 45],
+        engineEGT: newState.engineEGT !== undefined ? newState.engineEGT : [400, 400],
+        fuel: newState.fuel !== undefined ? newState.fuel : 100
       };
 
       setFlightData(newFlightData);
