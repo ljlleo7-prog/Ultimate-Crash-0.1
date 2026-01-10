@@ -996,10 +996,28 @@ class NewFlightPhysicsService {
     this.state.angularRates.q += alphaY * this.dt;
     this.state.angularRates.r += alphaZ * this.dt;
     
-    // Apply improved damping to angular rates
-    this.state.angularRates.p *= 0.996;  // Increased damping from 0.992
-    this.state.angularRates.q *= 0.996;  // Increased damping from 0.992
-    this.state.angularRates.r *= 0.996;  // Increased damping from 0.992
+    // ✅ ENHANCED: Variable angular damping based on pitch angle to prevent tailspins
+    // Increase damping at extreme pitch angles to prevent uncontrollable spins
+    const pitchAngle = Math.abs(this.state.orientation.theta); // Absolute pitch angle in radians
+    const extremePitchThreshold = Math.PI / 6; // 30 degrees
+    const maxDamping = 0.99; // Stronger damping at extreme angles
+    const minDamping = 0.996; // Normal damping at moderate angles
+    
+    // Calculate damping factor based on pitch angle
+    const dampingFactor = pitchAngle > extremePitchThreshold 
+      ? maxDamping 
+      : minDamping + (maxDamping - minDamping) * (pitchAngle / extremePitchThreshold);
+    
+    // Apply variable damping to angular rates
+    this.state.angularRates.p *= dampingFactor;  // Roll damping
+    this.state.angularRates.q *= dampingFactor;  // Pitch damping
+    this.state.angularRates.r *= dampingFactor;  // Yaw damping
+    
+    // ✅ ADDITIONAL: Prevent divergent spins by limiting maximum angular rates
+    const maxAngularRate = Math.PI; // 180 degrees per second limit
+    this.state.angularRates.p = Math.max(-maxAngularRate, Math.min(maxAngularRate, this.state.angularRates.p));
+    this.state.angularRates.q = Math.max(-maxAngularRate, Math.min(maxAngularRate, this.state.angularRates.q));
+    this.state.angularRates.r = Math.max(-maxAngularRate, Math.min(maxAngularRate, this.state.angularRates.r));
     
     // Update orientation using body rates
     const p = this.state.angularRates.p;
@@ -1358,11 +1376,32 @@ class NewFlightPhysicsService {
    */
   getCrashWarning() {
     // ✅ FIXED: Use position.z as positive altitude above ground
-    if (this.state.position.z <= 0) return 'TERRAIN CONTACT'; // Altitude <= 0 means at/below ground
-    if (this.state.position.z < 50) return 'LOW ALTITUDE'; // Less than 50m altitude
-    if (this.state.velocity.w < -10) return 'RAPID DESCENT';
-    if (Math.abs(this.state.orientation.phi) > Math.PI/2) return 'EXCESSIVE BANK';
-    if (Math.abs(this.state.orientation.theta) > Math.PI/3) return 'EXCESSIVE PITCH';
+    const altitude_m = this.state.position.z;
+    const verticalSpeed_ftmin = this.earthFrameVerticalVelocity * 196.85; // Convert m/s to ft/min
+    const timeToCrash = this.getTimeToCrash();
+    
+    // Collision detector: altitude 0 and VS < -2000 ft/min = sure crash
+    if (altitude_m <= 0 && verticalSpeed_ftmin < -2000) return 'SURE CRASH';
+    
+    // Alert triggers
+    if (altitude_m <= 0) return 'TERRAIN CONTACT'; // Altitude <= 0 means at/below ground
+    if (verticalSpeed_ftmin < -2000) return 'SINKRATE';
+    
+    // Time-based terrain and pull-up alerts
+    if (timeToCrash !== null && timeToCrash < 10) return 'TERRAIN'; // Less than 10 seconds to impact
+    if (timeToCrash !== null && timeToCrash < 5) return 'PULL UP'; // Less than 5 seconds to impact
+    
+    if (altitude_m < 100) return 'TOO-LOW';
+    
+    // Aircraft-specific bank angle threshold
+    const maxBankAngle = this.aircraft.maxBankAngle || Math.PI/2; // Default to 90 degrees
+    if (Math.abs(this.state.orientation.phi) > maxBankAngle) return 'BANK-ANGLE';
+    
+    // Stall detection (simplified)
+    const airspeeds = this.calculateAirspeeds();
+    const pitchAngle = Math.abs(this.state.orientation.theta);
+    if (airspeeds.indicatedAirspeed < 100 || pitchAngle > Math.PI/6) return 'STALL'; // Stall at low speed or high pitch (>30°)
+    
     return '';
   }
   

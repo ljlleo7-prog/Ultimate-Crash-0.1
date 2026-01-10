@@ -102,7 +102,7 @@ const FlightPanelModular = ({ flightData, onActionRequest, aircraftModel }) => {
         // Systems
         hydraulicPressure: prevState.hydraulicPressure,
         circuitBreakers: prevState.circuitBreakers,
-        alarms: prevState.alarms,
+        alarms: flightData.alarms || prevState.alarms,
         
         // Autopilot - Update from physics service status
         autopilot: flightData.autopilotEngaged || false, // ✅ Use physics service status
@@ -113,6 +113,14 @@ const FlightPanelModular = ({ flightData, onActionRequest, aircraftModel }) => {
       }));
     }
   }, [flightData]);
+  
+  // Handle crash warnings and alerts
+  useEffect(() => {
+    if (flightData?.crashWarning) {
+      setFlashText(flightData.crashWarning);
+      setFlashActive(true);
+    }
+  }, [flightData?.crashWarning]);
 
   const [flashActive, setFlashActive] = useState(false);
   const [flashText, setFlashText] = useState('');
