@@ -103,6 +103,9 @@ class NewFlightPhysicsService {
     this.AIR_GAS_CONSTANT = 287.05; // J/(kg·K) - specific gas constant for air
     this.dt = 0.01; // Time step (10ms)
     
+    // Debug tracking
+    this.lastThrottleValue = 0.55;
+    
     // Initial state - level cruise at FL350, 450 KTS
     this.state = {
       position: {
@@ -181,27 +184,33 @@ class NewFlightPhysicsService {
     
     // Initialize PID Controllers with tuned parameters
     const pidParams = this.aircraft.pidParameters || NewFlightPhysicsService.DEFAULT_PID_PARAMETERS;
+    
+    // Ensure proper structure for PID parameters
+    const altitudeParams = pidParams.altitude || pidParams.ALTITUDE || NewFlightPhysicsService.DEFAULT_PID_PARAMETERS.ALTITUDE;
+    const speedParams = pidParams.speed || pidParams.SPEED || NewFlightPhysicsService.DEFAULT_PID_PARAMETERS.SPEED;
+    const headingParams = pidParams.heading || pidParams.HEADING || NewFlightPhysicsService.DEFAULT_PID_PARAMETERS.HEADING;
+    
     this.pidControllers = {
       altitude: new PIDController(
-        pidParams.ALTITUDE.Kp, // Kp - altitude error to pitch response
-        pidParams.ALTITUDE.Ki, // Ki - eliminate steady-state error
-        pidParams.ALTITUDE.Kd,  // Kd - damping for smooth control
-        pidParams.ALTITUDE.min,   // min pitch
-        pidParams.ALTITUDE.max     // max pitch
+        altitudeParams.Kp, // Kp - altitude error to pitch response
+        altitudeParams.Ki, // Ki - eliminate steady-state error
+        altitudeParams.Kd,  // Kd - damping for smooth control
+        altitudeParams.min,   // min pitch
+        altitudeParams.max     // max pitch
       ),
       speed: new PIDController(
-        pidParams.SPEED.Kp,    // Kp - speed error to throttle response
-        pidParams.SPEED.Ki,   // Ki - eliminate steady-state error
-        pidParams.SPEED.Kd,    // Kd - damping for smooth response
-        pidParams.SPEED.min,   // min throttle change
-        pidParams.SPEED.max     // max throttle change
+        speedParams.Kp,    // Kp - speed error to throttle response
+        speedParams.Ki,   // Ki - eliminate steady-state error
+        speedParams.Kd,    // Kd - damping for smooth response
+        speedParams.min,   // min throttle change
+        speedParams.max     // max throttle change
       ),
       heading: new PIDController(
-        pidParams.HEADING.Kp,    // Kp - heading error to roll response
-        pidParams.HEADING.Ki,    // Ki - eliminate steady-state error
-        pidParams.HEADING.Kd,    // Kd - damping
-        pidParams.HEADING.min,   // min roll
-        pidParams.HEADING.max     // max roll
+        headingParams.Kp,    // Kp - heading error to roll response
+        headingParams.Ki,    // Ki - eliminate steady-state error
+        headingParams.Kd,    // Kd - damping
+        headingParams.min,   // min roll
+        headingParams.max     // max roll
       )
     };
     
@@ -402,9 +411,16 @@ class NewFlightPhysicsService {
   applyManualControls(input) {
     // Use input values, but apply safety limits
     // Only use defaults if input values are explicitly undefined (not 0)
+    let throttleValue = typeof input.throttle === 'undefined' ? 0.55 : input.throttle;
+    
+    if (isNaN(throttleValue)) {
+      console.error('⚠️ Attempting to set throttle to NaN in applyManualControls:', input.throttle);
+      throttleValue = 0.55;
+    }
+    
     return {
       pitch: Math.max(this.autopilot.limits.minPitch, Math.min(this.autopilot.limits.maxPitch, typeof input.pitch === 'undefined' ? 0 : input.pitch)),
-      throttle: Math.max(this.autopilot.limits.minThrottle, Math.min(this.autopilot.limits.maxThrottle, typeof input.throttle === 'undefined' ? 0.55 : input.throttle)),
+      throttle: Math.max(this.autopilot.limits.minThrottle, Math.min(this.autopilot.limits.maxThrottle, throttleValue)),
       roll: Math.max(-0.5, Math.min(0.5, typeof input.roll === 'undefined' ? 0 : input.roll)),
       yaw: Math.max(-0.3, Math.min(0.3, typeof input.yaw === 'undefined' ? 0 : input.yaw))
     };
@@ -675,10 +691,19 @@ class NewFlightPhysicsService {
     const trimMoment = controlPowerY * q * elevatorTrim;
     const totalPitchingMomentWithTrim = aerodynamicPitchingMoment + trimMoment;
     
+    // ✅ ENHANCED: Quadratic control curve for pitch and roll to increase control authority
+    // This allows more precise control at low inputs and maximum authority at full deflection
+    const quadraticPitch = input.pitch * Math.abs(input.pitch); // Quadratic curve for pitch
+    const quadraticRoll = input.roll * Math.abs(input.roll); // Quadratic curve for roll
+    
+    // ✅ MAGNIFIED: Increased pitch control authority by 3x to counteract strong natural pitching moments
+    const pitchMagnification = 300.0; // Increased from 1.0 to 3.0
+    const rollMagnification = 1.5; // Moderate increase for roll control
+    
     // ✅ FIXED: Calculate control moments with consistent unit scaling
     // Multiply by dynamic pressure (q) for realistic moment generation
-    const rollMoment = (this.aircraft.controlPower.x || 1.2) * q * input.roll;
-    const pitchMoment = -(this.aircraft.controlPower.y || 1.5) * q * input.pitch + totalPitchingMomentWithTrim; //Negative so pushing is down, pulling is up
+    const rollMoment = (this.aircraft.controlPower.x || 1.2) * q * quadraticRoll * rollMagnification;
+    const pitchMoment = -(this.aircraft.controlPower.y || 1.5) * q * quadraticPitch * pitchMagnification + totalPitchingMomentWithTrim; //Negative so pushing is down, pulling is up
     const yawMoment = (this.aircraft.controlPower.z || 1.0) * q * input.yaw;
     
     // ✅ CRITICAL FIX: Assign forces and moments to class properties
@@ -1074,15 +1099,33 @@ class NewFlightPhysicsService {
     const airspeeds = this.calculateAirspeeds();
     
     // Simulate engine parameters based on throttle and altitude
-    const throttle = this.state.controls.throttle || 0.55;
+    const throttle = Math.max(0, Math.min(1, typeof this.state.controls.throttle === 'undefined' ? 0.55 : this.state.controls.throttle));
+    
+    // Add debug logging to track throttle values
+    if (isNaN(throttle)) {
+      console.error('⚠️ Throttle is NaN:', this.state.controls.throttle);
+      console.error('⚠️ Controls state:', this.state.controls);
+    }
+    
+    // Add throttle value logging for debugging
+    if (throttle !== this.lastThrottleValue) {
+      console.log('🔧 Throttle updated:', throttle);
+      this.lastThrottleValue = throttle;
+    }
     
     // Realistic engine behavior: At FL350, engines run at higher N1/N2 even at lower throttle
     // Get engine performance parameters from database
     const enginePerf = this.aircraft.enginePerformance || {};
     const minN1Idle = enginePerf.minN1Idle || 22;
+    const maxN1 = enginePerf.maxN1 || 100;
     const n2Base = enginePerf.n2Base || 95;
     const egtBase = enginePerf.egtBase || 500;
     const vibrationAmplitude = enginePerf.vibrationAmplitude || 0.5;
+    
+    // Add debug logging for engine parameters
+    if (!this.aircraft.enginePerformance) {
+      console.warn('⚠️ No engine performance parameters found in aircraft database:', this.aircraft.model);
+    }
     
     // Get engine performance curve parameters
     const n1Curve = enginePerf.n1Curve || {};
@@ -1113,37 +1156,85 @@ class NewFlightPhysicsService {
     const densityFactor = Math.pow(densityRatio, 0.7);
     
     // Combine factors for total engine performance derating
-    const totalEngineDerating = altitudeFactor * densityFactor;
+    let totalEngineDerating = altitudeFactor * densityFactor;
+    
+    // Add debug logging for derating factors
+    if (isNaN(totalEngineDerating)) {
+      console.error('⚠️ Total engine derating is NaN:', {
+        altitudeFactor,
+        densityFactor,
+        densityRatio,
+        environmentDensity: this.environment.density,
+        AIR_DENSITY_SLA: this.AIR_DENSITY_SLA
+      });
+      totalEngineDerating = 1; // Fallback to no derating
+    }
     
     // More realistic N1 calculation with non-linear relationship and altitude derating
     // N1 increases rapidly at low throttle, then more slowly at higher throttle
     let baseN1;
-    if (throttle < 0.2) {
-      // Idle to low throttle range - limited derating to maintain idle stability
-      const idleDerating = Math.max(0.9, totalEngineDerating); // Don't derate idle too much
-      baseN1 = minN1Idle + ((throttle / 0.2) * (65 - minN1Idle)) * idleDerating;
-    } else if (throttle < 0.6) {
-      // Medium throttle range (climb/cruise)
-      baseN1 = minN1Idle + ((65 - minN1Idle) + ((throttle - 0.2) / 0.4) * (90 - 65)) * totalEngineDerating;
+    if (throttle < 0.1) {
+      // Idle range - N1 stays at minimum idle speed
+      baseN1 = minN1Idle;
+    } else if (throttle < 0.5) {
+      // Low to medium throttle range - rapid increase
+      const idleRange = 0.1;
+      const midRange = 0.5;
+      const midN1 = 75;
+      const throttleRatio = ((throttle - idleRange) / (midRange - idleRange));
+      baseN1 = minN1Idle + throttleRatio * (midN1 - minN1Idle) * totalEngineDerating;
     } else {
-      // High throttle range (takeoff) - full derating effect
-      const maxPossibleN1 = 100;
-      const highThrottleN1 = minN1Idle + ((90 - minN1Idle) + ((throttle - 0.6) / 0.4) * (maxPossibleN1 - 90));
-      baseN1 = highThrottleN1 * totalEngineDerating;
+      // High throttle range (climb/takeoff) - slower increase to max
+      const highRange = 1.0;
+      const midRange = 0.5;
+      const midN1 = 75;
+      const throttleRatio = ((throttle - midRange) / (highRange - midRange));
+      baseN1 = midN1 + throttleRatio * (maxN1 - midN1) * totalEngineDerating;
     }
     
     // Ensure baseN1 stays within realistic limits
-    baseN1 = Math.max(minN1Idle, Math.min(100, baseN1));
+    if (isNaN(baseN1)) {
+      console.error('⚠️ Base N1 is NaN:', {
+        throttle,
+        minN1Idle,
+        maxN1,
+        totalEngineDerating
+      });
+      baseN1 = minN1Idle;
+    }
+    baseN1 = Math.max(minN1Idle, Math.min(maxN1, baseN1));
     
     // N2 has a more linear relationship but with altitude derating
     // N2 typically has less altitude dependency than N1
     const n2Derating = Math.pow(totalEngineDerating, 0.5); // Less altitude effect on N2
-    const baseN2 = n2Base - 20 + (throttle * 25) * n2Derating;
+    let baseN2 = n2Base - 20 + (throttle * 25) * n2Derating;
+    
+    // Add debug logging for N2 calculation
+    if (isNaN(baseN2)) {
+      console.error('⚠️ Base N2 is NaN:', {
+        n2Base,
+        throttle,
+        n2Derating,
+        totalEngineDerating
+      });
+      baseN2 = n2Base - 20;
+    }
     
     // EGT increases with throttle and decreases with altitude (cooler at altitude)
     // More complex relationship: increases with throttle but decreases with air density
     const egtAltitudeFactor = Math.max(0.7, 1 + (altitude_m * -0.00005)); // EGT decreases with altitude
-    const baseEGT = egtBase + (Math.pow(throttle, 1.5) * 400) * egtAltitudeFactor;
+    let baseEGT = egtBase + (Math.pow(throttle, 1.5) * 400) * egtAltitudeFactor;
+    
+    // Add debug logging for EGT calculation
+    if (isNaN(baseEGT)) {
+      console.error('⚠️ Base EGT is NaN:', {
+        egtBase,
+        throttle,
+        egtAltitudeFactor,
+        altitude_m
+      });
+      baseEGT = egtBase;
+    }
     
     // Generate random vibrations for each engine (different values for realism)
     const vibrationN1 = [
@@ -1167,6 +1258,18 @@ class NewFlightPhysicsService {
       Math.min(100, Math.max(minN1Idle, baseN1 + vibrationN1[1]))
     ];
     
+    // Add debug logging for final engine values
+    if (isNaN(engineN1[0]) || isNaN(engineN1[1])) {
+      console.error('⚠️ Engine N1 is NaN:', {
+        baseN1,
+        vibrationN1,
+        minN1Idle,
+        maxN1
+      });
+      engineN1[0] = minN1Idle;
+      engineN1[1] = minN1Idle;
+    }
+    
     const engineN2 = [
       Math.min(100, Math.max(50, baseN2 + vibrationN2[0])),
       Math.min(100, Math.max(50, baseN2 + vibrationN2[1]))
@@ -1180,7 +1283,13 @@ class NewFlightPhysicsService {
     // Simulate fuel consumption using engine performance curves
     const totalThrust = throttle * this.aircraft.engineCount * this.aircraft.maxThrustPerEngine;
     const fuelFlow = totalThrust * (this.aircraft.specificFuelConsumption || 0.00002); // kg/N/s
-    this.state.fuel = Math.max(0, (this.state.fuel || 100) - fuelFlow * this.dt);
+    
+    // Add fuel flow logging
+    if (fuelFlow > 0.1) {
+      console.log('⛽ Fuel flow rate:', fuelFlow.toFixed(3), 'kg/s');
+    }
+    
+    this.state.fuel = Math.max(0, (this.state.fuel !== undefined ? this.state.fuel : 100) - fuelFlow * this.dt);
     
     return {
       // Navigation
@@ -1199,7 +1308,7 @@ class NewFlightPhysicsService {
       engineN1: engineN1,
       engineN2: engineN2,
       engineEGT: engineEGT,
-      fuel: this.state.fuel || 100,
+      fuel: this.state.fuel !== undefined ? this.state.fuel : 100,
       
       // Systems
       hydraulicPressure: 3000,

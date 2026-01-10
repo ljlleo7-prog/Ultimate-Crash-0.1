@@ -49,8 +49,8 @@ const FlightInProgress = () => {
     
     setThrottleControl(newThrottle);
     
-    // Send to physics engine using hook functions (0-1)
-    setThrottle(newThrottle);
+    // Send to physics engine as 0-1 range (convert percentage to 0-1)
+    setThrottle(newThrottle / 100);
   };
 
   // Handle surface control changes
@@ -148,7 +148,8 @@ const FlightInProgress = () => {
             // Handle specific actions
             switch (action) {
               case 'throttle':
-                handleThrustControl(0, payload); // Engine 1
+                // FlightPanelModular sends throttle in 0-1 range, convert to percentage for display
+                handleThrustControl(0, payload * 100); // Engine 1
                 console.log(`📡 FlightPanel Action: ${action} = ${payload}`);
                 break;
               case 'flaps':

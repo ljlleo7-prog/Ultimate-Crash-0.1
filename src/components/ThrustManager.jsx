@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 
 const ThrustManager = ({ controlThrust, flightState }) => {
   // Get current throttle from flight state (physics engine uses 0-1, display as percentage)
-  const baseThrottle = (flightState.throttle || 47);
+  const baseThrottle = ((typeof flightState.throttle === 'undefined' ? 0.47 : flightState.throttle) * 100);
   // Track throttle for each engine separately
   const [displayThrottle, setDisplayThrottle] = useState({
     e1: baseThrottle,
@@ -48,7 +48,7 @@ const ThrustManager = ({ controlThrust, flightState }) => {
       };
       
       // Send throttle as percentage (0-100) to physics engine
-      controlThrust(newThrottle);
+      controlThrust(engineIndex, newThrottle);
       
       return updatedThrottle;
     });
@@ -63,7 +63,7 @@ const ThrustManager = ({ controlThrust, flightState }) => {
     }));
     
     // Send throttle as percentage (0-100) to physics engine
-    controlThrust(newThrottle);
+    controlThrust(engineIndex, newThrottle);
   };
   
   // Helper function to create throttle lever for each engine

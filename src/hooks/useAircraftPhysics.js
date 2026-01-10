@@ -132,7 +132,7 @@ export function useAircraftPhysics(config = {}, autoStart = true) {
 
       if (physicsServiceRef.current && dt > 0) {
         try {
-          updatePhysics(dt);
+          updatePhysics();
         } catch (err) {
           console.error('🎮 PHYSICS LOOP: UPDATE ERROR', err);
         }
@@ -150,7 +150,7 @@ export function useAircraftPhysics(config = {}, autoStart = true) {
     console.log('🎮 useAircraftPhysics: PHYSICS ANIMATION LOOP STARTED');
   };
 
-  const updatePhysics = useCallback((dt = 0.016) => {
+  const updatePhysics = useCallback(() => {
     if (!isInitialized || !physicsServiceRef.current) {
       console.warn('⚠️ Physics update skipped - not initialized');
       return;
@@ -159,12 +159,23 @@ export function useAircraftPhysics(config = {}, autoStart = true) {
     try {
       const physicsService = physicsServiceRef.current;
       const currentTime = Date.now();
-      const deltaTime = (currentTime - lastUpdateTimeRef.current) / 1000;
+      const dt = (currentTime - lastUpdateTimeRef.current) / 1000;
       
-      const timeStep = Math.min(deltaTime || dt, 0.05);
+      // Sanitize time step to prevent extreme values
+      const timeStep = Math.min(Math.max(dt, 0.001), 0.033); // Clamp between 1ms and 33ms
+      
+      if (timeStep < 0.001) {
+        console.warn('⏱️ Physics update skipped - time step too small:', dt);
+        return;
+      }
+      
+      const throttleValue = currentControlsRef.current.throttle;
+      if (isNaN(throttleValue)) {
+        console.error('⚠️ Throttle is NaN in useAircraftPhysics update:', throttleValue);
+      }
       
       const newState = physicsService.update({
-        throttle: currentControlsRef.current.throttle,
+        throttle: isNaN(throttleValue) ? 0 : throttleValue,
         pitch: currentControlsRef.current.pitch,
         roll: currentControlsRef.current.roll,
         yaw: currentControlsRef.current.yaw
@@ -243,6 +254,10 @@ export function useAircraftPhysics(config = {}, autoStart = true) {
   }, [isInitialized]);
 
   const setThrottle = useCallback((value) => {
+    if (isNaN(value)) {
+      console.error('⚠️ Attempting to set throttle to NaN:', value);
+      return;
+    }
     const normalizedThrottle = Math.max(0, Math.min(1, value / 100));
     currentControlsRef.current = { ...currentControlsRef.current, throttle: normalizedThrottle };
   }, []);
@@ -323,12 +338,9 @@ export function useAircraftPhysics(config = {}, autoStart = true) {
   }, []);
 
   useEffect(() => {
-    if (isInitialized) {
-      console.log('✅ Physics Engine Initialized - Starting to track vertical speed...');
-      console.log('📊 Expected vertical speed behavior:');
-      console.log('   - Should change based on aircraft pitch and thrust');
-      console.log('   - Positive when climbing, negative when descending');
-      console.log('   - Should NOT be stuck at -1 or 0 indefinitely');
+    if (physicsServiceRef.current && isInitialized) {
+      console.log('🔄 Initializing physics with cruise configuration');
+      updatePhysics(); // Initial update without hardcoded time step
     }
   }, [isInitialized]);
 
