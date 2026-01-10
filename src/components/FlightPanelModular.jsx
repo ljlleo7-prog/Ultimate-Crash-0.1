@@ -1,5 +1,4 @@
-import React, { useState, useEffect } from 'react';
-import './FlightPanel.css';
+import React, { useState, useEffect, useCallback } from 'react';
 
 // Import modular components
 import CrashWarningFlash from './CrashWarningFlash';
@@ -11,6 +10,7 @@ import FlightPosePanel from './FlightPosePanel';
 import NavigationPanel from './NavigationPanel';
 import CentralPanel from './CentralPanel';
 import SurfaceControls from './SurfaceControls';
+import './FlightPanel.css';
 
 const FlightPanelModular = ({ flightData, onActionRequest, aircraftModel }) => {
   // Use flightData from parent component instead of creating own physics service
@@ -114,6 +114,10 @@ const FlightPanelModular = ({ flightData, onActionRequest, aircraftModel }) => {
     }
   }, [flightData]);
   
+  const [flashActive, setFlashActive] = useState(false);
+  const [flashText, setFlashText] = useState('');
+  const [showCrashPanel, setShowCrashPanel] = useState(false);
+
   // Handle crash warnings and alerts
   useEffect(() => {
     if (flightData?.crashWarning) {
@@ -121,10 +125,6 @@ const FlightPanelModular = ({ flightData, onActionRequest, aircraftModel }) => {
       setFlashActive(true);
     }
   }, [flightData?.crashWarning]);
-
-  const [flashActive, setFlashActive] = useState(false);
-  const [flashText, setFlashText] = useState('');
-  const [showCrashPanel, setShowCrashPanel] = useState(false);
 
   // Control functions - Updated to use parent's physics service
   const controlPitch = (amount) => {
