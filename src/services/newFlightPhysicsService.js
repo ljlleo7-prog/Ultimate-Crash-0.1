@@ -446,9 +446,10 @@ class NewFlightPhysicsService {
       throttleValue = 0.55;
     }
     
+    const limitedThrottle = Math.max(-0.7, Math.min(1, throttleValue));
     return {
       pitch: Math.max(this.autopilot.limits.minPitch, Math.min(this.autopilot.limits.maxPitch, typeof input.pitch === 'undefined' ? 0 : input.pitch)),
-      throttle: Math.max(this.autopilot.limits.minThrottle, Math.min(this.autopilot.limits.maxThrottle, throttleValue)),
+      throttle: limitedThrottle,
       roll: Math.max(-0.5, Math.min(0.5, typeof input.roll === 'undefined' ? 0 : input.roll)),
       yaw: Math.max(-0.3, Math.min(0.3, typeof input.yaw === 'undefined' ? 0 : input.yaw))
     };
@@ -754,7 +755,7 @@ class NewFlightPhysicsService {
    * ✅ UPDATED: Calculate propulsion/thrust forces using scalable multi-engine system
    */
   calculatePropulsionForces() {
-    const throttle = Math.max(0, Math.min(1, this.state.controls.throttle));
+    const throttle = Math.max(-0.7, Math.min(1, this.state.controls.throttle));
     const altitude_m = this.state.position.z;
     
     // Update propulsion manager with current throttle
@@ -1228,10 +1229,9 @@ class NewFlightPhysicsService {
       egt: egt
     };
     
-    // Simulate fuel consumption using engine performance curves
-     const throttle = this.state.controls.throttle || 0.47; // Use main throttle for display
-     const altitude_m = this.state.position.z; // Altitude in meters
-     const totalThrust = throttle * this.aircraft.engineCount * this.aircraft.maxThrustPerEngine;
+    const throttle = Math.abs(this.state.controls.throttle || 0.47);
+    const altitude_m = this.state.position.z;
+    const totalThrust = throttle * this.aircraft.engineCount * this.aircraft.maxThrustPerEngine;
      
      // ✅ FIXED: More realistic fuel consumption calculation
      // Account for altitude efficiency effects and use more realistic SFC values

@@ -234,7 +234,7 @@ export class PropulsionManager {
    * Set master throttle for all engines
    */
   setMasterThrottle(throttle) {
-    const validatedThrottle = Math.max(0, Math.min(1, throttle));
+    const validatedThrottle = Math.max(-0.7, Math.min(1, throttle));
     this.globalControls.masterThrottle = validatedThrottle;
     
     // Apply to all running engines
@@ -260,7 +260,7 @@ export class PropulsionManager {
     }
     
     const engine = this.engines[engineIndex];
-    const validatedThrottle = Math.max(0, Math.min(1, throttle));
+    const validatedThrottle = Math.max(-0.7, Math.min(1, throttle));
     
     if (!engine.failureState.isFailed) {
       engine.setThrottle(validatedThrottle);
@@ -285,9 +285,9 @@ export class PropulsionManager {
       const rightEngine = 1;
       
       if (engineIndex === leftEngine) {
-        return Math.max(0, masterThrottle - differential * 0.5);
+        return Math.max(-0.7, Math.min(1, masterThrottle - differential * 0.5));
       } else if (engineIndex === rightEngine) {
-        return Math.max(0, masterThrottle + differential * 0.5);
+        return Math.max(-0.7, Math.min(1, masterThrottle + differential * 0.5));
       }
     }
     
@@ -298,11 +298,11 @@ export class PropulsionManager {
       
       // Left engines (negative X)
       if (engineIndex <= 1) {
-        return Math.max(0, baseThrottle - yawFactor);
+        return Math.max(-0.7, Math.min(1, baseThrottle - yawFactor));
       }
       // Right engines (positive X)
       else {
-        return Math.max(0, baseThrottle + yawFactor);
+        return Math.max(-0.7, Math.min(1, baseThrottle + yawFactor));
       }
     }
     

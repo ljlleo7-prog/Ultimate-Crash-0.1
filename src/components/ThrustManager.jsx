@@ -1,297 +1,208 @@
 import React, { useState, useEffect, useCallback } from 'react';
 
 const ThrustManager = ({ controlThrust, flightState }) => {
-  // ✅ CLEAN ARCHITECTURE: Single throttle state (reverted for responsiveness)
-  // Internal state in 0-1 range (physics engine standard)
-  const [throttle, setThrottle] = useState(0.47); // Default 47% idle
+  const engineCount =
+    Array.isArray(flightState?.engineN1) ? flightState.engineN1.length :
+    Array.isArray(flightState?.engineN2) ? flightState.engineN2.length : 2;
   
-  // Display throttle as percentage (0-100)
-  const displayThrottle = throttle * 100;
+  const initial = Array(engineCount).fill(0.47);
+  const [throttles, setThrottles] = useState(initial);
+  const [reverse, setReverse] = useState(Array(engineCount).fill(false));
+  const [sync, setSync] = useState(true);
+  const displayThrottles = throttles.map(t => t * 100);
   
-  // ✅ CLEAN ARCHITECTURE: Sync with flight state when it changes
   useEffect(() => {
-    if (flightState?.throttle !== undefined) {
-      const newThrottle = Array.isArray(flightState.throttle) ? flightState.throttle[0] : flightState.throttle;
-      if (Math.abs(newThrottle - throttle) > 0.001) {
-        console.log('🔄 ThrustManager: Syncing with flight state:', flightState.throttle);
-        setThrottle(newThrottle);
+    if (Array.isArray(flightState?.engineThrottles)) {
+      const values = flightState.engineThrottles.map(v => (typeof v === 'number' ? v/100 : 0.47));
+      if (values.length === engineCount) {
+        setThrottles(values);
+      }
+    } else if (typeof flightState?.throttle === 'number') {
+      const t = flightState.throttle / 100;
+      setThrottles(Array(engineCount).fill(t));
+    }
+  }, [flightState?.engineThrottles, flightState?.throttle, engineCount]);
+  
+  const setLeverThrottle = useCallback((index, value) => {
+    const val = Math.max(0, Math.min(1, value));
+    setThrottles(prev => {
+      const next = [...prev];
+      next[index] = val;
+      if (sync) {
+        for (let i = 0; i < engineCount; i++) next[i] = val;
+      }
+      return next;
+    });
+    const mapLeverToCommand = (lever, isRev) => {
+      const v = Math.max(0, Math.min(1, lever));
+      const reverseSection = 0.2;
+      const forwardStart = reverseSection;
+      const forwardSpan = 1 - reverseSection;
+      if (!isRev) {
+        if (v <= reverseSection) return 0;
+        const norm = (v - forwardStart) / forwardSpan;
+        return norm;
+      }
+      if (v <= reverseSection) {
+        const frac = 1 - v / reverseSection;
+        return -0.7 * frac;
+      }
+      return 0;
+    };
+    const baseCommand = mapLeverToCommand(val, reverse[index]);
+    if (controlThrust) controlThrust(index, baseCommand);
+    if (sync) {
+      for (let i = 0; i < engineCount; i++) {
+        const cmd = mapLeverToCommand(val, reverse[i]);
+        if (controlThrust) controlThrust(i, cmd);
       }
     }
-  }, [flightState?.throttle, throttle]);
+  }, [controlThrust, reverse, sync, engineCount]);
   
-  // ✅ CLEAN ARCHITECTURE: Single throttle change handler
-  const handleThrottleChange = useCallback((newThrottleValue) => {
-    // Validate input (0-1 range for physics engine)
-    const validatedThrottle = Math.max(0, Math.min(1, newThrottleValue));
-    
-    console.log(`🎯 ThrustManager: Single throttle change requested:`, {
-      input: newThrottleValue,
-      validated: validatedThrottle,
-      display: (validatedThrottle * 100).toFixed(1) + '%'
-    });
-    
-    setThrottle(validatedThrottle);
-    
-    // Send to physics engine via parent's controlThrust function
-    if (controlThrust) {
-      controlThrust(0, validatedThrottle); // Single engine, new throttle in 0-1 range
-    }
-  }, [controlThrust]);
-  
-  // ✅ CLEAN ARCHITECTURE: Handle direct throttle set (for click/drag)
-  const handleDirectSet = useCallback((percentageValue) => {
-    const normalizedValue = percentageValue / 100; // Convert percentage to 0-1
-    handleThrottleChange(normalizedValue);
-  }, [handleThrottleChange]);
-  
-  // ✅ CLEAN ARCHITECTURE: Handle throttle increment/decrement
-  const handleIncrement = useCallback((delta) => {
-    const newThrottle = throttle + delta;
-    handleThrottleChange(newThrottle);
-  }, [throttle, handleThrottleChange]);
-  
-  // ✅ ENHANCED: Engine parameters display (single engine)
-  const getEngineParams = useCallback(() => {
-    // Engine parameters are arrays (one value per engine)
-    const n1 = Array.isArray(flightState?.engineN1) ? flightState.engineN1[0] : Number(flightState?.engineN1) || 22;
-    const n2 = Array.isArray(flightState?.engineN2) ? flightState.engineN2[0] : Number(flightState?.engineN2) || 45;
-    const egt = Array.isArray(flightState?.engineEGT) ? flightState.engineEGT[0] : Number(flightState?.engineEGT) || 400;
-    
-    return { n1, n2, egt };
-  }, [flightState]);
-  
-  // ✅ CLEAN ARCHITECTURE: Create single smaller throttle lever
-  const createThrottleLever = useCallback(() => {
-    const engineParams = getEngineParams();
-    const handleClick = (e) => {
-      e.preventDefault();
-      const rect = e.currentTarget.getBoundingClientRect();
-      const clickY = e.clientY - rect.top;
-      const clickPercentage = Math.max(0, Math.min(100, (1 - clickY / rect.height) * 100));
-      handleDirectSet(clickPercentage);
+  const onDrag = (index, e) => {
+    const target = e.currentTarget;
+    const rect = target.getBoundingClientRect();
+    const move = (evt) => {
+      const y = (evt.touches ? evt.touches[0].clientY : evt.clientY) - rect.top;
+      const pct = Math.max(0, Math.min(100, (1 - y / rect.height) * 100));
+      const raw = pct / 100;
+      const reverseSection = 0.2;
+      const isRev = reverse[index];
+      const clamped = isRev
+        ? Math.max(0, Math.min(reverseSection, raw))
+        : Math.max(reverseSection, Math.min(1, raw));
+      setLeverThrottle(index, clamped);
     };
+    const up = () => {
+      window.removeEventListener('mousemove', move);
+      window.removeEventListener('mouseup', up);
+      window.removeEventListener('touchmove', move);
+      window.removeEventListener('touchend', up);
+    };
+    window.addEventListener('mousemove', move);
+    window.addEventListener('mouseup', up);
+    window.addEventListener('touchmove', move, { passive: true });
+    window.addEventListener('touchend', up);
+    move(e);
+  };
+  
+  const toggleReverse = (index) => {
+    const wasRev = reverse[index];
+    const newValue = !wasRev;
+    const nextReverse = sync ? Array(engineCount).fill(newValue) : [...reverse];
+    if (!sync) {
+      nextReverse[index] = newValue;
+    }
+    const reverseSection = 0.2;
+    const nextThrottles = [...throttles];
+    for (let i = 0; i < engineCount; i++) {
+      const current = nextThrottles[i];
+      if (nextReverse[i]) {
+        nextThrottles[i] = Math.max(0, Math.min(reverseSection, current));
+      } else {
+        nextThrottles[i] = Math.max(reverseSection, Math.min(1, current));
+      }
+    }
+    setReverse(nextReverse);
+    setThrottles(nextThrottles);
+    const mapLeverToCommand = (lever, isRev) => {
+      const v = Math.max(0, Math.min(1, lever));
+      const reverseSection = 0.2;
+      const forwardStart = reverseSection;
+      const forwardSpan = 1 - reverseSection;
+      if (!isRev) {
+        if (v <= reverseSection) return 0;
+        const norm = (v - forwardStart) / forwardSpan;
+        return norm;
+      }
+      if (v <= reverseSection) {
+        const frac = 1 - v / reverseSection;
+        return -0.7 * frac;
+      }
+      return 0;
+    };
+    for (let i = 0; i < engineCount; i++) {
+      const lever = nextThrottles[i];
+      const isRev = nextReverse[i];
+      const cmd = mapLeverToCommand(lever, isRev);
+      if (controlThrust) controlThrust(i, cmd);
+    }
+  };
+  
+  const lever = (index) => {
+    const n1 = Array.isArray(flightState?.engineN1) ? flightState.engineN1[index] : flightState?.engineN1 || 22;
+    const n2 = Array.isArray(flightState?.engineN2) ? flightState.engineN2[index] : flightState?.engineN2 || 45;
+    const egt = Array.isArray(flightState?.engineEGT) ? flightState.engineEGT[index] : flightState?.engineEGT || 400;
+    const pct = displayThrottles[index];
+    const isRev = reverse[index];
     
     return React.createElement('div', {
-      className: 'thrust-manager-container',
+      key: index,
       style: {
         background: '#1a1a1a',
-        padding: '15px',
-        borderRadius: '12px',
-        marginBottom: '15px',
+        padding: '10px',
+        borderRadius: '10px',
         border: '2px solid #333',
-        boxShadow: '0 4px 8px rgba(0,0,0,0.3)',
-        display: 'flex',
-        justifyContent: 'center'
+        width: '110px'
       }
     },
-      // Main throttle lever
+      React.createElement('div', { style: { textAlign: 'center', marginBottom: '8px', color: '#00ff00', fontFamily: 'monospace', fontSize: '12px' } }, `ENG ${index+1}`),
       React.createElement('div', {
-        className: 'thrust-lever-container',
         style: {
-          background: '#1a1a1a',
-          padding: '15px',
-          borderRadius: '8px',
-          border: '2px solid #333',
-          boxShadow: '0 4px 8px rgba(0,0,0,0.3)',
-          minWidth: '150px'
-        }
+          position: 'relative',
+          height: '140px',
+          width: '30px',
+          background: '#2a2a2a',
+          borderRadius: '16px',
+          margin: '8px auto',
+          border: '2px solid #555',
+          cursor: 'grab',
+          userSelect: 'none'
+        },
+        onMouseDown: (e) => onDrag(index, e),
+        onTouchStart: (e) => onDrag(index, e)
       },
-        // Engine header
-        React.createElement('div', {
-          style: {
-            textAlign: 'center',
-            marginBottom: '15px'
-          }
-        },
-          React.createElement('div', {
-            style: {
-              fontSize: '18px',
-              fontWeight: 'bold',
-              color: '#00ff00',
-              fontFamily: 'monospace',
-              textShadow: '0 0 8px rgba(0,255,0,0.5)'
-            }
-          }, 'ENGINES'),
-          React.createElement('div', {
-            style: {
-              fontSize: '24px',
-              fontWeight: 'bold',
-              color: '#00ff00',
-              fontFamily: 'monospace',
-              textShadow: '0 0 8px rgba(0,255,0,0.5)'
-            }
-          }, `${displayThrottle.toFixed(1)}%`)
-        ),
-        
-        // Interactive throttle lever
-        React.createElement('div', {
-          className: 'thrust-lever-interactive',
-          style: {
-            position: 'relative',
-            height: '180px',
-            width: '45px',
-            background: '#2a2a2a',
-            borderRadius: '22px',
-            margin: '15px auto',
-            border: '2px solid #555',
-            cursor: 'pointer',
-            userSelect: 'none'
-          },
-          onClick: handleClick
-        },
-          // Background scale
-          React.createElement('div', {
-            style: {
-              position: 'absolute',
-              top: '8px',
-              left: '8px',
-              right: '8px',
-              bottom: '8px',
-              background: 'linear-gradient(to top, #ff4444 0%, #ffaa00 50%, #00ff00 100%)',
-              borderRadius: '15px',
-              opacity: 0.3
-            }
-          }),
-          
-          // Current throttle position indicator
-          React.createElement('div', {
-            style: {
-              position: 'absolute',
-              bottom: `${displayThrottle}%`,
-              left: '2px',
-              right: '2px',
-              height: '25px',
-              background: 'linear-gradient(to top, #ff4444, #ffaa00, #00ff00)',
-              borderRadius: '12px',
-              transition: 'bottom 0.1s ease',
-              boxShadow: '0 0 8px rgba(0,255,0,0.7)'
-            }
-          }),
-          
-          // Throttle handle
-          React.createElement('div', {
-            style: {
-              position: 'absolute',
-              bottom: `${displayThrottle}%`,
-              left: '-8px',
-              width: '60px',
-              height: '25px',
-              background: '#fff',
-              border: '2px solid #000',
-              borderRadius: '12px',
-              transform: 'translateY(50%)',
-              cursor: 'grab',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              fontSize: '12px',
-              fontWeight: 'bold',
-              color: '#000',
-              boxShadow: '0 2px 6px rgba(0,0,0,0.5)'
-            }
-          }, 'THR')
-        ),
-        
-        // Control buttons
-        React.createElement('div', {
-          style: {
-            display: 'flex',
-            justifyContent: 'space-between',
-            gap: '8px',
-            marginTop: '15px'
-          }
-        },
-          React.createElement('button', {
-            onClick: () => handleIncrement(-0.05), // -5%
-            disabled: flightState?.autopilot || flightState?.hasCrashed,
-            style: {
-              flex: 1,
-              padding: '10px 8px',
-              background: '#ef4444',
-              color: 'white',
-              border: 'none',
-              borderRadius: '6px',
-              cursor: 'pointer',
-              fontWeight: 'bold',
-              fontSize: '14px',
-              transition: 'background 0.2s'
-            }
-          }, '−'),
-          React.createElement('button', {
-            onClick: () => handleIncrement(0.05), // +5%
-            disabled: flightState?.autopilot || flightState?.hasCrashed,
-            style: {
-              flex: 1,
-              padding: '10px 8px',
-              background: '#10b981',
-              color: 'white',
-              border: 'none',
-              borderRadius: '6px',
-              cursor: 'pointer',
-              fontWeight: 'bold',
-              fontSize: '14px',
-              transition: 'background 0.2s'
-            }
-          }, '+')
-        ),
-        
-        // Engine parameters display
-        React.createElement('div', {
-          style: {
-            marginTop: '12px',
-            padding: '10px',
-            background: '#0a0a0a',
-            borderRadius: '6px',
-            border: '1px solid #333'
-          }
-        },
-          React.createElement('div', {
-            style: {
-              fontSize: '11px',
-              color: '#888',
-              marginBottom: '6px',
-              textAlign: 'center'
-            }
-          }, 'ENGINE PARAMETERS'),
-          React.createElement('div', {
-            style: {
-              fontSize: '11px',
-              fontFamily: 'monospace',
-              textAlign: 'center'
-            }
-          },
-            React.createElement('div', {
-              style: { color: '#00ff00' }
-            }, `N1: ${(engineParams?.n1 || 0).toFixed(1)}%`),
-            React.createElement('div', {
-              style: { color: '#00ff00' }
-            }, `N2: ${(engineParams?.n2 || 0).toFixed(1)}%`),
-            React.createElement('div', {
-              style: { color: '#ffaa00' }
-            }, `EGT: ${(engineParams?.egt || 0).toFixed(0)}°C`)
-          )
-        )
+        React.createElement('div', { style: { position: 'absolute', top: '6px', left: '6px', right: '6px', bottom: '6px', background: 'linear-gradient(to top, #ff4444 0%, #ffaa00 50%, #00ff00 100%)', borderRadius: '10px', opacity: 0.25 } }),
+        React.createElement('div', { style: { position: 'absolute', bottom: `${pct}%`, left: '3px', right: '3px', height: '18px', background: 'linear-gradient(to top, #ff4444, #ffaa00, #00ff00)', borderRadius: '10px', boxShadow: '0 0 6px rgba(0,255,0,0.7)' } }),
+        React.createElement('div', { style: { position: 'absolute', bottom: `${pct}%`, left: '-6px', width: '42px', height: '18px', background: '#fff', border: '2px solid #000', borderRadius: '10px', transform: 'translateY(50%)', fontSize: '10px', fontWeight: 'bold', color: '#000', display: 'flex', alignItems: 'center', justifyContent: 'center' } }, isRev ? 'REV' : 'THR')
       ),
-      
-      // Debug info (only in development)
-      process.env.NODE_ENV === 'development' && React.createElement('div', {
-        style: {
-          marginTop: '10px',
-          padding: '8px',
-          background: '#222',
-          borderRadius: '4px',
-          fontSize: '9px',
-          fontFamily: 'monospace',
-          color: '#666',
-          position: 'absolute',
-          top: '5px',
-          right: '5px'
-        }
-      }, `Debug: ${throttle.toFixed(3)} (${displayThrottle.toFixed(1)}%)`)
+      React.createElement('div', { style: { display: 'flex', justifyContent: 'space-between', gap: '6px', marginTop: '6px' } },
+        React.createElement('div', { style: { width: '100%', height: '18px', background: isRev ? '#ef4444' : '#10b981', color: '#fff', borderRadius: '5px', textAlign: 'center', lineHeight: '18px', fontSize: '10px', cursor: 'pointer' }, onClick: () => toggleReverse(index) }, isRev ? 'REV ON' : 'REV OFF')
+      ),
+      React.createElement('div', { style: { marginTop: '8px', background: '#0a0a0a', borderRadius: '6px', border: '1px solid #333', padding: '6px' } },
+        React.createElement('div', { style: { fontSize: '10px', color: '#888', marginBottom: '4px', textAlign: 'center' } }, 'ENGINE'),
+        React.createElement('div', { style: { fontSize: '10px', fontFamily: 'monospace', textAlign: 'center' } },
+          React.createElement('div', { style: { color: '#00ff00' } }, `N1: ${(n1 || 0).toFixed(1)}%`),
+          React.createElement('div', { style: { color: '#00ff00' } }, `N2: ${(n2 || 0).toFixed(1)}%`),
+          React.createElement('div', { style: { color: '#ffaa00' } }, `EGT: ${(egt || 0).toFixed(0)}°C`),
+          isRev && React.createElement('div', { style: { color: '#ef4444', fontWeight: 'bold' } }, 'REV')
+        )
+      )
     );
-  }, [displayThrottle, throttle, flightState, handleIncrement, getEngineParams]);
+  };
   
-  return createThrottleLever();
+  return React.createElement('div', { style: { background: '#1a1a1a', padding: '10px', borderRadius: '12px', border: '2px solid #333', display: 'flex', gap: '10px', alignItems: 'flex-start', width: `${engineCount*130}px` } },
+    React.createElement('div', { style: { display: 'flex', gap: '10px' } },
+      Array.from({ length: engineCount }).map((_, i) => lever(i))
+    ),
+      React.createElement('div', { style: { marginLeft: '8px' } },
+        React.createElement('label', { style: { display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', color: '#ccc' } },
+          React.createElement('input', {
+            type: 'checkbox',
+            checked: sync,
+            onChange: (e) => {
+              const checked = e.target.checked;
+              setSync(checked);
+              if (checked) {
+                const firstRev = reverse[0] || false;
+                setReverse(Array(engineCount).fill(firstRev));
+              }
+            }
+          }),
+          'Sync'
+        )
+      )
+  );
 
 };
 

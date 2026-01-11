@@ -24,7 +24,8 @@ export class Engine {
     
     // Current state
     this.currentState = {
-      throttle: 0,        // 0-1 range
+      throttle: 0,
+      throttleCommand: 0,
       n1: this.nominalParameters.n1Idle,
       n2: this.nominalParameters.n2Base,
       egt: this.nominalParameters.egtIdle,
@@ -92,10 +93,13 @@ export class Engine {
   }
   
   /**
-   * Set throttle position (0-1 range)
+   * Set throttle position (supports -0.7 to 1 for reverse)
    */
   setThrottle(throttleValue) {
-    const validatedThrottle = Math.max(0, Math.min(1, throttleValue));
+    const limited = Math.max(-0.7, Math.min(1, throttleValue));
+    this.currentState.throttleCommand = limited;
+    const magnitude = Math.abs(limited);
+    const validatedThrottle = Math.max(0, Math.min(1, magnitude));
     this.currentState.throttle = validatedThrottle;
     
     if (!this.failureState.isFailed) {
@@ -112,7 +116,7 @@ export class Engine {
    * Calculate engine parameters based on current state and conditions
    */
   calculateParameters(dt = 0.016) {
-    const throttle = this.currentState.throttle;
+    const throttle = this.currentState.throttleCommand !== undefined ? this.currentState.throttleCommand : this.currentState.throttle;
     const env = this.environmentalFactors;
     const nominal = this.nominalParameters;
     const degradation = this.degradationFactors;
@@ -161,13 +165,15 @@ export class Engine {
    * Calculate parameters for normal operation
    */
   calculateNormalParameters(throttle) {
+    const signedThrottle = throttle;
+    const throttleAbs = Math.max(0, Math.min(1, Math.abs(signedThrottle)));
     const nominal = this.nominalParameters;
     const altitude_m = this.environmentalFactors.altitude || 0;
     const airDensity = this.environmentalFactors.airDensity || 1.225;
     
     // Sea-level values at current throttle
-    const N10 = nominal.n1Idle + (Math.pow(throttle, 0.7) * (nominal.n1Max - nominal.n1Idle));
-    const N20 = nominal.n2Base + (Math.pow(throttle, 0.9) * 10);
+    const N10 = nominal.n1Idle + (Math.pow(throttleAbs, 0.7) * (nominal.n1Max - nominal.n1Idle));
+    const N20 = nominal.n2Base + (Math.pow(throttleAbs, 0.9) * 10);
     
     // A — Exponential Decay (Density-Scaled) for N1 - REDUCED DECAY RATE
     const kN1 = 0.00002; // Decay coefficient for N1 - reduced from 0.0001
@@ -186,16 +192,16 @@ export class Engine {
     
     // EGT calculation - Improved curve for higher values at TOGA
     let baseEGT;
-    if (throttle <= 0.05) {
+    if (throttleAbs <= 0.05) {
       baseEGT = nominal.egtIdle;
     } else {
       // More aggressive EGT curve that reaches higher values at TOGA
-      const egtCurve = Math.pow(throttle, 0.8);
+      const egtCurve = Math.pow(throttleAbs, 0.8);
       baseEGT = nominal.egtIdle + egtCurve * (nominal.egtMax - nominal.egtIdle);
     }
     
-    // Base thrust at sea level (environmental lapse applied later)
-    const baseThrust = this.maxThrust * throttle;
+    const sign = signedThrottle === 0 ? 0 : (signedThrottle > 0 ? 1 : -1);
+    const baseThrust = this.maxThrust * throttleAbs * sign;
     
     // Fuel flow using specific fuel consumption (baseline idle included)
     const idleFuel = 0.05; // kg/s idle baseline
@@ -209,7 +215,7 @@ export class Engine {
    */
   calculateFailedParameters() {
     const failure = this.failureState;
-    const throttle = this.currentState.throttle;
+    const throttle = this.currentState.throttleCommand !== undefined ? this.currentState.throttleCommand : this.currentState.throttle;
     const nominal = this.nominalParameters;
     
     let [baseN1, baseN2, baseEGT, baseThrust, baseFuelFlow] = this.calculateNormalParameters(throttle);

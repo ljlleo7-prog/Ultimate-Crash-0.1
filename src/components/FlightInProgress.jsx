@@ -66,13 +66,12 @@ const FlightInProgress = ({
       percentage: (throttleValue * 100).toFixed(1) + '%'
     });
     
-    // throttleValue is already in 0-1 range from ThrustManager
-    const validatedThrottle = Math.max(0, Math.min(1, throttleValue));
+    const validatedThrottle = Math.max(-0.7, Math.min(1, throttleValue));
     
     // Update local display state
     setThrottleControl(validatedThrottle * 100);
     
-    // Send directly to physics engine (0-1 range)
+    // Send directly to physics engine
     setThrottle(validatedThrottle);
     
     console.log('🚀 FlightInProgress: Single throttle sent to physics:', validatedThrottle);
@@ -176,8 +175,8 @@ const FlightInProgress = ({
         minWidth: '220px'
       }}>
         <div style={{ fontWeight: 700, marginBottom: '6px' }}>FORCES</div>
-        <div>Thrust: {(Math.max(0, flightData?.thrust || 0) / 1000).toFixed(1)} kN</div>
-        <div>Drag: {(Math.max(0, flightData?.drag || 0) / 1000).toFixed(1)} kN</div>
+        <div>Thrust: {(((flightData && typeof flightData.thrust === 'number') ? flightData.thrust : 0) / 1000).toFixed(1)} kN</div>
+        <div>Drag: {(((flightData && typeof flightData.drag === 'number') ? flightData.drag : 0) / 1000).toFixed(1)} kN</div>
       </div>
 
       {/* Center - Main Flight Panel */}

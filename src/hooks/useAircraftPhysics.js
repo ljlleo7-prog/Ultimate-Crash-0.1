@@ -286,8 +286,7 @@ export function useAircraftPhysics(config = {}, autoStart = true, model = 'reali
       console.error('⚠️ Attempting to set throttle to NaN:', value);
       return;
     }
-    // ✅ FIXED: Don't divide by 100 - value is already in 0-1 range from new ThrustManager
-    const normalizedThrottle = Math.max(0, Math.min(1, value));
+    const normalizedThrottle = Math.max(-0.7, Math.min(1, value));
     console.log('🎯 useAircraftPhysics: setThrottle:', {
       input: value,
       normalized: normalizedThrottle,
@@ -316,6 +315,23 @@ export function useAircraftPhysics(config = {}, autoStart = true, model = 'reali
     currentControlsRef.current = { ...currentControlsRef.current, yaw: value * Math.PI / 180 };
   }, []);
 
+  const setEngineThrottle = useCallback((engineIndex, value) => {
+    const normalizedThrottle = Math.max(-0.7, Math.min(1, value));
+    if (physicsServiceRef.current && typeof physicsServiceRef.current.setEngineThrottle === 'function') {
+      physicsServiceRef.current.setEngineThrottle(engineIndex, normalizedThrottle);
+    }
+    const throttles = Array.isArray(currentControlsRef.current.engineThrottles)
+      ? [...currentControlsRef.current.engineThrottles]
+      : [normalizedThrottle, normalizedThrottle];
+    if (engineIndex >= 0 && engineIndex < throttles.length) {
+      throttles[engineIndex] = normalizedThrottle;
+    }
+    currentControlsRef.current = {
+      ...currentControlsRef.current,
+      engineThrottles: throttles,
+      throttle: normalizedThrottle
+    };
+  }, []);
   // Control surface setters
   const setFlaps = useCallback((value) => {
     if (physicsServiceRef.current) {
@@ -394,6 +410,7 @@ export function useAircraftPhysics(config = {}, autoStart = true, model = 'reali
     isCrashed,
     physicsService: physicsServiceRef.current,
     setThrottle,
+    setEngineThrottle,
     setPitch,
     setRoll,
     setYaw,
