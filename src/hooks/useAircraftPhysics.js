@@ -32,7 +32,8 @@ export function useAircraftPhysics(config = {}, autoStart = true, model = 'reali
     gearPosition: 'up',
     flapsValue: 0,
     airBrakesValue: 0,
-    gearValue: false
+    gearValue: false,
+    frame: 0
   });
 
   const [physicsState, setPhysicsState] = useState({
@@ -81,9 +82,18 @@ export function useAircraftPhysics(config = {}, autoStart = true, model = 'reali
           aircraftDatabase = null;
         }
         
-        // Get the first aircraft from the database (can be configurable later)
-        const defaultAircraft = (aircraftDatabase && Array.isArray(aircraftDatabase) && aircraftDatabase.length > 0) 
-          ? aircraftDatabase[0] 
+        let selectedAircraft = null;
+        if (aircraftDatabase && Array.isArray(aircraftDatabase) && aircraftDatabase.length > 0) {
+          if (config && (config.aircraftModel || config.model)) {
+            const targetModel = config.aircraftModel || config.model;
+            selectedAircraft = aircraftDatabase.find(a => a.model === targetModel) || aircraftDatabase[0];
+          } else {
+            selectedAircraft = aircraftDatabase[0];
+          }
+        }
+
+        const defaultAircraft = selectedAircraft 
+          ? selectedAircraft 
           : {
               name: 'Boeing 737-800',
               mass: 41410,
@@ -99,16 +109,49 @@ export function useAircraftPhysics(config = {}, autoStart = true, model = 'reali
               maxThrust: 170000,
               engineConfiguration: 'twin'
             };
+        let finalAircraft = { ...defaultAircraft };
+
+        if (config) {
+          if (typeof config.fuelWeight === 'number' && !isNaN(config.fuelWeight) && config.fuelWeight > 0) {
+            finalAircraft.fuelWeight = config.fuelWeight;
+          }
+          if (typeof config.payloadWeight === 'number' && !isNaN(config.payloadWeight) && config.payloadWeight >= 0) {
+            finalAircraft.payloadWeight = config.payloadWeight;
+          }
+          if (typeof config.cruiseHeight === 'number' && !isNaN(config.cruiseHeight) && config.cruiseHeight > 0) {
+            finalAircraft.initialCruiseAltitudeFt = config.cruiseHeight;
+          }
+          if (typeof config.windSpeedKts === 'number' && !isNaN(config.windSpeedKts)) {
+            finalAircraft.windSpeedKts = config.windSpeedKts;
+          }
+        }
+
         console.log('🎮 useAircraftPhysics: DEFAULT AIRCRAFT DATA:', {
-          name: defaultAircraft.name || 'Unknown Aircraft',
-          mass: defaultAircraft.mass || 0,
-          thrust: defaultAircraft.maxThrustPerEngine || 0
+          name: finalAircraft.name || 'Unknown Aircraft',
+          mass: finalAircraft.mass || 0,
+          thrust: finalAircraft.maxThrustPerEngine || 0
         });
         
-        // Initialize appropriate physics service based on selected model
         const service = model === 'imaginary' ? 
-          new SimpleFlightPhysicsService(defaultAircraft) : 
-          new NewFlightPhysicsService(defaultAircraft);
+          new SimpleFlightPhysicsService(finalAircraft) : 
+          new NewFlightPhysicsService(finalAircraft);
+        
+        if (config && service && service.aircraft) {
+          if (typeof config.payloadWeight === 'number' && !isNaN(config.payloadWeight) && config.payloadWeight >= 0) {
+            service.aircraft.payloadWeight = config.payloadWeight;
+          }
+          if (typeof config.fuelWeight === 'number' && !isNaN(config.fuelWeight) && config.fuelWeight > 0) {
+            service.aircraft.fuelWeight = config.fuelWeight;
+            if (service.state && typeof service.state.fuel === 'number') {
+              service.state.fuel = config.fuelWeight;
+            }
+          }
+          if (typeof service.aircraft.emptyWeight === 'number') {
+            const fuelWeight = typeof service.aircraft.fuelWeight === 'number' ? service.aircraft.fuelWeight : 0;
+            const payloadWeight = typeof service.aircraft.payloadWeight === 'number' ? service.aircraft.payloadWeight : 0;
+            service.aircraft.mass = service.aircraft.emptyWeight + fuelWeight + payloadWeight;
+          }
+        }
         console.log('🎮 useAircraftPhysics: PHYSICS SERVICE CREATED');
         console.log('🎮 useAircraftPhysics: AIRCRAFT DATA IN PHYSICS SERVICE:', {
           basicLiftCoefficient: service?.aircraft?.basicLiftCoefficient,
@@ -146,31 +189,19 @@ export function useAircraftPhysics(config = {}, autoStart = true, model = 'reali
 
   const startPhysics = () => {
     console.log('🎮 useAircraftPhysics: STARTING PHYSICS ANIMATION LOOP...');
-    let lastTime = performance.now();
+    const targetStep = 1 / 60;
     const animate = () => {
-      const currentTime = performance.now();
-      const dt = (currentTime - lastTime) / 1000;
-      lastTime = currentTime;
-      
-      console.log('🎮 PHYSICS LOOP: ANIMATION FRAME', {
-        timestamp: new Date().toISOString(),
-        dt,
-        physicsRunning: physicsServiceRef.current ? 'AVAILABLE' : 'MISSING'
-      });
+      const currentTime = Date.now();
+      const elapsed = (currentTime - lastUpdateTimeRef.current) / 1000;
 
-      if (physicsServiceRef.current && dt > 0) {
+      if (physicsServiceRef.current && elapsed >= targetStep) {
         try {
-          updatePhysics();
+          updatePhysics(targetStep, currentTime);
         } catch (err) {
           console.error('🎮 PHYSICS LOOP: UPDATE ERROR', err);
         }
-      } else {
-        console.warn('🎮 PHYSICS LOOP: MISSING SERVICE OR INVALID DT', {
-          physicsServiceExists: !!physicsServiceRef.current,
-          dt
-        });
       }
-      
+
       requestAnimationFrame(animate);
     };
     
@@ -178,7 +209,7 @@ export function useAircraftPhysics(config = {}, autoStart = true, model = 'reali
     console.log('🎮 useAircraftPhysics: PHYSICS ANIMATION LOOP STARTED');
   };
 
-  const updatePhysics = useCallback(() => {
+  const updatePhysics = useCallback((fixedDt = 1 / 60, currentTimeOverride = null) => {
     if (!isInitialized || !physicsServiceRef.current) {
       console.warn('⚠️ Physics update skipped - not initialized');
       return;
@@ -186,16 +217,8 @@ export function useAircraftPhysics(config = {}, autoStart = true, model = 'reali
 
     try {
       const physicsService = physicsServiceRef.current;
-      const currentTime = Date.now();
-      const dt = (currentTime - lastUpdateTimeRef.current) / 1000;
-      
-      // Sanitize time step to prevent extreme values
-      const timeStep = Math.min(Math.max(dt, 0.001), 0.033); // Clamp between 1ms and 33ms
-      
-      if (timeStep < 0.001) {
-        console.warn('⏱️ Physics update skipped - time step too small:', dt);
-        return;
-      }
+      const currentTime = currentTimeOverride || Date.now();
+      const timeStep = fixedDt;
       
       const throttleValue = currentControlsRef.current.throttle;
       if (isNaN(throttleValue)) {
@@ -209,14 +232,35 @@ export function useAircraftPhysics(config = {}, autoStart = true, model = 'reali
         yaw: currentControlsRef.current.yaw
       }, timeStep);
 
-      // ✅ FIXED: Use position.z as positive altitude (no negative conversion needed)
-      const altitude = newState.position.z * 3.28084;
+      const altitude_m = Math.max(0, newState.position.z);
+      const altitude = altitude_m * 3.28084;
       const airspeeds = physicsService.calculateAirspeeds();
       
       const trueAirspeed = isNaN(airspeeds?.trueAirspeed) ? 450 : airspeeds.trueAirspeed;
       const indicatedAirspeed = isNaN(airspeeds?.indicatedAirspeed) ? 280 : airspeeds.indicatedAirspeed;
       
       const verticalSpeed = newState.verticalSpeed || 0;
+
+      const autopilotStatus = newState.autopilot || {};
+      const autopilotEngaged = !!autopilotStatus.engaged;
+
+      let actualThrottle = throttleValue;
+      if (
+        autopilotEngaged &&
+        physicsService &&
+        physicsService.state &&
+        physicsService.state.controls &&
+        typeof physicsService.state.controls.throttle === 'number'
+      ) {
+        actualThrottle = physicsService.state.controls.throttle;
+      }
+
+      if (autopilotEngaged) {
+        currentControlsRef.current = {
+          ...currentControlsRef.current,
+          throttle: actualThrottle
+        };
+      }
       
       console.log('🔍 VERTICAL SPEED DEBUG - Full Analysis:', {
         'physics_service_update_called': !!newState,
@@ -238,6 +282,11 @@ export function useAircraftPhysics(config = {}, autoStart = true, model = 'reali
       const airBrakesPosition = airBrakesState === 0 ? 'up' : 'down';
       const gearPosition = gearState === false ? 'up' : 'down';
 
+      const crashWarning = typeof newState.crashWarning === 'string' ? newState.crashWarning : '';
+      const alarms = Array.isArray(newState.alarms) ? newState.alarms : [];
+      const hasCrashed = !!newState.hasCrashed;
+      const autopilotTargets = newState.autopilotTargets || autopilotStatus.targets || null;
+
       const newFlightData = {
         altitude: altitude,
         airspeed: trueAirspeed,
@@ -246,7 +295,7 @@ export function useAircraftPhysics(config = {}, autoStart = true, model = 'reali
         pitch: newState.orientation.theta * 180 / Math.PI,
         roll: newState.orientation.phi * 180 / Math.PI,
         heading: newState.orientation.psi * 180 / Math.PI,
-        throttle: currentControlsRef.current.throttle * 100,
+        throttle: actualThrottle * 100,
         elevator: currentControlsRef.current.pitch * 180 / Math.PI,
         aileron: currentControlsRef.current.roll * 180 / Math.PI,
         rudder: currentControlsRef.current.yaw * 180 / Math.PI,
@@ -265,13 +314,21 @@ export function useAircraftPhysics(config = {}, autoStart = true, model = 'reali
         flapsValue: flapsState,
         airBrakesValue: airBrakesState,
         gearValue: gearState,
+        frame: typeof newState.frame === 'number' ? newState.frame : 0,
         engineN1: newState.engineParams?.n1 !== undefined ? newState.engineParams.n1 : [22, 22],
         engineN2: newState.engineParams?.n2 !== undefined ? newState.engineParams.n2 : [45, 45],
         engineEGT: newState.engineParams?.egt !== undefined ? newState.engineParams.egt : [400, 400],
-        fuel: newState.fuel !== undefined ? newState.fuel : 100
+        fuel: newState.fuel !== undefined ? newState.fuel : 100,
+        hasCrashed,
+        timeToCrash: typeof newState.timeToCrash === 'number' ? newState.timeToCrash : null,
+        crashWarning,
+        alarms,
+        autopilotEngaged,
+        autopilotTargets
       };
 
       setFlightData(newFlightData);
+      setIsCrashed(hasCrashed);
       setPhysicsState(newState);
       
       lastUpdateTimeRef.current = currentTime;

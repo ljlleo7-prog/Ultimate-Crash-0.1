@@ -30,12 +30,24 @@ const FlightInProgress = ({
 }) => {
 
 
-  // Aircraft configuration for physics initialization
+  const averagePassengerWeight = 90;
+  const averageCrewWeight = 90;
+  const totalPassengerWeight = (pax || 0) * averagePassengerWeight;
+  const totalCrewWeight = (crewCount || 0) * averageCrewWeight;
+  const additionalPayloadWeight = payload || 0;
+  const totalPayloadWeight = totalPassengerWeight + totalCrewWeight + additionalPayloadWeight;
+  const flightPlanFuelWeight = flightPlan && flightPlan.fuel && typeof flightPlan.fuel.totalFuel === 'number'
+    ? flightPlan.fuel.totalFuel
+    : 0;
+
   const aircraftConfig = {
-    model: 'Boeing 737-800', // Boeing 737-800 as default aircraft
-    mass: 79000, // kg
-    fuelWeight: 7000, // kg
-    payloadWeight: 8000 // kg
+    aircraftModel,
+    payloadWeight: totalPayloadWeight,
+    fuelWeight: flightPlanFuelWeight,
+    cruiseHeight,
+    windSpeedKts: weatherData && typeof weatherData.windSpeed === 'number'
+      ? weatherData.windSpeed
+      : 0
   };
 
   const {
@@ -52,7 +64,8 @@ const FlightInProgress = ({
     setYaw,
     setFlaps,
     setAirBrakes,
-    setGear
+    setGear,
+    physicsService
   } = useAircraftPhysics(aircraftConfig, true, physicsModel);
 
   // Control state for UI components
@@ -222,6 +235,34 @@ const FlightInProgress = ({
                 setYaw(payload);
                 console.log(`📡 FlightPanel Action: ${action} = ${payload}`);
                 break;
+              case 'toggle-autopilot': {
+                if (physicsService && typeof physicsService.setAutopilot === 'function') {
+                  const status = typeof physicsService.getAutopilotStatus === 'function'
+                    ? physicsService.getAutopilotStatus()
+                    : null;
+                  const engaged = status && typeof status.engaged === 'boolean' ? status.engaged : false;
+                  physicsService.setAutopilot(!engaged);
+                }
+                console.log(`📡 FlightPanel Action: ${action}`);
+                break;
+              }
+              case 'set-autopilot-targets': {
+                if (physicsService && typeof physicsService.updateAutopilotTargets === 'function' && payload) {
+                  const altitudeFt = typeof payload.altitude === 'number'
+                    ? payload.altitude
+                    : (flightData && typeof flightData.altitude === 'number' ? flightData.altitude : 0);
+                  const iasKts = typeof payload.ias === 'number'
+                    ? payload.ias
+                    : (flightData && typeof flightData.indicatedAirspeed === 'number' ? flightData.indicatedAirspeed : 0);
+                  const targets = {
+                    altitude: altitudeFt / 3.28084,
+                    speed: iasKts / 1.94384
+                  };
+                  physicsService.updateAutopilotTargets(targets);
+                }
+                console.log(`📡 FlightPanel Action: ${action} = ${JSON.stringify(payload)}`);
+                break;
+              }
               default:
                 console.log('Unhandled action:', action);
             }

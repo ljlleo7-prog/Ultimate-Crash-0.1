@@ -91,6 +91,17 @@ class RandomFlightService {
     };
   }
 
+  // Helper to round numbers to a given number of significant digits
+  roundToSignificantDigits(value, digits = 3) {
+    if (!Number.isFinite(value) || value === 0) {
+      return value;
+    }
+    const absValue = Math.abs(value);
+    const exponent = Math.floor(Math.log10(absValue));
+    const factor = Math.pow(10, digits - exponent - 1);
+    return Math.round(value * factor) / factor;
+  }
+
   // Generate random flight parameters
   async generateRandomFlightParameters() {
     const airline = this.getRandomAirline();
@@ -98,15 +109,17 @@ class RandomFlightService {
     const { departure, arrival, distance } = await this.getRandomAirports();
     const aircraft = await this.getRandomAircraftForDistance(distance.nauticalMiles);
     
-    // Calculate realistic payload based on aircraft capacity
     const maxPax = aircraft.passengers || 180;
-    const pax = Math.floor(Math.random() * (maxPax * 0.8)) + Math.floor(maxPax * 0.2); // 20-100% capacity
+    const rawPax = Math.floor(Math.random() * (maxPax * 0.8)) + Math.floor(maxPax * 0.2);
+    const pax = Math.round(this.roundToSignificantDigits(rawPax, 3));
     
-    const payload = Math.floor(pax * 100) + Math.floor(Math.random() * 5000); // Base + cargo
+    const rawPayload = Math.floor(pax * 100) + Math.floor(Math.random() * 5000);
+    const payload = Math.round(this.roundToSignificantDigits(rawPayload, 3));
     
-    // Random flight parameters
-    const fuelReserve = 0.1 + (Math.random() * 0.1); // 10-20% reserve
-    const cruiseHeight = Math.floor(28000 + (Math.random() * 12000)); // 28,000-40,000 ft
+    const rawFuelReserve = 0.1 + (Math.random() * 0.1);
+    const fuelReserve = this.roundToSignificantDigits(rawFuelReserve, 3);
+    const rawCruiseHeight = Math.floor(28000 + (Math.random() * 12000));
+    const cruiseHeight = Math.round(this.roundToSignificantDigits(rawCruiseHeight, 3));
     
     // Random time and season
     const useRandomTime = true;

@@ -142,11 +142,11 @@ export class Engine {
     ]);
     
     // Update current state
-    const alphaN1 = 0.0012;
-    const alphaN2 = 0.0010;
-    const alphaEGT = 0.0010;
-    const alphaThrust = 0.0015;
-    const alphaFuel = 0.0020;
+    const alphaN1 = 0.012;
+    const alphaN2 = 0.010;
+    const alphaEGT = 0.010;
+    const alphaThrust = 0.015;
+    const alphaFuel = 0.020;
     this.currentState.n1 += (baseN1 - this.currentState.n1) * alphaN1;
     this.currentState.n2 += (baseN2 - this.currentState.n2) * alphaN2;
     this.currentState.egt += (baseEGT - this.currentState.egt) * alphaEGT;

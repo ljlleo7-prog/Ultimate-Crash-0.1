@@ -32,12 +32,12 @@ const ModernAutopilotModule = ({ flightState, setAutopilotTargets, toggleAutopil
         React.createElement('div', { className: 'target-control' },
           React.createElement('button', {
             onClick: () => updateTarget('ias', Math.max(150, targets.ias - 10)),
-            disabled: !flightState.autopilot
+            disabled: flightState.hasCrashed
           }, '-'),
           React.createElement('span', { className: 'target-value' }, `${targets.ias.toFixed(0)}`),
           React.createElement('button', {
             onClick: () => updateTarget('ias', Math.min(350, targets.ias + 10)),
-            disabled: !flightState.autopilot
+            disabled: flightState.hasCrashed
           }, '+')
         )
       ),
@@ -48,12 +48,12 @@ const ModernAutopilotModule = ({ flightState, setAutopilotTargets, toggleAutopil
         React.createElement('div', { className: 'target-control' },
           React.createElement('button', {
             onClick: () => updateTarget('vs', Math.max(-4000, targets.vs - 500)),
-            disabled: !flightState.autopilot
+            disabled: flightState.hasCrashed
           }, '-'),
           React.createElement('span', { className: 'target-value' }, `${targets.vs >= 0 ? '+' : ''}${targets.vs.toFixed(0)}`),
           React.createElement('button', {
             onClick: () => updateTarget('vs', Math.min(4000, targets.vs + 500)),
-            disabled: !flightState.autopilot
+            disabled: flightState.hasCrashed
           }, '+')
         )
       ),
@@ -64,12 +64,12 @@ const ModernAutopilotModule = ({ flightState, setAutopilotTargets, toggleAutopil
         React.createElement('div', { className: 'target-control' },
           React.createElement('button', {
             onClick: () => updateTarget('altitude', Math.max(0, targets.altitude - 1000)),
-            disabled: !flightState.autopilot
+            disabled: flightState.hasCrashed
           }, '-'),
           React.createElement('span', { className: 'target-value' }, `${(targets.altitude / 1000).toFixed(1)}`),
           React.createElement('button', {
             onClick: () => updateTarget('altitude', Math.min(45000, targets.altitude + 1000)),
-            disabled: !flightState.autopilot
+            disabled: flightState.hasCrashed
           }, '+')
         )
       )

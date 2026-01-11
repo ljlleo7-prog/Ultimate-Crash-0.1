@@ -91,8 +91,8 @@ class NewFlightPhysicsService {
   };
 
   static DEFAULT_PID_PARAMETERS = {
-    ALTITUDE: { Kp: 0.0008, Ki: 0.0001, Kd: 0.002, min: -0.3, max: 0.3 },
-    SPEED: { Kp: 0.5, Ki: 0.05, Kd: 0.1, min: -0.5, max: 0.5 },
+    ALTITUDE: { Kp: 0.0003, Ki: 0, Kd: 0.001, min: -3, max: 3 },
+    SPEED: { Kp: 0.3, Ki: 0.03, Kd: 0.08, min: -0.3, max: 0.3 },
     HEADING: { Kp: 0.8, Ki: 0.1, Kd: 0.3, min: -0.5, max: 0.5 }
   };
 
@@ -106,7 +106,7 @@ class NewFlightPhysicsService {
     this.GRAVITY = 9.81; // m/s²
     this.AIR_DENSITY_SLA = 1.225; // kg/m³
     this.AIR_GAS_CONSTANT = 287.05; // J/(kg·K) - specific gas constant for air
-    this.dt = 0.01; // Time step (10ms)
+    this.dt = 1 / 60; // Fixed time step for physics integration (60 Hz)
     
     // Debug tracking
     this.lastThrottleValue = 0.55;
@@ -118,12 +118,15 @@ class NewFlightPhysicsService {
       maxThrustPerEngine: this.aircraft.maxThrustPerEngine || 120000
     });
     
-    // Initial state - level cruise at FL350, 450 KTS
+    const cruiseAltitudeFt = Number(this.aircraft.initialCruiseAltitudeFt) || 35000;
+    const cruiseAltitudeM = cruiseAltitudeFt * 0.3048;
+
+    // Initial state - level cruise at configured altitude, 450 KTS
     this.state = {
       position: {
         x: 0,     // North position (m)
         y: 0,     // East position (m)
-        z: 10668  // Altitude: 35,000 ft = 10,668 m (POSITIVE = above ground level)
+        z: cruiseAltitudeM  // Altitude in meters (POSITIVE = above ground level)
       },
       velocity: {
         u: 231.5, // Forward velocity (450 KTS TAS)
@@ -151,16 +154,18 @@ class NewFlightPhysicsService {
       flaps: 0,         // 0=UP, 1=TO, 2=LDG
       airBrakes: 0,     // 0=RETRACTED, 1=EXTENDED
       gear: false,       // Landing gear
-      fuel: this.aircraft.fuelWeight || 2000 // Use flight plan fuel load or default to 2000kg
+      fuel: this.aircraft.fuelWeight || 2000, // Use flight plan fuel load or default to 2000kg
+      frame: 0 // Debug frame counter
     };
     
     // Environment parameters (will be updated dynamically based on altitude)
     this.environment = {
-      density: NewFlightPhysicsService.DEFAULT_ENVIRONMENT.DENSITY,     // kg/m³ at FL350
-      pressure: NewFlightPhysicsService.DEFAULT_ENVIRONMENT.PRESSURE,   // Pa at FL350
-      temperature: NewFlightPhysicsService.DEFAULT_ENVIRONMENT.TEMPERATURE,   // K at FL350
-      speedOfSound: NewFlightPhysicsService.DEFAULT_ENVIRONMENT.SPEED_OF_SOUND, // m/s at FL350
-      wind: { x: 0, y: 0, z: 0 }
+      density: NewFlightPhysicsService.DEFAULT_ENVIRONMENT.DENSITY,
+      pressure: NewFlightPhysicsService.DEFAULT_ENVIRONMENT.PRESSURE,
+      temperature: NewFlightPhysicsService.DEFAULT_ENVIRONMENT.TEMPERATURE,
+      speedOfSound: NewFlightPhysicsService.DEFAULT_ENVIRONMENT.SPEED_OF_SOUND,
+      wind: { x: 0, y: 0, z: 0 },
+      windSpeedKts: Number(this.aircraft.windSpeedKts) || 0
     };
     
     // Force and moment accumulators
@@ -182,16 +187,18 @@ class NewFlightPhysicsService {
       enabled: false,
       engaged: false,
       targets: {
-        altitude: 10668, // 35,000 ft in meters (POSITIVE = upward from ground)
-        speed: 231.5,     // 450 KTS in m/s
-        heading: 0        // 0° (North)
+        altitude: cruiseAltitudeM,
+        speed: 231.5,
+        heading: 0
       },
       limits: {
         maxPitch: NewFlightPhysicsService.DEFAULT_AUTOPILOT_LIMITS.MAX_PITCH, // ±15° pitch limit
         minPitch: NewFlightPhysicsService.DEFAULT_AUTOPILOT_LIMITS.MIN_PITCH, // Don't allow nose-down beyond -5°
         maxThrottle: NewFlightPhysicsService.DEFAULT_AUTOPILOT_LIMITS.MAX_THROTTLE,         // 95% max thrust
         minThrottle: NewFlightPhysicsService.DEFAULT_AUTOPILOT_LIMITS.MIN_THROTTLE          // 20% min thrust
-      }
+      },
+      unstableFrames: 0,
+      disconnectAlert: ''
     };
     
     // Initialize PID Controllers with tuned parameters
@@ -326,8 +333,8 @@ class NewFlightPhysicsService {
    * Applies input smoothing, autopilot control, and integrates all forces
    */
   update(input = {}, dt = null) {
-    // Use provided time step if available, otherwise use internal dt
-    const timeStep = dt || this.dt;
+    // Use fixed internal time step for consistent 60 Hz simulation
+    const timeStep = this.dt;
     // Handle reset input
     if (input.reset) {
       this.reset();
@@ -350,10 +357,18 @@ class NewFlightPhysicsService {
     // Update environment properties based on current altitude
     this.updateEnvironmentProperties();
     
-    // Calculate control inputs (autopilot or manual)
-    const controlInputs = this.autopilot.engaged ? 
-      this.calculateAutopilotControls() : 
-      this.applyManualControls(input);
+    const manualControls = this.applyManualControls(input);
+    
+    let controlInputs;
+    if (this.autopilot.engaged) {
+      const auto = this.calculateAutopilotControls(timeStep);
+      controlInputs = {
+        ...manualControls,
+        throttle: auto.throttle
+      };
+    } else {
+      controlInputs = manualControls;
+    }
     
     // Apply input smoothing to prevent control oscillations
      this.state.controls.throttle = this.smoothInput(this.state.controls.throttle, controlInputs.throttle, 0.5); // More responsive throttle
@@ -370,10 +385,11 @@ class NewFlightPhysicsService {
     // Sum forces and integrate motion
     this.sumForcesAndMoments();
     this.integrateMotion(timeStep);
-  
-    
 
-    
+    if (this.autopilot && this.autopilot.engaged) {
+      this.checkAutopilotStability();
+    }
+
     // Return updated state
     return this.getAircraftState();
   }
@@ -381,55 +397,27 @@ class NewFlightPhysicsService {
   /**
    * Calculate autopilot control inputs using PID controllers
    */
-  calculateAutopilotControls() {
-    const currentAltitude = this.state.position.z;
-    const currentSpeed = Math.sqrt(
-      this.state.velocity.u * this.state.velocity.u + 
-      this.state.velocity.v * this.state.velocity.v + 
-      this.state.velocity.w * this.state.velocity.w
-    );
-    const currentHeading = this.state.orientation.psi;
-    
-    // Calculate PID outputs
-    const pitchCommand = this.pidControllers.altitude.calculate(
-      this.autopilot.targets.altitude, 
-      currentAltitude, 
-      timeStep
-    );
+  calculateAutopilotControls(dt = this.dt) {
+    const airspeeds = this.calculateAirspeeds();
+    const currentSpeed = airspeeds.indicatedAirspeedMS || 0;
     
     const throttleCommand = this.pidControllers.speed.calculate(
       this.autopilot.targets.speed, 
       currentSpeed, 
-      timeStep
-    );
-    
-    const rollCommand = this.pidControllers.heading.calculate(
-      this.autopilot.targets.heading, 
-      currentHeading, 
-      timeStep
-    );
-    
-    // ✅ FIXED: Apply control limits properly
-    const limitedPitch = Math.max(
-      this.autopilot.limits.minPitch, 
-      Math.min(this.autopilot.limits.maxPitch, pitchCommand)
+      dt
     );
     
     const limitedThrottle = Math.max(
       this.autopilot.limits.minThrottle, 
       Math.min(this.autopilot.limits.maxThrottle, this.state.controls.throttle + throttleCommand)
     );
-    
-    const limitedRoll = Math.max(-0.5, Math.min(0.5, rollCommand));
-    
-    // Add small coordination inputs for smooth flight
-    const yawCoordination = -rollCommand * (this.aircraft.yawCoordinationFactor || 0.1); // Coordinated turn
-    
+
     return {
-      pitch: limitedPitch,
       throttle: limitedThrottle,
-      roll: limitedRoll,
-      yaw: yawCoordination
+      pitch: 0,
+      roll: 0,
+      yaw: 0,
+      trim: this.state.controls.trim
     };
   }
   
@@ -493,15 +481,6 @@ class NewFlightPhysicsService {
     if (enabled) {
       // Reset PID controllers for smooth engagement
       Object.values(this.pidControllers).forEach(controller => controller.reset());
-      
-      // Set current values as targets to prevent sudden jumps
-      this.autopilot.targets.altitude = this.state.position.z;
-      this.autopilot.targets.speed = Math.sqrt(
-        this.state.velocity.u * this.state.velocity.u + 
-        this.state.velocity.v * this.state.velocity.v + 
-        this.state.velocity.w * this.state.velocity.w
-      );
-      this.autopilot.targets.heading = this.state.orientation.psi;
     }
     
 
@@ -527,11 +506,11 @@ class NewFlightPhysicsService {
           ki: this.pidControllers.speed.ki,
           kd: this.pidControllers.speed.kd
         },
-        heading: {
-          kp: this.pidControllers.heading.kp,
-          ki: this.pidControllers.heading.ki,
-          kd: this.pidControllers.heading.kd
-        }
+      heading: {
+        kp: this.pidControllers.heading.kp,
+        ki: this.pidControllers.heading.ki,
+        kd: this.pidControllers.heading.kd
+      }
       }
     };
   }
@@ -864,8 +843,7 @@ class NewFlightPhysicsService {
    * Uses standard atmosphere model for accurate airspeed calculations
    */
   calculateAirspeeds() {
-    // ✅ FIXED: Use position.z as positive altitude (no negative conversion needed)
-    const altitude_m = this.state.position.z; // Already positive for altitude above ground
+    const altitude_m = Math.max(0, this.state.position.z);
     const altitude_ft = altitude_m * 3.28084;
     
     // Standard atmosphere calculations
@@ -1016,7 +994,8 @@ class NewFlightPhysicsService {
   /**
    * Integrate 6-DOF motion equations
    */
-  integrateMotion() {
+  integrateMotion(timeStep = null) {
+    const dt = timeStep || this.dt;
     // Linear accelerations (F = ma)
     const ax = this.forces.x / this.aircraft.mass;
     const ay = this.forces.y / this.aircraft.mass;
@@ -1028,14 +1007,14 @@ class NewFlightPhysicsService {
     const alphaZ = this.moments.z / this.aircraft.momentOfInertiaYaw;
     
     // Integrate velocities
-    this.state.velocity.u += ax * this.dt;
-    this.state.velocity.v += ay * this.dt;
-    this.state.velocity.w += az * this.dt;
+    this.state.velocity.u += ax * dt;
+    this.state.velocity.v += ay * dt;
+    this.state.velocity.w += az * dt;
     
     // Integrate angular rates
-    this.state.angularRates.p += alphaX * this.dt;
-    this.state.angularRates.q += alphaY * this.dt;
-    this.state.angularRates.r += alphaZ * this.dt;
+    this.state.angularRates.p += alphaX * dt;
+    this.state.angularRates.q += alphaY * dt;
+    this.state.angularRates.r += alphaZ * dt;
     
     // ✅ ENHANCED: Variable angular damping based on pitch angle to prevent tailspins
     // Increase damping at extreme pitch angles to prevent uncontrollable spins
@@ -1078,9 +1057,9 @@ class NewFlightPhysicsService {
     const psiDot = (q * Math.sin(phi) + r * Math.cos(phi)) / Math.cos(safeTheta);
     
     // Integrate Euler angles
-    this.state.orientation.phi += phiDot * this.dt;
-    this.state.orientation.theta += thetaDot * this.dt;
-    this.state.orientation.psi += psiDot * this.dt;
+    this.state.orientation.phi += phiDot * dt;
+    this.state.orientation.theta += thetaDot * dt;
+    this.state.orientation.psi += psiDot * dt;
     
     // Normalize angles
     this.state.orientation.phi = this.normalizeAngle(this.state.orientation.phi);
@@ -1088,14 +1067,15 @@ class NewFlightPhysicsService {
     this.state.orientation.psi = this.normalizeAngle(this.state.orientation.psi);
     
     // Update position
-    this.updatePosition();
+    this.updatePosition(dt);
   }
   
   /**
    * Transform body velocities to earth frame and update position
    * Both body and earth frame: X=forward, Y=right, Z=upward
    */
-  updatePosition() {
+  updatePosition(dt = null) {
+    const timeStep = dt || this.dt;
     const phi = this.state.orientation.phi;
     const theta = this.state.orientation.theta;
     const psi = this.state.orientation.psi;
@@ -1127,9 +1107,16 @@ class NewFlightPhysicsService {
     this.earthFrameVerticalVelocity = zDot;
     
     // Update position
-    this.state.position.x += xDot * this.dt;
-    this.state.position.y += yDot * this.dt;
-    this.state.position.z += zDot * this.dt;
+    this.state.position.x += xDot * timeStep;
+    this.state.position.y += yDot * timeStep;
+    this.state.position.z += zDot * timeStep;
+
+    // Increment debug frame counter each time position is updated
+    this.state.frame = (this.state.frame || 0) + 1;
+
+    if (this.state.position.z < 0) {
+      this.state.position.z = 0;
+    }
   }
   
   /**
@@ -1143,8 +1130,7 @@ class NewFlightPhysicsService {
     const heading = (this.state.orientation.psi * 180 / Math.PI + 360) % 360;
     const pitch = this.state.orientation.theta * 180 / Math.PI;
     const roll = this.state.orientation.phi * 180 / Math.PI;
-    // ✅ FIXED: Use position.z as positive altitude (no negative conversion needed)
-    const altitude_ft = this.state.position.z * 3.28084;
+    const altitude_ft = Math.max(0, this.state.position.z) * 3.28084;
     
     // ✅ CRITICAL: Use earth frame vertical velocity for correct vertical speed
     const earthFrameVerticalVelocity = this.earthFrameVerticalVelocity || 0;
@@ -1152,7 +1138,10 @@ class NewFlightPhysicsService {
     
 
     
-    const groundSpeed = airspeed * 1.94384; // Convert m/s to knots
+    const windSpeedKts = this.environment && typeof this.environment.windSpeedKts === 'number'
+      ? this.environment.windSpeedKts
+      : 0;
+    const groundSpeed = airspeed * 1.94384 + windSpeedKts;
     
     // Get proper IAS/TAS calculations
     const airspeeds = this.calculateAirspeeds();
@@ -1196,6 +1185,7 @@ class NewFlightPhysicsService {
     
     // For display purposes, generate parameters for all engines based on actual engine count
     const engineCount = this.aircraft.engineCount || 2;
+    const frame = this.state.frame || 0;
     
     // Generate final values with realistic vibrations
     const localVibrationScale = 2;
@@ -1313,7 +1303,8 @@ class NewFlightPhysicsService {
       density: airspeeds.density,
       temperature: airspeeds.temperature,
       pressure: airspeeds.pressure,
-      densityRatio: airspeeds.densityRatio
+      densityRatio: airspeeds.densityRatio,
+      frame
     };
   }
   
@@ -1321,34 +1312,92 @@ class NewFlightPhysicsService {
    * Get crash warning status
    */
   getCrashWarning() {
-    // ✅ FIXED: Use position.z as positive altitude above ground
+    if (this.autopilot && typeof this.autopilot.disconnectAlert === 'string' && this.autopilot.disconnectAlert) {
+      const alert = this.autopilot.disconnectAlert;
+      this.autopilot.disconnectAlert = '';
+      return alert;
+    }
     const altitude_m = this.state.position.z;
     const verticalSpeed_ftmin = this.earthFrameVerticalVelocity * 196.85; // Convert m/s to ft/min
     const timeToCrash = this.getTimeToCrash();
-    
-    // Collision detector: altitude 0 and VS < -2000 ft/min = sure crash
-    if (altitude_m <= 0 && verticalSpeed_ftmin < -2000) return 'SURE CRASH';
-    
-    // Alert triggers
-    if (altitude_m <= 0) return 'TERRAIN CONTACT'; // Altitude <= 0 means at/below ground
-    if (verticalSpeed_ftmin < -2000) return 'SINKRATE';
-    
-    // Time-based terrain and pull-up alerts
-    if (timeToCrash !== null && timeToCrash < 10) return 'TERRAIN'; // Less than 10 seconds to impact
-    if (timeToCrash !== null && timeToCrash < 5) return 'PULL UP'; // Less than 5 seconds to impact
-    
-    if (altitude_m < 100) return 'TOO-LOW';
-    
-    // Aircraft-specific bank angle threshold
-    const maxBankAngle = this.aircraft.maxBankAngle || Math.PI/2; // Default to 90 degrees
-    if (Math.abs(this.state.orientation.phi) > maxBankAngle) return 'BANK-ANGLE';
-    
-    // Stall detection (simplified)
     const airspeeds = this.calculateAirspeeds();
-    const pitchAngle = Math.abs(this.state.orientation.theta);
-    if (airspeeds.indicatedAirspeed < 100 || pitchAngle > Math.PI/6) return 'STALL'; // Stall at low speed or high pitch (>30°)
-    
+    const indicatedAirspeed = airspeeds.indicatedAirspeed || 0;
+    const pitchDeg = this.state.orientation.theta * 180 / Math.PI;
+    const bankDeg = Math.abs(this.state.orientation.phi * 180 / Math.PI);
+    const stallSpeed = this.aircraft.stallSpeed || 125;
+
+    if (this.earthFrameVerticalVelocity * 196.85 < -2000) {
+      return 'SINKRATE';
+    }
+
+    if (timeToCrash !== null && timeToCrash <= 20 && verticalSpeed_ftmin < -1000) {
+      return 'TERRAIN';
+    }
+
+    if (timeToCrash !== null && timeToCrash <= 10 && verticalSpeed_ftmin < -1000) {
+      return 'PULL UP';
+    }
+
+    if (bankDeg > 45) {
+      return 'BANK ANGLE';
+    }
+
+    if (indicatedAirspeed < stallSpeed || Math.abs(pitchDeg) > 30) {
+      return 'STALL';
+    }
+
     return '';
+  }
+
+  checkAutopilotStability() {
+    const altitude_m = Math.max(0, this.state.position.z);
+    const altitude_ft = altitude_m * 3.28084;
+    const targetAltitude_m = this.autopilot && this.autopilot.targets && typeof this.autopilot.targets.altitude === 'number'
+      ? this.autopilot.targets.altitude
+      : altitude_m;
+    const targetAltitude_ft = targetAltitude_m * 3.28084;
+    const altitudeErrorFt = targetAltitude_ft - altitude_ft;
+    const airspeeds = this.calculateAirspeeds();
+    const ias_kts = airspeeds.indicatedAirspeed || 0;
+    const targetSpeed_ms = this.autopilot && this.autopilot.targets && typeof this.autopilot.targets.speed === 'number'
+      ? this.autopilot.targets.speed
+      : airspeeds.indicatedAirspeedMS || 0;
+    const targetSpeed_kts = targetSpeed_ms * 1.94384;
+    const speedErrorKts = targetSpeed_kts - ias_kts;
+    const pitchDeg = this.state.orientation.theta * 180 / Math.PI;
+    const bankDeg = Math.abs(this.state.orientation.phi * 180 / Math.PI);
+    const verticalSpeedFtMin = (this.earthFrameVerticalVelocity || 0) * 196.85;
+    const trimControl = this.state.controls.trim || 0;
+    const throttle = this.state.controls.throttle !== undefined ? this.state.controls.throttle : 0;
+    const trimUnits = trimControl / 20000;
+    const trimLimit = 20;
+    const trimSaturated = Math.abs(trimUnits) >= trimLimit - 0.5;
+    const minThrottle = this.autopilot.limits && typeof this.autopilot.limits.minThrottle === 'number'
+      ? this.autopilot.limits.minThrottle
+      : 0.2;
+    const maxThrottle = this.autopilot.limits && typeof this.autopilot.limits.maxThrottle === 'number'
+      ? this.autopilot.limits.maxThrottle
+      : 0.95;
+    const throttleSaturated = throttle <= minThrottle + 0.02 || throttle >= maxThrottle - 0.02;
+    let unstable = false;
+    if (Math.abs(altitudeErrorFt) > 5000) unstable = true;
+    if (Math.abs(speedErrorKts) > 100) unstable = true;
+    if (Math.abs(pitchDeg) > 35) unstable = true;
+    if (bankDeg > 60) unstable = true;
+    if (Math.abs(verticalSpeedFtMin) > 6000) unstable = true;
+    if (trimSaturated && Math.abs(altitudeErrorFt) > 2000) unstable = true;
+    if (throttleSaturated && Math.abs(speedErrorKts) > 60) unstable = true;
+    if (unstable) {
+      this.autopilot.unstableFrames = (this.autopilot.unstableFrames || 0) + 1;
+    } else {
+      this.autopilot.unstableFrames = 0;
+    }
+    if (this.autopilot.unstableFrames >= 100) {
+      this.autopilot.engaged = false;
+      this.autopilot.enabled = false;
+      this.autopilot.unstableFrames = 0;
+      this.autopilot.disconnectAlert = 'AP disconnected';
+    }
   }
   
   /**
@@ -1369,7 +1418,40 @@ class NewFlightPhysicsService {
    * Get crash status
    */
   getCrashStatus() {
-    return this.state.position.z <= 0; // Crashed if altitude <= 0 (ground level)
+    const altitude_m = this.state.position.z;
+    const verticalSpeed_ftmin = (this.earthFrameVerticalVelocity || 0) * 196.85;
+
+    const airspeeds = this.calculateAirspeeds();
+    const tas_ms = airspeeds.trueAirspeedMS || 0;
+    const speedOfSound = this.environment.speedOfSound || NewFlightPhysicsService.DEFAULT_ENVIRONMENT.SPEED_OF_SOUND;
+
+    const p = this.state.angularRates.p || 0;
+    const q = this.state.angularRates.q || 0;
+    const r = this.state.angularRates.r || 0;
+
+    const hardLanding = altitude_m <= 0 && verticalSpeed_ftmin < -2000;
+    const supersonic = tas_ms > speedOfSound;
+
+    const maxAngularRate = this.aircraft.maxAngularRate || 3.0;
+    const extremeAngular = Math.abs(p) > maxAngularRate || Math.abs(q) > maxAngularRate || Math.abs(r) > maxAngularRate;
+
+    const mass = this.aircraft.mass || 1;
+    const ax = (this.forces?.x || 0) / mass;
+    const ay = (this.forces?.y || 0) / mass;
+    const az = (this.forces?.z || 0) / mass;
+    const accel = Math.sqrt(ax * ax + ay * ay + az * az);
+    const maxAccel = 5 * this.GRAVITY;
+    const extremeAccel = accel > maxAccel;
+
+    const extremeNumeric =
+      !Number.isFinite(airspeeds.indicatedAirspeed) ||
+      !Number.isFinite(verticalSpeed_ftmin) ||
+      !Number.isFinite(tas_ms) ||
+      !Number.isFinite(p) ||
+      !Number.isFinite(q) ||
+      !Number.isFinite(r);
+
+    return hardLanding || supersonic || extremeAngular || extremeAccel || extremeNumeric;
   }
   
   /**
@@ -1377,31 +1459,34 @@ class NewFlightPhysicsService {
    */
   getAlarms() {
     const alarms = [];
-    
-    if (this.state.position.z > -10 && this.state.position.z < 0) {
-      alarms.push('LOW ALTITUDE WARNING');
+    const verticalSpeed_ftmin = this.earthFrameVerticalVelocity * 196.85;
+    const timeToCrash = this.getTimeToCrash();
+    const airspeeds = this.calculateAirspeeds();
+    const indicatedAirspeed = airspeeds.indicatedAirspeed || 0;
+    const pitchDeg = this.state.orientation.theta * 180 / Math.PI;
+    const bankDeg = Math.abs(this.state.orientation.phi * 180 / Math.PI);
+    const stallSpeed = this.aircraft.stallSpeed || 125;
+
+    if (verticalSpeed_ftmin < -2000) {
+      alarms.push('SINKRATE');
     }
-    
-    if (Math.abs(this.state.orientation.phi) > Math.PI/3) {
-      alarms.push('EXCESSIVE BANK ANGLE');
+
+    if (timeToCrash !== null && timeToCrash <= 20 && verticalSpeed_ftmin < -1000) {
+      alarms.push('TERRAIN');
     }
-    
-    if (Math.abs(this.state.orientation.theta) > Math.PI/4) {
-      alarms.push('EXCESSIVE PITCH ANGLE');
+
+    if (timeToCrash !== null && timeToCrash <= 10 && verticalSpeed_ftmin < -1000) {
+      alarms.push('PULL UP');
     }
-    
-    if (this.state.velocity.w < -15) {
-      alarms.push('RAPID DESCENT');
+
+    if (bankDeg > 45) {
+      alarms.push('BANK ANGLE');
     }
-    
-    if (this.state.fuel < 10) {
-      alarms.push('LOW FUEL');
+
+    if (indicatedAirspeed < stallSpeed || Math.abs(pitchDeg) > 30) {
+      alarms.push('STALL');
     }
-    
-    if (this.getAutopilotStatus() && this.state.position.z > -50) {
-      alarms.push('AUTOPILOT - TERRAIN WARNING');
-    }
-    
+
     return alarms;
   }
   

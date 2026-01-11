@@ -4,6 +4,7 @@ import React from 'react';
 const CentralPanel = ({ flightState }) => {
   // FIXED: Add safety checks for all properties
   const alarms = flightState.alarms || [];
+  const crashWarning = flightState.crashWarning || '';
   const engineN1 = flightState.engineN1 || [0, 0];
   const engineN2 = flightState.engineN2 || [0, 0];
   const engineEGT = flightState.engineEGT || [0, 0];
@@ -155,21 +156,33 @@ const CentralPanel = ({ flightState }) => {
         } 
       }, 'SYSTEM STATUS'),
       React.createElement('div', { className: 'status-items' },
+        crashWarning 
+          ? React.createElement('div', { 
+              className: 'alarm-item', 
+              style: {
+                color: '#ff4444',
+                marginBottom: '4px',
+                fontSize: '12px',
+                fontWeight: 'bold',
+                textTransform: 'uppercase'
+              }
+            }, `WARN: ${crashWarning}`)
+          : null,
         alarms.length > 0 
-          ? alarms.slice(0, 2).map((alarm, index) => // Only show top 2 alarms
+          ? alarms.map((alarm, index) =>
               React.createElement('div', { 
-                key: index, 
+                key: `alarm-${index}`, 
                 className: 'alarm-item', 
                 style: {
-                  color: '#ff4444',
-                  marginBottom: '3px',
+                  color: '#ff9999',
+                  marginBottom: '2px',
                   fontSize: '10px',
                   fontWeight: 'bold',
                   textTransform: 'uppercase'
                 }
-              }, alarm)
+              }, index + 1, ': ', alarm)
             )
-          : React.createElement('span', { 
+          : !crashWarning && React.createElement('span', { 
               className: 'status-ok', 
               style: {
                 color: '#00ff00',
@@ -178,7 +191,7 @@ const CentralPanel = ({ flightState }) => {
                 textAlign: 'center'
               }
             }, 'ALL SYSTEMS NORMAL')
-      )
+      ),
     )
   );
 };

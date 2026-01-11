@@ -74,12 +74,12 @@ function App() {
     loadAircraft();
   }, []);
 
-  // Calculate flight plan when airports and aircraft are selected
+  // Calculate flight plan when airports, aircraft, payload, and fuel reserve are selected
   useEffect(() => {
     const calculateFlightPlanAsync = async () => {
       if (selectedDeparture && selectedArrival && aircraftModel) {
         try {
-          const plan = await calculateFlightPlan(selectedDeparture, selectedArrival, aircraftModel, payload);
+          const plan = await calculateFlightPlan(selectedDeparture, selectedArrival, aircraftModel, payload, fuelReserve);
           setFlightPlan(plan);
         } catch (error) {
           console.error('Error calculating flight plan:', error);
@@ -89,9 +89,8 @@ function App() {
         setFlightPlan(null);
       }
     };
-    
     calculateFlightPlanAsync();
-  }, [selectedDeparture, selectedArrival, aircraftModel, payload]);
+  }, [selectedDeparture, selectedArrival, aircraftModel, payload, fuelReserve]);
 
   const handleSearch = (query) => {
     searchAirports(query);

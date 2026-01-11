@@ -42,7 +42,7 @@
         "y": 1.5,
         "z": 1.0
       },
-      "specificFuelConsumption": 0.0000021,
+      "specificFuelConsumption": 0.000021,
       "elevatorEffectiveness": 0.00105,
       "aileronEffectiveness": 0.00052,
       "rudderEffectiveness": 0.00031,
@@ -99,7 +99,7 @@
         "y": 1.5,
         "z": 1.0
       },
-      "specificFuelConsumption": 0.000020,
+      "specificFuelConsumption": 0.000060,
       "elevatorEffectiveness": 0.00102,
       "aileronEffectiveness": 0.00051,
       "rudderEffectiveness": 0.00030,
@@ -156,7 +156,7 @@
         "y": 1.5,
         "z": 1.0
       },
-      "specificFuelConsumption": 0.000017,
+      "specificFuelConsumption": 0.000051,
       "elevatorEffectiveness": 0.00088,
       "aileronEffectiveness": 0.00044,
       "rudderEffectiveness": 0.00026,
@@ -443,7 +443,7 @@
         "y": 1.5,
         "z": 1.0
       },
-      "specificFuelConsumption": 0.000019,
+      "specificFuelConsumption": 0.000057,
       "elevatorEffectiveness": 0.00095,
       "aileronEffectiveness": 0.00047,
       "rudderEffectiveness": 0.00028,
@@ -500,7 +500,7 @@
         "y": 1.5,
         "z": 1.0
       },
-      "specificFuelConsumption": 0.000018,
+      "specificFuelConsumption": 0.000054,
       "elevatorEffectiveness": 0.0009,
       "aileronEffectiveness": 0.00045,
       "rudderEffectiveness": 0.00027,
@@ -557,7 +557,7 @@
         "y": 1.5,
         "z": 1.0
       },
-      "specificFuelConsumption": 0.00002,
+      "specificFuelConsumption": 0.00006,
       "elevatorEffectiveness": 0.001,
       "aileronEffectiveness": 0.0005,
       "rudderEffectiveness": 0.0003,

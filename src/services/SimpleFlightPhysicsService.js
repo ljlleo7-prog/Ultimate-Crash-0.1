@@ -88,12 +88,15 @@ class SimpleFlightPhysicsService {
     // Force accumulators (for compatibility with realistic model)
     this.thrustForces = { x: 0, y: 0, z: 0 };
 
-    // Initial state - level cruise at FL350, 450 KTS
+    const cruiseAltitudeFt = Number(this.aircraft.initialCruiseAltitudeFt) || 35000;
+    const cruiseAltitudeM = cruiseAltitudeFt * 0.3048;
+
+    // Initial state - level cruise at configured altitude, 450 KTS
     this.state = {
       position: {
         x: 0,     // North position (m)
         y: 0,     // East position (m)
-        z: 10668  // Altitude: 35,000 ft = 10,668 m (POSITIVE = above ground level)
+        z: cruiseAltitudeM
       },
       velocity: {
         u: 231.5, // Forward velocity (450 KTS TAS)
@@ -129,7 +132,8 @@ class SimpleFlightPhysicsService {
       pressure: SimpleFlightPhysicsService.DEFAULT_ENVIRONMENT.PRESSURE,
       temperature: SimpleFlightPhysicsService.DEFAULT_ENVIRONMENT.TEMPERATURE,
       speedOfSound: SimpleFlightPhysicsService.DEFAULT_ENVIRONMENT.SPEED_OF_SOUND,
-      wind: { x: 0, y: 0, z: 0 }
+      wind: { x: 0, y: 0, z: 0 },
+      windSpeedKts: Number(this.aircraft.windSpeedKts) || 0
     };
 
     // Flight stage tracking

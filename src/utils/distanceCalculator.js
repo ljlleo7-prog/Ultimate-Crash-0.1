@@ -65,7 +65,7 @@ async function calculateFuelConsumption(distance, aircraftModel, payload = 0, re
 }
 
 // Calculate complete flight plan with aircraft-specific data
-async function calculateFlightPlan(departureAirport, arrivalAirport, aircraftModel, payload = 0) {
+async function calculateFlightPlan(departureAirport, arrivalAirport, aircraftModel, payload = 0, fuelReserve = 0.1) {
   if (!departureAirport || !arrivalAirport) {
     throw new Error('Both departure and arrival airports are required');
   }
@@ -78,7 +78,7 @@ async function calculateFlightPlan(departureAirport, arrivalAirport, aircraftMod
   );
 
   const flightTime = calculateFlightTime(distance);
-  const fuelData = await calculateFuelConsumption(distance, aircraftModel, payload);
+  const fuelData = await calculateFuelConsumption(distance, aircraftModel, payload, fuelReserve);
   
   // Get aircraft performance data
   const aircraft = await aircraftService.getAircraftByModel(aircraftModel);

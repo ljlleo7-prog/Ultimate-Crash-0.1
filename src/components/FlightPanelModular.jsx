@@ -71,7 +71,8 @@ const FlightPanelModular = ({ flightData, onActionRequest, aircraftModel }) => {
     // Crash Detection
     crashWarning: null,
     timeToCrash: null,
-    hasCrashed: false
+    hasCrashed: false,
+    frame: flightData?.frame || 0
   });
   
   // Update flightState when flightData changes
@@ -109,7 +110,8 @@ const FlightPanelModular = ({ flightData, onActionRequest, aircraftModel }) => {
         flightDirector: prevState.flightDirector,
         altitudeHold: prevState.altitudeHold,
         headingHold: prevState.headingHold,
-        autopilotTargets: prevState.autopilotTargets
+        autopilotTargets: prevState.autopilotTargets,
+        frame: typeof flightData.frame === 'number' ? flightData.frame : prevState.frame
       }));
     }
   }, [flightData]);
@@ -117,14 +119,32 @@ const FlightPanelModular = ({ flightData, onActionRequest, aircraftModel }) => {
   const [flashActive, setFlashActive] = useState(false);
   const [flashText, setFlashText] = useState('');
   const [showCrashPanel, setShowCrashPanel] = useState(false);
+  const [lastAlertTime, setLastAlertTime] = useState(0);
+  const alertCooldown = 3000;
 
   // Handle crash warnings and alerts
   useEffect(() => {
-    if (flightData?.crashWarning) {
-      setFlashText(flightData.crashWarning);
-      setFlashActive(true);
+    if (!flightData?.crashWarning) {
+      return;
     }
-  }, [flightData?.crashWarning]);
+    const now = Date.now();
+    if (now - lastAlertTime < alertCooldown) {
+      return;
+    }
+    setFlashText(flightData.crashWarning);
+    setFlashActive(true);
+  }, [flightData?.crashWarning, lastAlertTime]);
+
+  const handleAlertComplete = useCallback(() => {
+    setFlashActive(false);
+    setLastAlertTime(Date.now());
+  }, []);
+
+  useEffect(() => {
+    if (flightData?.hasCrashed) {
+      setShowCrashPanel(true);
+    }
+  }, [flightData?.hasCrashed]);
 
   // Control functions - Updated to use parent's physics service
   const controlPitch = (amount) => {
@@ -200,7 +220,7 @@ const FlightPanelModular = ({ flightData, onActionRequest, aircraftModel }) => {
   // Main render function
   return React.createElement('div', { className: 'modern-flight-panel', style: { userSelect: 'none' } },
     // Crash warning flash
-    React.createElement(CrashWarningFlash, { flashActive, flashText }),
+    React.createElement(CrashWarningFlash, { flashActive, flashText, onAlertComplete: handleAlertComplete }),
     
     // Crash panel (if crashed)
     React.createElement(CrashPanel, { showCrashPanel, resetFlight }),
@@ -239,6 +259,21 @@ const FlightPanelModular = ({ flightData, onActionRequest, aircraftModel }) => {
         }
       }, 'Test: 35000ft, 250kts')
     ),
+
+    // Debug frame panel
+    React.createElement('div', {
+      style: {
+        position: 'absolute',
+        bottom: '10px',
+        left: '10px',
+        padding: '6px 10px',
+        background: 'rgba(0, 0, 0, 0.7)',
+        color: '#0f0',
+        fontSize: '12px',
+        borderRadius: '4px',
+        zIndex: 1000
+      }
+    }, `Frame: ${flightState.frame !== undefined ? flightState.frame : 0}`),
     
     // Modern cockpit layout
     React.createElement('div', { className: 'modern-cockpit' },

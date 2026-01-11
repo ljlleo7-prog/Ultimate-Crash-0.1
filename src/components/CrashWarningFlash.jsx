@@ -43,9 +43,9 @@ const CrashWarningFlash = ({ flashActive, flashText, onAlertComplete }) => {
     className: warningClass,
     style: {
       position: 'fixed',
-      top: '20%',
+      top: '50%',
       left: '50%',
-      transform: 'translateX(-50%)',
+      transform: 'translate(-50%, -50%)',
       width: 'auto',
       minWidth: '300px',
       height: 'auto',
