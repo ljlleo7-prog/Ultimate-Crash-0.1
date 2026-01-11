@@ -70,6 +70,7 @@ const FlightInProgress = ({
 
   // Control state for UI components
   const [throttleControl, setThrottleControl] = useState(47); // Default 47% as mentioned by user
+  const [commandInput, setCommandInput] = useState('');
 
   // ✅ CLEAN ARCHITECTURE: Single throttle control handler (reverted for responsiveness)
   const handleThrustControl = (engineIndex, throttleValue) => {
@@ -106,6 +107,15 @@ const FlightInProgress = ({
     setAirBrakes(position);
   };
 
+  const handleCommandSubmit = (event) => {
+    event.preventDefault();
+    const trimmed = commandInput.trim();
+    if (!trimmed) {
+      return;
+    }
+    console.log('🧭 COMMAND INPUT:', trimmed);
+    setCommandInput('');
+  };
 
 
 
@@ -170,156 +180,248 @@ const FlightInProgress = ({
       height: '100vh',
       background: '#0a0a0a',
       overflow: 'hidden',
-      display: 'flex'
+      display: 'flex',
+      flexDirection: 'column'
     }}>
-
-      <div style={{
-        position: 'fixed',
-        top: '10px',
-        right: '10px',
-        background: 'rgba(0,0,0,0.9)',
-        color: 'lime',
-        padding: '10px',
-        borderRadius: '6px',
-        fontSize: '12px',
-        fontFamily: 'monospace',
-        zIndex: 1000,
-        border: '1px solid #333',
-        minWidth: '220px'
-      }}>
-        <div style={{ fontWeight: 700, marginBottom: '6px' }}>FORCES</div>
-        <div>Thrust: {(((flightData && typeof flightData.thrust === 'number') ? flightData.thrust : 0) / 1000).toFixed(1)} kN</div>
-        <div>Drag: {(((flightData && typeof flightData.drag === 'number') ? flightData.drag : 0) / 1000).toFixed(1)} kN</div>
-      </div>
-
-      {/* Center - Main Flight Panel */}
-      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-        <FlightPanelModular
-          flightData={flightData}
-          onActionRequest={(action, payload) => {
-            // Handle different payload types
-            const payloadStr = typeof payload === 'number' ? payload.toFixed(5) : JSON.stringify(payload);
-            console.log(`📡 UI Action: ${action} = ${payloadStr}`);
-            
-            // Handle specific actions
-            switch (action) {
-              case 'throttle':
-                // FlightPanelModular sends throttle in 0-1 range, pass directly to physics
-                handleThrustControl(0, payload); // Engine 1, throttle in 0-1 range
-                console.log(`📡 FlightPanel Action: ${action} = ${payload}`);
-                break;
-              case 'flaps':
-                handleFlapsControl(payload);
-                console.log(`📡 FlightPanel Action: ${action} = ${payload}`);
-                break;
-              case 'airBrakes':
-                handleAirBrakesControl(payload);
-                console.log(`📡 FlightPanel Action: ${action} = ${payload}`);
-                break;
-              case 'gear':
-                handleGearControl(payload);
-                console.log(`📡 FlightPanel Action: ${action} = ${payload}`);
-                break;
-              case 'pitch':
-                // Handle pitch control from flight panel
-                setPitch(payload);
-                console.log(`📡 FlightPanel Action: ${action} = ${payload}`);
-                break;
-              case 'roll':
-                // Handle roll control from flight panel
-                setRoll(payload);
-                console.log(`📡 FlightPanel Action: ${action} = ${payload}`);
-                break;
-              case 'yaw':
-                // Handle yaw control from flight panel
-                setYaw(payload);
-                console.log(`📡 FlightPanel Action: ${action} = ${payload}`);
-                break;
-              case 'toggle-autopilot': {
-                if (physicsService && typeof physicsService.setAutopilot === 'function') {
-                  const status = typeof physicsService.getAutopilotStatus === 'function'
-                    ? physicsService.getAutopilotStatus()
-                    : null;
-                  const engaged = status && typeof status.engaged === 'boolean' ? status.engaged : false;
-                  physicsService.setAutopilot(!engaged);
-                }
-                console.log(`📡 FlightPanel Action: ${action}`);
-                break;
-              }
-              case 'set-autopilot-targets': {
-                if (physicsService && typeof physicsService.updateAutopilotTargets === 'function' && payload) {
-                  const altitudeFt = typeof payload.altitude === 'number'
-                    ? payload.altitude
-                    : (flightData && typeof flightData.altitude === 'number' ? flightData.altitude : 0);
-                  const iasKts = typeof payload.ias === 'number'
-                    ? payload.ias
-                    : (flightData && typeof flightData.indicatedAirspeed === 'number' ? flightData.indicatedAirspeed : 0);
-                  const targets = {
-                    altitude: altitudeFt / 3.28084,
-                    speed: iasKts / 1.94384
-                  };
-                  physicsService.updateAutopilotTargets(targets);
-                }
-                console.log(`📡 FlightPanel Action: ${action} = ${JSON.stringify(payload)}`);
-                break;
-              }
-              default:
-                console.log('Unhandled action:', action);
-            }
-          }}
-        />
-        
-        {/* Integrated Control Panel at Bottom */}
-        <div style={{ padding: '10px', overflow: 'hidden' }}>
-          <IntegratedControlPanel
-            controlThrust={handleThrustControl}
-            controlFlaps={handleFlapsControl}
-            controlGear={handleGearControl}
-            controlAirBrakes={handleAirBrakesControl}
-            flightState={flightData}
-          />
-        </div>
-      </div>
-      
-
-      
-      {/* Crash/Reset Handling - Disabled for now */}
-      {/* 
-      {isCrashed && (
-        <div style={{
-          position: 'fixed',
-          top: '50%',
-          left: '50%',
-          transform: 'translate(-50%, -50%)',
-          background: 'rgba(220, 38, 38, 0.95)',
-          color: 'white',
-          padding: '30px',
-          borderRadius: '15px',
-          textAlign: 'center',
-          zIndex: 1000,
-          border: '3px solid #dc2626'
-        }}>
-          <div style={{ fontSize: '24px', marginBottom: '15px' }}>💥 Flight Ended</div>
-          <div style={{ marginBottom: '20px' }}>
-            Aircraft has crashed. Reset to start a new flight?
-          </div>
-          <button
-            onClick={resetAircraft}
+      <div
+        style={{
+          padding: '12px 20px',
+          borderBottom: '1px solid rgba(148, 163, 184, 0.4)',
+          background: 'linear-gradient(to right, rgba(15,23,42,0.95), rgba(30,64,175,0.85))',
+          display: 'flex',
+          gap: '16px',
+          alignItems: 'flex-start',
+          justifyContent: 'space-between',
+          zIndex: 10
+        }}
+      >
+        <div style={{ flex: 2, minWidth: 0 }}>
+          <div
             style={{
-              background: '#dc2626',
-              color: 'white',
-              border: 'none',
-              padding: '12px 25px',
-              borderRadius: '8px',
-              fontSize: '16px',
-              cursor: 'pointer'
+              fontSize: '12px',
+              letterSpacing: '0.14em',
+              textTransform: 'uppercase',
+              color: '#9CA3AF',
+              marginBottom: '4px'
             }}
           >
-            Reset Flight
-          </button>
+            Situation
+          </div>
+          <div
+            style={{
+              fontSize: '18px',
+              fontWeight: 600,
+              color: '#E5E7EB',
+              marginBottom: '4px'
+            }}
+          >
+            Placeholder: unfolding in-flight emergency narrative goes here.
+          </div>
+          <div
+            style={{
+              fontSize: '13px',
+              color: '#D1D5DB',
+              opacity: 0.9
+            }}
+          >
+            Placeholder: concise description of the current failure, risks, and time pressure.
+          </div>
         </div>
-      )} 
-      */}
+        <form
+          onSubmit={handleCommandSubmit}
+          style={{
+            flex: 1.3,
+            minWidth: '260px',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '6px'
+          }}
+        >
+          <label
+            style={{
+              fontSize: '12px',
+              textTransform: 'uppercase',
+              letterSpacing: '0.12em',
+              color: '#9CA3AF'
+            }}
+          >
+            Captain command
+          </label>
+          <div style={{ display: 'flex', gap: '8px' }}>
+            <input
+              type="text"
+              value={commandInput}
+              onChange={(event) => setCommandInput(event.target.value)}
+              placeholder="Placeholder: type your decision or cockpit command"
+              style={{
+                flex: 1,
+                padding: '8px 10px',
+                borderRadius: '6px',
+                border: '1px solid rgba(148,163,184,0.6)',
+                background: 'rgba(15,23,42,0.9)',
+                color: '#E5E7EB',
+                fontSize: '13px',
+                outline: 'none'
+              }}
+            />
+            <button
+              type="submit"
+              style={{
+                padding: '8px 14px',
+                borderRadius: '6px',
+                border: 'none',
+                background: 'linear-gradient(135deg, #DC2626, #F97316)',
+                color: 'white',
+                fontWeight: 600,
+                fontSize: '13px',
+                cursor: 'pointer',
+                whiteSpace: 'nowrap'
+              }}
+            >
+              Send
+            </button>
+          </div>
+          <div
+            style={{
+              fontSize: '11px',
+              color: '#9CA3AF'
+            }}
+          >
+            Placeholder: commands are logged only for now, not yet linked to systems.
+          </div>
+        </form>
+      </div>
+
+      <div style={{ flex: 1, display: 'flex', position: 'relative' }}>
+        <div style={{
+          position: 'fixed',
+          top: '10px',
+          right: '10px',
+          background: 'rgba(0,0,0,0.9)',
+          color: 'lime',
+          padding: '10px',
+          borderRadius: '6px',
+          fontSize: '12px',
+          fontFamily: 'monospace',
+          zIndex: 1000,
+          border: '1px solid #333',
+          minWidth: '220px'
+        }}>
+          <div style={{ fontWeight: 700, marginBottom: '6px' }}>FORCES</div>
+          <div>Thrust: {(((flightData && typeof flightData.thrust === 'number') ? flightData.thrust : 0) / 1000).toFixed(1)} kN</div>
+          <div>Drag: {(((flightData && typeof flightData.drag === 'number') ? flightData.drag : 0) / 1000).toFixed(1)} kN</div>
+        </div>
+
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+          <FlightPanelModular
+            flightData={flightData}
+            onActionRequest={(action, payload) => {
+              const payloadStr = typeof payload === 'number' ? payload.toFixed(5) : JSON.stringify(payload);
+              console.log(`📡 UI Action: ${action} = ${payloadStr}`);
+
+              switch (action) {
+                case 'throttle':
+                  handleThrustControl(0, payload);
+                  console.log(`📡 FlightPanel Action: ${action} = ${payload}`);
+                  break;
+                case 'flaps':
+                  handleFlapsControl(payload);
+                  console.log(`📡 FlightPanel Action: ${action} = ${payload}`);
+                  break;
+                case 'airBrakes':
+                  handleAirBrakesControl(payload);
+                  console.log(`📡 FlightPanel Action: ${action} = ${payload}`);
+                  break;
+                case 'gear':
+                  handleGearControl(payload);
+                  console.log(`📡 FlightPanel Action: ${action} = ${payload}`);
+                  break;
+                case 'pitch':
+                  setPitch(payload);
+                  console.log(`📡 FlightPanel Action: ${action} = ${payload}`);
+                  break;
+                case 'roll':
+                  setRoll(payload);
+                  console.log(`📡 FlightPanel Action: ${action} = ${payload}`);
+                  break;
+                case 'yaw':
+                  setYaw(payload);
+                  console.log(`📡 FlightPanel Action: ${action} = ${payload}`);
+                  break;
+                case 'toggle-autopilot': {
+                  if (physicsService && typeof physicsService.setAutopilot === 'function') {
+                    const status = typeof physicsService.getAutopilotStatus === 'function'
+                      ? physicsService.getAutopilotStatus()
+                      : null;
+                    const engaged = status && typeof status.engaged === 'boolean' ? status.engaged : false;
+                    physicsService.setAutopilot(!engaged);
+                  }
+                  console.log(`📡 FlightPanel Action: ${action}`);
+                  break;
+                }
+                case 'set-autopilot-targets': {
+                  if (physicsService && typeof physicsService.updateAutopilotTargets === 'function' && payload) {
+                    const altitudeFt = typeof payload.altitude === 'number'
+                      ? payload.altitude
+                      : (flightData && typeof flightData.altitude === 'number' ? flightData.altitude : 0);
+                    const iasKts = typeof payload.ias === 'number'
+                      ? payload.ias
+                      : (flightData && typeof flightData.indicatedAirspeed === 'number' ? flightData.indicatedAirspeed : 0);
+                    const targets = {
+                      altitude: altitudeFt / 3.28084,
+                      speed: iasKts / 1.94384
+                    };
+                    physicsService.updateAutopilotTargets(targets);
+                  }
+                  console.log(`📡 FlightPanel Action: ${action} = ${JSON.stringify(payload)}`);
+                  break;
+                }
+                default:
+                  console.log('Unhandled action:', action);
+              }
+            }}
+          />
+
+          <div style={{ padding: '10px', overflow: 'hidden' }}>
+            <IntegratedControlPanel
+              controlThrust={handleThrustControl}
+              controlFlaps={handleFlapsControl}
+              controlGear={handleGearControl}
+              controlAirBrakes={handleAirBrakesControl}
+              flightState={flightData}
+            />
+          </div>
+        </div>
+      </div>
+
+      {isCrashed && (
+        <div className="end-scene-overlay">
+          <div className="end-scene-content">
+            <div style={{ fontSize: '24px', marginBottom: '12px' }}>Flight Ended</div>
+            <div style={{ marginBottom: '20px', maxWidth: '420px' }}>
+              Placeholder: post-incident summary and narrative debrief will appear here.
+            </div>
+            <button
+              onClick={() => {
+                resetAircraft();
+                handleResetFlight();
+              }}
+              style={{
+                background: 'linear-gradient(135deg, #DC2626, #F97316)',
+                color: 'white',
+                border: 'none',
+                padding: '12px 25px',
+                borderRadius: '8px',
+                fontSize: '15px',
+                cursor: 'pointer',
+                fontWeight: 600
+              }}
+            >
+              Return to Initialization
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

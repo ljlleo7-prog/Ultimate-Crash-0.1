@@ -101,23 +101,22 @@ function App() {
       alert('Please select both departure and arrival airports');
       return;
     }
-    
-    // Start cinematic phase
+    const fadeDuration = 2500;
+    const reviewDuration = 5000;
+
     setCinematicPhase('fade_out');
-    
-    // After fade out, show cinematic review
+
     setTimeout(() => {
       setCinematicPhase('cinematic_review');
-      
-      // After cinematic review, start simulation
+
       setTimeout(() => {
         setCinematicPhase('fade_in');
         setTimeout(() => {
           setFlightInitialized(true);
           setCinematicPhase('none');
-        }, 1000);
-      }, 5000); // 5 seconds for cinematic review
-    }, 1000); // 1 second fade out
+        }, fadeDuration);
+      }, reviewDuration);
+    }, fadeDuration);
   };
 
   const handleResetFlight = () => {
