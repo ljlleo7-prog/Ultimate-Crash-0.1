@@ -80,7 +80,7 @@ class NewFlightPhysicsService {
 
   static DEFAULT_CONTROLS = {
     THROTTLE: 0.55, // 55% thrust for cruise
-    TRIM: 20     // Initial trim wheel position (displays as 11 units)
+    TRIM: 0     // Initial trim wheel position (displays as 11 units)
   };
 
   static DEFAULT_AUTOPILOT_LIMITS = {
@@ -115,7 +115,7 @@ class NewFlightPhysicsService {
     this.propulsionManager = new PropulsionManager({
       engineCount: this.aircraft.engineCount || 2,
       engineConfiguration: this.getEngineConfiguration(this.aircraft.engineCount || 2),
-      maxThrustPerEngine: this.aircraft.maxThrustPerEngine || 85000
+      maxThrustPerEngine: this.aircraft.maxThrustPerEngine || 120000
     });
     
     // Initial state - level cruise at FL350, 450 KTS
@@ -246,7 +246,7 @@ class NewFlightPhysicsService {
       
       // Engine properties
       engineCount: 2,           // Number of engines
-      maxThrustPerEngine: 85000, // N per engine
+      maxThrustPerEngine: 120000, // N per engine
       
       // Aerodynamic coefficients
       liftCurveSlope: 5.7,       // per radian
@@ -597,8 +597,8 @@ class NewFlightPhysicsService {
     // ✅ ENHANCED: Drag coefficient with proper AoA effect
     // Cd = Cd₀ + k·Cl² + Cd_alpha·|α| (drag increases with AoA magnitude)
     // PLUS: Direct head-on area effect: sin(|α|) for frontal area increase
-    const cdAlpha = 0.5; // Increased drag coefficient slope with AoA
-    const frontalAreaFactor = 0.8; // Factor for frontal area increase with AoA
+    const cdAlpha = 0.3; // Increased drag coefficient slope with AoA
+    const frontalAreaFactor = 0.3; // Factor for frontal area increase with AoA
     
     let cd = this.aircraft.zeroLiftDragCoefficient + 
              this.aircraft.inducedDragFactor * cl * cl + 
@@ -1193,26 +1193,39 @@ class NewFlightPhysicsService {
       console.warn('⚠️ No engine data available from propulsion manager:', this.aircraft.model);
     }
     
-    // For display purposes, use the first engine's data (or fallback values)
-    const firstEngine = engineData[0] || {};
-    const secondEngine = engineData[1] || {};
+    // For display purposes, generate parameters for all engines based on actual engine count
+    const engineCount = this.aircraft.engineCount || 2;
     
     // Generate final values with realistic vibrations
     const localVibrationScale = 2;
-    const engine1N1 = Math.min(100, Math.max(minN1Idle, (firstEngine.n1 || minN1Idle) + (Math.random() - 0.5) * localVibrationScale));
-    const engine2N1 = Math.min(100, Math.max(minN1Idle, (secondEngine.n1 || minN1Idle) + (Math.random() - 0.5) * localVibrationScale + (Math.random() - 0.5) * 1.5));
     
-    const engine1N2 = Math.min(100, Math.max(50, (firstEngine.n2 || 70) + (Math.random() - 0.5) * (localVibrationScale * 0.8)));
-    const engine2N2 = Math.min(100, Math.max(50, (secondEngine.n2 || 70) + (Math.random() - 0.5) * (localVibrationScale * 0.8) + (Math.random() - 0.5) * 2.0));
+    // Create arrays for each engine parameter
+    const n1 = [];
+    const n2 = [];
+    const egt = [];
     
-    const engine1EGT = Math.min(900, Math.max(400, (firstEngine.egt || 500) + (Math.random() - 0.5) * (localVibrationScale * 10)));
-    const engine2EGT = Math.min(900, Math.max(400, (secondEngine.egt || 500) + (Math.random() - 0.5) * (localVibrationScale * 10) + (Math.random() - 0.5) * 30));
+    // Generate parameters for each engine based on actual engine count
+    for (let i = 0; i < engineCount; i++) {
+      const engine = engineData[i] || {};
+      const randomVibration = (Math.random() - 0.5) * localVibrationScale;
+      const engineSpecificVariation = (Math.random() - 0.5) * 1.5;
+      
+      // Calculate parameters for this engine
+      const engineN1 = Math.min(100, Math.max(minN1Idle, (engine.n1 || minN1Idle) + randomVibration + engineSpecificVariation));
+      const engineN2 = Math.min(100, Math.max(50, (engine.n2 || 70) + (Math.random() - 0.5) * (localVibrationScale * 0.8) + (Math.random() - 0.5) * 2.0));
+      const engineEGT = Math.min(900, Math.max(400, (engine.egt || 500) + (Math.random() - 0.5) * (localVibrationScale * 10) + (Math.random() - 0.5) * 30));
+      
+      // Add to arrays
+      n1.push(engineN1);
+      n2.push(engineN2);
+      egt.push(engineEGT);
+    }
     
     // Return engine parameters as arrays for backward compatibility
     const engineParams = {
-      n1: [engine1N1, engine2N1],
-      n2: [engine1N2, engine2N2],
-      egt: [engine1EGT, engine2EGT]
+      n1: n1,
+      n2: n2,
+      egt: egt
     };
     
     // Simulate fuel consumption using engine performance curves
@@ -1253,10 +1266,12 @@ class NewFlightPhysicsService {
       verticalSpeed: verticalSpeed,
       altitude: altitude_ft,
       
-      // Engine - arrays for each engine
+      // Engine - arrays for each engine (backward compatibility)
       engineN1: engineParams.n1,
       engineN2: engineParams.n2,
       engineEGT: engineParams.egt,
+      // Engine parameters object (for compatibility with SimpleFlightPhysicsService)
+      engineParams: engineParams,
       fuel: this.state.fuel !== undefined ? this.state.fuel : 100,
       
       // Systems

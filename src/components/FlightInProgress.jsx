@@ -161,6 +161,25 @@ const FlightInProgress = ({
       display: 'flex'
     }}>
 
+      <div style={{
+        position: 'fixed',
+        top: '10px',
+        right: '10px',
+        background: 'rgba(0,0,0,0.9)',
+        color: 'lime',
+        padding: '10px',
+        borderRadius: '6px',
+        fontSize: '12px',
+        fontFamily: 'monospace',
+        zIndex: 1000,
+        border: '1px solid #333',
+        minWidth: '220px'
+      }}>
+        <div style={{ fontWeight: 700, marginBottom: '6px' }}>FORCES</div>
+        <div>Thrust: {(Math.max(0, flightData?.thrust || 0) / 1000).toFixed(1)} kN</div>
+        <div>Drag: {(Math.max(0, flightData?.drag || 0) / 1000).toFixed(1)} kN</div>
+      </div>
+
       {/* Center - Main Flight Panel */}
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
         <FlightPanelModular

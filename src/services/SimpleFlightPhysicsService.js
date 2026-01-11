@@ -1,26 +1,92 @@
 /**
- * Simple Flight Physics Service - Kinematics-based simplified physics model
- * Built for rookies and amateurs with simplified linear/quadratic approximations
- * while maintaining realistic visual appearance
+ * Simple Flight Physics Service - Animation-based simplified physics model
+ * Built for rookies and amateurs with realistic flight stage animations
+ * while maintaining intuitive controls and responsiveness
  */
 
 class SimpleFlightPhysicsService {
   static DEFAULT_ENVIRONMENT = {
     DENSITY: 0.379,     // kg/m³ at FL350
-    PRESSURE: 23840,   // Pa at FL350
+    PRESSURE: 23840,    // Pa at FL350
     TEMPERATURE: 229,   // K at FL350
     SPEED_OF_SOUND: 295 // m/s at FL350
   };
 
   static DEFAULT_CONTROLS = {
-    THROTTLE: 0.55, // 55% thrust for cruise
-    TRIM: 20     // Initial trim wheel position
+    THROTTLE: 0.55,     // 55% thrust for cruise
+    TRIM: 20,           // Initial trim wheel position
+    PITCH_SENSITIVITY: 5.0,  // Pitch sensitivity multiplier
+    ROLL_SENSITIVITY: 1.5,   // Roll sensitivity multiplier
+    YAW_SENSITIVITY: 2.0     // Yaw sensitivity multiplier
+  };
+
+  // Flight stage specific parameters for realistic animations
+  static FLIGHT_STAGE_PARAMS = {
+    'push-back': {
+      speedRange: [0, 5],     // m/s
+      verticalSpeed: 0,       // m/s
+      pitchRange: [-1, 1],    // degrees
+      rollRange: [-2, 2],     // degrees
+      throttleResponse: 1.0   // How responsive engine is to throttle
+    },
+    'taxi': {
+      speedRange: [0, 15],    // m/s
+      verticalSpeed: 0,       // m/s
+      pitchRange: [-1, 1],    // degrees
+      rollRange: [-2, 2],     // degrees
+      throttleResponse: 1.0   // How responsive engine is to throttle
+    },
+    'take-off': {
+      speedRange: [70, 100],  // m/s
+      verticalSpeed: 8,       // m/s
+      pitchRange: [5, 15],    // degrees
+      rollRange: [-5, 5],     // degrees
+      throttleResponse: 1.0   // How responsive engine is to throttle
+    },
+    'climb': {
+      speedRange: [100, 200], // m/s
+      verticalSpeed: 5,       // m/s
+      pitchRange: [2, 10],    // degrees
+      rollRange: [-10, 10],   // degrees
+      throttleResponse: 1.0   // How responsive engine is to throttle
+    },
+    'cruise': {
+      speedRange: [220, 240], // m/s
+      verticalSpeed: 0,       // m/s (level flight)
+      pitchRange: [-2, 2],    // degrees
+      rollRange: [-15, 15],   // degrees
+      throttleResponse: 1.0   // How responsive engine is to throttle
+    },
+    'descent': {
+      speedRange: [180, 220], // m/s
+      verticalSpeed: -4,      // m/s
+      pitchRange: [-5, -1],   // degrees
+      rollRange: [-10, 10],   // degrees
+      throttleResponse: 1.0   // How responsive engine is to throttle
+    },
+    'landing': {
+      speedRange: [60, 80],   // m/s
+      verticalSpeed: -2,      // m/s
+      pitchRange: [-3, 5],    // degrees
+      rollRange: [-5, 5],     // degrees
+      throttleResponse: 1.0   // How responsive engine is to throttle
+    },
+    'shutoff': {
+      speedRange: [0, 0],     // m/s
+      verticalSpeed: 0,       // m/s
+      pitchRange: [0, 0],     // degrees
+      rollRange: [0, 0],      // degrees
+      throttleResponse: 0     // How responsive engine is to throttle
+    }
   };
 
   constructor(aircraft) {
     this.aircraft = this.validateAircraftData(aircraft);
     this.GRAVITY = 9.81; // m/s²
     this.dt = 0.01; // Time step (10ms)
+
+    // Force accumulators (for compatibility with realistic model)
+    this.thrustForces = { x: 0, y: 0, z: 0 };
 
     // Initial state - level cruise at FL350, 450 KTS
     this.state = {
@@ -36,7 +102,7 @@ class SimpleFlightPhysicsService {
       },
       orientation: {
         phi: 0,   // Roll angle (0° = level)
-        theta: 0.05, // Initial pitch
+        theta: 0, // Pitch angle (0° = level)
         psi: 0    // Yaw: 0° (flying North)
       },
       angularRates: {
@@ -53,8 +119,8 @@ class SimpleFlightPhysicsService {
       },
       flaps: 0,         // 0=UP, 1=TO, 2=LDG
       airBrakes: 0,     // 0=RETRACTED, 1=EXTENDED
-      gear: false,       // Landing gear
-      fuel: this.aircraft.fuelWeight || 2000
+      gear: false,      // Landing gear
+      fuel: this.aircraft.fuelWeight || 20000
     };
 
     // Environment parameters
@@ -69,9 +135,22 @@ class SimpleFlightPhysicsService {
     // Flight stage tracking
     this.currentFlightStage = 'cruise'; // Initial stage
     this.earthFrameVerticalVelocity = 0;
+    this.targetVerticalSpeed = 0;
+    this.targetAltitude = this.state.position.z;
 
-    // Store previous control values
+    // Engine parameters that respond to throttle and flight stage
+    // Support variable engine counts based on aircraft data
+    const engineCount = this.aircraft.engineCount || 2;
+    this.engineParams = {
+      n1: Array(engineCount).fill(22),     // % RPM for each engine
+      n2: Array(engineCount).fill(50),     // % RPM for each engine
+      egt: Array(engineCount).fill(400),   // °C for each engine
+      fuelFlow: Array(engineCount).fill(1000) // kg/h for each engine
+    };
+
+    // Store previous control values for smoothing
     this.previousControls = { ...this.state.controls };
+    this.previousEngineParams = { ...this.engineParams };
   }
 
   /**
@@ -80,7 +159,7 @@ class SimpleFlightPhysicsService {
   validateAircraftData(aircraft) {
     const defaults = {
       wingArea: 125,           // m²
-      wingSpan: 35.8,           // m
+      wingSpan: 35.8,          // m
       maxLiftCoefficient: 1.4,
       fuelWeight: 20000,
       payloadWeight: 8000,
@@ -120,11 +199,11 @@ class SimpleFlightPhysicsService {
   updateEnvironmentProperties() {
     const altitude_m = this.state.position.z;
     const temperatureGradient = -0.0065; // K/m
-    const temperatureSeaLevel = 288.15; // K
-    const pressureSeaLevel = 101325; // Pa
-    const densitySeaLevel = 1.225; // kg/m³
+    const temperatureSeaLevel = 288.15;   // K
+    const pressureSeaLevel = 101325;      // Pa
+    const densitySeaLevel = 1.225;        // kg/m³
 
-    const temperature = temperatureSeaLevel + temperatureGradient * altitude_m;
+    const temperature = Math.max(216.65, temperatureSeaLevel + temperatureGradient * altitude_m);
     const pressure = pressureSeaLevel * Math.pow(temperature / temperatureSeaLevel, -this.GRAVITY / (287.05 * temperatureGradient));
     const density = pressure / (287.05 * temperature);
     const speedOfSound = Math.sqrt(1.4 * 287.05 * temperature);
@@ -152,20 +231,20 @@ class SimpleFlightPhysicsService {
     const airspeed_kts = airspeed * 1.94384;
     const throttle = this.state.controls.throttle;
 
-    // Simple flight stage detection using linear thresholds
+    // Flight stage detection based on altitude, airspeed, and vertical velocity
     if (altitude_ft < 10 && airspeed_kts < 5) {
       return throttle > 0.1 ? 'push-back' : 'shutoff';
     } else if (altitude_ft < 100 && airspeed_kts < 40) {
       return 'taxi';
-    } else if (altitude_ft < 1000 && airspeed_kts < 150 && this.earthFrameVerticalVelocity > 5) {
+    } else if (altitude_ft < 1000 && airspeed_kts < 180 && this.earthFrameVerticalVelocity > 5) {
       return 'take-off';
-    } else if (altitude_ft < 10000 && this.earthFrameVerticalVelocity > 5) {
+    } else if (altitude_ft < 8000 && this.earthFrameVerticalVelocity > 2) {
       return 'climb';
-    } else if (altitude_ft > 10000 && Math.abs(this.earthFrameVerticalVelocity) < 1) {
+    } else if (altitude_ft >= 8000 && Math.abs(this.earthFrameVerticalVelocity) < 1.0) {
       return 'cruise';
-    } else if (altitude_ft > 1000 && this.earthFrameVerticalVelocity < -5) {
+    } else if (altitude_ft > 1000 && this.earthFrameVerticalVelocity < -2) {
       return 'descent';
-    } else if (altitude_ft < 1000 && airspeed_kts < 150 && this.earthFrameVerticalVelocity < -5) {
+    } else if (altitude_ft < 1000 && airspeed_kts < 180 && this.earthFrameVerticalVelocity < -2) {
       return 'landing';
     } else {
       return 'cruise'; // Default to cruise for any other state
@@ -173,7 +252,7 @@ class SimpleFlightPhysicsService {
   }
 
   /**
-   * Update physics state using simplified kinematics
+   * Main update loop - animation-based approach that focuses on realistic flight stage behavior
    */
   update(input = {}, dt = null) {
     const timeStep = dt || this.dt;
@@ -184,172 +263,172 @@ class SimpleFlightPhysicsService {
     // Detect current flight stage
     this.currentFlightStage = this.detectFlightStage();
 
-    // Calculate control inputs
+    // Get flight stage parameters for current stage
+    const stageParams = SimpleFlightPhysicsService.FLIGHT_STAGE_PARAMS[this.currentFlightStage] || 
+                       SimpleFlightPhysicsService.FLIGHT_STAGE_PARAMS.cruise;
+
+    // Calculate control inputs with smoothing
     const controlInputs = this.applyManualControls(input);
+    this.smoothControls(controlInputs);
 
-    // Apply input smoothing
-    this.state.controls.throttle = this.smoothInput(this.state.controls.throttle, controlInputs.throttle, 0.5);
-    this.state.controls.pitch = this.smoothInput(this.state.controls.pitch, controlInputs.pitch, 0.4);
-    this.state.controls.roll = this.smoothInput(this.state.controls.roll, controlInputs.roll, 0.4);
-    this.state.controls.yaw = this.smoothInput(this.state.controls.yaw, controlInputs.yaw, 0.3);
-    this.state.controls.trim = this.smoothInput(this.state.controls.trim, controlInputs.trim || 0, 0.05);
+    // Update engine parameters based on throttle and flight stage
+    this.updateEngineParameters(stageParams);
 
-    // Simplified kinematics updates
-    this.updateVelocity(controlInputs, timeStep);
-    this.updateOrientation(controlInputs, timeStep);
+    // Animation-based updates for realistic flight behavior
+    this.updateVelocityAnimation(stageParams, timeStep);
+    this.updateOrientationAnimation(stageParams, timeStep);
     this.updatePosition(timeStep);
+    this.maintainAltitude(stageParams, timeStep);
 
     // Return updated state
     return this.getAircraftState();
   }
 
   /**
-   * Update velocity using simplified linear/quadratic relationships
+   * Smooth control inputs to prevent abrupt changes
    */
-  updateVelocity(controls, dt) {
-    const throttle = controls.throttle;
-    const pitch = controls.pitch;
-    const roll = controls.roll;
-    const yaw = controls.yaw;
+  smoothControls(controls) {
+    const smoothingFactors = {
+      throttle: 0.5,
+      pitch: 0.4,
+      roll: 0.4,
+      yaw: 0.3,
+      trim: 0.05
+    };
 
-    // Simplified thrust calculation (linear relationship)
-    const maxThrust = this.aircraft.engineCount * this.aircraft.maxThrustPerEngine;
-    const thrust = throttle * maxThrust;
-
-    // Simplified drag (quadratic in velocity)
-    const airspeed = Math.sqrt(
-      this.state.velocity.u * this.state.velocity.u +
-      this.state.velocity.v * this.state.velocity.v +
-      this.state.velocity.w * this.state.velocity.w
-    );
-    const drag = 0.5 * this.environment.density * airspeed * airspeed * this.aircraft.wingArea * this.aircraft.zeroLiftDragCoefficient;
-
-    // Simplified acceleration (linear)
-    const accelerationX = (thrust - drag) / this.aircraft.mass;
-
-    // Update forward velocity (u)
-    this.state.velocity.u += accelerationX * dt;
-    this.state.velocity.u = Math.max(0, this.state.velocity.u); // No negative forward speed
-
-    // Simplified vertical velocity (w) based on pitch and flight stage
-    let verticalAccel = 0;
-    if (this.currentFlightStage === 'take-off' || this.currentFlightStage === 'climb') {
-      verticalAccel = 1.5 * throttle; // Strong upward acceleration during climb
-    } else if (this.currentFlightStage === 'descent' || this.currentFlightStage === 'landing') {
-      verticalAccel = -1.0 * (1 - throttle); // Downward acceleration based on throttle reduction
-    } else {
-      // Cruise - simple trim adjustment
-      verticalAccel = 0.5 * pitch;
-    }
-
-    // Apply vertical acceleration with limits
-    this.state.velocity.w += verticalAccel * dt;
-    this.state.velocity.w = Math.max(-20, Math.min(20, this.state.velocity.w)); // Limit vertical speed
-
-    // Simplified lateral velocity (v) based on yaw
-    this.state.velocity.v += yaw * 10 * dt;
-    this.state.velocity.v = Math.max(-10, Math.min(10, this.state.velocity.v)); // Limit lateral speed
-
-    // Apply flight stage specific velocity adjustments
-    this.applyFlightStageVelocityAdjustments();
+    // Smooth each control input
+    Object.keys(smoothingFactors).forEach(control => {
+      if (control in controls) {
+        const currentValue = this.state.controls[control];
+        const targetValue = controls[control];
+        const smoothingFactor = smoothingFactors[control];
+        
+        this.state.controls[control] = this.smoothInput(currentValue, targetValue, smoothingFactor);
+      }
+    });
   }
 
   /**
-   * Apply flight stage specific velocity adjustments
+   * Update velocity based on flight stage animation parameters
    */
-  applyFlightStageVelocityAdjustments() {
-    switch (this.currentFlightStage) {
-      case 'push-back':
-        this.state.velocity.u = Math.max(0, Math.min(5, this.state.velocity.u)); // Max 5 m/s push-back
-        break;
-      case 'taxi':
-        this.state.velocity.u = Math.max(0, Math.min(15, this.state.velocity.u)); // Max 15 m/s taxi
-        break;
-      case 'take-off':
-        // Gradually increase speed during take-off
-        const takeoffSpeed = 75; // m/s (146 kts)
-        if (this.state.velocity.u < takeoffSpeed) {
-          this.state.velocity.u += 0.5; // Constant acceleration during take-off
-        }
-        break;
-      case 'landing':
-        // Gradually decrease speed during landing
-        const landingSpeed = 50; // m/s (97 kts)
-        if (this.state.velocity.u > landingSpeed) {
-          this.state.velocity.u -= 0.3; // Constant deceleration during landing
-        }
-        break;
-      case 'cruise':
-        // Maintain cruise speed with simple linear adjustment
-        const cruiseSpeed = 231.5; // m/s (450 kts)
-        const speedDiff = cruiseSpeed - this.state.velocity.u;
-        this.state.velocity.u += speedDiff * 0.01; // Slow adjustment to cruise speed
-        break;
-    }
+  updateVelocityAnimation(stageParams, dt) {
+    const throttle = this.state.controls.throttle;
+    const [minSpeed, maxSpeed] = stageParams.speedRange;
+    
+    // Base speed is mid-range of stage speed range
+    const baseSpeed = (minSpeed + maxSpeed) / 2;
+    
+    // Adjust speed based on throttle - more throttle increases speed within stage range
+    const speedOffset = (throttle - 0.5) * (maxSpeed - minSpeed) * 0.8;
+    const targetSpeed = Math.max(minSpeed, Math.min(maxSpeed, baseSpeed + speedOffset));
+    
+    // Smoothly transition to target speed
+    const speedDiff = targetSpeed - this.state.velocity.u;
+    this.state.velocity.u += speedDiff * 0.005;
+    
+    // Add slight random variation for realism
+    this.state.velocity.u += (Math.random() - 0.5) * 0.1;
+    
+    // Clamp to speed range
+    this.state.velocity.u = Math.max(minSpeed, Math.min(maxSpeed, this.state.velocity.u));
+    
+    // Update vertical velocity based on flight stage and pitch input
+    this.updateVerticalVelocity(stageParams, dt);
+    
+    // Update lateral velocity based on yaw input
+    this.updateLateralVelocity(dt);
   }
 
   /**
-   * Update orientation using simplified angular kinematics
+   * Update vertical velocity based on flight stage and pitch input
    */
-  updateOrientation(controls, dt) {
-    const pitch = controls.pitch;
-    const roll = controls.roll;
-    const yaw = controls.yaw;
+  updateVerticalVelocity(stageParams, dt) {
+    const pitch = this.state.controls.pitch;
+    const throttle = this.state.controls.throttle;
+    
+    // Base vertical speed from flight stage
+    let baseVerticalSpeed = stageParams.verticalSpeed;
+    
+    // Adjust vertical speed based on pitch input (positive pitch = nose up = climb)
+    const pitchEffect = pitch * SimpleFlightPhysicsService.DEFAULT_CONTROLS.PITCH_SENSITIVITY;
+    
+    // Adjust vertical speed based on throttle (more throttle = more climb capability)
+    const throttleEffect = (throttle - 0.5) * 2;
+    
+    // Calculate target vertical velocity
+    this.targetVerticalSpeed = baseVerticalSpeed + pitchEffect + throttleEffect;
+    
+    // Smoothly transition to target vertical speed
+    const verticalSpeedDiff = this.targetVerticalSpeed - this.state.velocity.w;
+    this.state.velocity.w += verticalSpeedDiff * 0.005;
+    
+    // Clamp vertical speed for realism
+    this.state.velocity.w = Math.max(-15, Math.min(15, this.state.velocity.w));
+  }
 
-    // Simplified angular rate calculations (linear relationships)
-    const pitchRate = pitch * 2; // Linear pitch response
-    const rollRate = roll * 3;   // Linear roll response
-    const yawRate = yaw * 2;     // Linear yaw response
+  /**
+   * Update lateral velocity based on yaw input
+   */
+  updateLateralVelocity(dt) {
+    const yaw = this.state.controls.yaw;
+    
+    // Lateral velocity based on yaw input
+    const targetLateralVelocity = yaw * 10;
+    
+    // Smoothly transition to target lateral velocity
+    const lateralSpeedDiff = targetLateralVelocity - this.state.velocity.v;
+    this.state.velocity.v += lateralSpeedDiff * 0.1;
+    
+    // Clamp lateral speed for realism
+    this.state.velocity.v = Math.max(-10, Math.min(10, this.state.velocity.v));
+  }
 
-    // Update angular rates
-    this.state.angularRates.p = rollRate;
-    this.state.angularRates.q = pitchRate;
-    this.state.angularRates.r = yawRate;
-
-    // Apply damping
-    this.state.angularRates.p *= 0.99;
-    this.state.angularRates.q *= 0.99;
-    this.state.angularRates.r *= 0.99;
-
-    // Update orientation (simple integration)
+  /**
+   * Update orientation based on flight stage animation parameters
+   */
+  updateOrientationAnimation(stageParams, dt) {
+    const pitch = this.state.controls.pitch;
+    const roll = this.state.controls.roll;
+    const yaw = this.state.controls.yaw;
+    
+    // Get pitch and roll ranges for current flight stage
+    const [minPitch, maxPitch] = stageParams.pitchRange;
+    const [minRoll, maxRoll] = stageParams.rollRange;
+    
+    // Convert ranges from degrees to radians
+    const minPitchRad = minPitch * Math.PI / 180;
+    const maxPitchRad = maxPitch * Math.PI / 180;
+    const minRollRad = minRoll * Math.PI / 180;
+    const maxRollRad = maxRoll * Math.PI / 180;
+    
+    // Calculate target orientation based on controls and flight stage
+    const targetPitch = pitch * SimpleFlightPhysicsService.DEFAULT_CONTROLS.PITCH_SENSITIVITY * Math.PI / 180;
+    const targetRoll = roll * SimpleFlightPhysicsService.DEFAULT_CONTROLS.ROLL_SENSITIVITY * Math.PI / 180;
+    const targetYaw = yaw * SimpleFlightPhysicsService.DEFAULT_CONTROLS.YAW_SENSITIVITY * Math.PI / 180;
+    
+    // Smoothly transition to target orientation
+    this.state.angularRates.q = this.smoothInput(this.state.angularRates.q, targetPitch * 10, 0.1);
+    this.state.angularRates.p = this.smoothInput(this.state.angularRates.p, targetRoll * 10, 0.1);
+    this.state.angularRates.r = this.smoothInput(this.state.angularRates.r, targetYaw * 10, 0.1);
+    
+    // Apply damping to angular rates
+    this.state.angularRates.p *= 0.98;
+    this.state.angularRates.q *= 0.98;
+    this.state.angularRates.r *= 0.98;
+    
+    // Update orientation angles
     this.state.orientation.phi += this.state.angularRates.p * dt;
     this.state.orientation.theta += this.state.angularRates.q * dt;
     this.state.orientation.psi += this.state.angularRates.r * dt;
-
+    
     // Normalize angles
     this.state.orientation.phi = this.normalizeAngle(this.state.orientation.phi);
     this.state.orientation.theta = this.normalizeAngle(this.state.orientation.theta);
     this.state.orientation.psi = this.normalizeAngle(this.state.orientation.psi);
-
-    // Apply flight stage specific orientation limits
-    this.applyFlightStageOrientationLimits();
-  }
-
-  /**
-   * Apply flight stage specific orientation limits
-   */
-  applyFlightStageOrientationLimits() {
-    // Simple linear limits for realistic appearance
-    switch (this.currentFlightStage) {
-      case 'take-off':
-        // Limit pitch up during take-off
-        this.state.orientation.theta = Math.max(0, Math.min(Math.PI/12, this.state.orientation.theta)); // Max 15° up
-        break;
-      case 'landing':
-        // Limit pitch to landing attitude
-        this.state.orientation.theta = Math.max(-Math.PI/24, Math.min(Math.PI/12, this.state.orientation.theta)); // -7.5° to +15°
-        break;
-      case 'taxi':
-      case 'push-back':
-        // Keep level during ground operations
-        this.state.orientation.phi = Math.max(-Math.PI/36, Math.min(Math.PI/36, this.state.orientation.phi)); // ±5° roll
-        this.state.orientation.theta = Math.max(-Math.PI/36, Math.min(Math.PI/36, this.state.orientation.theta)); // ±5° pitch
-        break;
-      default:
-        // General flight limits
-        this.state.orientation.phi = Math.max(-Math.PI/2, Math.min(Math.PI/2, this.state.orientation.phi)); // ±90° roll
-        this.state.orientation.theta = Math.max(-Math.PI/6, Math.min(Math.PI/6, this.state.orientation.theta)); // ±30° pitch
-    }
+    
+    // Clamp orientation to flight stage ranges
+    this.state.orientation.theta = Math.max(minPitchRad, Math.min(maxPitchRad, this.state.orientation.theta));
+    this.state.orientation.phi = Math.max(minRollRad, Math.min(maxRollRad, this.state.orientation.phi));
   }
 
   /**
@@ -364,12 +443,20 @@ class SimpleFlightPhysicsService {
     const v = this.state.velocity.v;
     const w = this.state.velocity.w;
 
-    // Simplified body to earth frame transformation
-    const xDot = u * Math.cos(theta) + w * Math.sin(theta);
-    const yDot = v;
-    const zDot = w * Math.cos(theta) - u * Math.sin(theta);
+    // Convert body frame velocities to earth frame
+    const cosPhi = Math.cos(phi);
+    const sinPhi = Math.sin(phi);
+    const cosTheta = Math.cos(theta);
+    const sinTheta = Math.sin(theta);
+    const cosPsi = Math.cos(psi);
+    const sinPsi = Math.sin(psi);
 
-    // Store earth frame vertical velocity
+    // Body to earth frame transformation (simplified)
+    const xDot = u * cosTheta * cosPsi - v * sinPsi + w * sinTheta * cosPsi;
+    const yDot = u * cosTheta * sinPsi + v * cosPsi + w * sinTheta * sinPsi;
+    const zDot = u * sinTheta + w * cosTheta;
+
+    // Store earth frame vertical velocity for flight stage detection
     this.earthFrameVerticalVelocity = zDot;
 
     // Update position
@@ -382,20 +469,84 @@ class SimpleFlightPhysicsService {
   }
 
   /**
+   * Maintain altitude during cruise flight stage
+   */
+  maintainAltitude(stageParams, dt) {
+    // Only maintain altitude in cruise stage
+    if (this.currentFlightStage !== 'cruise') {
+      this.targetAltitude = this.state.position.z;
+      return;
+    }
+
+    // Calculate altitude error
+    const altitudeError = this.targetAltitude - this.state.position.z;
+    
+    // If altitude error is significant, adjust vertical velocity to correct it
+    if (Math.abs(altitudeError) > 10) { // More than 10m error
+      // Calculate required vertical velocity to correct altitude
+      const correctionVelocity = altitudeError * 0.01;
+      
+      // Apply correction to vertical velocity
+      this.state.velocity.w += correctionVelocity * dt * 10;
+      
+      // Limit correction to prevent extreme vertical speeds
+      this.state.velocity.w = Math.max(-3, Math.min(3, this.state.velocity.w));
+    } else {
+      // If altitude is nearly correct, maintain level flight
+      this.state.velocity.w *= 0.99;
+    }
+  }
+
+  /**
+   * Update engine parameters based on throttle and flight stage
+   */
+  updateEngineParameters(stageParams) {
+    const throttle = this.state.controls.throttle;
+    const throttleResponse = stageParams.throttleResponse;
+    
+    // Calculate target engine parameters based on throttle
+    const targetN1 = 22 + throttle * 78 * throttleResponse;
+    const targetN2 = 50 + throttle * 50 * throttleResponse;
+    const targetEGT = 400 + throttle * 400 * throttleResponse;
+    const targetFuelFlow = 1000 + throttle * 3000 * throttleResponse;
+    
+    // Smoothly transition to target parameters for realistic engine response
+    // Increased smoothing factor for more gradual, delayed updates
+    const smoothingFactor = 0.005;
+    
+    this.engineParams.n1 = this.engineParams.n1.map(n1 => 
+      this.smoothInput(n1, targetN1, smoothingFactor)
+    );
+    
+    this.engineParams.n2 = this.engineParams.n2.map(n2 => 
+      this.smoothInput(n2, targetN2, smoothingFactor)
+    );
+    
+    this.engineParams.egt = this.engineParams.egt.map(egt => 
+      this.smoothInput(egt, targetEGT, smoothingFactor)
+    );
+    
+    this.engineParams.fuelFlow = this.engineParams.fuelFlow.map(flow => 
+      this.smoothInput(flow, targetFuelFlow, smoothingFactor)
+    );
+  }
+
+  /**
    * Apply manual control inputs with safety limits
    */
   applyManualControls(input) {
-    // Simple linear limits
+    // Control limits to prevent extreme inputs
     return {
-      pitch: Math.max(-0.3, Math.min(0.3, typeof input.pitch === 'undefined' ? 0 : input.pitch)),
+      pitch: -Math.max(-0.3, Math.min(0.3, typeof input.pitch === 'undefined' ? 0 : input.pitch)),
       throttle: Math.max(0, Math.min(1, typeof input.throttle === 'undefined' ? 0.55 : input.throttle)),
       roll: Math.max(-0.5, Math.min(0.5, typeof input.roll === 'undefined' ? 0 : input.roll)),
-      yaw: Math.max(-0.3, Math.min(0.3, typeof input.yaw === 'undefined' ? 0 : input.yaw))
+      yaw: Math.max(-0.3, Math.min(0.3, typeof input.yaw === 'undefined' ? 0 : input.yaw)),
+      trim: typeof input.trim === 'undefined' ? this.state.controls.trim : input.trim
     };
   }
 
   /**
-   * Smooth input values to prevent abrupt changes
+   * Smooth input value towards target value with given smoothing factor
    */
   smoothInput(currentValue, targetValue, smoothingFactor) {
     return currentValue + (targetValue - currentValue) * smoothingFactor;
@@ -411,37 +562,52 @@ class SimpleFlightPhysicsService {
   }
 
   /**
-   * Get current aircraft state for display
+   * Calculate proper IAS-TAS translation based on altitude and air density
    */
-  getAircraftState() {
+  calculateAirspeeds() {
     const velocity = this.state.velocity;
-    const airspeed = Math.sqrt(
+    
+    // True Airspeed (TAS) - actual speed through air
+    const tas_ms = Math.sqrt(
       velocity.u * velocity.u +
       velocity.v * velocity.v +
       velocity.w * velocity.w
     );
+    const tas_kts = tas_ms * 1.94384;
 
+    // Indicated Airspeed (IAS) - corrected for pressure and density
+    const pressureRatio = this.environment.pressure / 101325; // Ratio relative to sea level
+    const densityRatio = this.environment.density / 1.225;     // Ratio relative to sea level
+    
+    // Correct IAS calculation based on density ratio
+    const ias_ms = tas_ms * Math.sqrt(densityRatio);
+    const ias_kts = ias_ms * 1.94384;
+
+    // Calibrated Airspeed (CAS) - same as IAS in this simplified model
+    const cas_kts = ias_kts;
+
+    return {
+      trueAirspeed: tas_kts,
+      trueAirspeedMS: tas_ms,
+      indicatedAirspeed: ias_kts,
+      indicatedAirspeedMS: ias_ms,
+      calibratedAirspeed: cas_kts
+    };
+  }
+
+  /**
+   * Get current aircraft state for display
+   */
+  getAircraftState() {
+    const airspeeds = this.calculateAirspeeds();
+    
     const heading = (this.state.orientation.psi * 180 / Math.PI + 360) % 360;
     const pitch = this.state.orientation.theta * 180 / Math.PI;
     const roll = this.state.orientation.phi * 180 / Math.PI;
     const altitude_ft = this.state.position.z * 3.28084;
 
-    // Earth frame vertical velocity for correct vertical speed
-    const verticalSpeed = this.earthFrameVerticalVelocity * 196.85; // Convert m/s to ft/min
-
-    const groundSpeed = airspeed * 1.94384; // Convert m/s to knots
-
-    // Simulate engine parameters (simplified)
-    const throttle = this.state.controls.throttle;
-    const n1 = 22 + throttle * 78; // 22-100% N1
-    const n2 = 50 + throttle * 50; // 50-100% N2
-    const egt = 400 + throttle * 400; // 400-800°C EGT
-
-    const engineParams = {
-      n1: [n1, n1],
-      n2: [n2, n2],
-      egt: [egt, egt]
-    };
+    // Convert earth frame vertical velocity to ft/min
+    const verticalSpeed = this.earthFrameVerticalVelocity * 196.85; // m/s to ft/min
 
     return {
       position: { ...this.state.position },
@@ -453,43 +619,21 @@ class SimpleFlightPhysicsService {
       airBrakes: this.state.airBrakes,
       gear: this.state.gear,
       fuel: this.state.fuel,
+      verticalSpeed, // Add verticalSpeed at root level as expected by hook
       flightStage: this.currentFlightStage,
-      engineParams,
+      engineParams: this.engineParams, // Updated engine parameters
+      thrustForces: this.thrustForces, // For compatibility with realistic model
       derived: {
         heading,
         pitch,
         roll,
         altitude_ft,
         verticalSpeed,
-        groundSpeed,
-        airspeed: airspeed * 1.94384 // knots
+        groundSpeed: airspeeds.trueAirspeed, // Ground speed same as TAS in this model
+        airspeed: airspeeds.indicatedAirspeed, // Display IAS to user
+        trueAirspeed: airspeeds.trueAirspeed,
+        calibratedAirspeed: airspeeds.calibratedAirspeed
       }
-    };
-  }
-
-  /**
-   * Calculate airspeeds (simplified)
-   */
-  calculateAirspeeds() {
-    const velocity = this.state.velocity;
-    const tas_ms = Math.sqrt(
-      velocity.u * velocity.u +
-      velocity.v * velocity.v +
-      velocity.w * velocity.w
-    );
-    const tas_kts = tas_ms * 1.94384;
-
-    // Simplified IAS calculation
-    const altitude_m = this.state.position.z;
-    const densityRatio = Math.max(0.3, 1 - (altitude_m * 0.00003));
-    const ias_ms = tas_ms * Math.sqrt(densityRatio);
-    const ias_kts = ias_ms * 1.94384;
-
-    return {
-      trueAirspeed: tas_kts,
-      trueAirspeedMS: tas_ms,
-      indicatedAirspeed: ias_kts,
-      indicatedAirspeedMS: ias_ms
     };
   }
 
@@ -525,7 +669,7 @@ class SimpleFlightPhysicsService {
       },
       orientation: {
         phi: 0,
-        theta: 0.05,
+        theta: 0,
         psi: 0
       },
       angularRates: {
@@ -543,11 +687,22 @@ class SimpleFlightPhysicsService {
       flaps: 0,
       airBrakes: 0,
       gear: false,
-      fuel: this.aircraft.fuelWeight || 2000
+      fuel: this.aircraft.fuelWeight || 20000
+    };
+
+    // Reset engine parameters with variable engine count support
+    const engineCount = this.aircraft.engineCount || 2;
+    this.engineParams = {
+      n1: Array(engineCount).fill(22),
+      n2: Array(engineCount).fill(50),
+      egt: Array(engineCount).fill(400),
+      fuelFlow: Array(engineCount).fill(1000)
     };
 
     this.currentFlightStage = 'cruise';
     this.earthFrameVerticalVelocity = 0;
+    this.targetVerticalSpeed = 0;
+    this.targetAltitude = this.state.position.z;
   }
 }
 

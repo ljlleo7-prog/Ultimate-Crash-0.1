@@ -250,9 +250,9 @@ export function useAircraftPhysics(config = {}, autoStart = true, model = 'reali
         elevator: currentControlsRef.current.pitch * 180 / Math.PI,
         aileron: currentControlsRef.current.roll * 180 / Math.PI,
         rudder: currentControlsRef.current.yaw * 180 / Math.PI,
-        lift: 0,
-        drag: 0,
-        thrust: physicsService.thrustForces.x || 0,
+        lift: physicsService.aeroForces?.z || 0,
+        drag: Math.max(0, -(physicsService.aeroForces?.x || 0)),
+        thrust: physicsService.thrustForces?.x || 0,
         weight: 0,
         cg: {
           x: newState.position.x,
@@ -265,9 +265,9 @@ export function useAircraftPhysics(config = {}, autoStart = true, model = 'reali
         flapsValue: flapsState,
         airBrakesValue: airBrakesState,
         gearValue: gearState,
-        engineN1: newState.engineN1 !== undefined ? newState.engineN1 : [22, 22],
-        engineN2: newState.engineN2 !== undefined ? newState.engineN2 : [45, 45],
-        engineEGT: newState.engineEGT !== undefined ? newState.engineEGT : [400, 400],
+        engineN1: newState.engineParams?.n1 !== undefined ? newState.engineParams.n1 : [22, 22],
+        engineN2: newState.engineParams?.n2 !== undefined ? newState.engineParams.n2 : [45, 45],
+        engineEGT: newState.engineParams?.egt !== undefined ? newState.engineParams.egt : [400, 400],
         fuel: newState.fuel !== undefined ? newState.fuel : 100
       };
 

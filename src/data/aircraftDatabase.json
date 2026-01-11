@@ -32,7 +32,7 @@
       "inducedDragFactor": 0.040,
       "basicLiftCoefficient": 0.5,
       "horizontalStabilizerArea": 25,
-      "horizontalStabilizerCL": -0.09,
+      "horizontalStabilizerCL": -0.08,
       "horizontalStabilizerMomentArm": 12.5,
       "aerodynamicCenterPosition": 0.25,
       "centerOfGravityPosition": 0.15,
@@ -42,7 +42,7 @@
         "y": 1.5,
         "z": 1.0
       },
-      "specificFuelConsumption": 0.000021,
+      "specificFuelConsumption": 0.0000021,
       "elevatorEffectiveness": 0.00105,
       "aileronEffectiveness": 0.00052,
       "rudderEffectiveness": 0.00031,

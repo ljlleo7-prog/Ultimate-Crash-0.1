@@ -3,38 +3,27 @@
  * Supports 2, 3, 4+ engines for different aircraft types
  */
 import { Engine } from './Engine.js';
+import aircraftService from './aircraftService.js';
 
 export class PropulsionManager {
   constructor(aircraftConfig = {}) {
     // Engine configuration
+    this.aircraftModel = aircraftConfig.aircraftModel || 'Boeing 737-800';
     this.engineCount = aircraftConfig.engineCount || 2;
     this.engines = [];
-    this.engineConfiguration = aircraftConfig.engineConfiguration || 'twin'; // 'twin', 'tri', 'quad'
+    this.aircraft = null; // Will store fetched aircraft data
+    this.maxThrustPerEngine = aircraftConfig.maxThrustPerEngine || 120000; // Default to 120kN
     
-    // Aircraft-specific engine configurations
-    this.aircraftEngineConfigs = {
-      twin: {
-        engines: [
-          { position: { x: -8, y: 0, z: 0 }, thrust: 85000 }, // Left engine
-          { position: { x: 8, y: 0, z: 0 }, thrust: 85000 }  // Right engine
-        ]
-      },
-      tri: {
-        engines: [
-          { position: { x: -6, y: 0, z: 0 }, thrust: 75000 }, // Left engine
-          { position: { x: 6, y: 0, z: 0 }, thrust: 75000 },  // Right engine
-          { position: { x: 0, y: 0, z: -2 }, thrust: 80000 }  // Center engine
-        ]
-      },
-      quad: {
-        engines: [
-          { position: { x: -10, y: 0, z: 0 }, thrust: 70000 }, // Left outer
-          { position: { x: -3, y: 0, z: 0 }, thrust: 70000 },  // Left inner
-          { position: { x: 3, y: 0, z: 0 }, thrust: 70000 },   // Right inner
-          { position: { x: 10, y: 0, z: 0 }, thrust: 70000 }   // Right outer
-        ]
-      }
-    };
+    // Determine engine configuration based on engine count
+    if (this.engineCount === 2) {
+      this.engineConfiguration = 'twin';
+    } else if (this.engineCount === 3) {
+      this.engineConfiguration = 'tri';
+    } else if (this.engineCount >= 4) {
+      this.engineConfiguration = 'quad';
+    } else {
+      this.engineConfiguration = 'twin'; // Default fallback
+    }
     
     // Global control parameters
     this.globalControls = {
@@ -83,47 +72,161 @@ export class PropulsionManager {
       efficiency: 0
     };
     
-    // Initialize engines
+    // Initialize engines (will fetch data from database)
     this.initializeEngines();
   }
   
   /**
    * Initialize all engines based on aircraft configuration
    */
-  initializeEngines() {
-    const config = this.aircraftEngineConfigs[this.engineConfiguration];
-    
-    if (!config || config.engines.length !== this.engineCount) {
-      throw new Error(`Invalid engine configuration: ${this.engineConfiguration} with ${this.engineCount} engines`);
+  async initializeEngines() {
+    try {
+      // Fetch aircraft data from database
+      this.aircraft = await aircraftService.getAircraftByModel(this.aircraftModel);
+      
+      // Use database values if available, otherwise fall back to defaults
+      if (this.aircraft) {
+        this.engineCount = this.aircraft.engineCount;
+        this.maxThrustPerEngine = this.aircraft.maxThrustPerEngine;
+        this.log(`Fetched aircraft data for ${this.aircraftModel}`, {
+          engineCount: this.engineCount,
+          maxThrustPerEngine: this.maxThrustPerEngine
+        });
+      } else {
+        this.log(`Aircraft data not found for ${this.aircraftModel}, using default configuration`);
+      }
+      
+      // Determine engine configuration based on engine count
+      if (this.engineCount === 2) {
+        this.engineConfiguration = 'twin';
+      } else if (this.engineCount === 3) {
+        this.engineConfiguration = 'tri';
+      } else if (this.engineCount >= 4) {
+        this.engineConfiguration = 'quad';
+      } else {
+        this.engineConfiguration = 'twin'; // Default fallback
+      }
+      
+      // Clear existing engines
+      this.engines = [];
+      
+      // Get dynamic engine positions based on aircraft type
+      const enginePositions = this.getEnginePositions();
+      
+      // Create engines based on database configuration
+      for (let i = 0; i < this.engineCount; i++) {
+        const position = enginePositions[i] || { x: 0, y: 0, z: 0 };
+        
+        const engine = new Engine(i, {
+            engineType: this.aircraft?.engineType || 'turbofan',
+            maxThrust: this.maxThrustPerEngine,
+            specificFuelConsumption: this.aircraft?.specificFuelConsumption || 0.000021,
+            n1Idle: 22,
+            n1Max: 100,
+            n2Base: 85,
+            egtIdle: 550,
+            egtMax: 1000, // Increased maximum EGT to match Engine.js changes
+            vibrationAmplitude: 0.5
+          });
+        
+        // Position engines
+        engine.position = position;
+        this.engines.push(engine);
+      }
+      
+      this.log('Engines initialized', {
+        count: this.engineCount,
+        configuration: this.engineConfiguration,
+        totalThrust: this.getTotalMaxThrust(),
+        model: this.aircraftModel
+      });
+    } catch (error) {
+      this.log('Error initializing engines', { error: error.message });
+      // Fallback to default initialization if database fetch fails
+      this.fallbackInitializeEngines();
     }
+  }
+  
+  /**
+   * Get dynamic engine positions based on aircraft configuration
+   */
+  getEnginePositions() {
+    const positions = [];
+    
+    switch (this.engineConfiguration) {
+      case 'twin':
+        positions.push({ x: -8, y: 0, z: 0 });  // Left engine
+        positions.push({ x: 8, y: 0, z: 0 });   // Right engine
+        break;
+        
+      case 'tri':
+        positions.push({ x: -6, y: 0, z: 0 });  // Left engine
+        positions.push({ x: 6, y: 0, z: 0 });   // Right engine
+        positions.push({ x: 0, y: 2, z: -3 });  // Center engine (on tail for trijets)
+        break;
+        
+      case 'quad':
+        // For 4+ engine configurations
+        const outerSpacing = 10;
+        const innerSpacing = 3;
+        
+        // Left side engines
+        positions.push({ x: -outerSpacing, y: 0, z: 0 });  // Left outer
+        positions.push({ x: -innerSpacing, y: 0, z: 0 });   // Left inner
+        
+        // Right side engines
+        positions.push({ x: innerSpacing, y: 0, z: 0 });    // Right inner
+        positions.push({ x: outerSpacing, y: 0, z: 0 });    // Right outer
+        
+        // Add additional engines for aircraft with more than 4 engines
+        for (let i = 4; i < this.engineCount; i++) {
+          // Place additional engines in appropriate positions
+          const isLeft = i % 2 === 0;
+          const offset = i / 2;
+          const x = isLeft ? -(outerSpacing + offset * 3) : (outerSpacing + offset * 3);
+          positions.push({ x: x, y: 0, z: 0 });
+        }
+        break;
+        
+      default:
+        positions.push({ x: -8, y: 0, z: 0 });  // Left engine
+        positions.push({ x: 8, y: 0, z: 0 });   // Right engine
+    }
+    
+    return positions;
+  }
+  
+  /**
+   * Fallback initialization if database fetch fails
+   */
+  fallbackInitializeEngines() {
+    this.log('Using fallback engine initialization');
     
     // Clear existing engines
     this.engines = [];
     
-    // Create engines based on configuration
+    // Create engines with default values
     for (let i = 0; i < this.engineCount; i++) {
-      const engineConfig = config.engines[i];
+      const position = this.getEnginePositions()[i] || { x: 0, y: 0, z: 0 };
       
       const engine = new Engine(i, {
-        engineType: 'turbofan',
-        maxThrust: engineConfig.thrust,
-        n1Idle: 22,
-        n1Max: 100,
-        n2Base: 85,
-        egtIdle: 550,
-        egtMax: 900,
-        vibrationAmplitude: 0.5
-      });
+          engineType: 'turbofan',
+          maxThrust: this.maxThrustPerEngine,
+          n1Idle: 22,
+          n1Max: 100,
+          n2Base: 85,
+          egtIdle: 550,
+          egtMax: 1000,
+          vibrationAmplitude: 0.5
+        });
       
-      // Position engines
-      engine.position = engineConfig.position;
+      engine.position = position;
       this.engines.push(engine);
     }
     
-    this.log('Engines initialized', {
+    this.log('Fallback engines initialized', {
       count: this.engineCount,
-      configuration: this.engineConfiguration,
-      totalThrust: this.getTotalMaxThrust()
+      configuration: this.engineConfiguration
     });
   }
   
@@ -322,7 +425,7 @@ export class PropulsionManager {
     
     // Update all engines
     this.engines.forEach(engine => {
-      engine.calculateParameters();
+      engine.calculateParameters(deltaTime);
     });
     
     // Calculate overall performance metrics
@@ -437,7 +540,7 @@ export class PropulsionManager {
       
       if (status.isRunning) {
         // Forward thrust (assuming engines point in aircraft's forward direction)
-        totalForce.z += status.thrust;
+        totalForce.x += status.thrust;
         
         // Calculate torque based on engine position and thrust
         const torqueScale = 0.001; // Scale factor for torque calculation

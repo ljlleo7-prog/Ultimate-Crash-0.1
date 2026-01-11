@@ -10,6 +10,7 @@ export class Engine {
     this.engineType = config.engineType || 'turbofan';
     this.maxThrust = config.maxThrust || 85000; // N
     this.engineWeight = config.engineWeight || 3000; // kg
+    this.specificFuelConsumption = config.specificFuelConsumption || 0.0000021; // kg/N/s (SFC)
     
     // Normal operating parameters (can be exceeded in failure modes)
     this.nominalParameters = {
@@ -17,8 +18,8 @@ export class Engine {
       n1Max: config.n1Max || 100,        // Maximum N1
       n2Base: config.n2Base || 85,        // Base N2
       egtIdle: config.egtIdle || 550,    // EGT at idle (can drop to 100 in flameout)
-      egtMax: config.egtMax || 900,      // Maximum EGT (can exceed 1200 in fire)
-      vibrationAmplitude: config.vibrationAmplitude || 0.5
+      egtMax: config.egtMax || 1000,      // Increased maximum EGT for more realistic TOGA values
+      vibrationAmplitude: config.vibrationAmplitude || 0.05
     };
     
     // Current state
@@ -110,7 +111,7 @@ export class Engine {
   /**
    * Calculate engine parameters based on current state and conditions
    */
-  calculateParameters() {
+  calculateParameters(dt = 0.016) {
     const throttle = this.currentState.throttle;
     const env = this.environmentalFactors;
     const nominal = this.nominalParameters;
@@ -137,11 +138,16 @@ export class Engine {
     ]);
     
     // Update current state
-    this.currentState.n1 = baseN1;
-    this.currentState.n2 = baseN2;
-    this.currentState.egt = baseEGT;
-    this.currentState.thrust = baseThrust;
-    this.currentState.fuelFlow = baseFuelFlow;
+    const alphaN1 = 0.0012;
+    const alphaN2 = 0.0010;
+    const alphaEGT = 0.0010;
+    const alphaThrust = 0.0015;
+    const alphaFuel = 0.0020;
+    this.currentState.n1 += (baseN1 - this.currentState.n1) * alphaN1;
+    this.currentState.n2 += (baseN2 - this.currentState.n2) * alphaN2;
+    this.currentState.egt += (baseEGT - this.currentState.egt) * alphaEGT;
+    this.currentState.thrust += (baseThrust - this.currentState.thrust) * alphaThrust;
+    this.currentState.fuelFlow += (baseFuelFlow - this.currentState.fuelFlow) * alphaFuel;
     
     // Calculate derived parameters
     this.currentState.oilPressure = this.calculateOilPressure();
@@ -178,28 +184,22 @@ export class Engine {
     // Clamp N2 to reasonable limits
     let baseN2 = Math.max(50, Math.min(100, N2_h));
     
-    // EGT calculation (exponential with throttle, modified for altitude)
+    // EGT calculation - Improved curve for higher values at TOGA
     let baseEGT;
     if (throttle <= 0.05) {
       baseEGT = nominal.egtIdle;
     } else {
-      const egtCurve = Math.pow(throttle, 1.2);
+      // More aggressive EGT curve that reaches higher values at TOGA
+      const egtCurve = Math.pow(throttle, 0.8);
       baseEGT = nominal.egtIdle + egtCurve * (nominal.egtMax - nominal.egtIdle);
     }
     
-    // B — Power Law Thrust (Non-Linear) - IMPROVED ALTITUDE PERFORMANCE
-    const d = 1.0; // Exponent for power law thrust (reduced for better altitude performance)
-    const airDensity0 = 1.225; // Sea-level air density (kg/m³)
-    const baseThrustSeaLevel = this.maxThrust * Math.pow(throttle, 1.1); // Base thrust at sea level
+    // Base thrust at sea level (environmental lapse applied later)
+    const baseThrust = this.maxThrust * throttle;
     
-    // Calculate thrust with improved altitude efficiency using a more realistic lapse rate
-    const densityRatio = airDensity / airDensity0;
-    // Linear thrust lapse with minimum efficiency floor (more realistic for turbofans)
-    const thrustLapseFactor = Math.max(0.3, 0.85 * densityRatio + 0.15);
-    const baseThrust = baseThrustSeaLevel * thrustLapseFactor;
-    
-    // Fuel flow (scaled with thrust)
-    const baseFuelFlow = 0.3 + (baseThrust / this.maxThrust) * 2.0; // kg/s
+    // Fuel flow using specific fuel consumption (baseline idle included)
+    const idleFuel = 0.05; // kg/s idle baseline
+    const baseFuelFlow = Math.max(idleFuel, this.specificFuelConsumption * baseThrust);
     
     return [baseN1, baseN2, baseEGT, baseThrust, baseFuelFlow];
   }
@@ -266,43 +266,29 @@ export class Engine {
     
     // Air density effects
     const densityRatio = env.airDensity / 1.225;
-    const densityFactor = Math.pow(densityRatio, 0.7);
+    const thrustLapse = Math.pow(densityRatio, 0.7);
     
     // Temperature effects (hot day = reduced performance)
     const tempFactor = Math.max(0.6, 1 - ((env.temperature - 15) * 0.004));
     
-    // Altitude effects (high altitude = reduced performance)
-    const altitudeFactor = Math.max(0.3, 1 - (env.altitude * 0.00008));
-    
-    // Combined environmental factor
-    const envFactor = densityFactor * tempFactor * altitudeFactor;
+    // Combined environmental factor (remove double altitude scaling)
+    const envFactor = thrustLapse * tempFactor;
     
     return [
       n1, // N1 largely unaffected by environment
       n2, // N2 largely unaffected by environment  
       egt * tempFactor, // EGT affected by temperature
       thrust * envFactor, // Thrust heavily affected by environment
-      fuelFlow * envFactor // Fuel flow affected by environment
+      Math.max(0.05, fuelFlow * tempFactor) // Fuel flow affected by temperature only
     ];
   }
   
   /**
-   * Apply degradation effects
+   * Apply degradation effects (disabled as requested)
    */
   applyDegradationEffects([n1, n2, egt, thrust, fuelFlow]) {
-    const deg = this.degradationFactors;
-    
-    // Overall degradation factor
-    const degradationFactor = (deg.age + deg.wearLevel) * 0.5 - (deg.maintenance + deg.cleanliness) * 0.3 + 0.7;
-    const finalFactor = Math.max(0.3, Math.min(1.1, degradationFactor));
-    
-    return [
-      n1 * finalFactor,
-      n2 * finalFactor,
-      egt * (2 - finalFactor), // Higher EGT for degraded engine
-      thrust * finalFactor,
-      fuelFlow * finalFactor
-    ];
+    // Return parameters without degradation effects
+    return [n1, n2, egt, thrust, fuelFlow];
   }
   
   /**

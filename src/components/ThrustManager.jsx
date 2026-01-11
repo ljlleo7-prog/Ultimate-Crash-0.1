@@ -52,9 +52,10 @@ const ThrustManager = ({ controlThrust, flightState }) => {
   
   // ✅ ENHANCED: Engine parameters display (single engine)
   const getEngineParams = useCallback(() => {
-    const n1 = Number(flightState?.engineN1) || 22; // Default idle N1
-    const n2 = Number(flightState?.engineN2) || 45;
-    const egt = Number(flightState?.engineEGT) || 400;
+    // Engine parameters are arrays (one value per engine)
+    const n1 = Array.isArray(flightState?.engineN1) ? flightState.engineN1[0] : Number(flightState?.engineN1) || 22;
+    const n2 = Array.isArray(flightState?.engineN2) ? flightState.engineN2[0] : Number(flightState?.engineN2) || 45;
+    const egt = Array.isArray(flightState?.engineEGT) ? flightState.engineEGT[0] : Number(flightState?.engineEGT) || 400;
     
     return { n1, n2, egt };
   }, [flightState]);
