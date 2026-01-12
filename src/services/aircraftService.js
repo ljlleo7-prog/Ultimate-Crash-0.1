@@ -365,6 +365,52 @@ class AircraftService {
       }
     };
   }
+
+  // Get flap profile for specific aircraft
+  async getFlapProfile(aircraftModel) {
+    const aircraft = await this.getAircraftByModel(aircraftModel);
+    if (!aircraft) {
+      throw new Error(`Aircraft model '${aircraftModel}' not found`);
+    }
+
+    // Return the flap profile if it exists, otherwise return default values
+    return aircraft.flapProfile || {
+      positions: [
+        { angle: 0, clIncrement: 0, cdIncrement: 0, label: "UP" },
+        { angle: 10, clIncrement: 0.3, cdIncrement: 0.015, label: "1" },
+        { angle: 20, clIncrement: 0.6, cdIncrement: 0.035, label: "2" },
+        { angle: 30, clIncrement: 1.0, cdIncrement: 0.07, label: "FULL" }
+      ]
+    };
+  }
+
+  // Get airbrake profile for specific aircraft
+  async getAirbrakeProfile(aircraftModel) {
+    const aircraft = await this.getAircraftByModel(aircraftModel);
+    if (!aircraft) {
+      throw new Error(`Aircraft model '${aircraftModel}' not found`);
+    }
+
+    // Return the airbrake profile if it exists, otherwise return default values
+    return aircraft.airbrakeProfile || {
+      hasTwoTier: true,
+      airPosition: { dragIncrement: 0.06, liftDecrement: -0.1 },
+      groundPosition: { dragIncrement: 0.15, liftDecrement: -0.2 }
+    };
+  }
+
+  // Get all control surface profiles for specific aircraft
+  async getControlSurfaceProfiles(aircraftModel) {
+    const aircraft = await this.getAircraftByModel(aircraftModel);
+    if (!aircraft) {
+      throw new Error(`Aircraft model '${aircraftModel}' not found`);
+    }
+
+    return {
+      flaps: await this.getFlapProfile(aircraftModel),
+      airbrakes: await this.getAirbrakeProfile(aircraftModel)
+    };
+  }
 }
 
 // Create and export a singleton instance

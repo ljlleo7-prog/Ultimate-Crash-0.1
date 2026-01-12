@@ -1,64 +1,80 @@
 {
   "aircraft": [
     {
-      "model": "Boeing 737-800",
-      "type": "Narrow-body",
-      "manufacturer": "Boeing",
-      "iata": "738",
-      "icao": "B738",
-      "maxRange": 5430,
-      "cruiseSpeed": 450,
-      "fuelConsumption": 2200,
-      "maxFuelCapacity": 26020,
-      "maxPayload": 18900,
-      "maxPassengers": 189,
-      "typicalFuelBurn": 2.4,
-      "takeoffDistance": 2400,
-      "landingDistance": 1600,
-      "engineType": "CFM56-7B",
-      "engineCount": 2,
-      "category": "Medium-haul",
-      "wingArea": 125,
-      "wingSpan": 35.8,
-      "aspectRatio": 9.4,
-      "maxLiftCoefficient": 1.6,
-      "stallSpeed": 125,
-      "maxOperatingMach": 0.82,
-      "emptyWeight": 41400,
-      "maxTakeoffWeight": 79000,
-      "maxThrustPerEngine": 120000,
-      "liftCurveSlope": 5.7,
-      "zeroLiftDragCoefficient": 0.025,
-      "inducedDragFactor": 0.040,
-      "basicLiftCoefficient": 0.5,
-      "horizontalStabilizerArea": 25,
-      "horizontalStabilizerCL": -0.08,
-      "horizontalStabilizerMomentArm": 12.5,
-      "aerodynamicCenterPosition": 0.25,
-      "centerOfGravityPosition": 0.15,
-      "dragCenterPosition": 0.75,
-      "controlPower": {
-        "x": 1.2,
-        "y": 1.5,
-        "z": 1.0
-      },
-      "specificFuelConsumption": 0.000021,
-      "elevatorEffectiveness": 0.00105,
-      "aileronEffectiveness": 0.00052,
-      "rudderEffectiveness": 0.00031,
-      "sideForceCoefficient": 0.00021,
-      "initialCruiseThrottle": 0.56,
-      "pidParameters": {
-        "altitude": { "Kp": 0.00082, "Ki": 0.000105, "Kd": 0.0021, "min": -0.31, "max": 0.31 },
-        "speed": { "Kp": 0.52, "Ki": 0.052, "Kd": 0.105, "min": -0.52, "max": 0.52 },
-        "heading": { "Kp": 0.82, "Ki": 0.105, "Kd": 0.31, "min": -0.52, "max": 0.52 }
-      },
-      "momentOfInertiaRoll": 30000,
-      "momentOfInertiaPitch": 50000,
-      "momentOfInertiaYaw": 80000
+    "model": "Boeing 737-800",
+    "type": "Narrow-body",
+    "manufacturer": "Boeing",
+    "iata": "738",
+    "icao": "B738",
+    "maxRange": 3200,
+    "cruiseSpeed": 450,
+    "fuelConsumption": 2200,
+    "maxFuelCapacity": 26020,
+    "maxPayload": 18900,
+    "maxPassengers": 189,
+    "typicalFuelBurn": 2.4,
+    "takeoffDistance": 2400,
+    "landingDistance": 1600,
+    "engineType": "CFM56-7B",
+    "engineCount": 2,
+    "category": "Medium-haul",
+    "wingArea": 125,
+    "wingSpan": 35.8,
+    "aspectRatio": 9.4,
+    "maxLiftCoefficient": 1.6,
+    "stallSpeed": 125,
+    "maxOperatingMach": 0.82,
+    "emptyWeight": 41400,
+    "maxTakeoffWeight": 79000,
+    "maxThrustPerEngine": 120000,
+    "liftCurveSlope": 5.7,
+    "zeroLiftDragCoefficient": 0.025,
+    "inducedDragFactor": 0.040,
+    "basicLiftCoefficient": 0.5,
+    "horizontalStabilizerArea": 25,
+    "horizontalStabilizerCL": -0.08,
+    "horizontalStabilizerMomentArm": 12.5,
+    "aerodynamicCenterPosition": 0.25,
+    "centerOfGravityPosition": 0.15,
+    "dragCenterPosition": 0.75,
+    "controlPower": {
+      "x": 1.2,
+      "y": 1.5,
+      "z": 1.0
     },
-    {
-      "model": "Airbus A320-200",
+    "specificFuelConsumption": 0.000021,
+    "elevatorEffectiveness": 0.00105,
+    "aileronEffectiveness": 0.00052,
+    "rudderEffectiveness": 0.00031,
+    "sideForceCoefficient": 0.00021,
+    "initialCruiseThrottle": 0.56,
+    "pidParameters": {
+      "altitude": { "Kp": 0.00082, "Ki": 0.000105, "Kd": 0.0021, "min": -0.31, "max": 0.31 },
+      "speed": { "Kp": 0.52, "Ki": 0.052, "Kd": 0.105, "min": -0.52, "max": 0.52 },
+      "heading": { "Kp": 0.82, "Ki": 0.105, "Kd": 0.31, "min": -0.52, "max": 0.52 }
+    },
+    "momentOfInertiaRoll": 30000,
+    "momentOfInertiaPitch": 50000,
+    "momentOfInertiaYaw": 80000,
+    "flapProfile": {
+      "positions": [
+        { "angle": 0, "clIncrement": 0, "cdIncrement": 0, "label": "UP" },
+        { "angle": 5, "clIncrement": 0.1, "cdIncrement": 0.005, "label": "1" },
+        { "angle": 10, "clIncrement": 0.3, "cdIncrement": 0.01, "label": "5" },
+        { "angle": 15, "clIncrement": 0.5, "cdIncrement": 0.02, "label": "10" },
+        { "angle": 20, "clIncrement": 0.8, "cdIncrement": 0.03, "label": "15" },
+        { "angle": 25, "clIncrement": 1.1, "cdIncrement": 0.05, "label": "25" },
+        { "angle": 30, "clIncrement": 1.3, "cdIncrement": 0.08, "label": "30" },
+        { "angle": 35, "clIncrement": 1.5, "cdIncrement": 0.12, "label": "40" }
+      ]
+    },
+    "airbrakeProfile": {
+      "hasTwoTier": true,
+      "airPosition": { "dragIncrement": 0.06, "liftDecrement": -0.1 },
+      "groundPosition": { "dragIncrement": 0.15, "liftDecrement": -0.2 }
+    }
+  },
+    {"model": "Airbus A320-200",
       "type": "Narrow-body",
       "manufacturer": "Airbus",
       "iata": "320",
@@ -112,7 +128,21 @@
       },
       "momentOfInertiaRoll": 32000,
       "momentOfInertiaPitch": 52000,
-      "momentOfInertiaYaw": 85000
+      "momentOfInertiaYaw": 85000,
+      "flapProfile": {
+        "positions": [
+          { "angle": 0, "clIncrement": 0, "cdIncrement": 0, "label": "UP" },
+          { "angle": 18, "clIncrement": 0.4, "cdIncrement": 0.02, "label": "1" },
+          { "angle": 20, "clIncrement": 0.6, "cdIncrement": 0.035, "label": "2" },
+          { "angle": 25, "clIncrement": 0.8, "cdIncrement": 0.05, "label": "3" },
+          { "angle": 30, "clIncrement": 1.0, "cdIncrement": 0.07, "label": "FULL" }
+        ]
+      },
+      "airbrakeProfile": {
+        "hasTwoTier": true,
+        "airPosition": { "dragIncrement": 0.065, "liftDecrement": -0.12 },
+        "groundPosition": { "dragIncrement": 0.18, "liftDecrement": -0.25 }
+      }
     },
     {
       "model": "Boeing 777-300ER",
@@ -169,7 +199,21 @@
       },
       "momentOfInertiaRoll": 180000,
       "momentOfInertiaPitch": 250000,
-      "momentOfInertiaYaw": 320000
+      "momentOfInertiaYaw": 320000,
+      "flapProfile": {
+        "positions": [
+          { "angle": 0, "clIncrement": 0, "cdIncrement": 0, "label": "UP" },
+          { "angle": 10, "clIncrement": 0.3, "cdIncrement": 0.015, "label": "TO1" },
+          { "angle": 15, "clIncrement": 0.5, "cdIncrement": 0.025, "label": "TO2" },
+          { "angle": 20, "clIncrement": 0.7, "cdIncrement": 0.04, "label": "LDG" },
+          { "angle": 30, "clIncrement": 1.0, "cdIncrement": 0.075, "label": "FULL" }
+        ]
+      },
+      "airbrakeProfile": {
+        "hasTwoTier": true,
+        "airPosition": { "dragIncrement": 0.07, "liftDecrement": -0.15 },
+        "groundPosition": { "dragIncrement": 0.22, "liftDecrement": -0.3 }
+      }
     },
     {
       "model": "Airbus A350-900",

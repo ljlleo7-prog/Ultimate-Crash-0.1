@@ -804,19 +804,23 @@ class NewFlightPhysicsService {
     let flapsCl = 0;
     let flapsCd = 0;
     
-    switch (this.state.flaps) {
-      case 1: // Takeoff flaps
-        flapsCl = 0.8; // Additional lift coefficient
-        flapsCd = 0.01; // Additional drag coefficient
-        break;
-      case 2: // Landing flaps
-        flapsCl = 1.2; // More lift for landing
-        flapsCd = 0.02; // More drag for landing
-        break;
-      default: // Flaps up (0)
-        flapsCl = 0;
-        flapsCd = 0;
-    }
+    // Get the flap profile from the aircraft data or use defaults if not available
+    const flapProfile = this.aircraft.flapProfile || {
+      positions: [
+        { angle: 0, clIncrement: 0, cdIncrement: 0, label: "UP" },
+        { angle: 10, clIncrement: 0.3, cdIncrement: 0.015, label: "1" },
+        { angle: 20, clIncrement: 0.6, cdIncrement: 0.035, label: "2" },
+        { angle: 30, clIncrement: 1.0, cdIncrement: 0.07, label: "FULL" }
+      ]
+    };
+    
+    // Get the current flap position index
+    const flapIndex = Math.max(0, Math.min(this.state.flaps, flapProfile.positions.length - 1));
+    const flapPosition = flapProfile.positions[flapIndex];
+    
+    // Apply the lift and drag increments from the selected flap position
+    flapsCl = flapPosition.clIncrement;
+    flapsCd = flapPosition.cdIncrement;
     
     return {
       cl: cl + flapsCl,
@@ -917,9 +921,26 @@ class NewFlightPhysicsService {
     let airbrakeCl = 0;
     
     if (this.state.airBrakes > 0) {
-      // Airbrakes increase drag significantly and reduce lift
-      airbrakeCd = 0.05; // Significant drag increase
-      airbrakeCl = -0.1; // Lift reduction (spoiler effect)
+      // Get the airbrake profile from the aircraft data or use defaults if not available
+      const airbrakeProfile = this.aircraft.airbrakeProfile || {
+        hasTwoTier: true,
+        airPosition: { dragIncrement: 0.06, liftDecrement: -0.1 },
+        groundPosition: { dragIncrement: 0.15, liftDecrement: -0.2 }
+      };
+      
+      // Determine if the aircraft is on the ground or in the air
+      const isOnGround = this.isOnGround();
+      
+      // Apply the appropriate airbrake profile based on the aircraft's state
+      if (airbrakeProfile.hasTwoTier) {
+        const airbrakePosition = isOnGround ? airbrakeProfile.groundPosition : airbrakeProfile.airPosition;
+        airbrakeCd = airbrakePosition.dragIncrement;
+        airbrakeCl = airbrakePosition.liftDecrement;
+      } else {
+        // For single-tier airbrakes, use air position values
+        airbrakeCd = airbrakeProfile.airPosition?.dragIncrement || 0.05;
+        airbrakeCl = airbrakeProfile.airPosition?.liftDecrement || -0.1;
+      }
     }
     
     return {
@@ -932,7 +953,9 @@ class NewFlightPhysicsService {
    * ✅ NEW: Control surface setters
    */
   setFlaps(flaps) {
-    this.state.flaps = Math.max(0, Math.min(2, Math.round(flaps)));
+    // Get the number of flap positions from the aircraft's flap profile or default to 4
+    const maxFlapPositions = this.aircraft.flapProfile?.positions?.length - 1 || 3;
+    this.state.flaps = Math.max(0, Math.min(maxFlapPositions, Math.round(flaps)));
 
   }
   

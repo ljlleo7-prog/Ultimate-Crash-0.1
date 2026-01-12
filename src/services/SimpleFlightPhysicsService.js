@@ -650,7 +650,9 @@ class SimpleFlightPhysicsService {
    * Control surface setters (same interface as realistic model)
    */
   setFlaps(flaps) {
-    this.state.flaps = Math.max(0, Math.min(2, Math.round(flaps)));
+    // Get the number of flap positions from the aircraft's flap profile or default to 4
+    const maxFlapPositions = this.aircraft.flapProfile?.positions?.length - 1 || 3;
+    this.state.flaps = Math.max(0, Math.min(maxFlapPositions, Math.round(flaps)));
   }
 
   setAirBrakes(position) {
