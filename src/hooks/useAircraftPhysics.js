@@ -11,28 +11,28 @@ export function useAircraftPhysics(config = {}, autoStart = true, model = 'reali
   });
 
   const [flightData, setFlightData] = useState({
-    altitude: 35000,
-    airspeed: 450,
-    indicatedAirspeed: 280,
-    verticalSpeed: -1,
-    pitch: 2.5,
-    roll: 0.5,
-    heading: 270,
-    throttle: 47,
+    altitude: 0,
+    airspeed: 0,
+    indicatedAirspeed: 0,
+    verticalSpeed: 0,
+    pitch: 0,
+    roll: 0,
+    heading: 0,
+    throttle: 0,
     elevator: 0,
     aileron: 0,
     rudder: 0,
-    lift: 571.4,
-    drag: 42.0,
-    thrust: 56.4,
-    weight: 553.3,
+    lift: 0,
+    drag: 0,
+    thrust: 0,
+    weight: 0,
     cg: { x: 0, y: 0, z: 0 },
     flapsPosition: 'up',
     airBrakesPosition: 'up',
-    gearPosition: 'up',
+    gearPosition: 'down',
     flapsValue: 0,
     airBrakesValue: 0,
-    gearValue: false,
+    gearValue: true,
     frame: 0
   });
 
@@ -414,23 +414,23 @@ export function useAircraftPhysics(config = {}, autoStart = true, model = 'reali
     }
     
     currentControlsRef.current = {
-      throttle: 0.47, // Legacy
-      engineThrottles: [0.47, 0.47], // Both engines at 47% idle
+      throttle: 0.3, // Starting with low throttle
+      engineThrottles: [0.3, 0.3], // Both engines at 30% for takeoff preparation
       pitch: 0,
       roll: 0,
       yaw: 0
     };
     
     setFlightData({
-      altitude: 35000,
-      airspeed: 450,
-      indicatedAirspeed: 280,
+      altitude: 0,
+      airspeed: 0,
+      indicatedAirspeed: 0,
       verticalSpeed: 0,
       pitch: 0.0,
       roll: 0,
       heading: 0,
-      throttle: 47, // Legacy
-      engineThrottles: [47, 47], // Both engines at 47% idle
+      throttle: 30, // Starting with low throttle
+      engineThrottles: [30, 30], // Both engines at 30% for takeoff preparation
       elevator: 0,
       aileron: 0,
       rudder: 0,
@@ -441,20 +441,20 @@ export function useAircraftPhysics(config = {}, autoStart = true, model = 'reali
       cg: { x: 0, y: 0, z: 0 },
       flapsPosition: 'up',
       airBrakesPosition: 'up',
-      gearPosition: 'up',
+      gearPosition: 'down',
       flapsValue: 0,
       airBrakesValue: 0,
-      gearValue: false
+      gearValue: true
     });
     
     lastUpdateTimeRef.current = Date.now();
     
-    console.log('🔄 Aircraft reset to cruise configuration');
+    console.log('🔄 Aircraft reset to neutral configuration');
   }, []);
 
   useEffect(() => {
     if (physicsServiceRef.current && isInitialized) {
-      console.log('🔄 Initializing physics with cruise configuration');
+      console.log('🔄 Initializing physics with runway configuration');
       updatePhysics(); // Initial update without hardcoded time step
     }
   }, [isInitialized]);

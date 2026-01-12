@@ -75,6 +75,100 @@ const FlightInProgress = ({
   const [throttleControl, setThrottleControl] = useState(47);
   const [commandInput, setCommandInput] = useState('');
   const [sceneState, setSceneState] = useState(sceneManager.getState());
+  const [narrative, setNarrative] = useState(null);
+  const [activeFailures, setActiveFailures] = useState([]);
+  const [phaseName, setPhaseName] = useState('');
+
+  // Set up event listeners for narrative and failure updates
+  useEffect(() => {
+    // Subscribe to narrative updates
+    const unsubscribeNarrative = eventBus.subscribe(eventBus.Types.NARRATIVE_UPDATE, (payload) => {
+      setNarrative(payload);
+    });
+    
+    // Subscribe to critical messages
+    const unsubscribeCritical = eventBus.subscribe(eventBus.Types.CRITICAL_MESSAGE, (payload) => {
+      // Flash effect or special handling for critical messages
+      setNarrative(payload);
+      // Could add audio alert here
+    });
+    
+    // Subscribe to phase changes
+    const unsubscribePhase = eventBus.subscribe(eventBus.Types.PHASE_CHANGED, (payload) => {
+      setPhaseName(payload.phase.name);
+      if (payload.phase.narrative) {
+        setNarrative(payload.phase.narrative);
+      }
+    });
+    
+    // Subscribe to failure updates
+    const unsubscribeFailure = eventBus.subscribe(eventBus.Types.FAILURE_OCCURRED, (payload) => {
+      // Update active failures display
+      const state = sceneManager.getState();
+      setActiveFailures(state.activeFailures);
+    });
+    
+    const unsubscribeFailureResolved = eventBus.subscribe(eventBus.Types.FAILURE_RESOLVED, (payload) => {
+      // Update active failures display
+      const state = sceneManager.getState();
+      setActiveFailures(state.activeFailures);
+    });
+    
+    // Subscribe to physics initialization events
+    const unsubscribePhysicsInit = eventBus.subscribe(eventBus.Types.PHYSICS_INITIALIZE, (payload) => {
+      // Apply initial conditions to physics service
+      if (physicsService && typeof physicsService.setInitialConditions === 'function') {
+        physicsService.setInitialConditions(payload.initialConditions);
+      }
+      
+      // Update autopilot targets if provided
+      if (physicsService && typeof physicsService.updateAutopilotTargets === 'function') {
+        const targets = {};
+        if (payload.targetAltitude !== undefined) {
+          targets.altitude = payload.targetAltitude;
+        }
+        if (payload.targetSpeed !== undefined) {
+          targets.speed = payload.targetSpeed;
+        }
+        if (Object.keys(targets).length > 0) {
+          physicsService.updateAutopilotTargets(targets);
+        }
+      }
+    });
+    
+    return () => {
+      unsubscribeNarrative();
+      unsubscribeCritical();
+      unsubscribePhase();
+      unsubscribeFailure();
+      unsubscribeFailureResolved();
+      unsubscribePhysicsInit();
+    };
+  }, [physicsService]);
+
+  // Main update loop
+  useEffect(() => {
+    sceneManager.start();
+    let animationId = null;
+    let lastTime = performance.now();
+    const loop = now => {
+      const dt = (now - lastTime) / 1000;
+      lastTime = now;
+      sceneManager.update(dt);
+      const state = sceneManager.getState();
+      setSceneState(state);
+      if (state.physicsActive && isInitialized) {
+        updatePhysics(1 / 60, now);
+      }
+      animationId = requestAnimationFrame(loop);
+    };
+    animationId = requestAnimationFrame(loop);
+    return () => {
+      if (animationId) {
+        cancelAnimationFrame(animationId);
+      }
+    };
+  }, [isInitialized, updatePhysics]);
 
   // ✅ CLEAN ARCHITECTURE: Single throttle control handler (reverted for responsiveness)
   const handleThrustControl = (engineIndex, throttleValue) => {
@@ -180,29 +274,6 @@ const FlightInProgress = ({
     );
   }
 
-  useEffect(() => {
-    sceneManager.start();
-    let animationId = null;
-    let lastTime = performance.now();
-    const loop = now => {
-      const dt = (now - lastTime) / 1000;
-      lastTime = now;
-      sceneManager.update(dt);
-      const state = sceneManager.getState();
-      setSceneState(state);
-      if (state.physicsActive && isInitialized) {
-        updatePhysics(1 / 60, now);
-      }
-      animationId = requestAnimationFrame(loop);
-    };
-    animationId = requestAnimationFrame(loop);
-    return () => {
-      if (animationId) {
-        cancelAnimationFrame(animationId);
-      }
-    };
-  }, [isInitialized, updatePhysics]);
-
   return (
     <div style={{
       position: 'relative',
@@ -235,27 +306,62 @@ const FlightInProgress = ({
               marginBottom: '4px'
             }}
           >
-            Situation
+            {phaseName || 'Situation'}
           </div>
           <div
             style={{
               fontSize: '18px',
               fontWeight: 600,
-              color: '#E5E7EB',
+              color: narrative?.severity === 'critical' ? '#ef4444' : narrative?.severity === 'warning' ? '#f59e0b' : '#E5E7EB',
               marginBottom: '4px'
             }}
           >
-            Placeholder: unfolding in-flight emergency narrative goes here.
+            {narrative?.title || 'Awaiting flight instructions...'}
           </div>
           <div
             style={{
               fontSize: '13px',
               color: '#D1D5DB',
-              opacity: 0.9
+              opacity: 0.9,
+              marginBottom: '8px'
             }}
           >
-            Placeholder: concise description of the current failure, risks, and time pressure.
+            {narrative?.content || 'Prepare for takeoff.'}
           </div>
+          
+          {/* Active Failures Display */}
+          {activeFailures.length > 0 && (
+            <div style={{ marginTop: '8px' }}>
+              <div style={{
+                fontSize: '11px',
+                textTransform: 'uppercase',
+                color: '#ef4444',
+                marginBottom: '4px'
+              }}>
+                Active Failures ({activeFailures.length})
+              </div>
+              <div style={{
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '3px'
+              }}>
+                {activeFailures.map((failure, index) => (
+                  <div key={index} style={{
+                    fontSize: '10px',
+                    color: failure.isCritical ? '#ef4444' : '#f59e0b',
+                    padding: '4px 6px',
+                    background: 'rgba(239, 68, 68, 0.1)',
+                    borderRadius: '3px',
+                    display: 'flex',
+                    justifyContent: 'space-between'
+                  }}>
+                    <span>{failure.type.toUpperCase()} {failure.data.engineIndex !== undefined ? `ENGINE ${failure.data.engineIndex + 1}` : ''}</span>
+                    <span>{failure.isCritical ? 'CRITICAL' : `${Math.round(failure.progress)}%`}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
         <form
           onSubmit={handleCommandSubmit}

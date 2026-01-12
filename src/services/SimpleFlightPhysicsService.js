@@ -6,15 +6,15 @@
 
 class SimpleFlightPhysicsService {
   static DEFAULT_ENVIRONMENT = {
-    DENSITY: 0.379,     // kg/m³ at FL350
-    PRESSURE: 23840,    // Pa at FL350
-    TEMPERATURE: 229,   // K at FL350
-    SPEED_OF_SOUND: 295 // m/s at FL350
+    DENSITY: 1.225,     // kg/m³ at sea level
+    PRESSURE: 101325,   // Pa at sea level
+    TEMPERATURE: 288.15, // K (15°C) at sea level
+    SPEED_OF_SOUND: 340.3 // m/s at sea level
   };
 
   static DEFAULT_CONTROLS = {
-    THROTTLE: 0.55,     // 55% thrust for cruise
-    TRIM: 20,           // Initial trim wheel position
+    THROTTLE: 0.3,     // 30% thrust for takeoff preparation
+    TRIM: 0,           // Initial trim wheel position
     PITCH_SENSITIVITY: 5.0,  // Pitch sensitivity multiplier
     ROLL_SENSITIVITY: 1.5,   // Roll sensitivity multiplier
     YAW_SENSITIVITY: 2.0     // Yaw sensitivity multiplier
@@ -88,25 +88,22 @@ class SimpleFlightPhysicsService {
     // Force accumulators (for compatibility with realistic model)
     this.thrustForces = { x: 0, y: 0, z: 0 };
 
-    const cruiseAltitudeFt = Number(this.aircraft.initialCruiseAltitudeFt) || 35000;
-    const cruiseAltitudeM = cruiseAltitudeFt * 0.3048;
-
-    // Initial state - level cruise at configured altitude, 450 KTS
+    // Initial state - on the runway with 0 speed
     this.state = {
       position: {
         x: 0,     // North position (m)
         y: 0,     // East position (m)
-        z: cruiseAltitudeM
+        z: 0      // Altitude: 0 ft (on the ground)
       },
       velocity: {
-        u: 231.5, // Forward velocity (450 KTS TAS)
+        u: 0,     // Forward velocity: 0 KTS
         v: 0,     // Rightward velocity
         w: 0      // Vertical velocity (body frame, Z-upward)
       },
       orientation: {
         phi: 0,   // Roll angle (0° = level)
         theta: 0, // Pitch angle (0° = level)
-        psi: 0    // Yaw: 0° (flying North)
+        psi: 0    // Yaw: 0° (aligned with runway)
       },
       angularRates: {
         p: 0, // Roll rate
@@ -114,7 +111,7 @@ class SimpleFlightPhysicsService {
         r: 0  // Yaw rate
       },
       controls: {
-        throttle: this.aircraft.initialCruiseThrottle || SimpleFlightPhysicsService.DEFAULT_CONTROLS.THROTTLE,
+        throttle: this.aircraft.initialTakeoffThrottle || SimpleFlightPhysicsService.DEFAULT_CONTROLS.THROTTLE,
         pitch: 0,       // Neutral elevator
         roll: 0,        // Neutral ailerons
         yaw: 0,         // Neutral rudder
@@ -122,7 +119,7 @@ class SimpleFlightPhysicsService {
       },
       flaps: 0,         // 0=UP, 1=TO, 2=LDG
       airBrakes: 0,     // 0=RETRACTED, 1=EXTENDED
-      gear: false,      // Landing gear
+      gear: true,       // Landing gear down for takeoff
       fuel: this.aircraft.fuelWeight || 20000
     };
 
@@ -137,10 +134,10 @@ class SimpleFlightPhysicsService {
     };
 
     // Flight stage tracking
-    this.currentFlightStage = 'cruise'; // Initial stage
+    this.currentFlightStage = 'taxi'; // Initial stage (on the runway)
     this.earthFrameVerticalVelocity = 0;
     this.targetVerticalSpeed = 0;
-    this.targetAltitude = this.state.position.z;
+    this.targetAltitude = this.state.position.z; // Stay at ground level initially
 
     // Engine parameters that respond to throttle and flight stage
     // Support variable engine counts based on aircraft data
@@ -368,6 +365,11 @@ class SimpleFlightPhysicsService {
     
     // Clamp vertical speed for realism
     this.state.velocity.w = Math.max(-15, Math.min(15, this.state.velocity.w));
+    
+    // Simple ground logic: if on ground, clamp body frame vertical velocity to 0 or positive
+    if (this.isOnGround()) {
+      this.state.velocity.w = Math.max(0, this.state.velocity.w);
+    }
   }
 
   /**
@@ -460,13 +462,16 @@ class SimpleFlightPhysicsService {
     const yDot = u * cosTheta * sinPsi + v * cosPsi + w * sinTheta * sinPsi;
     const zDot = u * sinTheta + w * cosTheta;
 
+    // Simple ground logic: if on ground, clamp vertical speed to 0 or positive (can't go down)
+    const clampedZDot = this.isOnGround() ? Math.max(0, zDot) : zDot;
+
     // Store earth frame vertical velocity for flight stage detection
-    this.earthFrameVerticalVelocity = zDot;
+    this.earthFrameVerticalVelocity = clampedZDot;
 
     // Update position
     this.state.position.x += xDot * dt;
     this.state.position.y += yDot * dt;
-    this.state.position.z += zDot * dt;
+    this.state.position.z += clampedZDot * dt;
 
     // Ensure altitude doesn't go below ground level
     this.state.position.z = Math.max(0, this.state.position.z);
@@ -657,6 +662,16 @@ class SimpleFlightPhysicsService {
   }
 
   /**
+   * Check if aircraft is on the ground
+   * Criteria: altitude < ground threshold and vertical speed <= 0
+   */
+  isOnGround() {
+    const groundThreshold = 0.1; // 10 cm above ground
+    const verticalSpeedThreshold = 0.1; // m/s - aircraft is moving down or stationary
+    return this.state.position.z < groundThreshold && this.earthFrameVerticalVelocity <= verticalSpeedThreshold;
+  }
+
+  /**
    * Reset aircraft to initial state
    */
   reset() {
@@ -664,10 +679,10 @@ class SimpleFlightPhysicsService {
       position: {
         x: 0,
         y: 0,
-        z: 10668
+        z: 0  // Altitude: 0 ft (on the ground)
       },
       velocity: {
-        u: 231.5,
+        u: 0, // Forward velocity: 0 KTS
         v: 0,
         w: 0
       },
@@ -690,7 +705,7 @@ class SimpleFlightPhysicsService {
       },
       flaps: 0,
       airBrakes: 0,
-      gear: false,
+      gear: true,       // Landing gear down for takeoff
       fuel: this.aircraft.fuelWeight || 20000
     };
 
@@ -703,10 +718,10 @@ class SimpleFlightPhysicsService {
       fuelFlow: Array(engineCount).fill(1000)
     };
 
-    this.currentFlightStage = 'cruise';
+    this.currentFlightStage = 'taxi'; // Reset to runway stage
     this.earthFrameVerticalVelocity = 0;
     this.targetVerticalSpeed = 0;
-    this.targetAltitude = this.state.position.z;
+    this.targetAltitude = this.state.position.z; // Stay at ground level initially
   }
 }
 

@@ -5,6 +5,7 @@
 // Import the new multi-engine system
 import { PropulsionManager } from './PropulsionManager.js';
 import { ParameterValidator } from '../utils/ParameterValidator.js';
+import eventBus, { EventTypes } from './eventBus.js';
 class PIDController {
   constructor(kp, ki, kd, outputMin = -1, outputMax = 1) {
     this.kp = kp; // Proportional gain
@@ -72,14 +73,14 @@ class PIDController {
 class NewFlightPhysicsService {
   // HARDCODED DEFAULT PARAMETERS
   static DEFAULT_ENVIRONMENT = {
-    DENSITY: 0.379,     // kg/m³ at FL350
-    PRESSURE: 23840,   // Pa at FL350
-    TEMPERATURE: 229,   // K at FL350
-    SPEED_OF_SOUND: 295 // m/s at FL350
+    DENSITY: 1.225,     // kg/m³ at sea level
+    PRESSURE: 101325,   // Pa at sea level
+    TEMPERATURE: 288.15, // K (15°C) at sea level
+    SPEED_OF_SOUND: 340.3 // m/s at sea level
   };
 
   static DEFAULT_CONTROLS = {
-    THROTTLE: 0.55, // 55% thrust for cruise
+    THROTTLE: 0.3, // 30% thrust for takeoff preparation
     TRIM: 0     // Initial trim wheel position (displays as 11 units)
   };
 
@@ -109,7 +110,7 @@ class NewFlightPhysicsService {
     this.dt = 1 / 60; // Fixed time step for physics integration (60 Hz)
     
     // Debug tracking
-    this.lastThrottleValue = 0.55;
+    this.lastThrottleValue = 0.3; // Start with low throttle
     
     // ✅ NEW: Initialize scalable multi-engine system
     this.propulsionManager = new PropulsionManager({
@@ -118,25 +119,22 @@ class NewFlightPhysicsService {
       maxThrustPerEngine: this.aircraft.maxThrustPerEngine || 120000
     });
     
-    const cruiseAltitudeFt = Number(this.aircraft.initialCruiseAltitudeFt) || 35000;
-    const cruiseAltitudeM = cruiseAltitudeFt * 0.3048;
-
-    // Initial state - level cruise at configured altitude, 450 KTS
+    // Initial state - neutral position on the ground, ready for takeoff
     this.state = {
       position: {
         x: 0,     // North position (m)
         y: 0,     // East position (m)
-        z: cruiseAltitudeM  // Altitude in meters (POSITIVE = above ground level)
+        z: 0      // Altitude in meters (0 = on ground)
       },
       velocity: {
-        u: 231.5, // Forward velocity (450 KTS TAS)
+        u: 0,     // Forward velocity (0 KTS)
         v: 0,     // Rightward velocity
         w: 0      // Vertical velocity (body frame, Z-upward)
       },
       orientation: {
         phi: 0,   // Roll angle (0° = level)
-        theta: 0.05, // Initial pitch 0° - dynamic pitch based on torque calculations
-        psi: 0    // Yaw: 0° (flying North)
+        theta: 0, // Initial pitch 0° - level on runway
+        psi: 0    // Yaw: 0° (aligned with runway)
       },
       angularRates: {
         p: 0, // Roll rate
@@ -144,26 +142,26 @@ class NewFlightPhysicsService {
         r: 0  // Yaw rate
       },
       controls: {
-        throttle: this.aircraft.initialCruiseThrottle || NewFlightPhysicsService.DEFAULT_CONTROLS.THROTTLE, // 55% thrust for cruise
+        throttle: 0.3, // 30% thrust for takeoff preparation
         pitch: 0,       // Neutral elevator
         roll: 0,        // Neutral ailerons
         yaw: 0,         // Neutral rudder
-        trim: NewFlightPhysicsService.DEFAULT_CONTROLS.TRIM   // Initial trim wheel position (displays as 11 units)
+        trim: 0         // Neutral trim
       },
-      // ✅ NEW: Control surfaces state with proper defaults
-      flaps: 0,         // 0=UP, 1=TO, 2=LDG
-      airBrakes: 0,     // 0=RETRACTED, 1=EXTENDED
-      gear: false,       // Landing gear
+      // ✅ NEW: Control surfaces state with proper defaults for takeoff
+      flaps: 0,         // 0=UP, will be set to 1 (TO) by takeoff phase
+      airBrakes: 0,     // 0=RETRACTED
+      gear: true,       // Landing gear DOWN for takeoff
       fuel: this.aircraft.fuelWeight || 2000, // Use flight plan fuel load or default to 2000kg
       frame: 0 // Debug frame counter
     };
     
-    // Environment parameters (will be updated dynamically based on altitude)
+    // Environment parameters at sea level (will be updated dynamically)
     this.environment = {
-      density: NewFlightPhysicsService.DEFAULT_ENVIRONMENT.DENSITY,
-      pressure: NewFlightPhysicsService.DEFAULT_ENVIRONMENT.PRESSURE,
-      temperature: NewFlightPhysicsService.DEFAULT_ENVIRONMENT.TEMPERATURE,
-      speedOfSound: NewFlightPhysicsService.DEFAULT_ENVIRONMENT.SPEED_OF_SOUND,
+      density: 1.225,   // kg/m³ at sea level
+      pressure: 101325, // Pa at sea level
+      temperature: 288.15, // K (15°C) at sea level
+      speedOfSound: 340.3, // m/s at sea level
       wind: { x: 0, y: 0, z: 0 },
       windSpeedKts: Number(this.aircraft.windSpeedKts) || 0
     };
@@ -180,15 +178,14 @@ class NewFlightPhysicsService {
     // Earth frame velocity components
     this.earthFrameVerticalVelocity = 0; // m/s
 
-
     
     // 🚁 PID AUTOPILOT SYSTEM
     this.autopilot = {
       enabled: false,
       engaged: false,
       targets: {
-        altitude: cruiseAltitudeM,
-        speed: 231.5,
+        altitude: 0,
+        speed: 0,
         heading: 0
       },
       limits: {
@@ -984,6 +981,16 @@ class NewFlightPhysicsService {
   }
   
   /**
+   * Check if aircraft is on the ground
+   * Criteria: altitude < ground threshold and vertical speed <= 0
+   */
+  isOnGround() {
+    const groundThreshold = 0.1; // 10 cm above ground
+    const verticalSpeedThreshold = 0.1; // m/s - aircraft is moving down or stationary
+    return this.state.position.z < groundThreshold && this.earthFrameVerticalVelocity <= verticalSpeedThreshold;
+  }
+  
+  /**
    * Calculate temperature ratio relative to sea level standard atmosphere
    * Uses ISA (International Standard Atmosphere) model
    */
@@ -1008,6 +1015,12 @@ class NewFlightPhysicsService {
       y: (this.aeroForces?.y || 0) + (this.thrustForces?.y || 0) + (this.gravityForces?.y || 0),
       z: (this.aeroForces?.z || 0) + (this.thrustForces?.z || 0) + (this.gravityForces?.z || 0)
     };
+    
+    // Simple ground logic: if on ground, ensure vertical force is upward to prevent sinking
+    if (this.isOnGround()) {
+      // Set vertical force to 0 when on ground to prevent further downward acceleration
+      this.forces.z = Math.max(0, this.forces.z);
+    }
     
     this.moments = {
       x: (this.aeroMoments?.x || 0),
@@ -1126,15 +1139,16 @@ class NewFlightPhysicsService {
                  v * Math.sin(phi) * Math.cos(theta) + 
                  w * Math.cos(phi) * Math.cos(theta);
     
+    // Simple ground logic: if on ground, clamp vertical speed to 0 or positive (can't go down)
+    const clampedZDot = this.isOnGround() ? Math.max(0, zDot) : zDot;
 
-    
     // Store for vertical speed calculation
-    this.earthFrameVerticalVelocity = zDot;
+    this.earthFrameVerticalVelocity = clampedZDot;
     
     // Update position
     this.state.position.x += xDot * timeStep;
     this.state.position.y += yDot * timeStep;
-    this.state.position.z += zDot * timeStep;
+    this.state.position.z += clampedZDot * timeStep;
 
     // Increment debug frame counter each time position is updated
     this.state.frame = (this.state.frame || 0) + 1;
@@ -1267,6 +1281,9 @@ class NewFlightPhysicsService {
     }
     
     this.state.fuel = Math.max(0, (this.state.fuel !== undefined ? this.state.fuel : 100) - fuelFlow * this.dt);
+    
+    // Check for physics events before returning state
+    this.checkPhysicsEvents(altitude_m, altitude_ft, airspeeds.trueAirspeed, airspeeds.indicatedAirspeed);
     
     return {
       // Navigation
@@ -1537,51 +1554,200 @@ class NewFlightPhysicsService {
   smoothInput(current, target, rate) {
     return current + (target - current) * rate;
   }
-  
+
   /**
-   * Reset aircraft to initial cruise state
+   * Check for critical physics events and emit appropriate events
+   */
+  checkPhysicsEvents(altitude_m, altitude_ft, tas_kts, ias_kts) {
+    const velocity = this.state.velocity;
+    const airspeed = Math.sqrt(velocity.u * velocity.u + velocity.v * velocity.v + velocity.w * velocity.w);
+    
+    // Calculate angle of attack for stall detection
+    const flightPathAngle = Math.atan2(velocity.w, velocity.u);
+    const alpha = this.state.orientation.theta - flightPathAngle;
+    const aoaDegrees = alpha * (180 / Math.PI);
+    
+    // Stall warning thresholds
+    const stallWarningAoA = 15; // degrees
+    const stallAoA = 18; // degrees
+    
+    // High speed warning thresholds
+    const highSpeedWarning = 350; // knots IAS
+    const highSpeedDanger = 380; // knots IAS (VNE - never exceed speed)
+    
+    // Altitude warning thresholds
+    const altitudeWarningLow = 1000; // feet
+    const altitudeWarningVeryLow = 500; // feet
+    
+    // G-force warning thresholds
+    const gForceWarningHigh = 2.5; // positive Gs
+    const gForceWarningLow = -1.0; // negative Gs
+    
+    // Calculate g-forces
+    const totalForce = Math.sqrt(
+      this.forces.x * this.forces.x + 
+      this.forces.y * this.forces.y + 
+      this.forces.z * this.forces.z
+    );
+    const gForce = totalForce / (this.aircraft.mass * 9.81);
+    
+    // Stall detection
+    if (aoaDegrees >= stallAoA && airspeed > 50) {
+      eventBus.publishWithMetadata(EventTypes.STALL_OCCURRED, {
+        aoa: aoaDegrees,
+        airspeed: ias_kts,
+        altitude: altitude_ft,
+        timestamp: Date.now()
+      });
+    } else if (aoaDegrees >= stallWarningAoA && airspeed > 50) {
+      eventBus.publishWithMetadata(EventTypes.STALL_WARNING, {
+        aoa: aoaDegrees,
+        airspeed: ias_kts,
+        altitude: altitude_ft,
+        timeToStall: Math.max(0, (stallAoA - aoaDegrees) / 0.5) // Estimated time in seconds
+      });
+    }
+    
+    // High speed detection
+    if (ias_kts >= highSpeedDanger) {
+      eventBus.publishWithMetadata(EventTypes.HIGH_SPEED_OCCURRED, {
+        speed: ias_kts,
+        altitude: altitude_ft,
+        timestamp: Date.now()
+      });
+    } else if (ias_kts >= highSpeedWarning) {
+      eventBus.publishWithMetadata(EventTypes.HIGH_SPEED_WARNING, {
+        speed: ias_kts,
+        altitude: altitude_ft,
+        deltaToDanger: highSpeedDanger - ias_kts
+      });
+    }
+    
+    // Altitude warning
+    if (altitude_ft < altitudeWarningVeryLow && this.state.velocity.w < 0) {
+      eventBus.publishWithMetadata(EventTypes.ALTITUDE_WARNING, {
+        altitude: altitude_ft,
+        verticalSpeed: this.earthFrameVerticalVelocity * 196.85, // ft/min
+        severity: 'critical'
+      });
+    } else if (altitude_ft < altitudeWarningLow && this.state.velocity.w < 0) {
+      eventBus.publishWithMetadata(EventTypes.ALTITUDE_WARNING, {
+        altitude: altitude_ft,
+        verticalSpeed: this.earthFrameVerticalVelocity * 196.85, // ft/min
+        severity: 'warning'
+      });
+    }
+    
+    // G-force warning
+    if (Math.abs(gForce) >= gForceWarningHigh || gForce <= gForceWarningLow) {
+      eventBus.publishWithMetadata(EventTypes.G_FORCE_WARNING, {
+        gForce: gForce.toFixed(2),
+        altitude: altitude_ft,
+        speed: ias_kts
+      });
+    }
+  }
+
+  /**
+   * Reset aircraft to runway conditions
    */
   reset() {
-    // ✅ FIXED: Reset to level cruise at FL350, 450 KTS using positive altitude
-    this.state = {
+    // Reset to runway conditions (sea level, 0 speed)
+    this.setInitialConditions({
       position: {
-        x: 0,     // North position (m)
-        y: 0,     // East position (m)
-        z: 10668  // Altitude: 35,000 ft = 10,668 m (POSITIVE = above ground level)
+        x: 0,
+        y: 0,
+        z: 0  // Altitude: 0 ft (on the ground)
       },
       velocity: {
-        u: 231.5, // Forward velocity (450 KTS TAS)
-        v: 0,     // Rightward velocity
-        w: 0      // Vertical velocity
+        u: 0, // Forward velocity: 0 KTS
+        v: 0,
+        w: 0
       },
       orientation: {
         phi: 0,   // Roll angle (0° = level)
-        theta: 0.05236, // Pitch: +3° for cruise
+        theta: 0, // Pitch: 0° for runway
+        psi: 0    // Yaw: 0° (aligned with runway)
+      },
+      throttle: 0.3 // 30% thrust for takeoff preparation
+    });
+  }
+
+  /**
+   * Set custom initial conditions for aircraft
+   */
+  setInitialConditions(conditions) {
+    const defaults = {
+      position: {
+        x: 0,
+        y: 0,
+        z: 0
+      },
+      velocity: {
+        u: 0,
+        v: 0,
+        w: 0
+      },
+      orientation: {
+        phi: 0,   // Roll angle (0° = level)
+        theta: 0, // Pitch: 0° for takeoff
         psi: 0    // Yaw: 0° (flying North)
       },
+      throttle: 0
+    };
+
+    const config = { ...defaults, ...conditions };
+
+    // Update state with new initial conditions
+    this.state = {
+      position: {
+        x: config.position.x,
+        y: config.position.y,
+        z: config.position.z
+      },
+      velocity: {
+        u: config.velocity.u,
+        v: config.velocity.v,
+        w: config.velocity.w
+      },
+      orientation: {
+        phi: config.orientation.phi,
+        theta: config.orientation.theta,
+        psi: config.orientation.psi
+      },
       angularRates: {
-        p: 0, // Roll rate
-        q: 0, // Pitch rate
-        r: 0  // Yaw rate
+        p: 0,
+        q: 0,
+        r: 0
       },
       controls: {
-        throttle: 0.55, // 55% thrust for cruise
-        pitch: 0,       // Neutral elevator
-        roll: 0,        // Neutral ailerons
-        yaw: 0          // Neutral rudder
+        throttle: config.throttle,
+        pitch: 0,
+        roll: 0,
+        yaw: 0
       },
-      // ✅ NEW: Control surfaces state with proper defaults
-      flaps: 0,         // 0=UP, 1=TO, 2=LDG
-      airBrakes: 0,     // 0=RETRACTED, 1=EXTENDED
-      gear: false       // Landing gear
+      flaps: 0,
+      airBrakes: 0,
+      gear: false,
+      fuel: this.state?.fuel || (this.aircraft.fuelWeight || 2000)
     };
-    
-    // Reset PID controllers
+
+    // Update environment properties based on new altitude
+    this.updateEnvironmentProperties();
+
+    // Reset PID controllers for smooth transition
     Object.values(this.pidControllers).forEach(controller => controller.reset());
-    
 
-    
-
+    // Update autopilot targets if available
+    if (config.position.z !== undefined) {
+      this.autopilot.targets.altitude = config.position.z;
+    }
+    if (config.velocity.u !== undefined) {
+      this.autopilot.targets.speed = config.velocity.u;
+    }
+    if (config.orientation.psi !== undefined) {
+      this.autopilot.targets.heading = config.orientation.psi;
+    }
   }
   
   /**
