@@ -364,7 +364,8 @@ class NewFlightPhysicsService {
       const auto = this.calculateAutopilotControls(timeStep);
       controlInputs = {
         ...manualControls,
-        throttle: auto.throttle
+        throttle: auto.throttle,
+        pitch: auto.pitch*0.05
       };
     } else {
       controlInputs = manualControls;
@@ -398,6 +399,30 @@ class NewFlightPhysicsService {
    * Calculate autopilot control inputs using PID controllers
    */
   calculateAutopilotControls(dt = this.dt) {
+    const altitude_m = Math.max(0, this.state.position.z);
+    const targetAltitude_m = this.autopilot.targets.altitude || altitude_m;
+    const altitudeError_m = targetAltitude_m - altitude_m;
+    const altitudeError_ft = altitudeError_m * 3.28084;
+
+    const currentVS_mps = this.earthFrameVerticalVelocity || 0;
+    const currentVS_ftmin = currentVS_mps * 196.85;
+
+    const vsGain = 0.3;
+    let targetVS_ftmin = altitudeError_ft * vsGain;
+    const maxVS = 1500;
+    if (targetVS_ftmin > maxVS) targetVS_ftmin = maxVS;
+    if (targetVS_ftmin < -maxVS) targetVS_ftmin = -maxVS;
+
+    const vsError_ftmin = targetVS_ftmin - currentVS_ftmin;
+    const vsToPitch = 0.00003;
+    const pitchDelta = vsError_ftmin * vsToPitch;
+
+    const currentPitch = this.state.controls.pitch || 0;
+    const desiredPitch = Math.max(
+      this.autopilot.limits.minPitch,
+      Math.min(this.autopilot.limits.maxPitch, currentPitch + pitchDelta)
+    );
+
     const airspeeds = this.calculateAirspeeds();
     const currentSpeed = airspeeds.indicatedAirspeedMS || 0;
     
@@ -414,7 +439,7 @@ class NewFlightPhysicsService {
 
     return {
       throttle: limitedThrottle,
-      pitch: 0,
+      pitch: desiredPitch,
       roll: 0,
       yaw: 0,
       trim: this.state.controls.trim

@@ -1,0 +1,398 @@
+[
+  {
+    "id": "ap-on",
+    "abbr": "APON",
+    "template": "AP ON",
+    "description": "Engage autopilot"
+  },
+  {
+    "id": "ap-off",
+    "abbr": "APOFF",
+    "template": "AP OFF",
+    "description": "Disconnect autopilot"
+  },
+  {
+    "id": "ap-nav-on",
+    "abbr": "APNAV",
+    "template": "AP NAV ON",
+    "description": "Let autopilot follow navigation source"
+  },
+  {
+    "id": "ap-nav-off",
+    "abbr": "APNAVX",
+    "template": "AP NAV OFF",
+    "description": "Disconnect navigation tracking mode"
+  },
+  {
+    "id": "ap-approach-arm",
+    "abbr": "APAPR",
+    "template": "AP APPROACH ARM",
+    "description": "Arm approach mode for landing"
+  },
+  {
+    "id": "set-altitude",
+    "abbr": "ALT",
+    "template": "SET ALT {altitude_ft}",
+    "description": "Set target altitude in feet"
+  },
+  {
+    "id": "set-speed",
+    "abbr": "SPD",
+    "template": "SET SPD {ias_kts}",
+    "description": "Set target airspeed in knots"
+  },
+  {
+    "id": "set-heading",
+    "abbr": "HDG",
+    "template": "SET HDG {heading_deg}",
+    "description": "Set heading bug in degrees"
+  },
+  {
+    "id": "descend-to",
+    "abbr": "DES",
+    "template": "DESCEND TO {altitude_ft}",
+    "description": "Begin descent toward altitude"
+  },
+  {
+    "id": "climb-to",
+    "abbr": "CLB",
+    "template": "CLIMB TO {altitude_ft}",
+    "description": "Climb toward altitude"
+  },
+  {
+    "id": "level-change",
+    "abbr": "LVLCHG",
+    "template": "LEVEL CHANGE {altitude_ft}",
+    "description": "Command level change to altitude"
+  },
+  {
+    "id": "hold-altitude",
+    "abbr": "ALTHLD",
+    "template": "HOLD ALTITUDE",
+    "description": "Maintain current altitude"
+  },
+  {
+    "id": "hold-heading",
+    "abbr": "HDGHLD",
+    "template": "HOLD HEADING",
+    "description": "Maintain current heading"
+  },
+  {
+    "id": "thrust-toga",
+    "abbr": "TOGA",
+    "template": "SET THRUST TOGA",
+    "description": "Apply takeoff or go-around power"
+  },
+  {
+    "id": "thrust-idle",
+    "abbr": "IDLE",
+    "template": "SET THRUST IDLE",
+    "description": "Retard thrust levers to idle"
+  },
+  {
+    "id": "thrust-mct",
+    "abbr": "MCT",
+    "template": "SET THRUST MCT",
+    "description": "Set thrust to maximum continuous"
+  },
+  {
+    "id": "set-manual-thrust",
+    "abbr": "THR",
+    "template": "SET THRUST {percent}",
+    "description": "Set thrust lever position in percent"
+  },
+  {
+    "id": "flaps-set",
+    "abbr": "FLP",
+    "template": "SET FLAPS {position}",
+    "description": "Set flaps position"
+  },
+  {
+    "id": "gear-down",
+    "abbr": "GRDN",
+    "template": "GEAR DOWN",
+    "description": "Extend landing gear"
+  },
+  {
+    "id": "gear-up",
+    "abbr": "GRUP",
+    "template": "GEAR UP",
+    "description": "Retract landing gear"
+  },
+  {
+    "id": "spoilers-arm",
+    "abbr": "SPAR",
+    "template": "SPEEDBRAKE ARM",
+    "description": "Arm speedbrake for landing"
+  },
+  {
+    "id": "spoilers-set",
+    "abbr": "SPB",
+    "template": "SPEEDBRAKE {position}",
+    "description": "Set speedbrake position"
+  },
+  {
+    "id": "engine-shutdown",
+    "abbr": "ENGX",
+    "template": "SHUTDOWN ENGINE {engine_no}",
+    "description": "Shut down specified engine"
+  },
+  {
+    "id": "engine-relight",
+    "abbr": "ENGRL",
+    "template": "RELIGHT ENGINE {engine_no}",
+    "description": "Attempt engine relight"
+  },
+  {
+    "id": "apu-start",
+    "abbr": "APUON",
+    "template": "APU START",
+    "description": "Start auxiliary power unit"
+  },
+  {
+    "id": "apu-stop",
+    "abbr": "APUOFF",
+    "template": "APU STOP",
+    "description": "Shut down auxiliary power unit"
+  },
+  {
+    "id": "fuel-crossfeed-on",
+    "abbr": "XFEED",
+    "template": "FUEL CROSSFEED ON",
+    "description": "Open fuel crossfeed valve"
+  },
+  {
+    "id": "fuel-crossfeed-off",
+    "abbr": "XFEEDX",
+    "template": "FUEL CROSSFEED OFF",
+    "description": "Close fuel crossfeed valve"
+  },
+  {
+    "id": "packs-off",
+    "abbr": "PACKX",
+    "template": "PACKS OFF",
+    "description": "Turn off air conditioning packs"
+  },
+  {
+    "id": "packs-on",
+    "abbr": "PACK",
+    "template": "PACKS ON",
+    "description": "Turn on air conditioning packs"
+  },
+  {
+    "id": "crew-brief",
+    "abbr": "BRFCREW",
+    "template": "BRIEF CREW {topic}",
+    "description": "Give a briefing to the cabin crew"
+  },
+  {
+    "id": "cabin-check",
+    "abbr": "CABCHK",
+    "template": "CABIN CHECK",
+    "description": "Request full cabin status check"
+  },
+  {
+    "id": "prepare-landing",
+    "abbr": "PREPLD",
+    "template": "PREPARE CABIN FOR LANDING",
+    "description": "Instruct crew to prepare for landing"
+  },
+  {
+    "id": "prepare-evac",
+    "abbr": "PREPEV",
+    "template": "PREPARE CABIN FOR EVACUATION",
+    "description": "Instruct crew to prepare for possible evacuation"
+  },
+  {
+    "id": "crew-seats",
+    "abbr": "SEATCREW",
+    "template": "CREW TO SEATS",
+    "description": "Command all crew to be seated"
+  },
+  {
+    "id": "pa-announce",
+    "abbr": "PA",
+    "template": "PA ANNOUNCEMENT {message}",
+    "description": "Make public announcement to passengers"
+  },
+  {
+    "id": "call-purser",
+    "abbr": "PURSR",
+    "template": "CALL PURSER",
+    "description": "Request purser to cockpit"
+  },
+  {
+    "id": "declare-emergency",
+    "abbr": "MAYDAY",
+    "template": "DECLARE MAYDAY {brief_reason}",
+    "description": "Flag a full emergency"
+  },
+  {
+    "id": "declare-urgency",
+    "abbr": "PAN",
+    "template": "DECLARE PANPAN {brief_reason}",
+    "description": "Declare an urgent situation"
+  },
+  {
+    "id": "atc-request-vectors",
+    "abbr": "VECT",
+    "template": "REQUEST VECTORS {destination}",
+    "description": "Ask ATC for radar vectors"
+  },
+  {
+    "id": "atc-request-descent",
+    "abbr": "REQDES",
+    "template": "REQUEST DESCENT {altitude_ft}",
+    "description": "Ask ATC for lower altitude"
+  },
+  {
+    "id": "atc-request-climb",
+    "abbr": "REQCLB",
+    "template": "REQUEST CLIMB {altitude_ft}",
+    "description": "Ask ATC for higher altitude"
+  },
+  {
+    "id": "atc-priority-landing",
+    "abbr": "PRILND",
+    "template": "REQUEST PRIORITY LANDING",
+    "description": "Ask ATC for priority landing clearance"
+  },
+  {
+    "id": "atc-fuel-emergency",
+    "abbr": "FULEM",
+    "template": "NOTIFY MINIMUM FUEL",
+    "description": "Inform ATC of critical fuel state"
+  },
+  {
+    "id": "atc-squawk",
+    "abbr": "SQWK",
+    "template": "SQUAWK {code}",
+    "description": "Set transponder code"
+  },
+  {
+    "id": "atc-ident",
+    "abbr": "IDENT",
+    "template": "IDENT",
+    "description": "Activate transponder ident"
+  },
+  {
+    "id": "check-circuit-breakers",
+    "abbr": "CHKCB",
+    "template": "CHECK CIRCUIT BREAKERS",
+    "description": "Scan circuit breakers for popped items"
+  },
+  {
+    "id": "check-hydraulics",
+    "abbr": "CHKHYD",
+    "template": "CHECK HYDRAULIC SYSTEMS",
+    "description": "Review hydraulic pressures and quantities"
+  },
+  {
+    "id": "check-electrical",
+    "abbr": "CHKELEC",
+    "template": "CHECK ELECTRICAL SYSTEM",
+    "description": "Review electrical loads and sources"
+  },
+  {
+    "id": "check-fuel-balance",
+    "abbr": "CHKFUEL",
+    "template": "CHECK FUEL BALANCE",
+    "description": "Compare left and right tank quantities"
+  },
+  {
+    "id": "check-flight-controls",
+    "abbr": "CHKCTL",
+    "template": "CHECK FLIGHT CONTROLS",
+    "description": "Verify control surface movements"
+  },
+  {
+    "id": "check-doors",
+    "abbr": "CHKDRS",
+    "template": "CHECK DOORS AND HATCHES",
+    "description": "Confirm all doors are correctly latched"
+  },
+  {
+    "id": "check-pressurization",
+    "abbr": "CHKPRS",
+    "template": "CHECK PRESSURIZATION",
+    "description": "Review cabin altitude and differential"
+  },
+  {
+    "id": "check-oxygen",
+    "abbr": "CHKOX",
+    "template": "CHECK OXYGEN SYSTEMS",
+    "description": "Verify oxygen supply and masks"
+  },
+  {
+    "id": "check-icing",
+    "abbr": "CHKICE",
+    "template": "CHECK ICING CONDITIONS",
+    "description": "Assess airframe and engine icing"
+  },
+  {
+    "id": "anti-ice-on",
+    "abbr": "AICE",
+    "template": "ANTI-ICE ON",
+    "description": "Activate anti-ice systems"
+  },
+  {
+    "id": "anti-ice-off",
+    "abbr": "AICEX",
+    "template": "ANTI-ICE OFF",
+    "description": "Deactivate anti-ice systems"
+  },
+  {
+    "id": "run-checklist-generic",
+    "abbr": "CHKLST",
+    "template": "RUN CHECKLIST {name}",
+    "description": "Run named checklist"
+  },
+  {
+    "id": "run-checklist-engine-fire",
+    "abbr": "CHKENGF",
+    "template": "RUN CHECKLIST ENGINE FIRE",
+    "description": "Execute engine fire checklist"
+  },
+  {
+    "id": "run-checklist-pressurization",
+    "abbr": "CHKPRSCL",
+    "template": "RUN CHECKLIST LOSS OF PRESSURIZATION",
+    "description": "Execute pressurization loss checklist"
+  },
+  {
+    "id": "run-checklist-ditching",
+    "abbr": "CHKDITCH",
+    "template": "RUN CHECKLIST DITCHING",
+    "description": "Execute ditching checklist"
+  },
+  {
+    "id": "run-checklist-go-around",
+    "abbr": "CHKGAR",
+    "template": "RUN CHECKLIST GO AROUND",
+    "description": "Execute go-around checklist"
+  },
+  {
+    "id": "evac-command",
+    "abbr": "EVAC",
+    "template": "START EVACUATION",
+    "description": "Command immediate aircraft evacuation"
+  },
+  {
+    "id": "evac-stop",
+    "abbr": "EVACX",
+    "template": "STOP EVACUATION",
+    "description": "Cancel ongoing evacuation"
+  },
+  {
+    "id": "elt-on",
+    "abbr": "ELTON",
+    "template": "ACTIVATE ELT",
+    "description": "Turn on emergency locator transmitter"
+  },
+  {
+    "id": "elt-off",
+    "abbr": "ELTOFF",
+    "template": "DEACTIVATE ELT",
+    "description": "Turn off emergency locator transmitter"
+  }
+]

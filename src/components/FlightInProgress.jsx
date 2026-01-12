@@ -2,6 +2,9 @@ import React, { useState, useEffect } from 'react';
 import { useAircraftPhysics } from '../hooks/useAircraftPhysics';
 import FlightPanelModular from './FlightPanelModular';
 import IntegratedControlPanel from './IntegratedControlPanel';
+import commandDatabase from '../commandDatabase.json';
+import sceneManager from '../services/sceneManager.js';
+import eventBus from '../services/eventBus.js';
 
 const FlightInProgress = ({ 
   callsign, 
@@ -66,11 +69,12 @@ const FlightInProgress = ({
     setAirBrakes,
     setGear,
     physicsService
-  } = useAircraftPhysics(aircraftConfig, true, physicsModel);
+  } = useAircraftPhysics(aircraftConfig, false, physicsModel);
 
   // Control state for UI components
-  const [throttleControl, setThrottleControl] = useState(47); // Default 47% as mentioned by user
+  const [throttleControl, setThrottleControl] = useState(47);
   const [commandInput, setCommandInput] = useState('');
+  const [sceneState, setSceneState] = useState(sceneManager.getState());
 
   // ✅ CLEAN ARCHITECTURE: Single throttle control handler (reverted for responsiveness)
   const handleThrustControl = (engineIndex, throttleValue) => {
@@ -114,14 +118,17 @@ const FlightInProgress = ({
       return;
     }
     console.log('🧭 COMMAND INPUT:', trimmed);
+    eventBus.publish('command.input', {
+      raw: trimmed,
+      sceneId: sceneState.sceneId,
+      scenarioId: sceneState.scenarioId
+    });
     setCommandInput('');
   };
 
 
 
 
-  // Auto-start logic means we don't need a start button anymore
-  // Show loading state briefly while physics initializes
   if (!isInitialized && !error) {
     return (
       <div style={{
@@ -172,6 +179,29 @@ const FlightInProgress = ({
       </div>
     );
   }
+
+  useEffect(() => {
+    sceneManager.start();
+    let animationId = null;
+    let lastTime = performance.now();
+    const loop = now => {
+      const dt = (now - lastTime) / 1000;
+      lastTime = now;
+      sceneManager.update(dt);
+      const state = sceneManager.getState();
+      setSceneState(state);
+      if (state.physicsActive && isInitialized) {
+        updatePhysics(1 / 60, now);
+      }
+      animationId = requestAnimationFrame(loop);
+    };
+    animationId = requestAnimationFrame(loop);
+    return () => {
+      if (animationId) {
+        cancelAnimationFrame(animationId);
+      }
+    };
+  }, [isInitialized, updatePhysics]);
 
   return (
     <div style={{
@@ -275,20 +305,68 @@ const FlightInProgress = ({
                 fontWeight: 600,
                 fontSize: '13px',
                 cursor: 'pointer',
-                whiteSpace: 'nowrap'
+                whiteSpace: 'nowrap',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center'
               }}
             >
-              Send
+              ➤
             </button>
           </div>
           <div
             style={{
+              marginTop: '6px',
               fontSize: '11px',
               color: '#9CA3AF'
             }}
           >
             Placeholder: commands are logged only for now, not yet linked to systems.
           </div>
+          {commandInput.trim().length > 0 && (
+            <div
+              style={{
+                marginTop: '6px',
+                borderRadius: '6px',
+                border: '1px solid rgba(148,163,184,0.4)',
+                background: 'rgba(15,23,42,0.9)',
+                maxHeight: '140px',
+                overflowY: 'auto'
+              }}
+            >
+              {commandDatabase
+                .filter((template) => {
+                  const value = commandInput.trim().toLowerCase();
+                  const abbr = template.abbr.toLowerCase();
+                  const full = template.template.toLowerCase();
+                  return abbr.startsWith(value) || full.startsWith(value);
+                })
+                .map((template) => (
+                  <button
+                    key={template.id}
+                    type="button"
+                    onClick={() => setCommandInput(template.template)}
+                    style={{
+                      width: '100%',
+                      textAlign: 'left',
+                      padding: '6px 8px',
+                      border: 'none',
+                      background: 'transparent',
+                      cursor: 'pointer',
+                      color: '#E5E7EB',
+                      fontSize: '11px',
+                      borderBottom: '1px solid rgba(31,41,55,0.8)'
+                    }}
+                  >
+                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '2px' }}>
+                      <span style={{ fontWeight: 600, color: '#BFDBFE' }}>{template.abbr}</span>
+                      <span style={{ color: '#9CA3AF' }}>{template.template}</span>
+                    </div>
+                    <div style={{ color: '#9CA3AF', fontSize: '10px' }}>{template.description}</div>
+                  </button>
+                ))}
+            </div>
+          )}
         </form>
       </div>
 
