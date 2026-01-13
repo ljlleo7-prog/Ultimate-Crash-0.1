@@ -1,0 +1,46 @@
+{
+  "airports": [
+    {
+      "iata": "DXB",
+      "icao": "OMDB",
+      "name": "Dubai International Airport",
+      "city": "Dubai",
+      "country": "United Arab Emirates",
+      "latitude": 25.2527999,
+      "longitude": 55.3643989,
+      "elevation": 10,
+      "category": "4F",
+      "runways": [
+        { "name": "12L/30R", "length": 12000, "surface": "Asphalt", "category": "Heavy" },
+        { "name": "12R/30L", "length": 12000, "surface": "Asphalt", "category": "Heavy" },
+        { "name": "14/32", "length": 12000, "surface": "Asphalt", "category": "Heavy" }
+      ],
+      "frequencies": [
+        { "type": "ATIS", "frequency": 126.0 },
+        { "type": "Tower", "frequency": 118.2 },
+        { "type": "Ground", "frequency": 121.75 }
+      ]
+    },
+    {
+      "iata": "IST",
+      "icao": "LTBA",
+      "name": "Istanbul Atatürk Airport",
+      "city": "Istanbul",
+      "country": "Turkey",
+      "latitude": 40.9769001,
+      "longitude": 28.8141994,
+      "elevation": 183,
+      "category": "4F",
+      "runways": [
+        { "name": "05L/23R", "length": 12000, "surface": "Asphalt", "category": "Heavy" },
+        { "name": "05R/23L", "length": 12000, "surface": "Asphalt", "category": "Heavy" },
+        { "name": "06/24", "length": 12000, "surface": "Asphalt", "category": "Heavy" }
+      ],
+      "frequencies": [
+        { "type": "ATIS", "frequency": 126.0 },
+        { "type": "Tower", "frequency": 118.2 },
+        { "type": "Ground", "frequency": 121.75 }
+      ]
+    }
+  ]
+}

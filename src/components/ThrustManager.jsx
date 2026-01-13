@@ -5,7 +5,7 @@ const ThrustManager = ({ controlThrust, flightState }) => {
     Array.isArray(flightState?.engineN1) ? flightState.engineN1.length :
     Array.isArray(flightState?.engineN2) ? flightState.engineN2.length : 2;
   
-  const initial = Array(engineCount).fill(0.47);
+  const initial = Array(engineCount).fill(0.2);
   const [throttles, setThrottles] = useState(initial);
   const [reverse, setReverse] = useState(Array(engineCount).fill(false));
   const [sync, setSync] = useState(true);
@@ -13,7 +13,7 @@ const ThrustManager = ({ controlThrust, flightState }) => {
   
   useEffect(() => {
     if (Array.isArray(flightState?.engineThrottles)) {
-      const values = flightState.engineThrottles.map(v => (typeof v === 'number' ? v/100 : 0.47));
+      const values = flightState.engineThrottles.map(v => (typeof v === 'number' ? v/100 : 0.2));
       if (values.length === engineCount) {
         setThrottles(values);
       }

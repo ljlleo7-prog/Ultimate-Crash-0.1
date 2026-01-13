@@ -78,12 +78,13 @@ export class Engine {
   /**
    * Update environmental conditions
    */
-  updateEnvironment(altitude, airDensity, temperature, humidity) {
+  updateEnvironment(altitude, airDensity, temperature, humidity, tas = 0) {
     this.environmentalFactors = {
       altitude: altitude || 0,
       airDensity: airDensity || 1.225,
       temperature: temperature || 15,
-      humidity: humidity || 0.5
+      humidity: humidity || 0.5,
+      tas: tas || 0
     };
     
     // Recalculate parameters if running
@@ -170,42 +171,45 @@ export class Engine {
     const nominal = this.nominalParameters;
     const altitude_m = this.environmentalFactors.altitude || 0;
     const airDensity = this.environmentalFactors.airDensity || 1.225;
+    const densityRatio = airDensity / 1.225;
     
     // Sea-level values at current throttle
     const N10 = nominal.n1Idle + (Math.pow(throttleAbs, 0.7) * (nominal.n1Max - nominal.n1Idle));
     const N20 = nominal.n2Base + (Math.pow(throttleAbs, 0.9) * 10);
     
-    // A — Exponential Decay (Density-Scaled) for N1 - REDUCED DECAY RATE
-    const kN1 = 0.00002; // Decay coefficient for N1 - reduced from 0.0001
+    // N1 Decay with altitude
+    const kN1 = 0.00002;
     const N1_h = N10 * Math.exp(-kN1 * altitude_m);
-    
-    // Clamp N1 to reasonable limits
     let baseN1 = Math.max(nominal.n1Idle, Math.min(nominal.n1Max, N1_h));
     
-    // B — Modified Exponential for N2 - REDUCED DECAY RATE
-    const kN2 = 0.00001; // Decay coefficient for N2 - reduced from 0.00005
-    const cN2 = 0.3; // Change limit factor for N2 - reduced from 0.5
+    // N2 Decay with altitude
+    const kN2 = 0.00001;
+    const cN2 = 0.3;
     const N2_h = N20 * (1 - cN2 * (1 - Math.exp(-kN2 * altitude_m)));
-    
-    // Clamp N2 to reasonable limits
     let baseN2 = Math.max(50, Math.min(100, N2_h));
     
-    // EGT calculation - Improved curve for higher values at TOGA
+    // EGT calculation
     let baseEGT;
     if (throttleAbs <= 0.05) {
       baseEGT = nominal.egtIdle;
     } else {
-      // More aggressive EGT curve that reaches higher values at TOGA
       const egtCurve = Math.pow(throttleAbs, 0.8);
       baseEGT = nominal.egtIdle + egtCurve * (nominal.egtMax - nominal.egtIdle);
     }
     
     const sign = signedThrottle === 0 ? 0 : (signedThrottle > 0 ? 1 : -1);
-    const baseThrust = this.maxThrust * throttleAbs * sign;
     
-    // Fuel flow using specific fuel consumption (baseline idle included)
-    const idleFuel = 0.05; // kg/s idle baseline
-    const baseFuelFlow = Math.max(idleFuel, this.specificFuelConsumption * baseThrust);
+    // Improved Thrust Formula: T = T_static * (rho/rho0)^0.7 * (1 - 0.15 * Mach)
+    // We'll use a simplified Mach effect based on TAS if available, or just density
+    const mach = (this.environmentalFactors.tas || 0) / 340; // Approx speed of sound
+    const thrustFactor = Math.pow(densityRatio, 0.7) * (1 - 0.15 * mach);
+    const baseThrust = this.maxThrust * throttleAbs * thrustFactor * sign;
+    
+    // Improved Fuel Flow: FF = SFC * Thrust + IdleFF
+    // Typical SFC for modern turbofan: 0.000015 kg/N/s
+    const sfc = this.specificFuelConsumption || 0.000015;
+    const idleFuel = 0.08 * (this.maxThrust / 100000); // Scaled idle fuel based on engine size
+    const baseFuelFlow = Math.max(idleFuel, sfc * Math.abs(baseThrust));
     
     return [baseN1, baseN2, baseEGT, baseThrust, baseFuelFlow];
   }
@@ -270,22 +274,18 @@ export class Engine {
   applyEnvironmentalEffects([n1, n2, egt, thrust, fuelFlow]) {
     const env = this.environmentalFactors;
     
-    // Air density effects
-    const densityRatio = env.airDensity / 1.225;
-    const thrustLapse = Math.pow(densityRatio, 0.7);
-    
     // Temperature effects (hot day = reduced performance)
-    const tempFactor = Math.max(0.6, 1 - ((env.temperature - 15) * 0.004));
-    
-    // Combined environmental factor (remove double altitude scaling)
-    const envFactor = thrustLapse * tempFactor;
+    // ISA deviation: T - (15 - 0.0065 * alt)
+    const isaTemp = 15 - (0.0065 * env.altitude);
+    const tempDev = env.temperature - isaTemp;
+    const tempFactor = Math.max(0.7, 1 - (tempDev * 0.005));
     
     return [
-      n1, // N1 largely unaffected by environment
-      n2, // N2 largely unaffected by environment  
-      egt * tempFactor, // EGT affected by temperature
-      thrust * envFactor, // Thrust heavily affected by environment
-      Math.max(0.05, fuelFlow * tempFactor) // Fuel flow affected by temperature only
+      n1,
+      n2,
+      egt * (1 + tempDev * 0.001), // EGT increases on hot days
+      thrust * tempFactor,
+      fuelFlow * (1 + tempDev * 0.002) // Fuel flow increases slightly on hot days for same thrust
     ];
   }
   

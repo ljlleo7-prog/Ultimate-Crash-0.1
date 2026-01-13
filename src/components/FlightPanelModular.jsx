@@ -309,6 +309,7 @@ const FlightPanelModular = ({ flightData, onActionRequest, aircraftModel }) => {
           controlFlaps,
           controlGear,
           controlAirBrakes,
+          controlTrim: (payload) => onActionRequest('trim', payload),
           flightState,
           aircraftModel
         })

@@ -33,6 +33,7 @@ function App() {
   const [useRandomTime, setUseRandomTime] = useState(true);
   const [season, setSeason] = useState('');
   const [useRandomSeason, setUseRandomSeason] = useState(true);
+  const [apiKey, setApiKey] = useState('');
   
   // Flight simulation state
   const [flightInitialized, setFlightInitialized] = useState(false);
@@ -267,7 +268,9 @@ function App() {
         handleInitializeFlight: handleInitializeFlight,
         handleSearch: handleSearch,
         physicsModel: physicsModel,
-        setPhysicsModel: setPhysicsModel
+        setPhysicsModel: setPhysicsModel,
+        apiKey: apiKey,
+        setApiKey: setApiKey
       })
     )
   );

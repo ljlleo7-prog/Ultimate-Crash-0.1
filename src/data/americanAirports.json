@@ -1,0 +1,99 @@
+{
+  "airports": [
+    {
+      "iata": "ATL",
+      "icao": "KATL",
+      "name": "Hartsfield–Jackson Atlanta International Airport",
+      "city": "Atlanta",
+      "country": "United States",
+      "latitude": 33.6366998,
+      "longitude": -84.4280976,
+      "elevation": 1026,
+      "category": "4F",
+      "runways": [
+        { "name": "08L/26R", "length": 12390, "surface": "Asphalt", "category": "Heavy" },
+        { "name": "08R/26L", "length": 10000, "surface": "Asphalt", "category": "Heavy" },
+        { "name": "09L/27R", "length": 9000, "surface": "Asphalt", "category": "Heavy" },
+        { "name": "09R/27L", "length": 9000, "surface": "Asphalt", "category": "Heavy" },
+        { "name": "10/28", "length": 8000, "surface": "Asphalt", "category": "Heavy" },
+        { "name": "11/29", "length": 9000, "surface": "Asphalt", "category": "Heavy" }
+      ],
+      "frequencies": [
+        { "type": "ATIS", "frequency": 126.025 },
+        { "type": "Tower", "frequency": 118.25 },
+        { "type": "Ground", "frequency": 121.95 }
+      ]
+    },
+    {
+      "iata": "LAX",
+      "icao": "KLAX",
+      "name": "Los Angeles International Airport",
+      "city": "Los Angeles",
+      "country": "United States",
+      "latitude": 33.9425011,
+      "longitude": -118.4079971,
+      "elevation": 128,
+      "category": "4F",
+      "runways": [
+        { "name": "06L/24R", "length": 12091, "surface": "Asphalt", "category": "Heavy" },
+        { "name": "06R/24L", "length": 10885, "surface": "Asphalt", "category": "Heavy" },
+        { "name": "07L/25R", "length": 8975, "surface": "Asphalt", "category": "Heavy" },
+        { "name": "07R/25L", "length": 11095, "surface": "Asphalt", "category": "Heavy" },
+        { "name": "08/26", "length": 8926, "surface": "Asphalt", "category": "Heavy" }
+      ],
+      "frequencies": [
+        { "type": "ATIS", "frequency": 128.55 },
+        { "type": "Tower", "frequency": 118.2 },
+        { "type": "Ground", "frequency": 121.75 }
+      ]
+    },
+    {
+      "iata": "ORD",
+      "icao": "KORD",
+      "name": "O'Hare International Airport",
+      "city": "Chicago",
+      "country": "United States",
+      "latitude": 41.9786005,
+      "longitude": -87.9048004,
+      "elevation": 668,
+      "category": "4F",
+      "runways": [
+        { "name": "04L/22R", "length": 10800, "surface": "Asphalt", "category": "Heavy" },
+        { "name": "04R/22L", "length": 13000, "surface": "Asphalt", "category": "Heavy" },
+        { "name": "09L/27R", "length": 10000, "surface": "Asphalt", "category": "Heavy" },
+        { "name": "09R/27L", "length": 10000, "surface": "Asphalt", "category": "Heavy" },
+        { "name": "10L/28R", "length": 10000, "surface": "Asphalt", "category": "Heavy" },
+        { "name": "10R/28L", "length": 10000, "surface": "Asphalt", "category": "Heavy" }
+      ],
+      "frequencies": [
+        { "type": "ATIS", "frequency": 126.05 },
+        { "type": "Tower", "frequency": 118.2 },
+        { "type": "Ground", "frequency": 121.75 }
+      ]
+    },
+    {
+      "iata": "DFW",
+      "icao": "KDFW",
+      "name": "Dallas-Fort Worth International Airport",
+      "city": "Dallas",
+      "country": "United States",
+      "latitude": 32.8968000,
+      "longitude": -97.0372000,
+      "elevation": 607,
+      "category": "4F",
+      "runways": [
+        { "name": "01L/19R", "length": 13400, "surface": "Concrete", "category": "Heavy" },
+        { "name": "01R/19L", "length": 13400, "surface": "Concrete", "category": "Heavy" },
+        { "name": "09L/27R", "length": 12000, "surface": "Concrete", "category": "Heavy" },
+        { "name": "09R/27L", "length": 12000, "surface": "Concrete", "category": "Heavy" },
+        { "name": "17L/35R", "length": 13400, "surface": "Concrete", "category": "Heavy" },
+        { "name": "17R/35L", "length": 13400, "surface": "Concrete", "category": "Heavy" }
+      ],
+      "frequencies": [
+        { "type": "ATIS", "frequency": 126.0 },
+        { "type": "Tower", "frequency": 118.2 },
+        { "type": "Ground", "frequency": 121.75 }
+      ]
+    }
+  ]
+}

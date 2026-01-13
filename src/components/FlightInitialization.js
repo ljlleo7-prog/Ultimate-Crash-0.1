@@ -24,7 +24,8 @@ const FlightInitialization = ({
   aircraftSuggestions,
   handleInitializeFlight,
   handleSearch,
-  physicsModel, setPhysicsModel
+  physicsModel, setPhysicsModel,
+  apiKey, setApiKey
 }) => {
   
   const generateRandomTime = () => {
@@ -419,6 +420,19 @@ const FlightInitialization = ({
             placeholder: 'HH:MMZ',
             disabled: useRandomTime
           })
+        ),
+        React.createElement('div', { className: 'parameter-group' },
+          React.createElement('label', null, 'Airport API Key:'),
+          React.createElement('input', {
+            type: 'password',
+            value: apiKey,
+            onChange: (e) => setApiKey(e.target.value),
+            placeholder: 'Enter API key for real-time data (optional)',
+            style: { width: '100%' }
+          }),
+          React.createElement('p', { style: { fontSize: '12px', color: '#666', marginTop: '5px' } },
+            'Leave blank to use local database. Free trial will be used if available.'
+          )
         ),
 
         React.createElement('div', { className: 'parameter-group' },

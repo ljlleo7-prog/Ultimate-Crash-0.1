@@ -115,7 +115,7 @@
         "y": 1.5,
         "z": 1.0
       },
-      "specificFuelConsumption": 0.000060,
+      "specificFuelConsumption": 0.000018,
       "elevatorEffectiveness": 0.00102,
       "aileronEffectiveness": 0.00051,
       "rudderEffectiveness": 0.00030,
@@ -186,7 +186,7 @@
         "y": 1.5,
         "z": 1.0
       },
-      "specificFuelConsumption": 0.000051,
+      "specificFuelConsumption": 0.000016,
       "elevatorEffectiveness": 0.00088,
       "aileronEffectiveness": 0.00044,
       "rudderEffectiveness": 0.00026,

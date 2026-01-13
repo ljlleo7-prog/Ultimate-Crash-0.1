@@ -1,10 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import aircraftService from '../services/aircraftService';
 
-const ControlSurfacePanel = ({ controlFlaps, controlGear, controlAirBrakes, flightState, aircraftModel }) => {
+const ControlSurfacePanel = ({ controlFlaps, controlGear, controlAirBrakes, controlTrim, flightState, aircraftModel }) => {
   const [flapProfile, setFlapProfile] = useState(null);
   const [airbrakeProfile, setAirbrakeProfile] = useState(null);
   const [loading, setLoading] = useState(true);
+
+  // Trim state
+  const trimValue = flightState?.trimValue || 0;
 
   useEffect(() => {
     const fetchProfiles = async () => {
@@ -234,7 +237,110 @@ const ControlSurfacePanel = ({ controlFlaps, controlGear, controlAirBrakes, flig
         onToggle: controlAirBrakes,
         positionLabels: airbrakeLabels,
         colorMap: { 0: '#10b981', [airbrakeMax]: '#ef4444' }
-      })
+      }),
+
+      // Trim Wheel (Custom UI)
+      React.createElement('div', { 
+        style: { 
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          gap: '4px',
+          width: '60px'
+        } 
+      },
+        React.createElement('div', { 
+          style: { 
+            display: 'flex', 
+            flexDirection: 'column',
+            alignItems: 'center',
+            fontSize: '10px',
+            fontWeight: 'bold',
+            height: '30px',
+            justifyContent: 'center'
+          } 
+        },
+          React.createElement('span', { style: { color: '#93c5fd', marginBottom: '2px' } }, 'TRIM'),
+          React.createElement('span', { 
+            style: { 
+              color: '#f59e0b',
+              background: 'rgba(255, 255, 255, 0.1)',
+              padding: '1px 4px',
+              borderRadius: '3px',
+              fontSize: '9px'
+            } 
+          }, `${(trimValue / 100).toFixed(1)}`)
+        ),
+        React.createElement('div', {
+          style: {
+            position: 'relative',
+            height: '90px',
+            width: '40px',
+            background: '#0f172a',
+            borderRadius: '20px',
+            border: '2px solid #475569',
+            boxShadow: 'inset 0 0 10px rgba(0,0,0,0.8)',
+            cursor: 'ns-resize',
+            overflow: 'hidden',
+            display: 'flex',
+            flexDirection: 'column',
+            justifyContent: 'center',
+            alignItems: 'center'
+          },
+          onWheel: (e) => {
+            const delta = -e.deltaY;
+            const step = e.shiftKey ? 10 : 1;
+            const newValue = Math.max(-1000, Math.min(1000, trimValue + (delta > 0 ? step : -step)));
+            controlTrim(newValue);
+          },
+          onMouseDown: (e) => {
+            e.preventDefault();
+            const startY = e.clientY;
+            const startValue = trimValue;
+            
+            const handleMouseMove = (moveEvent) => {
+              const deltaY = startY - moveEvent.clientY;
+              const sensitivity = 5;
+              const newValue = Math.max(-1000, Math.min(1000, startValue + deltaY * sensitivity));
+              controlTrim(newValue);
+            };
+            
+            const handleMouseUp = () => {
+              window.removeEventListener('mousemove', handleMouseMove);
+              window.removeEventListener('mouseup', handleMouseUp);
+            };
+            
+            window.addEventListener('mousemove', handleMouseMove);
+            window.addEventListener('mouseup', handleMouseUp);
+          }
+        },
+          // Wheel Visuals
+          Array.from({ length: 8 }).map((_, i) => {
+            const offset = ((trimValue / 10) + i * 20) % 160 - 80;
+            return React.createElement('div', {
+              key: i,
+              style: {
+                position: 'absolute',
+                width: '100%',
+                height: '2px',
+                background: '#475569',
+                top: `${50 + offset}%`,
+                opacity: Math.max(0, 1 - Math.abs(offset) / 50)
+              }
+            });
+          }),
+          // Center indicator
+          React.createElement('div', {
+            style: {
+              width: '100%',
+              height: '4px',
+              background: '#ef4444',
+              zIndex: 2,
+              boxShadow: '0 0 5px #ef4444'
+            }
+          })
+        )
+      )
     ),
     
     // Right side: Status Info (Vertical)

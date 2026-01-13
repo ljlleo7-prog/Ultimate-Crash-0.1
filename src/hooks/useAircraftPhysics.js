@@ -314,6 +314,7 @@ export function useAircraftPhysics(config = {}, autoStart = true, model = 'reali
         flapsValue: flapsState,
         airBrakesValue: airBrakesState,
         gearValue: gearState,
+        trimValue: newState.controls?.trim || 0,
         frame: typeof newState.frame === 'number' ? newState.frame : 0,
         engineN1: newState.engineParams?.n1 !== undefined ? newState.engineParams.n1 : [22, 22],
         engineN2: newState.engineParams?.n2 !== undefined ? newState.engineParams.n2 : [45, 45],
@@ -324,7 +325,8 @@ export function useAircraftPhysics(config = {}, autoStart = true, model = 'reali
         crashWarning,
         alarms,
         autopilotEngaged,
-        autopilotTargets
+        autopilotTargets,
+        debugPhysics: newState.debugPhysics
       };
 
       setFlightData(newFlightData);
@@ -408,14 +410,20 @@ export function useAircraftPhysics(config = {}, autoStart = true, model = 'reali
     }
   }, []);
 
+  const setTrim = useCallback((value) => {
+    if (physicsServiceRef.current && typeof physicsServiceRef.current.setTrim === 'function') {
+      physicsServiceRef.current.setTrim(value);
+    }
+  }, []);
+
   const resetAircraft = useCallback(() => {
     if (physicsServiceRef.current) {
       physicsServiceRef.current.reset();
     }
     
     currentControlsRef.current = {
-      throttle: 0.3, // Starting with low throttle
-      engineThrottles: [0.3, 0.3], // Both engines at 30% for takeoff preparation
+      throttle: 0.05, // Starting with idle
+      engineThrottles: [0.05, 0.05], // Both engines at 5% idle for takeoff preparation
       pitch: 0,
       roll: 0,
       yaw: 0
@@ -429,8 +437,8 @@ export function useAircraftPhysics(config = {}, autoStart = true, model = 'reali
       pitch: 0.0,
       roll: 0,
       heading: 0,
-      throttle: 30, // Starting with low throttle
-      engineThrottles: [30, 30], // Both engines at 30% for takeoff preparation
+      throttle: 5, // Starting with idle
+      engineThrottles: [5, 5], // Both engines at 5% idle for takeoff preparation
       elevator: 0,
       aileron: 0,
       rudder: 0,
@@ -474,6 +482,7 @@ export function useAircraftPhysics(config = {}, autoStart = true, model = 'reali
     setFlaps,
     setAirBrakes,
     setGear,
+    setTrim,
     updatePhysics,
     resetAircraft
   };

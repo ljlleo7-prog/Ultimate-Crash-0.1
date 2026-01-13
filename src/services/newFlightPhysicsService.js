@@ -80,8 +80,8 @@ class NewFlightPhysicsService {
   };
 
   static DEFAULT_CONTROLS = {
-    THROTTLE: 0.3, // 30% thrust for takeoff preparation
-    TRIM: 0     // Initial trim wheel position (displays as 11 units)
+    THROTTLE: 0.05, // 5% idle for takeoff preparation
+    TRIM: 0     // Initial trim wheel position
   };
 
   static DEFAULT_AUTOPILOT_LIMITS = {
@@ -142,18 +142,26 @@ class NewFlightPhysicsService {
         r: 0  // Yaw rate
       },
       controls: {
-        throttle: 0.3, // 30% thrust for takeoff preparation
+        throttle: NewFlightPhysicsService.DEFAULT_CONTROLS.THROTTLE, // Use default idle
         pitch: 0,       // Neutral elevator
         roll: 0,        // Neutral ailerons
         yaw: 0,         // Neutral rudder
-        trim: 0         // Neutral trim
+        trim: NewFlightPhysicsService.DEFAULT_CONTROLS.TRIM
       },
       // ✅ NEW: Control surfaces state with proper defaults for takeoff
       flaps: 0,         // 0=UP, will be set to 1 (TO) by takeoff phase
       airBrakes: 0,     // 0=RETRACTED
       gear: true,       // Landing gear DOWN for takeoff
       fuel: this.aircraft.fuelWeight || 2000, // Use flight plan fuel load or default to 2000kg
-      frame: 0 // Debug frame counter
+      frame: 0, // Debug frame counter
+      debugPhysics: { // NEW: Debug physics data
+        theta: null,
+        dynamicPressure_q: null,
+        pitchMoment_y: null,
+        pitchRate_q: null,
+        altitude_z: null,
+        isOnGround: null
+      }
     };
     
     // Environment parameters at sea level (will be updated dynamically)
@@ -308,6 +316,27 @@ class NewFlightPhysicsService {
     
     return validated;
   }
+
+  /**
+   * Helper function for deep merging objects.
+   * @param {object} target - The target object to merge into.
+   * @param {object} source - The source object to merge from.
+   * @returns {object} The merged object.
+   */
+  _deepMerge(target, source) {
+    for (const key in source) {
+      if (source.hasOwnProperty(key)) {
+        if (typeof source[key] === 'object' && source[key] !== null && !Array.isArray(source[key]) && typeof target[key] === 'object' && target[key] !== null) {
+          // If both are objects, recurse
+          target[key] = this._deepMerge(target[key], source[key]);
+        } else {
+          // Otherwise, assign the value
+          target[key] = source[key];
+        }
+      }
+    }
+    return target;
+  }
   
   /**
    * ✅ NEW: Get engine configuration based on engine count
@@ -384,6 +413,25 @@ class NewFlightPhysicsService {
     this.sumForcesAndMoments();
     this.integrateMotion(timeStep);
 
+    // Store debug physics data
+    const airspeeds = this.calculateAirspeeds();
+    const q_debug = 0.5 * this.environment.density * (airspeeds.trueAirspeedMS * airspeeds.trueAirspeedMS);
+    
+    // Calculate lift and pitch torque for debug
+    const cl_debug = this.aircraft.basicLiftCoefficient + this.aircraft.liftCurveSlope * (this.state.orientation.theta - Math.atan2(this.state.velocity.w, this.state.velocity.u));
+    const lift_debug = q_debug * Math.max(0, cl_debug) * this.aircraft.wingArea;
+    
+    this.state.debugPhysics = {
+      theta: this.state.orientation.theta,
+      dynamicPressure_q: q_debug,
+      pitchMoment_y: this.moments.y,
+      pitchRate_q: this.state.angularRates.q,
+      altitude_z: this.state.position.z,
+      isOnGround: this.isOnGround(),
+      lift: lift_debug,
+      pitchTorque: this.moments.y
+    };
+
     if (this.autopilot && this.autopilot.engaged) {
       this.checkAutopilotStability();
     }
@@ -452,7 +500,6 @@ class NewFlightPhysicsService {
     let throttleValue = typeof input.throttle === 'undefined' ? 0.55 : input.throttle;
     
     if (isNaN(throttleValue)) {
-      console.error('⚠️ Attempting to set throttle to NaN in applyManualControls:', input.throttle);
       throttleValue = 0.55;
     }
     
@@ -469,13 +516,11 @@ class NewFlightPhysicsService {
    * Set trim control from cockpit
    */
   setTrim(trimValue) {
-    // Apply safety limits: trim typically ranges from -500,000 to +500,000
-    const trimmedValue = Math.max(-500000, Math.min(500000, trimValue || 0));
+    // Apply safety limits: trim ranges from -1000 to +1000 to match UI
+    const trimmedValue = Math.max(-1000, Math.min(1000, trimValue || 0));
     
     // Smoothly apply trim change to avoid sudden jolts
-    this.state.controls.trim = this.smoothInput(this.state.controls.trim, trimmedValue, 0.1);
-    
-
+    this.state.controls.trim = this.smoothInput(this.state.controls.trim, trimmedValue, 0.05);
   }
 
   /**
@@ -561,7 +606,11 @@ class NewFlightPhysicsService {
     const airspeed = Math.sqrt(velocity.u * velocity.u + velocity.v * velocity.v + velocity.w * velocity.w);
     
     // ✅ SAFE: Prevent division by zero
-    if (airspeed < 1) return { forces: { x: 0, y: 0, z: 0 }, moments: { x: 0, y: 0, z: 0 } };
+    if (airspeed < 1) {
+      this.aeroForces = { x: 0, y: 0, z: 0 };
+      this.aeroMoments = { x: 0, y: 0, z: 0 };
+      return { forces: { x: 0, y: 0, z: 0 }, moments: { x: 0, y: 0, z: 0 } };
+    }
     
     const dynamicPressure = 0.5 * this.environment.density * airspeed * airspeed;
     const q = dynamicPressure;
@@ -620,9 +669,14 @@ class NewFlightPhysicsService {
     cl = gearResult.cl;
     cd = gearResult.cd;
     
+    // ✅ NEW: Apply ground effect (increases lift when close to ground)
+    const heightAboveGround = Math.max(0.1, this.state.position.z);
+    const wingSpan = this.aircraft.wingSpan || 35.8;
+    const groundEffectFactor = 1.0 + Math.exp(-2.0 * heightAboveGround / wingSpan) * 0.15;
+    
     // Calculate aerodynamic forces
-    const lift = q * cl * this.aircraft.wingArea; // Main wing lift
-    const drag = q * cd * this.aircraft.wingArea; // Main wing drag
+    const lift = q * cl * this.aircraft.wingArea * groundEffectFactor; // Main wing lift with ground effect
+    const drag = q * cd * this.aircraft.wingArea / groundEffectFactor; // Main wing drag reduced by ground effect
     
     // ✅ NEW: Calculate horizontal stabilizer downforce
     const stabilizerLift = q * this.aircraft.horizontalStabilizerCL * this.aircraft.horizontalStabilizerArea;
@@ -695,10 +749,16 @@ class NewFlightPhysicsService {
     // ✅ TOTAL AERODYNAMIC PITCHING MOMENT including stabilizer
     const totalPitchingMoment = liftPitchingMoment + dragPitchingMoment + stabilizerPitchingMoment;
     
+    // ✅ NEW: Nose wheel ground reaction moment
+    // When on ground, the nose wheel prevents the nose from pitching down
+    let noseWheelMoment = 0;
+    if (this.isOnGround() && totalPitchingMoment < 0) {
+      // Counteract negative (nose-down) aerodynamic moments when on ground
+      noseWheelMoment = -totalPitchingMoment;
+    }
+    
     // ✅ FIXED: Proper elevator trim calculation with aircraft parameters
-    // Trim should counteract the AERODYNAMIC pitching moment (lift + drag + stabilizer)
-    // NOT the total moment that includes trim effects (circular dependency)
-    const aerodynamicPitchingMoment = liftPitchingMoment + dragPitchingMoment + stabilizerPitchingMoment;
+    const aerodynamicPitchingMoment = totalPitchingMoment + noseWheelMoment;
     
     // ✅ ENHANCED: Parameterized trim calculation
     // Use aircraft-specific control surface parameters (default to realistic values)
@@ -707,14 +767,14 @@ class NewFlightPhysicsService {
     
     // ✅ COCKPIT TRIM CONTROL: Use trim wheel position from aircraft state
     // Display factor: trimControl / 20,000 = cockpit trim units
-    const trimControl = this.state.controls.trim; // Trim wheel position from cockpit
+    const trimControl = this.state.controls.trim || 0; // Trim wheel position from cockpit
     
     // ✅ FIXED: Define controlPowerY first to avoid reference error
     const controlPowerY = this.aircraft.controlPower?.y || 1.5;
     
     // Convert trim control to elevator deflection
     // elevatorTrim represents the deflection angle needed to generate the trim moment
-    const elevatorTrim = trimControl / controlPowerY;
+    const elevatorTrim = trimControl / 1000.0; // Scale trim control to radians/degrees equivalent
     
     // ✅ SAFE: Angular moments with validation
     const rollInertia = Math.max(1000, this.aircraft.momentOfInertiaRoll || 10000);
@@ -722,7 +782,10 @@ class NewFlightPhysicsService {
     const yawInertia = Math.max(1000, this.aircraft.momentOfInertiaYaw || 20000);
     
     // ✅ ENHANCED: Calculate total pitching moment including trim effects
-    const trimMoment = controlPowerY * q * elevatorTrim;
+    // Multiply by dynamic pressure (q) for realistic moment generation
+    // Magnify trim effect to be comparable with control surface authority
+    const trimMagnification = 5000; // Trim is usually less powerful than full elevator but still significant
+    const trimMoment = controlPowerY * q * elevatorTrim * trimMagnification * (this.aircraft.wingArea / 10);
     const totalPitchingMomentWithTrim = aerodynamicPitchingMoment + trimMoment;
     
     // ✅ ENHANCED: Quadratic control curve for pitch and roll to increase control authority
@@ -730,19 +793,31 @@ class NewFlightPhysicsService {
     const quadraticPitch = input.pitch * Math.abs(input.pitch); // Quadratic curve for pitch
     const quadraticRoll = input.roll * Math.abs(input.roll); // Quadratic curve for roll
     
-    // ✅ MAGNIFIED: Increased pitch control authority by 3x to counteract strong natural pitching moments
-    const pitchMagnification = 100000.0; // Increased from 1.0 to 3.0
-    const rollMagnification = 1.5; // Moderate increase for roll control
+    // ✅ MAGNIFIED: Increased pitch control authority to counteract strong natural pitching moments
+    const pitchMagnification = 25000; // Increased from 1.8 to 2.5 for better rotation authority
+    const rollMagnification = 0.8; 
     
     // ✅ FIXED: Calculate control moments with consistent unit scaling
     // Multiply by dynamic pressure (q) for realistic moment generation
-    const rollMoment = (this.aircraft.controlPower.x || 1.2) * q * quadraticRoll * rollMagnification;
-    const pitchMoment = -(this.aircraft.controlPower.y || 1.5) * q * quadraticPitch * pitchMagnification + totalPitchingMomentWithTrim/2; //Negative so pushing is down, pulling is up
-    const yawMoment = (this.aircraft.controlPower.z || 1.0) * q * input.yaw;
+    const rollMoment = (this.aircraft.controlPower.x || 1.2) * q * quadraticRoll * rollMagnification * (this.aircraft.wingArea / 10);
+    const pitchMoment = -(this.aircraft.controlPower.y || 1.5) * q * quadraticPitch * pitchMagnification * (this.aircraft.wingArea / 10) + totalPitchingMomentWithTrim; // Negative so pushing is down, pulling is up
+    const yawMoment = (this.aircraft.controlPower.z || 1.0) * q * input.yaw * (this.aircraft.wingArea / 10);
     
     // ✅ CRITICAL FIX: Assign forces and moments to class properties
     this.aeroForces = { x: Fx_total, y: Fy_total, z: Fz_total };
     this.aeroMoments = { x: rollMoment, y: pitchMoment, z: yawMoment };
+    
+    // Update debug physics data
+    this.state.debugPhysics = {
+      theta: this.state.orientation.theta,
+      dynamicPressure_q: q,
+      pitchMoment_y: pitchMoment,
+      pitchRate_q: this.state.angularRates.q,
+      altitude_z: this.state.position.z,
+      isOnGround: this.isOnGround(),
+      lift: lift,
+      pitchTorque: pitchMoment
+    };
     
 
     
@@ -766,12 +841,18 @@ class NewFlightPhysicsService {
     // Update propulsion manager with current throttle
     this.propulsionManager.setMasterThrottle(throttle);
     
+    // Get proper airspeeds for Mach calculation
+    const airspeeds = this.calculateAirspeeds();
+    
     // Update environmental conditions
     this.propulsionManager.updateEnvironment(
       altitude_m,
       this.environment.density,
       this.environment.temperature,
-      this.environment.humidity || 0.5
+      this.environment.humidity || 0.5,
+      0,
+      0,
+      airspeeds.trueAirspeedMS
     );
     
     // Update propulsion system (includes individual engine calculations)
@@ -786,17 +867,17 @@ class NewFlightPhysicsService {
     
     // Store individual engine data for display
     this.individualEngineData = propulsionResult.individualThrusts;
-    
-    // Debug logging for multi-engine system
-    if (process.env.NODE_ENV === 'development' && throttle > 0.1) {
-      const performance = this.propulsionManager.performanceMetrics;
-      console.log('🛠️ Multi-Engine Propulsion System:', {
-        masterThrottle: throttle.toFixed(3),
-        totalThrust: performance.totalThrust.toFixed(1),
-        enginesRunning: performance.enginesRunning,
-        thrustAsymmetry: performance.thrustAsymmetry.toFixed(3),
-        efficiency: performance.efficiency.toFixed(3),
-        individualThrusts: propulsionResult.individualThrusts.map(t => t.toFixed(1))
+
+    // ✅ PASS TAS TO INDIVIDUAL ENGINES: Use airspeeds.trueAirspeedMS
+    if (this.propulsionManager.engines) {
+      this.propulsionManager.engines.forEach(engine => {
+        engine.updateEnvironment(
+          altitude_m,
+          this.environment.density,
+          this.environment.temperature,
+          this.environment.humidity || 0.5,
+          airspeeds.trueAirspeedMS
+        );
       });
     }
   }
@@ -905,15 +986,15 @@ class NewFlightPhysicsService {
     
     // ✅ SAFE: Ensure all values are valid numbers
     return {
-      trueAirspeed: isNaN(tas_kts) ? 450 : tas_kts,
-      trueAirspeedMS: isNaN(tas_ms) ? 231.5 : tas_ms,
-      indicatedAirspeed: isNaN(ias_kts) ? 280 : ias_kts,
-      indicatedAirspeedMS: isNaN(ias_ms) ? 144 : ias_ms,
-      density: isNaN(density) ? 0.379 : density,
-      temperature: isNaN(temperature) ? 229 : temperature,
-      pressure: isNaN(pressure) ? 23840 : pressure,
-      densityRatio: isNaN(densityRatio) ? 0.309 : densityRatio,
-      altitude_ft: isNaN(altitude_ft) ? 35000 : altitude_ft
+      trueAirspeed: isNaN(tas_kts) ? 0 : tas_kts,
+      trueAirspeedMS: isNaN(tas_ms) ? 0 : tas_ms,
+      indicatedAirspeed: isNaN(ias_kts) ? 0 : ias_kts,
+      indicatedAirspeedMS: isNaN(ias_ms) ? 0 : ias_ms,
+      density: isNaN(density) ? 1.225 : density,
+      temperature: isNaN(temperature) ? 288.15 : temperature,
+      pressure: isNaN(pressure) ? 101325 : pressure,
+      densityRatio: isNaN(densityRatio) ? 1.0 : densityRatio,
+      altitude_ft: isNaN(altitude_ft) ? 0 : altitude_ft
     };
   }
 
@@ -987,8 +1068,9 @@ class NewFlightPhysicsService {
   }
   
   setGear(gear) {
-    this.state.gear = !!gear;
-
+    // Prevent gear retraction if on the ground
+    if (!gear && this.isOnGround()) return;
+    this.state.gear = gear;
   }
   
   /**
@@ -1143,6 +1225,14 @@ class NewFlightPhysicsService {
     this.state.orientation.phi += phiDot * dt;
     this.state.orientation.theta += thetaDot * dt;
     this.state.orientation.psi += psiDot * dt;
+
+    // ✅ GROUND REACTION: Prevent pitching down into the ground
+    if (this.isOnGround() && this.state.orientation.theta < 0) {
+      this.state.orientation.theta = 0;
+      if (this.state.angularRates.q < 0) {
+        this.state.angularRates.q = 0;
+      }
+    }
     
     // Normalize angles
     this.state.orientation.phi = this.normalizeAngle(this.state.orientation.phi);
@@ -1236,24 +1326,6 @@ class NewFlightPhysicsService {
     const engineThrottle1 = Math.max(0, Math.min(1, 
       (this.state.controls.engineThrottles && this.state.controls.engineThrottles[1]) || this.state.controls.throttle || 0.47));
     
-    // Add debug logging to track throttle values
-    if (isNaN(engineThrottle0) || isNaN(engineThrottle1)) {
-      console.error('⚠️ Engine throttles are NaN:', {
-        engine0: engineThrottle0,
-        engine1: engineThrottle1,
-        controls: this.state.controls
-      });
-    }
-    
-    // Add throttle value logging for debugging
-    if (engineThrottle0 !== this.lastThrottleValue || engineThrottle1 !== this.lastThrottleValue) {
-      console.log('🔧 Engine throttles updated:', {
-        engine0: engineThrottle0,
-        engine1: engineThrottle1
-      });
-      this.lastThrottleValue = engineThrottle0; // Update for engine 0 tracking
-    }
-    
     // Get engine performance parameters from database
     const enginePerf = this.aircraft.enginePerformance || {};
     const minN1Idle = enginePerf.minN1Idle || 22;
@@ -1261,11 +1333,6 @@ class NewFlightPhysicsService {
     
     // Get engine parameters from propulsion manager (uses new formulas)
     const engineData = this.propulsionManager.getEngineData();
-    
-    // Add debug logging for engine parameters
-    if (engineData.length === 0) {
-      console.warn('⚠️ No engine data available from propulsion manager:', this.aircraft.model);
-    }
     
     // For display purposes, generate parameters for all engines based on actual engine count
     const engineCount = this.aircraft.engineCount || 2;
@@ -1309,21 +1376,10 @@ class NewFlightPhysicsService {
      
      // ✅ FIXED: More realistic fuel consumption calculation
      // Account for altitude efficiency effects and use more realistic SFC values
-     // Typical SFC for modern turbofans at cruise: ~0.000015 kg/N/s
-     const baseSFC = this.aircraft.specificFuelConsumption || 0.000015; // kg/N/s
-     const altitudeEfficiencyFactor = Math.max(0.5, 1 - (altitude_m * 0.00003)); // Less efficient at higher altitude
+     // Typical SFC for modern turbofans at SL: ~0.000009 kg/N/s, at cruise: ~0.000015 kg/N/s
+     const baseSFC = this.aircraft.specificFuelConsumption || 0.000009; // kg/N/s (Reduced for realism)
+     const altitudeEfficiencyFactor = Math.max(0.4, 1 - (altitude_m * 0.000025)); // Less efficient at higher altitude
      const fuelFlow = totalThrust * baseSFC * altitudeEfficiencyFactor; // kg/s
-    
-    // Add fuel flow logging
-    if (fuelFlow > 0.1) {
-      console.log('⛽ Fuel flow rate:', fuelFlow.toFixed(3), 'kg/s', {
-        throttle: (throttle * 100).toFixed(1) + '%',
-        totalThrust: totalThrust.toFixed(0) + ' N',
-        baseSFC: (baseSFC * 1000000).toFixed(1) + ' g/kN/s',
-        altitudeEfficiency: altitudeEfficiencyFactor.toFixed(2),
-        altitude: (altitude_m * 3.28084).toFixed(0) + ' ft'
-      });
-    }
     
     this.state.fuel = Math.max(0, (this.state.fuel !== undefined ? this.state.fuel : 100) - fuelFlow * this.dt);
     
@@ -1391,7 +1447,9 @@ class NewFlightPhysicsService {
       temperature: airspeeds.temperature,
       pressure: airspeeds.pressure,
       densityRatio: airspeeds.densityRatio,
-      frame
+      frame,
+      // Debug Physics
+      debugPhysics: this.state.debugPhysics
     };
   }
   
@@ -1744,7 +1802,7 @@ class NewFlightPhysicsService {
     const config = { ...defaults, ...conditions };
 
     // Update state with new initial conditions
-    this.state = {
+    this.state = this._deepMerge({ ...this.state }, {
       position: {
         x: config.position.x,
         y: config.position.y,
@@ -1769,13 +1827,14 @@ class NewFlightPhysicsService {
         throttle: config.throttle,
         pitch: 0,
         roll: 0,
-        yaw: 0
+        yaw: 0,
+        trim: config.trim || 0
       },
-      flaps: 0,
-      airBrakes: 0,
-      gear: false,
+      flaps: config.flaps || 0,
+      airBrakes: config.airBrakes || 0,
+      gear: config.gear !== undefined ? config.gear : (this.state?.gear !== undefined ? this.state.gear : true),
       fuel: this.state?.fuel || (this.aircraft.fuelWeight || 2000)
-    };
+    });
 
     // Update environment properties based on new altitude
     this.updateEnvironmentProperties();
@@ -1836,6 +1895,13 @@ class NewFlightPhysicsService {
     if (this.propulsionManager) {
       this.propulsionManager.setDifferentialThrottle(differential);
     }
+  }
+  
+  /**
+   * Set elevator trim
+   */
+  setTrim(value) {
+    this.state.controls.trim = value;
   }
   
   /**

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAircraftPhysics } from '../hooks/useAircraftPhysics';
 import FlightPanelModular from './FlightPanelModular';
+import DebugPhysicsPanel from './DebugPhysicsPanel';
 import commandDatabase from '../commandDatabase.json';
 import sceneManager from '../services/sceneManager.js';
 import eventBus from '../services/eventBus.js';
@@ -67,6 +68,7 @@ const FlightInProgress = ({
     setFlaps,
     setAirBrakes,
     setGear,
+    setTrim,
     physicsService
   } = useAircraftPhysics(aircraftConfig, false, physicsModel);
 
@@ -153,12 +155,14 @@ const FlightInProgress = ({
     const loop = now => {
       const dt = (now - lastTime) / 1000;
       lastTime = now;
-      sceneManager.update(dt);
+      const lastSceneState = sceneManager.getState();
+      let physicsState = null;
+      if (lastSceneState.physicsActive && isInitialized) {
+        physicsState = updatePhysics(1 / 60, now);
+      }
+      sceneManager.update(dt, physicsState);
       const state = sceneManager.getState();
       setSceneState(state);
-      if (state.physicsActive && isInitialized) {
-        updatePhysics(1 / 60, now);
-      }
       animationId = requestAnimationFrame(loop);
     };
     animationId = requestAnimationFrame(loop);
@@ -476,24 +480,11 @@ const FlightInProgress = ({
       </div>
 
       <div style={{ flex: 1, display: 'flex', position: 'relative' }}>
-        <div style={{
-          position: 'fixed',
-          top: '10px',
-          right: '10px',
-          background: 'rgba(0,0,0,0.9)',
-          color: 'lime',
-          padding: '10px',
-          borderRadius: '6px',
-          fontSize: '12px',
-          fontFamily: 'monospace',
-          zIndex: 1000,
-          border: '1px solid #333',
-          minWidth: '220px'
-        }}>
-          <div style={{ fontWeight: 700, marginBottom: '6px' }}>FORCES</div>
-          <div>Thrust: {(((flightData && typeof flightData.thrust === 'number') ? flightData.thrust : 0) / 1000).toFixed(1)} kN</div>
-          <div>Drag: {(((flightData && typeof flightData.drag === 'number') ? flightData.drag : 0) / 1000).toFixed(1)} kN</div>
-        </div>
+        <DebugPhysicsPanel 
+          debugPhysicsData={flightData?.debugPhysics} 
+          thrust={flightData?.thrust}
+          drag={flightData?.drag}
+        />
 
         <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
           <FlightPanelModular
@@ -517,6 +508,10 @@ const FlightInProgress = ({
                   break;
                 case 'gear':
                   handleGearControl(payload);
+                  console.log(`📡 FlightPanel Action: ${action} = ${payload}`);
+                  break;
+                case 'trim':
+                  setTrim(payload);
                   console.log(`📡 FlightPanel Action: ${action} = ${payload}`);
                   break;
                 case 'pitch':
@@ -577,8 +572,7 @@ const FlightInProgress = ({
             </div>
             <button
               onClick={() => {
-                resetAircraft();
-                handleResetFlight();
+                window.location.reload();
               }}
               style={{
                 background: 'linear-gradient(135deg, #DC2626, #F97316)',

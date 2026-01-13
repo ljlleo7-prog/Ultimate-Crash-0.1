@@ -260,7 +260,7 @@ class SceneManager {
     }
   }
 
-  update(dt) {
+  update(dt, payload = null) {
     if (this.status !== 'running') {
       return;
     }
@@ -291,8 +291,33 @@ class SceneManager {
       physicsActive: this.physicsActive()
     });
     
+    this.checkPhaseCompletion(dt, payload);
+  }
+
+  checkPhaseCompletion(dt, payload) {
+    const phase = this.currentPhase();
+    if (!phase) return;
+
     // Check if phase is complete
-    if (this.elapsedInPhase >= phase.durationSeconds) {
+    let isPhaseComplete = false;
+    
+    // Condition-based completion for specific phases
+    if (phase.type === FlightPhases.TAKEOFF) {
+      // User requested: wait for 3000ft and AP engagement
+      // payload.position.z is altitude in meters
+      const altitude_m = payload?.position?.z || 0;
+      const altitude_ft = altitude_m * 3.28084;
+      const apEngaged = payload?.autopilot?.engaged || false;
+      
+      if (altitude_ft >= 3000 && apEngaged) {
+        isPhaseComplete = true;
+      }
+    } else {
+      // Default: time-based completion
+      isPhaseComplete = this.elapsedInPhase >= phase.durationSeconds;
+    }
+
+    if (isPhaseComplete) {
       eventBus.publishWithMetadata('phase.ended', {
         scenarioId: this.scenario.id,
         phaseId: phase.id,
@@ -493,10 +518,10 @@ class SceneManager {
       engine: { resolved: 'Engine ${engineIndex + 1} restored to normal operation.' },
       hydraulic: { resolved: 'Hydraulic pressure stabilized. System restored.' },
       electrical: { resolved: 'Electrical bus power restored to normal levels.' },
-      fuel: { resolved: 'Fuel leak contained. Imbalance corrected.' }
+      fuel: { resolved: 'Fuel imbalance resolved.' }
     };
     
-    const template = templates[failure.type]?.resolved || 'System ${type} restored to normal operation.';
+    const template = templates[failure.type]?.resolved || 'System ${type} restored.';
     return this.parseTemplate(template, failure.data);
   }
 
@@ -537,7 +562,7 @@ class SceneManager {
       narrativeHistory: this.narrativeHistory.slice(-5) // Return last 5 narrative entries
     };
   }
-  
+
   // Set initial physics conditions for the current phase
   setPhaseInitialConditions(phase) {
     if (!phase || !phase.physics) {
@@ -550,6 +575,8 @@ class SceneManager {
       velocity: { u: 0, v: 0, w: 0 },
       orientation: { phi: 0, theta: 0, psi: 0 },
       throttle: 0
+      // Gear is omitted here to preserve current state in physics service
+      // Unless explicitly set by a phase below
     };
 
     // Apply phase-specific physics settings
@@ -576,13 +603,14 @@ class SceneManager {
       initialConditions.velocity.v = 0;
       initialConditions.velocity.w = 0;
       initialConditions.orientation.theta = 0;
+      initialConditions.gear = true; // Explicitly DOWN for takeoff
       
       // Set initial heading based on departure airport runway (default to 130 degrees for runway 13R)
       const runwayHeading = this.getDepartureRunwayHeading() || 130;
       initialConditions.orientation.psi = runwayHeading * Math.PI / 180;
       
-      // Apply takeoff configuration
-      initialConditions.throttle = 0.3; // Start with low throttle
+      // Apply takeoff configuration - set to idle for startup
+      initialConditions.throttle = 0.05; // 5% idle instead of 30%
     }
 
     // Publish initial conditions event
@@ -595,56 +623,12 @@ class SceneManager {
     });
   }
 
-  // Get departure runway heading (simplified for now)
   getDepartureRunwayHeading() {
-    // In a real system, this would get data from an airport database
-    // For now, return a random runway heading based on departure airport
-    const runways = {
-      'KJFK': [130, 40, 220, 310], // Runway headings for JFK
-      'KLAX': [25, 70, 205, 250],  // Runway headings for LAX
-      'KSFO': [10, 285, 19, 200]   // Runway headings for SFO
-    };
-
-    const airportRunways = runways[this.scenario.departure] || [130];
-    return airportRunways[Math.floor(Math.random() * airportRunways.length)];
-  }
-
-  // Add emergency phase
-  addEmergencyPhase(failureId) {
-    const failure = this.activeFailures.get(failureId);
-    if (!failure) return;
-    
-    const emergencyPhase = {
-      id: `emergency-${failureId}`,
-      name: 'Emergency Response',
-      type: FlightPhases.EMERGENCY,
-      durationSeconds: 180, // 3 minutes to handle emergency
-      physics: {
-        mode: 'continuous'
-      },
-      narrative: {
-        title: 'Emergency Procedure Required',
-        content: `Execute emergency checklist for ${failure.type} failure immediately!`,
-        severity: 'critical'
-      },
-      failureId: failureId,
-      requiredAction: failure.type
-    };
-    
-    // Insert emergency phase after current phase
-    this.scenario.phases.splice(this.currentIndex + 1, 0, emergencyPhase);
-    
-    // Publish emergency phase added event
-    eventBus.publishWithMetadata('emergency.phase.added', {
-      scenarioId: this.scenario.id,
-      emergencyPhase,
-      currentPhase: this.currentPhase(),
-      failure
-    });
+    // This would ideally come from the scenario's departure airport data
+    return 130; // Default for KJFK 13R
   }
 }
 
-const sceneManager = new SceneManager(defaultScenario);
-
-export default sceneManager;
-
+// Create a singleton instance
+const instance = new SceneManager();
+export default instance;

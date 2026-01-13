@@ -1,8 +1,22 @@
-import airportData from '../data/airportDatabase.json';
+import fs from 'fs';
+import path from 'path';
+
+const americanAirports = JSON.parse(fs.readFileSync(path.join(import.meta.dirname, '../data/americanAirports.json'), 'utf8'));
+const europeanAirports = JSON.parse(fs.readFileSync(path.join(import.meta.dirname, '../data/europeanAirports.json'), 'utf8'));
+const asianAirports = JSON.parse(fs.readFileSync(path.join(import.meta.dirname, '../data/asianAirports.json'), 'utf8'));
+const otherAirports = JSON.parse(fs.readFileSync(path.join(import.meta.dirname, '../data/otherAirports.json'), 'utf8'));
 
 class AirportService {
-  constructor() {
-    this.airports = airportData.airports;
+  constructor(apiKey = '') {
+    this.airports = [
+      ...americanAirports.airports,
+      ...europeanAirports.airports,
+      ...asianAirports.airports,
+      ...otherAirports.airports
+    ];
+    this.apiKey = apiKey;
+    this.useLocalDatabase = !apiKey;
+    this.freeTrialUsed = false;
   }
 
   // Get all airports
@@ -134,5 +148,6 @@ class AirportService {
 }
 
 export const airportService = new AirportService();
+export const createAirportService = (apiKey) => new AirportService(apiKey);
 
 export default AirportService;

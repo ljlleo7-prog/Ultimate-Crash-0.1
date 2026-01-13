@@ -1,0 +1,92 @@
+{
+  "airports": [
+    {
+      "iata": "LHR",
+      "icao": "EGLL",
+      "name": "Heathrow Airport",
+      "city": "London",
+      "country": "United Kingdom",
+      "latitude": 51.4706001,
+      "longitude": -0.4619410,
+      "elevation": 83,
+      "category": "4F",
+      "runways": [
+        { "name": "09L/27R", "length": 12799, "surface": "Asphalt", "category": "Heavy" },
+        { "name": "09R/27L", "length": 12799, "surface": "Asphalt", "category": "Heavy" }
+      ],
+      "frequencies": [
+        { "type": "ATIS", "frequency": 126.25 },
+        { "type": "Tower", "frequency": 118.2 },
+        { "type": "Ground", "frequency": 121.75 }
+      ]
+    },
+    {
+      "iata": "CDG",
+      "icao": "LFPG",
+      "name": "Charles de Gaulle International Airport",
+      "city": "Paris",
+      "country": "France",
+      "latitude": 49.0096998,
+      "longitude": 2.5477990,
+      "elevation": 394,
+      "category": "4F",
+      "runways": [
+        { "name": "08L/26R", "length": 12009, "surface": "Concrete", "category": "Heavy" },
+        { "name": "08R/26L", "length": 12009, "surface": "Concrete", "category": "Heavy" },
+        { "name": "09L/27R", "length": 11811, "surface": "Concrete", "category": "Heavy" },
+        { "name": "09R/27L", "length": 11811, "surface": "Concrete", "category": "Heavy" },
+        { "name": "10L/28R", "length": 10827, "surface": "Concrete", "category": "Heavy" },
+        { "name": "10R/28L", "length": 10827, "surface": "Concrete", "category": "Heavy" }
+      ],
+      "frequencies": [
+        { "type": "ATIS", "frequency": 126.05 },
+        { "type": "Tower", "frequency": 118.2 },
+        { "type": "Ground", "frequency": 121.75 }
+      ]
+    },
+    {
+      "iata": "AMS",
+      "icao": "EHAM",
+      "name": "Amsterdam Airport Schiphol",
+      "city": "Amsterdam",
+      "country": "Netherlands",
+      "latitude": 52.3086014,
+      "longitude": 4.7638890,
+      "elevation": -11,
+      "category": "4F",
+      "runways": [
+        { "name": "06/24", "length": 11483, "surface": "Concrete", "category": "Heavy" },
+        { "name": "18C/36C", "length": 12000, "surface": "Concrete", "category": "Heavy" },
+        { "name": "18R/36L", "length": 12000, "surface": "Concrete", "category": "Heavy" },
+        { "name": "18L/36R", "length": 12000, "surface": "Concrete", "category": "Heavy" }
+      ],
+      "frequencies": [
+        { "type": "ATIS", "frequency": 126.0 },
+        { "type": "Tower", "frequency": 118.2 },
+        { "type": "Ground", "frequency": 121.75 }
+      ]
+    },
+    {
+      "iata": "FRA",
+      "icao": "EDDF",
+      "name": "Frankfurt am Main International Airport",
+      "city": "Frankfurt",
+      "country": "Germany",
+      "latitude": 50.0331001,
+      "longitude": 8.5705500,
+      "elevation": 364,
+      "category": "4F",
+      "runways": [
+        { "name": "07L/25R", "length": 12000, "surface": "Concrete", "category": "Heavy" },
+        { "name": "07R/25L", "length": 12000, "surface": "Concrete", "category": "Heavy" },
+        { "name": "18L/36R", "length": 12000, "surface": "Concrete", "category": "Heavy" },
+        { "name": "18R/36L", "length": 12000, "surface": "Concrete", "category": "Heavy" }
+      ],
+      "frequencies": [
+        { "type": "ATIS", "frequency": 126.0 },
+        { "type": "Tower", "frequency": 118.2 },
+        { "type": "Ground", "frequency": 121.75 }
+      ]
+    }
+  ]
+}

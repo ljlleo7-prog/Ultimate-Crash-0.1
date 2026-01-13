@@ -382,18 +382,19 @@ export class PropulsionManager {
   /**
    * Update environmental conditions
    */
-  updateEnvironment(altitude, airDensity, temperature, humidity, windSpeed = 0, windDirection = 0) {
+  updateEnvironment(altitude, airDensity, temperature, humidity, windSpeed = 0, windDirection = 0, tas = 0) {
     this.environment = {
       airDensity: airDensity || 1.225,
       temperature: temperature || 15,
       humidity: humidity || 0.5,
       windSpeed: windSpeed || 0,
-      windDirection: windDirection || 0
+      windDirection: windDirection || 0,
+      tas: tas || 0
     };
     
     // Update all engines with new environmental conditions
     this.engines.forEach(engine => {
-      engine.updateEnvironment(altitude, airDensity, temperature, humidity);
+      engine.updateEnvironment(altitude, airDensity, temperature, humidity, tas);
     });
     
     this.log('Environment updated', this.environment);
