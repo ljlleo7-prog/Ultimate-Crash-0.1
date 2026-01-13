@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAircraftPhysics } from '../hooks/useAircraftPhysics';
+import { updateWeather } from '../services/weatherService';
+import weatherConfig from '../config/weatherConfig.json';
 import FlightPanelModular from './FlightPanelModular';
 import DebugPhysicsPanel from './DebugPhysicsPanel';
 import commandDatabase from '../commandDatabase.json';
@@ -27,6 +29,7 @@ const FlightInProgress = ({
   formatFlightTime, 
   formatFuel, 
   weatherData, 
+  setWeatherData, 
   failureType, 
   crewCount, 
   physicsModel = 'imaginary' 
@@ -146,6 +149,22 @@ const FlightInProgress = ({
       unsubscribePhysicsInit();
     };
   }, [physicsService]);
+
+  // Weather update effect
+  useEffect(() => {
+    if (!weatherData || !setWeatherData) return;
+
+    const interval = setInterval(() => {
+      setWeatherData(prevWeatherData => {
+        const updated = updateWeather(prevWeatherData, weatherConfig.atisUpdateIntervalMinutes);
+        // Optionally, publish weather updates to eventBus if other components need to react
+        // eventBus.publish(eventBus.Types.WEATHER_UPDATE, updated);
+        return updated;
+      });
+    }, weatherConfig.atisUpdateIntervalMinutes * 60 * 1000); // Convert minutes to milliseconds
+
+    return () => clearInterval(interval);
+  }, [weatherData, setWeatherData]);
 
   // Main update loop
   useEffect(() => {

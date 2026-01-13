@@ -15,8 +15,7 @@
         { "name": "08R/26L", "length": 10000, "surface": "Asphalt", "category": "Heavy" },
         { "name": "09L/27R", "length": 9000, "surface": "Asphalt", "category": "Heavy" },
         { "name": "09R/27L", "length": 9000, "surface": "Asphalt", "category": "Heavy" },
-        { "name": "10/28", "length": 8000, "surface": "Asphalt", "category": "Heavy" },
-        { "name": "11/29", "length": 9000, "surface": "Asphalt", "category": "Heavy" }
+        { "name": "10/28", "length": 8000, "surface": "Asphalt", "category": "Heavy" }
       ],
       "frequencies": [
         { "type": "ATIS", "frequency": 126.025 },
@@ -38,8 +37,7 @@
         { "name": "06L/24R", "length": 12091, "surface": "Asphalt", "category": "Heavy" },
         { "name": "06R/24L", "length": 10885, "surface": "Asphalt", "category": "Heavy" },
         { "name": "07L/25R", "length": 8975, "surface": "Asphalt", "category": "Heavy" },
-        { "name": "07R/25L", "length": 11095, "surface": "Asphalt", "category": "Heavy" },
-        { "name": "08/26", "length": 8926, "surface": "Asphalt", "category": "Heavy" }
+        { "name": "07R/25L", "length": 11095, "surface": "Asphalt", "category": "Heavy" }
       ],
       "frequencies": [
         { "type": "ATIS", "frequency": 128.55 },

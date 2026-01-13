@@ -34,9 +34,7 @@
         { "name": "08L/26R", "length": 12009, "surface": "Concrete", "category": "Heavy" },
         { "name": "08R/26L", "length": 12009, "surface": "Concrete", "category": "Heavy" },
         { "name": "09L/27R", "length": 11811, "surface": "Concrete", "category": "Heavy" },
-        { "name": "09R/27L", "length": 11811, "surface": "Concrete", "category": "Heavy" },
-        { "name": "10L/28R", "length": 10827, "surface": "Concrete", "category": "Heavy" },
-        { "name": "10R/28L", "length": 10827, "surface": "Concrete", "category": "Heavy" }
+        { "name": "09R/27L", "length": 11811, "surface": "Concrete", "category": "Heavy" }
       ],
       "frequencies": [
         { "type": "ATIS", "frequency": 126.05 },

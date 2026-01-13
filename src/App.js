@@ -7,6 +7,8 @@ import { calculateDistance, calculateFlightPlan, formatDistance, formatFlightTim
 import AirportSearchInput from './components/AirportSearchInput.js';
 import FlightInitialization from './components/FlightInitialization.js';
 import FlightInProgress from './components/FlightInProgress.jsx';
+import { generateInitialWeather, updateWeather } from './services/weatherService';
+
 import { FadeOverlay, CinematicReview } from './components/CinematicComponents.js';
 
 function App() {
@@ -47,15 +49,7 @@ function App() {
   
   // New simulation state variables
   const [failureType, setFailureType] = useState('random');
-  const [weatherData, setWeatherData] = useState({
-    windSpeed: 0,
-    windDirection: 0,
-    visibility: 10,
-    cloudCover: 0,
-    birdStrike: false,
-    turbulence: 'none',
-    precipitation: 'none'
-  });
+  const [weatherData, setWeatherData] = useState(null);
   const [crewCount, setCrewCount] = useState(2);
   const [simulationStarted, setSimulationStarted] = useState(false);
   const [cinematicPhase, setCinematicPhase] = useState('none');
@@ -105,6 +99,31 @@ function App() {
     const fadeDuration = 2500;
     const reviewDuration = 5000;
 
+    // Determine season
+    let currentSeason = season;
+    if (useRandomSeason) {
+      const seasons = ['spring', 'summer', 'autumn', 'winter'];
+      currentSeason = seasons[Math.floor(Math.random() * seasons.length)];
+      setSeason(currentSeason);
+    }
+
+    // Determine Zulu time
+    let currentTimeZulu = timeZulu;
+    if (useRandomTime) {
+      const now = new Date();
+      currentTimeZulu = now.toISOString();
+      setTimeZulu(currentTimeZulu);
+    }
+
+    // Generate initial weather data
+    const initialWeather = generateInitialWeather(
+      selectedDeparture.latitude,
+      selectedDeparture.longitude,
+      currentSeason,
+      currentTimeZulu
+    );
+    setWeatherData(initialWeather);
+
     setCinematicPhase('fade_out');
 
     setTimeout(() => {
@@ -141,6 +160,7 @@ function App() {
         selectedArrival: selectedArrival,
         aircraftModel: aircraftModel,
         weatherData: weatherData,
+      setWeatherData: setWeatherData,
         crewCount: crewCount,
         failureType: failureType,
         difficulty: difficulty,
@@ -179,6 +199,7 @@ function App() {
       formatFlightTime: formatFlightTime,
       formatFuel: formatFuel,
       weatherData: weatherData,
+      setWeatherData: setWeatherData,
       failureType: failureType,
       crewCount: crewCount,
       physicsModel: physicsModel

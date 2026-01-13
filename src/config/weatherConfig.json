@@ -1,0 +1,52 @@
+{
+  "temperature": {
+    "range": [-20, 40],
+    "variationSpeed": 0.5,
+    "distribution": "normal"
+  },
+  "windSpeed": {
+    "range": [0, 50],
+    "variationSpeed": 1,
+    "distribution": "exponential"
+  },
+  "windGust": {
+    "range": [0, 70],
+    "variationSpeed": 1.5,
+    "distribution": "exponential"
+  },
+  "windDirection": {
+    "range": [0, 359],
+    "variationSpeed": 5,
+    "distribution": "uniform"
+  },
+  "cloudCover": {
+    "range": [0, 100],
+    "variationSpeed": 2,
+    "distribution": "uniform"
+  },
+  "visibility": {
+    "range": [100, 20000],
+    "variationSpeed": 100,
+    "distribution": "lognormal"
+  },
+  "atisUpdateIntervalMinutes": 30,
+  "extremeWeatherProbability": 0.01,
+  "seasonalVariations": {
+    "summer": {
+      "temperatureOffset": 15,
+      "windSpeedMultiplier": 0.8
+    },
+    "winter": {
+      "temperatureOffset": -10,
+      "windSpeedMultiplier": 1.2
+    },
+    "spring": {
+      "temperatureOffset": 5,
+      "windSpeedMultiplier": 1
+    },
+    "autumn": {
+      "temperatureOffset": 5,
+      "windSpeedMultiplier": 1
+    }
+  }
+}
