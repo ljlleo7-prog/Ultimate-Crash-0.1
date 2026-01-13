@@ -9,7 +9,7 @@ import ModernAutopilotModule from './ModernAutopilotModule';
 import FlightPosePanel from './FlightPosePanel';
 import NavigationPanel from './NavigationPanel';
 import CentralPanel from './CentralPanel';
-import SurfaceControls from './SurfaceControls';
+import ControlSurfacePanel from './ControlSurfacePanel';
 import './FlightPanel.css';
 
 const FlightPanelModular = ({ flightData, onActionRequest, aircraftModel }) => {
@@ -101,9 +101,14 @@ const FlightPanelModular = ({ flightData, onActionRequest, aircraftModel }) => {
         fuel: flightData.fuel || prevState.fuel,
         
         // Systems
-        hydraulicPressure: prevState.hydraulicPressure,
+        hydraulicPressure: flightData.hydraulicPressure || prevState.hydraulicPressure,
         circuitBreakers: prevState.circuitBreakers,
         alarms: flightData.alarms || prevState.alarms,
+        
+        // Surface controls
+        flapsValue: flightData.flapsValue,
+        gearValue: flightData.gearValue,
+        airBrakesValue: flightData.airBrakesValue,
         
         // Autopilot - Update from physics service status
         autopilot: flightData.autopilotEngaged || false, // ✅ Use physics service status
@@ -186,19 +191,19 @@ const FlightPanelModular = ({ flightData, onActionRequest, aircraftModel }) => {
 
   const controlFlaps = (position) => {
     if (onActionRequest) {
-      onActionRequest('control-flaps', position);
+      onActionRequest('flaps', position);
     }
   };
 
   const controlAirBrakes = (position) => {
     if (onActionRequest) {
-      onActionRequest('control-airbrakes', position);
+      onActionRequest('airBrakes', position);
     }
   };
 
   const controlGear = (position) => {
     if (onActionRequest) {
-      onActionRequest('control-gear', position);
+      onActionRequest('gear', position);
     }
   };
 
@@ -299,17 +304,16 @@ const FlightPanelModular = ({ flightData, onActionRequest, aircraftModel }) => {
       // Manual controls at bottom
       React.createElement('div', { className: 'manual-controls' },
         React.createElement(DraggableJoystick, { controlPitch, controlRoll, flightState }),
-        React.createElement(ThrustManager, { controlThrust, flightState })
+        React.createElement(ThrustManager, { controlThrust, flightState }),
+        React.createElement(ControlSurfacePanel, {
+          controlFlaps,
+          controlGear,
+          controlAirBrakes,
+          flightState,
+          aircraftModel
+        })
       )
-    ),
-    
-    // Surface Controls (Flaps, Gear, Airbrakes) - New Lever-Style Component
-    React.createElement(SurfaceControls, {
-      controlFlaps,
-      controlGear,
-      controlAirBrakes,
-      flightState
-    })
+    )
   );
 };
 

@@ -135,7 +135,17 @@ const DraggableJoystick = ({ controlPitch, controlRoll, flightState }) => {
   }, [isDragging, handleMouseMove, handleMouseUp]);
 
   // Simple, clean JSX return with proper centering
-  return React.createElement('div', { className: 'draggable-joystick' },
+  return React.createElement('div', { 
+    className: 'draggable-joystick',
+    style: {
+      background: 'linear-gradient(135deg, #1e293b 0%, #334155 100%)',
+      padding: '15px',
+      borderRadius: '10px',
+      border: '2px solid #475569',
+      minWidth: '150px',
+      boxShadow: '0 4px 20px rgba(0, 0, 0, 0.5)'
+    }
+  },
     React.createElement('h4', null, 'Flight Controls'),
     React.createElement('div', { 
       ref: joystickRef,

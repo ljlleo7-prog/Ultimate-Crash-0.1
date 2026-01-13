@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useAircraftPhysics } from '../hooks/useAircraftPhysics';
 import FlightPanelModular from './FlightPanelModular';
-import IntegratedControlPanel from './IntegratedControlPanel';
 import commandDatabase from '../commandDatabase.json';
 import sceneManager from '../services/sceneManager.js';
 import eventBus from '../services/eventBus.js';
@@ -566,15 +565,6 @@ const FlightInProgress = ({
             }}
           />
 
-          <div style={{ padding: '10px', overflow: 'hidden' }}>
-            <IntegratedControlPanel
-              controlThrust={handleThrustControl}
-              controlFlaps={handleFlapsControl}
-              controlGear={handleGearControl}
-              controlAirBrakes={handleAirBrakesControl}
-              flightState={flightData}
-            />
-          </div>
         </div>
       </div>
 

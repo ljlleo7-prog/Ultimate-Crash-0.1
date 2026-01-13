@@ -616,6 +616,10 @@ class NewFlightPhysicsService {
     cl = airbrakeResult.cl;
     cd = airbrakeResult.cd;
     
+    const gearResult = this.calculateGearEffects(cl, cd);
+    cl = gearResult.cl;
+    cd = gearResult.cd;
+    
     // Calculate aerodynamic forces
     const lift = q * cl * this.aircraft.wingArea; // Main wing lift
     const drag = q * cd * this.aircraft.wingArea; // Main wing drag
@@ -949,6 +953,24 @@ class NewFlightPhysicsService {
     };
   }
   
+  /**
+   * ✅ NEW: Calculate gear effects on aerodynamics
+   */
+  calculateGearEffects(cl, cd) {
+    let gearCd = 0;
+    
+    if (this.state.gear) {
+      // Landing gear down significantly increases drag
+      // Typical gear drag coefficient is around 0.015 - 0.030
+      gearCd = this.aircraft.gearDragCoefficient || 0.02;
+    }
+    
+    return {
+      cl: cl, // Gear usually has minimal effect on lift
+      cd: cd + gearCd
+    };
+  }
+
   /**
    * ✅ NEW: Control surface setters
    */

@@ -139,10 +139,10 @@ const ThrustManager = ({ controlThrust, flightState }) => {
     return React.createElement('div', {
       key: index,
       style: {
-        background: '#1a1a1a',
+        background: 'rgba(0, 0, 0, 0.3)',
         padding: '10px',
         borderRadius: '10px',
-        border: '2px solid #333',
+        border: '1px solid #475569',
         width: '110px'
       }
     },
@@ -181,7 +181,7 @@ const ThrustManager = ({ controlThrust, flightState }) => {
     );
   };
   
-  return React.createElement('div', { style: { background: '#1a1a1a', padding: '10px', borderRadius: '12px', border: '2px solid #333', display: 'flex', gap: '10px', alignItems: 'flex-start', width: `${engineCount*130}px` } },
+  return React.createElement('div', { style: { background: 'linear-gradient(135deg, #1e293b 0%, #334155 100%)', padding: '15px', borderRadius: '10px', border: '2px solid #475569', display: 'flex', gap: '10px', alignItems: 'flex-start', width: 'fit-content', boxShadow: '0 4px 20px rgba(0, 0, 0, 0.5)' } },
     React.createElement('div', { style: { display: 'flex', gap: '10px' } },
       Array.from({ length: engineCount }).map((_, i) => lever(i))
     ),

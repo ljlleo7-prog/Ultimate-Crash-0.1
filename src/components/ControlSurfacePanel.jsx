@@ -1,81 +1,109 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
+import aircraftService from '../services/aircraftService';
 
-const ControlSurfacePanel = ({ controlFlaps, controlGear, controlAirBrakes, flightState }) => {
-  // Multi-position lever component for flaps
-  const MultiPositionLeverControl = ({ label, position, maxPosition, onToggle, positionLabels, colorMap }) => {
+const ControlSurfacePanel = ({ controlFlaps, controlGear, controlAirBrakes, flightState, aircraftModel }) => {
+  const [flapProfile, setFlapProfile] = useState(null);
+  const [airbrakeProfile, setAirbrakeProfile] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchProfiles = async () => {
+      setLoading(true);
+      try {
+        const profiles = await aircraftService.getControlSurfaceProfiles(aircraftModel || 'Boeing 737-800');
+        setFlapProfile(profiles.flaps);
+        setAirbrakeProfile(profiles.airbrakes);
+      } catch (error) {
+        console.error('Error fetching aircraft profiles:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchProfiles();
+  }, [aircraftModel]);
+
+  // Lever control component (compact version)
+  const LeverControl = ({ label, position, maxPosition, onToggle, positionLabels, colorMap, height = 90 }) => {
     const percentage = (position / maxPosition) * 100;
-    const currentLabel = positionLabels[position];
+    const currentLabel = positionLabels[position] || position;
     const currentColor = colorMap[position] || '#f59e0b';
 
     return React.createElement('div', { 
       style: { 
-        marginBottom: '25px',
         display: 'flex',
         flexDirection: 'column',
-        gap: '8px'
+        alignItems: 'center',
+        gap: '4px',
+        width: '60px'
       } 
     },
+      // Label and value
       React.createElement('div', { 
         style: { 
           display: 'flex', 
-          justifyContent: 'space-between',
+          flexDirection: 'column',
           alignItems: 'center',
-          fontSize: '14px',
-          fontWeight: '600'
+          fontSize: '10px',
+          fontWeight: 'bold',
+          height: '30px',
+          justifyContent: 'center'
         } 
       },
-        React.createElement('span', { style: { color: '#93c5fd' } }, label),
+        React.createElement('span', { style: { color: '#93c5fd', marginBottom: '2px' } }, label),
         React.createElement('span', { 
           style: { 
             color: currentColor,
             background: 'rgba(255, 255, 255, 0.1)',
-            padding: '3px 8px',
-            borderRadius: '4px',
-            fontSize: '12px',
-            fontWeight: 'bold'
+            padding: '1px 4px',
+            borderRadius: '3px',
+            fontSize: '9px'
           } 
         }, currentLabel)
       ),
       
-      // Lever housing with position markers
+      // Lever housing
       React.createElement('div', { 
         style: { 
           position: 'relative',
-          height: '140px',
-          width: '45px',
+          height: `${height}px`,
+          width: '32px',
           background: 'linear-gradient(180deg, #1e293b, #0f172a)',
-          borderRadius: '22px',
-          margin: '0 auto',
-          border: '2px solid #3b82f6',
-          boxShadow: 'inset 0 2px 8px rgba(0, 0, 0, 0.6)',
+          borderRadius: '16px',
+          border: '1px solid #3b82f6',
+          boxShadow: 'inset 0 1px 4px rgba(0, 0, 0, 0.6)',
           userSelect: 'none',
-          cursor: 'grab'
+          cursor: 'pointer'
         },
         onMouseDown: (e) => {
+          console.log(`LeverControl: onMouseDown for ${label}`, { clientY: e.clientY, maxPosition, position });
           e.preventDefault();
           e.stopPropagation();
           
           const leverElement = e.currentTarget;
           const rect = leverElement.getBoundingClientRect();
           
-          const handleMouseMove = (moveEvent) => {
-            moveEvent.preventDefault();
-            moveEvent.stopPropagation();
-            
-            // Calculate position based on mouse Y relative to lever housing
-            const relativeY = moveEvent.clientY - rect.top;
-            const relativePosition = 1 - (relativeY / rect.height);
-            
-            // Calculate new position with discrete steps
-            const newPosition = Math.round(relativePosition * maxPosition);
+          const handleUpdate = (clientY) => {
+            const relativeY = clientY - rect.top;
+            // Invert the calculation: top of the lever is 0, bottom is maxPosition
+            const invertedRelativePosition = (relativeY / rect.height);
+            const newPosition = Math.round(invertedRelativePosition * maxPosition);
             const clampedPosition = Math.max(0, Math.min(maxPosition, newPosition));
             
             if (clampedPosition !== position) {
+              console.log(`LeverControl: onToggle for ${label} with new position ${clampedPosition}`);
               onToggle(clampedPosition);
             }
           };
+
+          handleUpdate(e.clientY);
+          
+          const handleMouseMove = (moveEvent) => {
+            console.log(`LeverControl: handleMouseMove for ${label}`, { clientY: moveEvent.clientY });
+            handleUpdate(moveEvent.clientY);
+          };
           
           const handleMouseUp = () => {
+            console.log(`LeverControl: handleMouseUp for ${label}`);
             document.removeEventListener('mousemove', handleMouseMove);
             document.removeEventListener('mouseup', handleMouseUp);
             document.body.style.cursor = '';
@@ -84,6 +112,11 @@ const ControlSurfacePanel = ({ controlFlaps, controlGear, controlAirBrakes, flig
           document.body.style.cursor = 'grabbing';
           document.addEventListener('mousemove', handleMouseMove);
           document.addEventListener('mouseup', handleMouseUp);
+        },
+        onClick: (e) => {
+          if (maxPosition === 1) {
+            onToggle(position === 0 ? 1 : 0);
+          }
         }
       },
         // Position markers
@@ -94,15 +127,16 @@ const ControlSurfacePanel = ({ controlFlaps, controlGear, controlAirBrakes, flig
             key: index,
             style: {
               position: 'absolute',
-              bottom: `${markerPercentage}%`,
+              top: `${markerPercentage}%`, // Changed from bottom to top
               left: '50%',
               transform: 'translateX(-50%)',
-              width: '4px',
-              height: '8px',
+              width: '3px',
+              height: '5px',
               background: isActive ? currentColor : '#475569',
-              borderRadius: '2px',
-              boxShadow: isActive ? `0 0 8px ${currentColor}` : 'none',
-              transition: 'all 0.2s ease'
+              borderRadius: '1px',
+              boxShadow: isActive ? `0 0 4px ${currentColor}` : 'none',
+              transition: 'all 0.2s ease',
+              zIndex: 1
             }
           });
         }),
@@ -110,240 +144,123 @@ const ControlSurfacePanel = ({ controlFlaps, controlGear, controlAirBrakes, flig
         // Lever handle
         React.createElement('div', { style: {
           position: 'absolute',
-          bottom: `${percentage}%`,
-          left: '-8px',
-          width: '61px',
-          height: '28px',
+          top: `${percentage}%`, // Changed from bottom to top
+          left: '-5px',
+          width: '42px',
+          height: '18px',
           background: `linear-gradient(135deg, ${currentColor}, ${currentColor}88)`,
-          borderRadius: '14px',
-          transform: 'translateY(50%) rotate(15deg)',
-          border: '2px solid #1e293b',
-          boxShadow: `0 4px 12px rgba(0, 0, 0, 0.8), 0 0 15px ${currentColor}44`,
+          borderRadius: '9px',
+          transform: 'translateY(-50%) rotate(10deg)', // Adjusted translateY for top positioning
+          border: '1px solid #1e293b',
+          boxShadow: `0 2px 6px rgba(0, 0, 0, 0.8), 0 0 8px ${currentColor}44`,
           cursor: 'grab',
           userSelect: 'none',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          fontSize: '11px',
+          fontSize: '8px',
           fontWeight: 'bold',
           color: '#ffffff',
-          transition: 'bottom 0.3s cubic-bezier(0.4, 0, 0.2, 1), background 0.3s ease, transform 0.3s ease',
-          textShadow: '0 1px 2px rgba(0, 0, 0, 0.8)'
+          transition: 'top 0.2s cubic-bezier(0.4, 0, 0.2, 1), background 0.3s ease', // Changed bottom to top
+          textShadow: '0 1px 1px rgba(0, 0, 0, 0.8)',
+          zIndex: 2
         } }, label.substring(0, 3))
       )
     );
   };
 
-  // Binary lever component for gear and speedbrakes
-  const BinaryLeverControl = ({ label, position, onToggle, positionLabels, colorMap }) => {
-    const isUp = position === 0;
-    const percentage = isUp ? 0 : 100;
-    const currentLabel = positionLabels[position];
-    const currentColor = colorMap[position] || '#f59e0b';
+  if (loading) {
+    return React.createElement('div', { className: 'control-surface-panel', style: { minWidth: '220px', height: '180px', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#1e293b', borderRadius: '10px', color: '#93c5fd' } }, 'Loading Aircraft Data...');
+  }
 
-    return React.createElement('div', { 
-      style: { 
-        marginBottom: '25px',
-        display: 'flex',
-        flexDirection: 'column',
-        gap: '8px'
-      } 
-    },
-      React.createElement('div', { 
-        style: { 
-          display: 'flex', 
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          fontSize: '14px',
-          fontWeight: '600'
-        } 
-      },
-        React.createElement('span', { style: { color: '#93c5fd' } }, label),
-        React.createElement('span', { 
-          style: { 
-            color: currentColor,
-            background: 'rgba(255, 255, 255, 0.1)',
-            padding: '3px 8px',
-            borderRadius: '4px',
-            fontSize: '12px',
-            fontWeight: 'bold'
-          } 
-        }, currentLabel)
-      ),
-      
-      // Lever housing with position markers
-      React.createElement('div', { 
-        style: { 
-          position: 'relative',
-          height: '120px',
-          width: '45px',
-          background: 'linear-gradient(180deg, #1e293b, #0f172a)',
-          borderRadius: '22px',
-          margin: '0 auto',
-          border: '2px solid #3b82f6',
-          boxShadow: 'inset 0 2px 8px rgba(0, 0, 0, 0.6)',
-          userSelect: 'none',
-          cursor: 'pointer'
-        },
-        onClick: () => onToggle(isUp ? 1 : 0)
-      },
-        // Up marker
-        React.createElement('div', {
-          style: {
-            position: 'absolute',
-            top: '10px',
-            left: '50%',
-            transform: 'translateX(-50%)',
-            width: '4px',
-            height: '8px',
-            background: isUp ? currentColor : '#475569',
-            borderRadius: '2px',
-            boxShadow: isUp ? `0 0 8px ${currentColor}` : 'none',
-            transition: 'all 0.2s ease'
-          }
-        }),
-        
-        // Down marker
-        React.createElement('div', {
-          style: {
-            position: 'absolute',
-            bottom: '10px',
-            left: '50%',
-            transform: 'translateX(-50%)',
-            width: '4px',
-            height: '8px',
-            background: !isUp ? currentColor : '#475569',
-            borderRadius: '2px',
-            boxShadow: !isUp ? `0 0 8px ${currentColor}` : 'none',
-            transition: 'all 0.2s ease'
-          }
-        }),
-        
-        // Lever handle
-        React.createElement('div', { style: {
-          position: 'absolute',
-          bottom: `${percentage}%`,
-          left: '-8px',
-          width: '61px',
-          height: '26px',
-          background: `linear-gradient(135deg, ${currentColor}, ${currentColor}88)`,
-          borderRadius: '13px',
-          transform: 'translateY(50%) rotate(15deg)',
-          border: '2px solid #1e293b',
-          boxShadow: `0 4px 10px rgba(0, 0, 0, 0.8), 0 0 12px ${currentColor}44`,
-          cursor: 'pointer',
-          userSelect: 'none',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          fontSize: '11px',
-          fontWeight: 'bold',
-          color: '#ffffff',
-          transition: 'bottom 0.4s cubic-bezier(0.4, 0, 0.2, 1), background 0.3s ease, transform 0.3s ease',
-          textShadow: '0 1px 2px rgba(0, 0, 0, 0.8)'
-        } }, label.substring(0, 3))
-      )
-    );
-  };
+  // Prepare Flap Labels
+  const flapLabels = flapProfile?.positions.reduce((acc, pos, idx) => {
+    acc[idx] = pos.label;
+    return acc;
+  }, {}) || { 0: 'UP', 1: 'TO', 2: 'LDG' };
+
+  const flapMax = (flapProfile?.positions.length || 3) - 1;
+
+  // Prepare Airbrake Labels
+  const airbrakeLabels = airbrakeProfile?.hasTwoTier 
+    ? { 0: 'RET', 1: 'ARM', 2: 'FLT', 3: 'GND' } 
+    : { 0: 'RET', 1: 'EXT' };
+  
+  const airbrakeMax = airbrakeProfile?.hasTwoTier ? 3 : 1;
 
   return React.createElement('div', { 
     className: 'control-surface-panel',
     style: {
-      background: 'linear-gradient(135deg, rgba(15, 23, 42, 0.95), rgba(30, 41, 59, 0.95))',
-      border: '2px solid #3b82f6',
-      borderRadius: '12px',
-      padding: '20px',
-      margin: '10px',
-      minWidth: '220px',
+      background: 'linear-gradient(135deg, #1e293b 0%, #334155 100%)',
+      border: '2px solid #475569',
+      borderRadius: '10px',
+      padding: '12px',
+      display: 'flex',
+      flexDirection: 'row',
+      gap: '15px',
       color: 'white',
       fontFamily: 'Courier New, monospace',
-      boxShadow: '0 4px 20px rgba(0, 0, 0, 0.7), inset 0 1px 0 rgba(255, 255, 255, 0.1)'
+      boxShadow: '0 4px 20px rgba(0, 0, 0, 0.5)',
+      alignItems: 'flex-start'
     }
   },
-    // Title
-    React.createElement('h3', { 
-      style: { 
-        margin: '0 0 25px 0', 
-        textAlign: 'center',
-        color: '#3b82f6',
-        fontSize: '16px',
-        fontWeight: 'bold',
-        textTransform: 'uppercase',
-        letterSpacing: '1px',
-        textShadow: '0 0 10px rgba(59, 130, 246, 0.5)'
-      } 
-    }, 'Control Surfaces'),
+    // Left side: Controls in a row
+    React.createElement('div', { style: { display: 'flex', flexDirection: 'row', gap: '15px' } },
+      // Flaps
+      React.createElement(LeverControl, {
+        label: 'FLAPS',
+        position: flightState.flapsValue || 0,
+        maxPosition: flapMax,
+        onToggle: controlFlaps,
+        positionLabels: flapLabels,
+        colorMap: { 0: '#10b981', [flapMax]: '#ef4444' }
+      }),
+      
+      // Gear
+      React.createElement(LeverControl, {
+        label: 'GEAR',
+        position: flightState.gearValue ? 1 : 0,
+        maxPosition: 1,
+        onToggle: (val) => controlGear(val === 1),
+        positionLabels: { 0: 'UP', 1: 'DN' },
+        colorMap: { 0: '#10b981', 1: '#ef4444' }
+      }),
+      
+      // Airbrakes
+      React.createElement(LeverControl, {
+        label: 'BRAKES',
+        position: flightState.airBrakesValue || 0,
+        maxPosition: airbrakeMax,
+        onToggle: controlAirBrakes,
+        positionLabels: airbrakeLabels,
+        colorMap: { 0: '#10b981', [airbrakeMax]: '#ef4444' }
+      })
+    ),
     
-    // Flaps Control - Multi-position lever
-    React.createElement(MultiPositionLeverControl, {
-      label: 'FLAPS',
-      position: flightState.flaps || 0,
-      maxPosition: 2,
-      onToggle: controlFlaps,
-      positionLabels: { 0: 'UP', 1: 'TO', 2: 'LDG' },
-      colorMap: { 0: '#10b981', 1: '#f59e0b', 2: '#ef4444' }
-    }),
-    
-    // Gear Control - Binary lever
-    React.createElement(BinaryLeverControl, {
-      label: 'GEAR',
-      position: flightState.gear ? 1 : 0,
-      onToggle: (value) => controlGear(value === 1),
-      positionLabels: { 0: 'UP', 1: 'DOWN' },
-      colorMap: { 0: '#10b981', 1: '#ef4444' }
-    }),
-    
-    // Air Brakes Control - Binary lever
-    React.createElement(BinaryLeverControl, {
-      label: 'BRAKES',
-      position: flightState.airBrakes || 0,
-      onToggle: controlAirBrakes,
-      positionLabels: { 0: 'RTCT', 1: 'EXT' },
-      colorMap: { 0: '#10b981', 1: '#ef4444' }
-    }),
-    
-    // Status Indicators
+    // Right side: Status Info (Vertical)
     React.createElement('div', { 
       style: { 
-        marginTop: '20px',
-        paddingTop: '15px',
-        borderTop: '1px solid rgba(75, 85, 99, 0.5)',
-        fontSize: '12px',
-        color: '#94a3b8'
+        display: 'flex',
+        flexDirection: 'column',
+        gap: '8px',
+        paddingLeft: '12px',
+        borderLeft: '1px solid rgba(75, 85, 99, 0.5)',
+        minWidth: '110px'
       } 
     },
-      React.createElement('div', { 
-        style: { 
-          display: 'flex', 
-          justifyContent: 'space-between',
-          marginBottom: '4px',
-          alignItems: 'center'
-        } 
-      },
-        React.createElement('span', {}, 'Hydraulic Pressure:'),
-        React.createElement('span', { 
-          style: { 
-            color: flightState.hydraulicPressure > 2000 ? '#10b981' : 
-                   flightState.hydraulicPressure > 1000 ? '#f59e0b' : '#ef4444',
-            fontWeight: 'bold'
-          } 
-        }, `${flightState.hydraulicPressure} PSI`)
+      React.createElement('div', { style: { fontSize: '11px', fontWeight: 'bold', color: '#3b82f6', marginBottom: '2px' } }, 'SYSTEMS'),
+      
+      React.createElement('div', { style: { fontSize: '9px', display: 'flex', justifyContent: 'space-between' } },
+        React.createElement('span', { style: { color: '#94a3b8' } }, 'HYD:'),
+        React.createElement('span', { style: { color: flightState.hydraulicPressure > 2000 ? '#10b981' : '#ef4444', fontWeight: 'bold' } }, `${flightState.hydraulicPressure}`)
       ),
-      React.createElement('div', { 
-        style: { 
-          display: 'flex', 
-          justifyContent: 'space-between',
-          alignItems: 'center'
-        } 
-      },
-        React.createElement('span', {}, 'System Status:'),
-        React.createElement('span', { 
-          style: { 
-            color: flightState.hydraulicPressure > 1000 ? '#10b981' : '#ef4444',
-            fontWeight: 'bold'
-          } 
-        }, flightState.hydraulicPressure > 1000 ? 'NORMAL' : 'FAILURE')
-      )
+      
+      React.createElement('div', { style: { fontSize: '9px', display: 'flex', justifyContent: 'space-between' } },
+        React.createElement('span', { style: { color: '#94a3b8' } }, 'STATUS:'),
+        React.createElement('span', { style: { color: flightState.hydraulicPressure > 1000 ? '#10b981' : '#ef4444', fontWeight: 'bold' } }, flightState.hydraulicPressure > 1000 ? 'OK' : 'FAIL')
+      ),
+
+      React.createElement('div', { style: { fontSize: '9px', marginTop: '4px', color: '#60a5fa', fontStyle: 'italic', maxWidth: '100px' } }, aircraftModel?.substring(0, 15) || 'B737-800')
     )
   );
 };

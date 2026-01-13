@@ -272,11 +272,26 @@ class SimpleFlightPhysicsService {
     const controlInputs = this.applyManualControls(input);
     this.smoothControls(controlInputs);
 
+    // Initialize CL and CD with basic aircraft values
+    let currentCl = this.aircraft.basicLiftCoefficient;
+    let currentCd = this.aircraft.zeroLiftDragCoefficient;
+
+    // Apply effects from flaps, airbrakes, and gear
+    const flapEffects = this.calculateFlapsEffects(currentCl, currentCd);
+    currentCl = flapEffects.cl;
+    currentCd = flapEffects.cd;
+
+    const airbrakeEffects = this.calculateAirbrakeEffects(currentCd);
+    currentCd = airbrakeEffects.cd;
+
+    const gearEffects = this.calculateGearEffects(currentCd);
+    currentCd = gearEffects.cd;
+
     // Update engine parameters based on throttle and flight stage
     this.updateEngineParameters(stageParams);
 
     // Animation-based updates for realistic flight behavior
-    this.updateVelocityAnimation(stageParams, timeStep);
+    this.updateVelocityAnimation(stageParams, timeStep, currentCl, currentCd); // Pass CL/CD
     this.updateOrientationAnimation(stageParams, timeStep);
     this.updatePosition(timeStep);
     this.maintainAltitude(stageParams, timeStep);
@@ -312,16 +327,20 @@ class SimpleFlightPhysicsService {
   /**
    * Update velocity based on flight stage animation parameters
    */
-  updateVelocityAnimation(stageParams, dt) {
+  updateVelocityAnimation(stageParams, dt, currentCl, currentCd) {
     const throttle = this.state.controls.throttle;
     const [minSpeed, maxSpeed] = stageParams.speedRange;
     
     // Base speed is mid-range of stage speed range
-    const baseSpeed = (minSpeed + maxSpeed) / 2;
+    let baseSpeed = (minSpeed + maxSpeed) / 2;
     
     // Adjust speed based on throttle - more throttle increases speed within stage range
     const speedOffset = (throttle - 0.5) * (maxSpeed - minSpeed) * 0.8;
-    const targetSpeed = Math.max(minSpeed, Math.min(maxSpeed, baseSpeed + speedOffset));
+    let targetSpeed = Math.max(minSpeed, Math.min(maxSpeed, baseSpeed + speedOffset));
+    
+    // Apply drag effects from currentCd: higher drag reduces target speed
+    targetSpeed *= (1 - currentCd * 5); // Multiplier to make drag noticeable
+    targetSpeed = Math.max(0, targetSpeed); // Ensure speed doesn't go negative
     
     // Smoothly transition to target speed
     const speedDiff = targetSpeed - this.state.velocity.u;
@@ -333,8 +352,8 @@ class SimpleFlightPhysicsService {
     // Clamp to speed range
     this.state.velocity.u = Math.max(minSpeed, Math.min(maxSpeed, this.state.velocity.u));
     
-    // Update vertical velocity based on flight stage and pitch input
-    this.updateVerticalVelocity(stageParams, dt);
+    // Update vertical velocity based on flight stage, pitch input, and currentCl
+    this.updateVerticalVelocity(stageParams, dt, currentCl);
     
     // Update lateral velocity based on yaw input
     this.updateLateralVelocity(dt);
@@ -343,7 +362,7 @@ class SimpleFlightPhysicsService {
   /**
    * Update vertical velocity based on flight stage and pitch input
    */
-  updateVerticalVelocity(stageParams, dt) {
+  updateVerticalVelocity(stageParams, dt, currentCl) {
     const pitch = this.state.controls.pitch;
     const throttle = this.state.controls.throttle;
     
@@ -356,8 +375,11 @@ class SimpleFlightPhysicsService {
     // Adjust vertical speed based on throttle (more throttle = more climb capability)
     const throttleEffect = (throttle - 0.5) * 2;
     
+    // Apply lift effects from currentCl: higher lift increases vertical speed
+    const liftEffect = (currentCl - this.aircraft.basicLiftCoefficient) * 10; // Multiplier to make lift noticeable
+    
     // Calculate target vertical velocity
-    this.targetVerticalSpeed = baseVerticalSpeed + pitchEffect + throttleEffect;
+    this.targetVerticalSpeed = baseVerticalSpeed + pitchEffect + throttleEffect + liftEffect;
     
     // Smoothly transition to target vertical speed
     const verticalSpeedDiff = this.targetVerticalSpeed - this.state.velocity.w;
@@ -538,6 +560,79 @@ class SimpleFlightPhysicsService {
     this.engineParams.fuelFlow = this.engineParams.fuelFlow.map(flow => 
       this.smoothInput(flow, targetFuelFlow, smoothingFactor)
     );
+  }
+
+  /**
+   * Calculate lift and drag effects of flaps
+   */
+  calculateFlapsEffects(cl, cd) {
+    let flapsCl = 0;
+    let flapsCd = 0;
+    
+    // Get the flap profile from the aircraft data or use defaults if not available
+    const flapProfile = this.aircraft.flapProfile || {
+      positions: [
+        { angle: 0, clIncrement: 0, cdIncrement: 0, label: "UP" },
+        { angle: 10, clIncrement: 0.3, cdIncrement: 0.015, label: "1" },
+        { angle: 20, clIncrement: 0.6, cdIncrement: 0.035, label: "2" },
+        { angle: 30, clIncrement: 1.0, cdIncrement: 0.07, label: "FULL" }
+      ]
+    };
+    
+    // Get the current flap position index
+    const flapIndex = Math.max(0, Math.min(this.state.flaps, flapProfile.positions.length - 1));
+    const flapPosition = flapProfile.positions[flapIndex];
+    
+    // Apply the lift and drag increments from the selected flap position
+    flapsCl = flapPosition.clIncrement;
+    flapsCd = flapPosition.cdIncrement;
+    
+    return {
+      cl: cl + flapsCl,
+      cd: cd + flapsCd
+    };
+  }
+
+  /**
+   * Calculate drag effects of airbrakes
+   */
+  calculateAirbrakeEffects(cd) {
+    let airbrakeCd = 0;
+
+    // Get the airbrake profile from the aircraft data or use defaults
+    const airbrakeProfile = this.aircraft.airbrakeProfile || {
+      positions: [
+        { dragIncrement: 0, label: "RETRACTED" },
+        { dragIncrement: 0.02, label: "EXTENDED" }
+      ]
+    };
+
+    // Get the current airbrake position index
+    const airbrakeIndex = Math.max(0, Math.min(this.state.airBrakes, airbrakeProfile.positions.length - 1));
+    const airbrakePosition = airbrakeProfile.positions[airbrakeIndex];
+
+    // Apply the drag increment from the selected airbrake position
+    airbrakeCd = airbrakePosition.dragIncrement;
+
+    return {
+      cd: cd + airbrakeCd
+    };
+  }
+
+  /**
+   * Calculate drag effects of landing gear
+   */
+  calculateGearEffects(cd) {
+    let gearCd = 0;
+
+    // If gear is down, apply drag increment
+    if (this.state.gear) {
+      gearCd = this.aircraft.gearDragCoefficient || 0.02; // Default gear drag
+    }
+
+    return {
+      cd: cd + gearCd
+    };
   }
 
   /**
