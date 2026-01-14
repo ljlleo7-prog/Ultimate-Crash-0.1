@@ -531,6 +531,16 @@ class SceneManager {
       arrival: this.scenario.arrival || 'Unknown',
       aircraft: this.scenario.aircraftModel || 'Unknown Aircraft',
       difficulty: this.scenario.difficulty || 'Unknown',
+      // Route-related parameters
+      departureGate: this.scenario.departureGate || 'Unknown',
+      departureTaxiway: this.scenario.departureTaxiway || 'Unknown',
+      departureRunway: this.scenario.departureRunway || 'Unknown',
+      arrivalGate: this.scenario.arrivalGate || 'Unknown',
+      arrivalTaxiway: this.scenario.arrivalTaxiway || 'Unknown',
+      arrivalRunway: this.scenario.arrivalRunway || 'Unknown',
+      SID: this.scenario.SID || 'Unknown',
+      STAR: this.scenario.STAR || 'Unknown',
+      waypoints: this.scenario.waypoints?.join(' → ') || 'None',
       ...data
     };
     

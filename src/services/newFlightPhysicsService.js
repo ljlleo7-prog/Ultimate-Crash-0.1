@@ -93,6 +93,8 @@ class NewFlightPhysicsService {
     MIN_TRIM: -0.5               // Min trim adjustment
   };
 
+  static NOSE_GEAR_PITCH_RATE_LIMIT = -0.5; // radians/s, negative for nose-down
+
   static DEFAULT_PID_PARAMETERS = {
     ALTITUDE: { Kp: 0.0003, Ki: 0, Kd: 0.001, min: -3, max: 3 },
     SPEED: { Kp: 0.6, Ki: 0, Kd: 0.16, min: -0.3, max: 0.3 },
@@ -117,6 +119,7 @@ class NewFlightPhysicsService {
     this.initialLongitude = initialLongitude;
 
     // Debug tracking
+    this.noseGearFailed = false;
     this.lastThrottleValue = 0.3; // Start with low throttle
     
     // ✅ NEW: Initialize scalable multi-engine system
@@ -949,6 +952,9 @@ class NewFlightPhysicsService {
     flapsCl = flapPosition.clIncrement;
     flapsCd = flapPosition.cdIncrement;
     
+    // Log flap effects for debugging
+    console.log(`Flaps: Index=${flapIndex}, Angle=${flapPosition.angle}, CL_Inc=${flapsCl}, CD_Inc=${flapsCd}`);
+    
     return {
       cl: cl + flapsCl,
       cd: cd + flapsCd
@@ -1270,10 +1276,23 @@ class NewFlightPhysicsService {
     this.state.orientation.psi += psiDot * dt;
 
     // ✅ GROUND REACTION: Prevent pitching down into the ground
-    if (this.isOnGround() && this.state.orientation.theta < 0) {
-      this.state.orientation.theta = 0;
-      if (this.state.angularRates.q < 0) {
-        this.state.angularRates.q = 0;
+    if (this.isOnGround()) {
+      // Nose gear failure condition
+      if (this.state.angularRates.q < NewFlightPhysicsService.NOSE_GEAR_PITCH_RATE_LIMIT) {
+        this.noseGearFailed = true;
+      }
+
+      if (this.noseGearFailed) {
+        // Force nose down if gear failed
+        this.state.orientation.theta = Math.min(this.state.orientation.theta, -0.2); // -0.2 radians is about -11 degrees
+        if (this.state.angularRates.q > 0) { // Prevent pitching up if nose gear failed
+          this.state.angularRates.q = 0;
+        }
+      } else if (this.state.orientation.theta < 0) {
+        this.state.orientation.theta = 0;
+        if (this.state.angularRates.q < 0) {
+          this.state.angularRates.q = 0;
+        }
       }
     }
     
@@ -1467,6 +1486,7 @@ class NewFlightPhysicsService {
       timeToCrash: this.getTimeToCrash(),
       hasCrashed: this.getCrashStatus(),
       alarms: this.getAlarms(),
+      noseGearFailed: this.noseGearFailed,
       
       // Physics data for compatibility
       position: { 

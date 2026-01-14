@@ -7,7 +7,9 @@ import { calculateDistance, calculateFlightPlan, formatDistance, formatFlightTim
 import AirportSearchInput from './components/AirportSearchInput.js';
 import FlightInitialization from './components/FlightInitialization.js';
 import FlightInProgress from './components/FlightInProgress.jsx';
+import RouteSelection from './components/RouteSelection.jsx';
 import { generateInitialWeather, updateWeather } from './services/weatherService';
+import { generateDefaultRouteData } from './services/routeUtils';
 
 import { FadeOverlay, CinematicReview } from './components/CinematicComponents.js';
 
@@ -61,6 +63,19 @@ function App() {
   const [simulationStarted, setSimulationStarted] = useState(false);
   const [cinematicPhase, setCinematicPhase] = useState('none');
   const [physicsModel, setPhysicsModel] = useState('imaginary'); // Default to imaginary model
+  
+  // Route selection state
+  const [routeSelectionPhase, setRouteSelectionPhase] = useState(false);
+  const [selectedDepartureGate, setSelectedDepartureGate] = useState(null);
+  const [selectedDepartureTaxiway, setSelectedDepartureTaxiway] = useState(null);
+  const [selectedDepartureRunway, setSelectedDepartureRunway] = useState(null);
+  const [selectedSID, setSelectedSID] = useState(null);
+  const [selectedWaypoints, setSelectedWaypoints] = useState([]);
+  const [selectedSTAR, setSelectedSTAR] = useState(null);
+  const [selectedArrivalRunway, setSelectedArrivalRunway] = useState(null);
+  const [selectedArrivalTaxiway, setSelectedArrivalTaxiway] = useState(null);
+  const [selectedArrivalGate, setSelectedArrivalGate] = useState(null);
+  const [shouldSkipRouteSelection, setShouldSkipRouteSelection] = useState(false);
 
   // Load popular aircraft models
   useEffect(() => {
@@ -103,9 +118,7 @@ function App() {
       alert('Please select both departure and arrival airports');
       return;
     }
-    const fadeDuration = 2500;
-    const reviewDuration = 5000;
-
+    
     // Determine season
     let currentSeason = season;
     if (useRandomSeason) {
@@ -130,7 +143,23 @@ function App() {
       currentTimeZulu
     );
     setWeatherData(initialWeather);
-
+    
+    // Check if route selection is needed based on difficulty and skip flag
+    if (difficulty === 'rookie' && shouldSkipRouteSelection) {
+      // Rookie mode with skip - use default values
+      proceedToCinematicReview();
+    } else {
+      // Enter route selection phase
+      setRouteSelectionPhase(true);
+      // Make sure we're not in cinematic mode
+      setCinematicPhase('none');
+    }
+  };
+  
+  const proceedToCinematicReview = () => {
+    const fadeDuration = 2500;
+    const reviewDuration = 5000;
+    
     setCinematicPhase('fade_out');
 
     setTimeout(() => {
@@ -144,6 +173,17 @@ function App() {
         }, fadeDuration);
       }, reviewDuration);
     }, fadeDuration);
+  };
+  
+  const handleSkipRouteSelection = () => {
+    setShouldSkipRouteSelection(true);
+    setRouteSelectionPhase(false);
+    proceedToCinematicReview();
+  };
+  
+  const handleCompleteRouteSelection = () => {
+    setRouteSelectionPhase(false);
+    proceedToCinematicReview();
   };
 
   const handleResetFlight = () => {
@@ -210,9 +250,20 @@ function App() {
       setWeatherData: setWeatherData,
       failureType: failureType,
       crewCount: crewCount,
-      physicsModel: physicsModel
+      physicsModel: physicsModel,
+      // Route-related props
+      selectedDepartureGate: selectedDepartureGate,
+      selectedDepartureTaxiway: selectedDepartureTaxiway,
+      selectedDepartureRunway: selectedDepartureRunway,
+      selectedSID: selectedSID,
+      selectedWaypoints: selectedWaypoints,
+      selectedSTAR: selectedSTAR,
+      selectedArrivalRunway: selectedArrivalRunway,
+      selectedArrivalTaxiway: selectedArrivalTaxiway,
+      selectedArrivalGate: selectedArrivalGate
     });
   }
+
 
   return React.createElement('div', { className: 'App' },
     React.createElement('header', { className: 'app-header' },
@@ -276,7 +327,7 @@ function App() {
         season: season,
         setSeason: setSeason,
         useRandomSeason: useRandomSeason,
-        setUseRandomSeason: setUseRandomSeason,
+        setUseRandomSeason: useRandomSeason,
         selectedDeparture: selectedDeparture,
         selectedArrival: selectedArrival,
         searchResults: searchResults,
@@ -300,6 +351,34 @@ function App() {
         setPhysicsModel: setPhysicsModel,
         apiKey: apiKey,
         setApiKey: setApiKey
+      }),
+      
+      // Route Selection Component
+      routeSelectionPhase && React.createElement(RouteSelection, {
+        difficulty: difficulty,
+        selectedDeparture: selectedDeparture,
+        selectedArrival: selectedArrival,
+        onSkip: handleSkipRouteSelection,
+        onComplete: handleCompleteRouteSelection,
+        
+        selectedDepartureGate: selectedDepartureGate,
+        setSelectedDepartureGate: setSelectedDepartureGate,
+        selectedDepartureTaxiway: selectedDepartureTaxiway,
+        setSelectedDepartureTaxiway: setSelectedDepartureTaxiway,
+        selectedDepartureRunway: selectedDepartureRunway,
+        setSelectedDepartureRunway: setSelectedDepartureRunway,
+        selectedSID: selectedSID,
+        setSelectedSID: setSelectedSID,
+        selectedWaypoints: selectedWaypoints,
+        setSelectedWaypoints: setSelectedWaypoints,
+        selectedSTAR: selectedSTAR,
+        setSelectedSTAR: setSelectedSTAR,
+        selectedArrivalRunway: selectedArrivalRunway,
+        setSelectedArrivalRunway: setSelectedArrivalRunway,
+        selectedArrivalTaxiway: selectedArrivalTaxiway,
+        setSelectedArrivalTaxiway: setSelectedArrivalTaxiway,
+        selectedArrivalGate: selectedArrivalGate,
+        setSelectedArrivalGate: setSelectedArrivalGate
       })
     )
   );

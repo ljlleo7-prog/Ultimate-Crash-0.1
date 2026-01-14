@@ -91,7 +91,11 @@ async function calculateFlightPlan(departureAirport, arrivalAirport, aircraftMod
       city: departureAirport.city,
       country: departureAirport.country,
       runways: departureAirport.runways,
-      frequencies: departureAirport.frequencies
+      frequencies: departureAirport.frequencies,
+      gate: routeDetails.departureGate || 'Unknown',
+      taxiway: routeDetails.departureTaxiway || 'Unknown',
+      runway: routeDetails.departureRunway || 'Unknown',
+      SID: routeDetails.SID || 'Unknown'
     },
     arrival: {
       airport: arrivalAirport.iata || arrivalAirport.icao,
@@ -99,7 +103,16 @@ async function calculateFlightPlan(departureAirport, arrivalAirport, aircraftMod
       city: arrivalAirport.city,
       country: arrivalAirport.country,
       runways: arrivalAirport.runways,
-      frequencies: arrivalAirport.frequencies
+      frequencies: arrivalAirport.frequencies,
+      gate: routeDetails.arrivalGate || 'Unknown',
+      taxiway: routeDetails.arrivalTaxiway || 'Unknown',
+      runway: routeDetails.arrivalRunway || 'Unknown',
+      STAR: routeDetails.STAR || 'Unknown'
+    },
+    route: {
+      waypoints: routeDetails.waypoints || [],
+      SID: routeDetails.SID || 'Unknown',
+      STAR: routeDetails.STAR || 'Unknown'
     },
     distance: {
       nauticalMiles: distance,

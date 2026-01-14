@@ -33,7 +33,17 @@ const FlightInProgress = ({
   setWeatherData, 
   failureType, 
   crewCount, 
-  physicsModel = 'imaginary' 
+  physicsModel = 'imaginary',
+  // Route-related props
+  selectedDepartureGate,
+  selectedDepartureTaxiway,
+  selectedDepartureRunway,
+  selectedSID,
+  selectedWaypoints,
+  selectedSTAR,
+  selectedArrivalRunway,
+  selectedArrivalTaxiway,
+  selectedArrivalGate
 }) => {
 
 
@@ -179,16 +189,28 @@ const FlightInProgress = ({
         aircraftModel: aircraftModel
       });
       
-      sceneManager.updateScenario({
+      // Pass route data from parent component
+      const routeData = {
         callsign: callsign,
         departure: selectedDeparture.iata || selectedDeparture.icao,
         arrival: selectedArrival.iata || selectedArrival.icao,
-        aircraftModel: aircraftModel
-      });
+        aircraftModel: aircraftModel,
+        departureGate: selectedDepartureGate,
+        departureTaxiway: selectedDepartureTaxiway,
+        departureRunway: selectedDepartureRunway,
+        SID: selectedSID,
+        waypoints: selectedWaypoints,
+        STAR: selectedSTAR,
+        arrivalRunway: selectedArrivalRunway,
+        arrivalTaxiway: selectedArrivalTaxiway,
+        arrivalGate: selectedArrivalGate
+      };
       
-      console.log('✅ FlightInProgress: Scene manager updated successfully');
+      sceneManager.updateScenario(routeData);
+      
+      console.log('✅ FlightInProgress: Scene manager updated successfully with route data');
     }
-  }, [callsign, selectedDeparture, selectedArrival, aircraftModel]);
+  }, [callsign, selectedDeparture, selectedArrival, aircraftModel, selectedDepartureGate, selectedDepartureTaxiway, selectedDepartureRunway, selectedSID, selectedWaypoints, selectedSTAR, selectedArrivalRunway, selectedArrivalTaxiway, selectedArrivalGate]);
 
   // Main update loop
   useEffect(() => {
