@@ -104,6 +104,419 @@
         { "type": "Tower", "frequency": 118.2 },
         { "type": "Ground", "frequency": 121.75 }
       ]
+    },
+    {
+      "iata": "SIN",
+      "icao": "WSSS",
+      "name": "Changi Airport",
+      "city": "Singapore",
+      "country": "Singapore",
+      "latitude": 1.3591000,
+      "longitude": 103.9890000,
+      "elevation": 22,
+      "category": "4F",
+      "runways": [
+        { "name": "02L/20R", "length": 12000, "surface": "Asphalt", "category": "Heavy" },
+        { "name": "02R/20L", "length": 12000, "surface": "Asphalt", "category": "Heavy" },
+        { "name": "05/23", "length": 10000, "surface": "Asphalt", "category": "Heavy" }
+      ],
+      "frequencies": [
+        { "type": "ATIS", "frequency": 126.0 },
+        { "type": "Tower", "frequency": 118.2 },
+        { "type": "Ground", "frequency": 121.75 }
+      ]
+    },
+    {
+      "iata": "ICN",
+      "icao": "RKSI",
+      "name": "Incheon International Airport",
+      "city": "Seoul",
+      "country": "South Korea",
+      "latitude": 37.4602000,
+      "longitude": 126.4406000,
+      "elevation": 20,
+      "category": "4F",
+      "runways": [
+        { "name": "01L/19R", "length": 12000, "surface": "Concrete", "category": "Heavy" },
+        { "name": "01R/19L", "length": 12000, "surface": "Concrete", "category": "Heavy" },
+        { "name": "02L/20R", "length": 12000, "surface": "Concrete", "category": "Heavy" },
+        { "name": "02R/20L", "length": 12000, "surface": "Concrete", "category": "Heavy" }
+      ],
+      "frequencies": [
+        { "type": "ATIS", "frequency": 126.0 },
+        { "type": "Tower", "frequency": 118.2 },
+        { "type": "Ground", "frequency": 121.75 }
+      ]
+    },
+    {
+      "iata": "BKK",
+      "icao": "VTBS",
+      "name": "Suvarnabhumi Airport",
+      "city": "Bangkok",
+      "country": "Thailand",
+      "latitude": 13.6899996,
+      "longitude": 100.7400055,
+      "elevation": 7,
+      "category": "4F",
+      "runways": [
+        { "name": "01L/19R", "length": 12000, "surface": "Concrete", "category": "Heavy" },
+        { "name": "01R/19L", "length": 12000, "surface": "Concrete", "category": "Heavy" },
+        { "name": "03/21", "length": 10000, "surface": "Concrete", "category": "Heavy" }
+      ],
+      "frequencies": [
+        { "type": "ATIS", "frequency": 126.0 },
+        { "type": "Tower", "frequency": 118.2 },
+        { "type": "Ground", "frequency": 121.75 }
+      ]
+    },
+    {
+      "iata": "DEL",
+      "icao": "VIDP",
+      "name": "Indira Gandhi International Airport",
+      "city": "Delhi",
+      "country": "India",
+      "latitude": 28.5665000,
+      "longitude": 77.1031000,
+      "elevation": 706,
+      "category": "4F",
+      "runways": [
+        { "name": "09L/27R", "length": 12000, "surface": "Concrete", "category": "Heavy" },
+        { "name": "09R/27L", "length": 12000, "surface": "Concrete", "category": "Heavy" },
+        { "name": "11/29", "length": 10000, "surface": "Concrete", "category": "Heavy" }
+      ],
+      "frequencies": [
+        { "type": "ATIS", "frequency": 126.0 },
+        { "type": "Tower", "frequency": 118.2 },
+        { "type": "Ground", "frequency": 121.75 }
+      ]
+    },
+    {
+      "iata": "BOM",
+      "icao": "VABB",
+      "name": "Chhatrapati Shivaji Maharaj International Airport",
+      "city": "Mumbai",
+      "country": "India",
+      "latitude": 19.0886993,
+      "longitude": 72.8678970,
+      "elevation": 13,
+      "category": "4F",
+      "runways": [
+        { "name": "09/27", "length": 10000, "surface": "Concrete", "category": "Heavy" },
+        { "name": "14/32", "length": 10000, "surface": "Concrete", "category": "Heavy" }
+      ],
+      "frequencies": [
+        { "type": "ATIS", "frequency": 126.0 },
+        { "type": "Tower", "frequency": 118.2 },
+        { "type": "Ground", "frequency": 121.75 }
+      ]
+    },
+    {
+      "iata": "KUL",
+      "icao": "WMKK",
+      "name": "Kuala Lumpur International Airport",
+      "city": "Kuala Lumpur",
+      "country": "Malaysia",
+      "latitude": 2.7456000,
+      "longitude": 101.7092000,
+      "elevation": 60,
+      "category": "4F",
+      "runways": [
+        { "name": "07L/25R", "length": 12000, "surface": "Concrete", "category": "Heavy" },
+        { "name": "07R/25L", "length": 12000, "surface": "Concrete", "category": "Heavy" },
+        { "name": "15/33", "length": 10000, "surface": "Concrete", "category": "Heavy" }
+      ],
+      "frequencies": [
+        { "type": "ATIS", "frequency": 126.0 },
+        { "type": "Tower", "frequency": 118.2 },
+        { "type": "Ground", "frequency": 121.75 }
+      ]
+    },
+    {
+      "iata": "TPE",
+      "icao": "RCTP",
+      "name": "Taiwan Taoyuan International Airport",
+      "city": "Taipei",
+      "country": "Taiwan",
+      "latitude": 25.0775995,
+      "longitude": 121.2379989,
+      "elevation": 200,
+      "category": "4F",
+      "runways": [
+        { "name": "05L/23R", "length": 12000, "surface": "Concrete", "category": "Heavy" },
+        { "name": "05R/23L", "length": 12000, "surface": "Concrete", "category": "Heavy" }
+      ],
+      "frequencies": [
+        { "type": "ATIS", "frequency": 126.0 },
+        { "type": "Tower", "frequency": 118.2 },
+        { "type": "Ground", "frequency": 121.75 }
+      ]
+    },
+    {
+      "iata": "DOH",
+      "icao": "OTHH",
+      "name": "Hamad International Airport",
+      "city": "Doha",
+      "country": "Qatar",
+      "latitude": 25.2644000,
+      "longitude": 51.6033000,
+      "elevation": 10,
+      "category": "4F",
+      "runways": [
+        { "name": "16L/34R", "length": 12000, "surface": "Concrete", "category": "Heavy" },
+        { "name": "16R/34L", "length": 12000, "surface": "Concrete", "category": "Heavy" }
+      ],
+      "frequencies": [
+        { "type": "ATIS", "frequency": 126.0 },
+        { "type": "Tower", "frequency": 118.2 },
+        { "type": "Ground", "frequency": 121.75 }
+      ]
+    },
+    {
+      "iata": "DXB",
+      "icao": "OMDB",
+      "name": "Dubai International Airport",
+      "city": "Dubai",
+      "country": "United Arab Emirates",
+      "latitude": 25.2528000,
+      "longitude": 55.3644000,
+      "elevation": 10,
+      "category": "4F",
+      "runways": [
+        { "name": "12L/30R", "length": 12000, "surface": "Concrete", "category": "Heavy" },
+        { "name": "12R/30L", "length": 12000, "surface": "Concrete", "category": "Heavy" },
+        { "name": "14/32", "length": 10000, "surface": "Concrete", "category": "Heavy" }
+      ],
+      "frequencies": [
+        { "type": "ATIS", "frequency": 126.0 },
+        { "type": "Tower", "frequency": 118.2 },
+        { "type": "Ground", "frequency": 121.75 }
+      ]
+    },
+    {
+      "iata": "CGK",
+      "icao": "WIII",
+      "name": "Soekarno-Hatta International Airport",
+      "city": "Jakarta",
+      "country": "Indonesia",
+      "latitude": -6.1250000,
+      "longitude": 106.6500000,
+      "elevation": 10,
+      "category": "4F",
+      "runways": [
+        { "name": "07L/25R", "length": 12000, "surface": "Concrete", "category": "Heavy" },
+        { "name": "07R/25L", "length": 12000, "surface": "Concrete", "category": "Heavy" },
+        { "name": "09/27", "length": 10000, "surface": "Concrete", "category": "Heavy" }
+      ],
+      "frequencies": [
+        { "type": "ATIS", "frequency": 126.0 },
+        { "type": "Tower", "frequency": 118.2 },
+        { "type": "Ground", "frequency": 121.75 }
+      ]
+    },
+    {
+      "iata": "NRT",
+      "icao": "RJAA",
+      "name": "Narita International Airport",
+      "city": "Tokyo",
+      "country": "Japan",
+      "latitude": 35.7647018,
+      "longitude": 140.3860016,
+      "elevation": 63,
+      "category": "4F",
+      "runways": [
+        { "name": "16L/34R", "length": 12000, "surface": "Concrete", "category": "Heavy" },
+        { "name": "16R/34L", "length": 12000, "surface": "Concrete", "category": "Heavy" },
+        { "name": "05/23", "length": 10000, "surface": "Concrete", "category": "Heavy" }
+      ],
+      "frequencies": [
+        { "type": "ATIS", "frequency": 126.0 },
+        { "type": "Tower", "frequency": 118.2 },
+        { "type": "Ground", "frequency": 121.75 }
+      ]
+    },
+    {
+      "iata": "SZX",
+      "icao": "ZGSZ",
+      "name": "Shenzhen Bao'an International Airport",
+      "city": "Shenzhen",
+      "country": "China",
+      "latitude": 22.6399994,
+      "longitude": 113.8100052,
+      "elevation": 16,
+      "category": "4F",
+      "runways": [
+        { "name": "15L/33R", "length": 12000, "surface": "Concrete", "category": "Heavy" },
+        { "name": "15R/33L", "length": 12000, "surface": "Concrete", "category": "Heavy" },
+        { "name": "01/19", "length": 10000, "surface": "Concrete", "category": "Heavy" }
+      ],
+      "frequencies": [
+        { "type": "ATIS", "frequency": 126.0 },
+        { "type": "Tower", "frequency": 118.2 },
+        { "type": "Ground", "frequency": 121.75 }
+      ]
+    },
+    {
+      "iata": "CTU",
+      "icao": "ZUUU",
+      "name": "Chengdu Shuangliu International Airport",
+      "city": "Chengdu",
+      "country": "China",
+      "latitude": 30.5705002,
+      "longitude": 103.9449997,
+      "elevation": 1887,
+      "category": "4F",
+      "runways": [
+        { "name": "02L/20R", "length": 12000, "surface": "Concrete", "category": "Heavy" },
+        { "name": "02R/20L", "length": 12000, "surface": "Concrete", "category": "Heavy" }
+      ],
+      "frequencies": [
+        { "type": "ATIS", "frequency": 126.0 },
+        { "type": "Tower", "frequency": 118.2 },
+        { "type": "Ground", "frequency": 121.75 }
+      ]
+    },
+    {
+      "iata": "WUH",
+      "icao": "ZHHH",
+      "name": "Wuhan Tianhe International Airport",
+      "city": "Wuhan",
+      "country": "China",
+      "latitude": 30.7447004,
+      "longitude": 114.2870026,
+      "elevation": 118,
+      "category": "4F",
+      "runways": [
+        { "name": "04L/22R", "length": 12000, "surface": "Concrete", "category": "Heavy" },
+        { "name": "04R/22L", "length": 12000, "surface": "Concrete", "category": "Heavy" }
+      ],
+      "frequencies": [
+        { "type": "ATIS", "frequency": 126.0 },
+        { "type": "Tower", "frequency": 118.2 },
+        { "type": "Ground", "frequency": 121.75 }
+      ]
+    },
+    {
+      "iata": "XIY",
+      "icao": "ZLXY",
+      "name": "Xi'an Xianyang International Airport",
+      "city": "Xi'an",
+      "country": "China",
+      "latitude": 34.3461001,
+      "longitude": 108.7479935,
+      "elevation": 1024,
+      "category": "4F",
+      "runways": [
+        { "name": "05L/23R", "length": 12000, "surface": "Concrete", "category": "Heavy" },
+        { "name": "05R/23L", "length": 12000, "surface": "Concrete", "category": "Heavy" },
+        { "name": "12/30", "length": 10000, "surface": "Concrete", "category": "Heavy" }
+      ],
+      "frequencies": [
+        { "type": "ATIS", "frequency": 126.0 },
+        { "type": "Tower", "frequency": 118.2 },
+        { "type": "Ground", "frequency": 121.75 }
+      ]
+    },
+    {
+      "iata": "CGO",
+      "icao": "ZHCC",
+      "name": "Zhengzhou Xinzheng International Airport",
+      "city": "Zhengzhou",
+      "country": "China",
+      "latitude": 34.5656996,
+      "longitude": 113.8009949,
+      "elevation": 496,
+      "category": "4F",
+      "runways": [
+        { "name": "09L/27R", "length": 12000, "surface": "Concrete", "category": "Heavy" },
+        { "name": "09R/27L", "length": 12000, "surface": "Concrete", "category": "Heavy" }
+      ],
+      "frequencies": [
+        { "type": "ATIS", "frequency": 126.0 },
+        { "type": "Tower", "frequency": 118.2 },
+        { "type": "Ground", "frequency": 121.75 }
+      ]
+    },
+    {
+      "iata": "HGH",
+      "icao": "ZSHC",
+      "name": "Hangzhou Xiaoshan International Airport",
+      "city": "Hangzhou",
+      "country": "China",
+      "latitude": 30.2280998,
+      "longitude": 120.3930054,
+      "elevation": 33,
+      "category": "4F",
+      "runways": [
+        { "name": "07L/25R", "length": 12000, "surface": "Concrete", "category": "Heavy" },
+        { "name": "07R/25L", "length": 12000, "surface": "Concrete", "category": "Heavy" },
+        { "name": "19/01", "length": 10000, "surface": "Concrete", "category": "Heavy" }
+      ],
+      "frequencies": [
+        { "type": "ATIS", "frequency": 126.0 },
+        { "type": "Tower", "frequency": 118.2 },
+        { "type": "Ground", "frequency": 121.75 }
+      ]
+    },
+    {
+      "iata": "TSN",
+      "icao": "ZBTJ",
+      "name": "Tianjin Binhai International Airport",
+      "city": "Tianjin",
+      "country": "China",
+      "latitude": 39.1300011,
+      "longitude": 117.3600006,
+      "elevation": 10,
+      "category": "4F",
+      "runways": [
+        { "name": "02L/20R", "length": 12000, "surface": "Concrete", "category": "Heavy" },
+        { "name": "02R/20L", "length": 12000, "surface": "Concrete", "category": "Heavy" }
+      ],
+      "frequencies": [
+        { "type": "ATIS", "frequency": 126.0 },
+        { "type": "Tower", "frequency": 118.2 },
+        { "type": "Ground", "frequency": 121.75 }
+      ]
+    },
+    {
+      "iata": "CKG",
+      "icao": "ZUCK",
+      "name": "Chongqing Jiangbei International Airport",
+      "city": "Chongqing",
+      "country": "China",
+      "latitude": 29.7177000,
+      "longitude": 106.6439972,
+      "elevation": 1200,
+      "category": "4F",
+      "runways": [
+        { "name": "02L/20R", "length": 12000, "surface": "Concrete", "category": "Heavy" },
+        { "name": "02R/20L", "length": 12000, "surface": "Concrete", "category": "Heavy" },
+        { "name": "15/33", "length": 10000, "surface": "Concrete", "category": "Heavy" }
+      ],
+      "frequencies": [
+        { "type": "ATIS", "frequency": 126.0 },
+        { "type": "Tower", "frequency": 118.2 },
+        { "type": "Ground", "frequency": 121.75 }
+      ]
+    },
+    {
+      "iata": "NKG",
+      "icao": "ZSNJ",
+      "name": "Nanjing Lukou International Airport",
+      "city": "Nanjing",
+      "country": "China",
+      "latitude": 31.9408005,
+      "longitude": 118.7879944,
+      "elevation": 300,
+      "category": "4F",
+      "runways": [
+        { "name": "07L/25R", "length": 12000, "surface": "Concrete", "category": "Heavy" },
+        { "name": "07R/25L", "length": 12000, "surface": "Concrete", "category": "Heavy" }
+      ],
+      "frequencies": [
+        { "type": "ATIS", "frequency": 126.0 },
+        { "type": "Tower", "frequency": 118.2 },
+        { "type": "Ground", "frequency": 121.75 }
+      ]
     }
   ]
 }

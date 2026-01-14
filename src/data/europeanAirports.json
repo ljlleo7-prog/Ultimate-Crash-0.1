@@ -7,17 +7,36 @@
       "city": "London",
       "country": "United Kingdom",
       "latitude": 51.4706001,
-      "longitude": -0.4619410,
+      "longitude": -0.461941,
       "elevation": 83,
       "category": "4F",
       "runways": [
-        { "name": "09L/27R", "length": 12799, "surface": "Asphalt", "category": "Heavy" },
-        { "name": "09R/27L", "length": 12799, "surface": "Asphalt", "category": "Heavy" }
+        {
+          "name": "09L/27R",
+          "length": 12799,
+          "surface": "Asphalt",
+          "category": "Heavy"
+        },
+        {
+          "name": "09R/27L",
+          "length": 12799,
+          "surface": "Asphalt",
+          "category": "Heavy"
+        }
       ],
       "frequencies": [
-        { "type": "ATIS", "frequency": 126.25 },
-        { "type": "Tower", "frequency": 118.2 },
-        { "type": "Ground", "frequency": 121.75 }
+        {
+          "type": "ATIS",
+          "frequency": 126.25
+        },
+        {
+          "type": "Tower",
+          "frequency": 118.2
+        },
+        {
+          "type": "Ground",
+          "frequency": 121.75
+        }
       ]
     },
     {
@@ -27,41 +46,54 @@
       "city": "Paris",
       "country": "France",
       "latitude": 49.0096998,
-      "longitude": 2.5477990,
+      "longitude": 2.547799,
       "elevation": 394,
       "category": "4F",
       "runways": [
-        { "name": "08L/26R", "length": 12009, "surface": "Concrete", "category": "Heavy" },
-        { "name": "08R/26L", "length": 12009, "surface": "Concrete", "category": "Heavy" },
-        { "name": "09L/27R", "length": 11811, "surface": "Concrete", "category": "Heavy" },
-        { "name": "09R/27L", "length": 11811, "surface": "Concrete", "category": "Heavy" }
+        {
+          "name": "08L/26R",
+          "length": 12009,
+          "surface": "Concrete",
+          "category": "Heavy"
+        },
+        {
+          "name": "08R/26L",
+          "length": 12009,
+          "surface": "Concrete",
+          "category": "Heavy"
+        },
+        {
+          "name": "09L/27R",
+          "length": 11811,
+          "surface": "Concrete",
+          "category": "Heavy"
+        },
+        {
+          "name": "09R/27L",
+          "length": 11811,
+          "surface": "Concrete",
+          "category": "Heavy"
+        },
+        {
+          "name": "10/28",
+          "length": 9843,
+          "surface": "Concrete",
+          "category": "Heavy"
+        }
       ],
       "frequencies": [
-        { "type": "ATIS", "frequency": 126.05 },
-        { "type": "Tower", "frequency": 118.2 },
-        { "type": "Ground", "frequency": 121.75 }
-      ]
-    },
-    {
-      "iata": "AMS",
-      "icao": "EHAM",
-      "name": "Amsterdam Airport Schiphol",
-      "city": "Amsterdam",
-      "country": "Netherlands",
-      "latitude": 52.3086014,
-      "longitude": 4.7638890,
-      "elevation": -11,
-      "category": "4F",
-      "runways": [
-        { "name": "06/24", "length": 11483, "surface": "Concrete", "category": "Heavy" },
-        { "name": "18C/36C", "length": 12000, "surface": "Concrete", "category": "Heavy" },
-        { "name": "18R/36L", "length": 12000, "surface": "Concrete", "category": "Heavy" },
-        { "name": "18L/36R", "length": 12000, "surface": "Concrete", "category": "Heavy" }
-      ],
-      "frequencies": [
-        { "type": "ATIS", "frequency": 126.0 },
-        { "type": "Tower", "frequency": 118.2 },
-        { "type": "Ground", "frequency": 121.75 }
+        {
+          "type": "ATIS",
+          "frequency": 126.05
+        },
+        {
+          "type": "Tower",
+          "frequency": 118.2
+        },
+        {
+          "type": "Ground",
+          "frequency": 121.75
+        }
       ]
     },
     {
@@ -71,19 +103,678 @@
       "city": "Frankfurt",
       "country": "Germany",
       "latitude": 50.0331001,
-      "longitude": 8.5705500,
+      "longitude": 8.57055,
       "elevation": 364,
       "category": "4F",
       "runways": [
-        { "name": "07L/25R", "length": 12000, "surface": "Concrete", "category": "Heavy" },
-        { "name": "07R/25L", "length": 12000, "surface": "Concrete", "category": "Heavy" },
-        { "name": "18L/36R", "length": 12000, "surface": "Concrete", "category": "Heavy" },
-        { "name": "18R/36L", "length": 12000, "surface": "Concrete", "category": "Heavy" }
+        {
+          "name": "07L/25R",
+          "length": 12000,
+          "surface": "Concrete",
+          "category": "Heavy"
+        },
+        {
+          "name": "07R/25L",
+          "length": 12000,
+          "surface": "Concrete",
+          "category": "Heavy"
+        },
+        {
+          "name": "18L/36R",
+          "length": 12000,
+          "surface": "Concrete",
+          "category": "Heavy"
+        },
+        {
+          "name": "18R/36L",
+          "length": 12000,
+          "surface": "Concrete",
+          "category": "Heavy"
+        },
+        {
+          "name": "25C/07C",
+          "length": 12000,
+          "surface": "Concrete",
+          "category": "Heavy"
+        }
       ],
       "frequencies": [
-        { "type": "ATIS", "frequency": 126.0 },
-        { "type": "Tower", "frequency": 118.2 },
-        { "type": "Ground", "frequency": 121.75 }
+        {
+          "type": "ATIS",
+          "frequency": 126.0
+        },
+        {
+          "type": "Tower",
+          "frequency": 118.2
+        },
+        {
+          "type": "Ground",
+          "frequency": 121.75
+        }
+      ]
+    },
+    {
+      "iata": "MUC",
+      "icao": "EDDM",
+      "name": "Munich Airport",
+      "city": "Munich",
+      "country": "Germany",
+      "latitude": 48.3538,
+      "longitude": 11.7861,
+      "elevation": 449,
+      "category": "4F",
+      "runways": [
+        {
+          "name": "08L/26R",
+          "length": 12000,
+          "surface": "Concrete",
+          "category": "Heavy"
+        },
+        {
+          "name": "08R/26L",
+          "length": 12000,
+          "surface": "Concrete",
+          "category": "Heavy"
+        },
+        {
+          "name": "09/27",
+          "length": 9843,
+          "surface": "Concrete",
+          "category": "Heavy"
+        }
+      ],
+      "frequencies": [
+        {
+          "type": "ATIS",
+          "frequency": 126.0
+        },
+        {
+          "type": "Tower",
+          "frequency": 118.2
+        },
+        {
+          "type": "Ground",
+          "frequency": 121.75
+        }
+      ]
+    },
+    {
+      "iata": "ZRH",
+      "icao": "LSZH",
+      "name": "Zurich Airport",
+      "city": "Zurich",
+      "country": "Switzerland",
+      "latitude": 47.4647,
+      "longitude": 8.54917,
+      "elevation": 1416,
+      "category": "4F",
+      "runways": [
+        {
+          "name": "10/28",
+          "length": 12000,
+          "surface": "Asphalt",
+          "category": "Heavy"
+        },
+        {
+          "name": "16/34",
+          "length": 9843,
+          "surface": "Asphalt",
+          "category": "Heavy"
+        }
+      ],
+      "frequencies": [
+        {
+          "type": "ATIS",
+          "frequency": 126.0
+        },
+        {
+          "type": "Tower",
+          "frequency": 118.2
+        },
+        {
+          "type": "Ground",
+          "frequency": 121.75
+        }
+      ]
+    },
+    {
+      "iata": "FCO",
+      "icao": "LIRF",
+      "name": "Leonardo da Vinci-Fiumicino Airport",
+      "city": "Rome",
+      "country": "Italy",
+      "latitude": 41.7999,
+      "longitude": 12.2516,
+      "elevation": 16,
+      "category": "4F",
+      "runways": [
+        {
+          "name": "05L/23R",
+          "length": 12000,
+          "surface": "Asphalt",
+          "category": "Heavy"
+        },
+        {
+          "name": "05R/23L",
+          "length": 12000,
+          "surface": "Asphalt",
+          "category": "Heavy"
+        },
+        {
+          "name": "16L/34R",
+          "length": 9843,
+          "surface": "Asphalt",
+          "category": "Heavy"
+        },
+        {
+          "name": "16R/34L",
+          "length": 9843,
+          "surface": "Asphalt",
+          "category": "Heavy"
+        }
+      ],
+      "frequencies": [
+        {
+          "type": "ATIS",
+          "frequency": 126.0
+        },
+        {
+          "type": "Tower",
+          "frequency": 118.2
+        },
+        {
+          "type": "Ground",
+          "frequency": 121.75
+        }
+      ]
+    },
+    {
+      "iata": "BCN",
+      "icao": "LEBL",
+      "name": "Barcelona-El Prat Airport",
+      "city": "Barcelona",
+      "country": "Spain",
+      "latitude": 41.2974,
+      "longitude": 2.0781,
+      "elevation": 10,
+      "category": "4F",
+      "runways": [
+        {
+          "name": "07L/25R",
+          "length": 12000,
+          "surface": "Asphalt",
+          "category": "Heavy"
+        },
+        {
+          "name": "07R/25L",
+          "length": 12000,
+          "surface": "Asphalt",
+          "category": "Heavy"
+        },
+        {
+          "name": "09/27",
+          "length": 9843,
+          "surface": "Asphalt",
+          "category": "Heavy"
+        }
+      ],
+      "frequencies": [
+        {
+          "type": "ATIS",
+          "frequency": 126.0
+        },
+        {
+          "type": "Tower",
+          "frequency": 118.2
+        },
+        {
+          "type": "Ground",
+          "frequency": 121.75
+        }
+      ]
+    },
+    {
+      "iata": "MAD",
+      "icao": "LEMD",
+      "name": "Adolfo Su\u00e1rez Madrid\u2013Barajas Airport",
+      "city": "Madrid",
+      "country": "Spain",
+      "latitude": 40.4722,
+      "longitude": -3.56194,
+      "elevation": 2195,
+      "category": "4F",
+      "runways": [
+        {
+          "name": "18L/36R",
+          "length": 12000,
+          "surface": "Asphalt",
+          "category": "Heavy"
+        },
+        {
+          "name": "18R/36L",
+          "length": 12000,
+          "surface": "Asphalt",
+          "category": "Heavy"
+        },
+        {
+          "name": "14L/32R",
+          "length": 12000,
+          "surface": "Asphalt",
+          "category": "Heavy"
+        },
+        {
+          "name": "14R/32L",
+          "length": 12000,
+          "surface": "Asphalt",
+          "category": "Heavy"
+        }
+      ],
+      "frequencies": [
+        {
+          "type": "ATIS",
+          "frequency": 126.0
+        },
+        {
+          "type": "Tower",
+          "frequency": 118.2
+        },
+        {
+          "type": "Ground",
+          "frequency": 121.75
+        }
+      ]
+    },
+    {
+      "iata": "IST",
+      "icao": "LTFM",
+      "name": "Istanbul Airport",
+      "city": "Istanbul",
+      "country": "Turkiye",
+      "latitude": 41.2667,
+      "longitude": 28.75,
+      "elevation": 100,
+      "category": "4F",
+      "runways": [
+        {
+          "name": "05L/23R",
+          "length": 12000,
+          "surface": "Concrete",
+          "category": "Heavy"
+        },
+        {
+          "name": "05R/23L",
+          "length": 12000,
+          "surface": "Concrete",
+          "category": "Heavy"
+        },
+        {
+          "name": "16L/34R",
+          "length": 12000,
+          "surface": "Concrete",
+          "category": "Heavy"
+        },
+        {
+          "name": "16R/34L",
+          "length": 12000,
+          "surface": "Concrete",
+          "category": "Heavy"
+        }
+      ],
+      "frequencies": [
+        {
+          "type": "ATIS",
+          "frequency": 126.0
+        },
+        {
+          "type": "Tower",
+          "frequency": 118.2
+        },
+        {
+          "type": "Ground",
+          "frequency": 121.75
+        }
+      ]
+    },
+    {
+      "iata": "DUB",
+      "icao": "EIDW",
+      "name": "Dublin Airport",
+      "city": "Dublin",
+      "country": "Ireland",
+      "latitude": 53.4213,
+      "longitude": -6.27007,
+      "elevation": 249,
+      "category": "4E",
+      "runways": [
+        {
+          "name": "10/28",
+          "length": 10000,
+          "surface": "Asphalt",
+          "category": "Heavy"
+        },
+        {
+          "name": "16/34",
+          "length": 10000,
+          "surface": "Asphalt",
+          "category": "Heavy"
+        }
+      ],
+      "frequencies": [
+        {
+          "type": "ATIS",
+          "frequency": 126.0
+        },
+        {
+          "type": "Tower",
+          "frequency": 118.2
+        },
+        {
+          "type": "Ground",
+          "frequency": 121.75
+        }
+      ]
+    },
+    {
+      "iata": "CPH",
+      "icao": "EKCH",
+      "name": "Copenhagen Airport",
+      "city": "Copenhagen",
+      "country": "Denmark",
+      "latitude": 55.6181,
+      "longitude": 12.6561,
+      "elevation": 23,
+      "category": "4E",
+      "runways": [
+        {
+          "name": "04L/22R",
+          "length": 10000,
+          "surface": "Asphalt",
+          "category": "Heavy"
+        },
+        {
+          "name": "04R/22L",
+          "length": 10000,
+          "surface": "Asphalt",
+          "category": "Heavy"
+        },
+        {
+          "name": "09/27",
+          "length": 9843,
+          "surface": "Asphalt",
+          "category": "Heavy"
+        }
+      ],
+      "frequencies": [
+        {
+          "type": "ATIS",
+          "frequency": 126.0
+        },
+        {
+          "type": "Tower",
+          "frequency": 118.2
+        },
+        {
+          "type": "Ground",
+          "frequency": 121.75
+        }
+      ]
+    },
+    {
+      "iata": "ARN",
+      "icao": "ESSA",
+      "name": "Stockholm Arlanda Airport",
+      "city": "Stockholm",
+      "country": "Sweden",
+      "latitude": 59.6519,
+      "longitude": 17.9186,
+      "elevation": 98,
+      "category": "4E",
+      "runways": [
+        {
+          "name": "01L/19R",
+          "length": 10000,
+          "surface": "Asphalt",
+          "category": "Heavy"
+        },
+        {
+          "name": "01R/19L",
+          "length": 10000,
+          "surface": "Asphalt",
+          "category": "Heavy"
+        },
+        {
+          "name": "08/26",
+          "length": 9843,
+          "surface": "Asphalt",
+          "category": "Heavy"
+        }
+      ],
+      "frequencies": [
+        {
+          "type": "ATIS",
+          "frequency": 126.0
+        },
+        {
+          "type": "Tower",
+          "frequency": 118.2
+        },
+        {
+          "type": "Ground",
+          "frequency": 121.75
+        }
+      ]
+    },
+    {
+      "iata": "OSL",
+      "icao": "ENGM",
+      "name": "Oslo Gardermoen Airport",
+      "city": "Oslo",
+      "country": "Norway",
+      "latitude": 60.1939,
+      "longitude": 11.07,
+      "elevation": 200,
+      "category": "4E",
+      "runways": [
+        {
+          "name": "01L/19R",
+          "length": 10000,
+          "surface": "Asphalt",
+          "category": "Heavy"
+        },
+        {
+          "name": "01R/19L",
+          "length": 10000,
+          "surface": "Asphalt",
+          "category": "Heavy"
+        }
+      ],
+      "frequencies": [
+        {
+          "type": "ATIS",
+          "frequency": 126.0
+        },
+        {
+          "type": "Tower",
+          "frequency": 118.2
+        },
+        {
+          "type": "Ground",
+          "frequency": 121.75
+        }
+      ]
+    },
+    {
+      "iata": "PRG",
+      "icao": "LKPR",
+      "name": "V\u00e1clav Havel Airport Prague",
+      "city": "Prague",
+      "country": "Czech Republic",
+      "latitude": 50.1009,
+      "longitude": 14.26,
+      "elevation": 1200,
+      "category": "4E",
+      "runways": [
+        {
+          "name": "06/24",
+          "length": 10000,
+          "surface": "Asphalt",
+          "category": "Heavy"
+        },
+        {
+          "name": "12/30",
+          "length": 9843,
+          "surface": "Asphalt",
+          "category": "Heavy"
+        }
+      ],
+      "frequencies": [
+        {
+          "type": "ATIS",
+          "frequency": 126.0
+        },
+        {
+          "type": "Tower",
+          "frequency": 118.2
+        },
+        {
+          "type": "Ground",
+          "frequency": 121.75
+        }
+      ]
+    },
+    {
+      "iata": "AMS",
+      "icao": "EHAM",
+      "name": "Amsterdam Airport Schiphol",
+      "city": "Amsterdam",
+      "country": "Netherlands",
+      "latitude": 52.3086014,
+      "longitude": 4.763889,
+      "elevation": -11,
+      "category": "4F",
+      "runways": [
+        {
+          "name": "06/24",
+          "length": 11483,
+          "surface": "Concrete",
+          "category": "Heavy"
+        },
+        {
+          "name": "18C/36C",
+          "length": 12000,
+          "surface": "Concrete",
+          "category": "Heavy"
+        },
+        {
+          "name": "18R/36L",
+          "length": 12000,
+          "surface": "Concrete",
+          "category": "Heavy"
+        },
+        {
+          "name": "18L/36R",
+          "length": 12000,
+          "surface": "Concrete",
+          "category": "Heavy"
+        }
+      ],
+      "frequencies": [
+        {
+          "type": "ATIS",
+          "frequency": 126.0
+        },
+        {
+          "type": "Tower",
+          "frequency": 118.2
+        },
+        {
+          "type": "Ground",
+          "frequency": 121.75
+        }
+      ]
+    },
+    {
+      "iata": "MXP",
+      "icao": "LIMC",
+      "name": "Milan Malpensa Airport",
+      "city": "Milan",
+      "country": "Italy",
+      "latitude": 45.6397,
+      "longitude": 8.72167,
+      "elevation": 83,
+      "category": "4F",
+      "runways": [
+        {
+          "name": "17L/35R",
+          "length": 12000,
+          "surface": "Asphalt",
+          "category": "Heavy"
+        },
+        {
+          "name": "17R/35L",
+          "length": 12000,
+          "surface": "Asphalt",
+          "category": "Heavy"
+        },
+        {
+          "name": "01/19",
+          "length": 9843,
+          "surface": "Asphalt",
+          "category": "Heavy"
+        }
+      ],
+      "frequencies": [
+        {
+          "type": "ATIS",
+          "frequency": 126.0
+        },
+        {
+          "type": "Tower",
+          "frequency": 118.2
+        },
+        {
+          "type": "Ground",
+          "frequency": 121.75
+        }
+      ]
+    },
+    {
+      "iata": "LIS",
+      "icao": "LPPT",
+      "name": "Lisbon Portela Airport",
+      "city": "Lisbon",
+      "country": "Portugal",
+      "latitude": 38.7756,
+      "longitude": -9.135,
+      "elevation": 23,
+      "category": "4F",
+      "runways": [
+        {
+          "name": "03/21",
+          "length": 10000,
+          "surface": "Asphalt",
+          "category": "Heavy"
+        },
+        {
+          "name": "17/35",
+          "length": 10000,
+          "surface": "Asphalt",
+          "category": "Heavy"
+        }
+      ],
+      "frequencies": [
+        {
+          "type": "ATIS",
+          "frequency": 126.0
+        },
+        {
+          "type": "Tower",
+          "frequency": 118.2
+        },
+        {
+          "type": "Ground",
+          "frequency": 121.75
+        }
       ]
     }
   ]

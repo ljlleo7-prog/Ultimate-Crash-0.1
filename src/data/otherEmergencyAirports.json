@@ -1,0 +1,981 @@
+[
+  {
+    "iata": "AAN",
+    "icao": "OMAL",
+    "name": "Al Ain Airport",
+    "city": "Al Ain",
+    "country": "United Arab Emirates"
+  },
+  {
+    "iata": "ABJ",
+    "icao": "DIAP",
+    "name": "Felix Houphouet Boigny Airport",
+    "city": "Abidjan",
+    "country": "Ivory Coast"
+  },
+  {
+    "iata": "ACC",
+    "icao": "KACC",
+    "name": "Kotoka International Airport",
+    "city": "Accra",
+    "country": "Ghana"
+  },
+  {
+    "iata": "ALA",
+    "icao": "UAAA",
+    "name": "Almaty International Airport",
+    "city": "Almaty",
+    "country": "Kazakhstan"
+  },
+  {
+    "iata": "ATH",
+    "icao": "LGAV",
+    "name": "Athens International Airport",
+    "city": "Athens",
+    "country": "Greece"
+  },
+  {
+    "iata": "BAH",
+    "icao": "OBBI",
+    "name": "Bahrain International Airport",
+    "city": "Manama",
+    "country": "Bahrain"
+  },
+  {
+    "iata": "BEL",
+    "icao": "SBEG",
+    "name": "Eduardo Gomes International Airport",
+    "city": "Manaus",
+    "country": "Brazil"
+  },
+  {
+    "iata": "BEN",
+    "icao": "HLLB",
+    "name": "Benina Airport",
+    "city": "Benghazi",
+    "country": "Libya"
+  },
+  {
+    "iata": "BEY",
+    "icao": "OLBA",
+    "name": "Beirut-Rafic Hariri International Airport",
+    "city": "Beirut",
+    "country": "Lebanon"
+  },
+  {
+    "iata": "BJL",
+    "icao": "GBYD",
+    "name": "Banjul International Airport",
+    "city": "Banjul",
+    "country": "Gambia"
+  },
+  {
+    "iata": "BME",
+    "icao": "YBRM",
+    "name": "Broome Airport",
+    "city": "Broome",
+    "country": "Australia"
+  },
+  {
+    "iata": "BSB",
+    "icao": "SBBR",
+    "name": "Presidente Juscelino Kubitschek Airport",
+    "city": "Bras\u00edlia",
+    "country": "Brazil"
+  },
+  {
+    "iata": "BSR",
+    "icao": "ORBI",
+    "name": "Basra International Airport",
+    "city": "Basra",
+    "country": "Iraq"
+  },
+  {
+    "iata": "BSS",
+    "icao": "GABS",
+    "name": " Osvaldo Vieira International Airport",
+    "city": "Bissau",
+    "country": "Guinea-Bissau"
+  },
+  {
+    "iata": "CCS",
+    "icao": "SVMI",
+    "name": "Sim\u00f3n Bol\u00edvar International Airport",
+    "city": "Caracas",
+    "country": "Venezuela"
+  },
+  {
+    "iata": "CLJ",
+    "icao": "LRCL",
+    "name": "Cluj Avram Iancu Airport",
+    "city": "Cluj-Napoca",
+    "country": "Romania"
+  },
+  {
+    "iata": "CMB",
+    "icao": "VCBI",
+    "name": "Bandaranaike International Airport",
+    "city": "Colombo",
+    "country": "Sri Lanka"
+  },
+  {
+    "iata": "CNF",
+    "icao": "SBCF",
+    "name": "Tancredo Neves International Airport",
+    "city": "Belo Horizonte",
+    "country": "Brazil"
+  },
+  {
+    "iata": "CNS",
+    "icao": "YBCS",
+    "name": "Cairns Airport",
+    "city": "Cairns",
+    "country": "Australia"
+  },
+  {
+    "iata": "COK",
+    "icao": "VOCI",
+    "name": "Cochin International Airport",
+    "city": "Kochi",
+    "country": "India"
+  },
+  {
+    "iata": "CPT",
+    "icao": "FACT",
+    "name": "Cape Town International Airport",
+    "city": "Cape Town",
+    "country": "South Africa"
+  },
+  {
+    "iata": "CUR",
+    "icao": "TNCC",
+    "name": "Hato International Airport",
+    "city": "Willemstad",
+    "country": "Cura\u00e7ao"
+  },
+  {
+    "iata": "CWB",
+    "icao": "SBCT",
+    "name": "Afonso Pena Airport",
+    "city": "Curitiba",
+    "country": "Brazil"
+  },
+  {
+    "iata": "DAR",
+    "icao": "HTDA",
+    "name": "Julius Nyerere International Airport",
+    "city": "Dar es Salaam",
+    "country": "Tanzania"
+  },
+  {
+    "iata": "EVN",
+    "icao": "UDYZ",
+    "name": "Zvartnots International Airport",
+    "city": "Yerevan",
+    "country": "Armenia"
+  },
+  {
+    "iata": "FAMN",
+    "icao": "FAMN",
+    "name": "Matsapha Airport",
+    "latitude": -26.5294,
+    "longitude": 31.3069,
+    "category": "4B",
+    "runway": "09/27",
+    "runwayLength": 6800
+  },
+  {
+    "iata": "FDF",
+    "icao": "TFFF",
+    "name": "Aim\u00e9 C\u00e9saire Airport",
+    "city": "Fort-de-France",
+    "country": "Martinique"
+  },
+  {
+    "iata": "FLN",
+    "icao": "SBFL",
+    "name": "Herc\u00edlio Luz International Airport",
+    "city": "Florian\u00f3polis",
+    "country": "Brazil"
+  },
+  {
+    "iata": "FNA",
+    "icao": "FAAA",
+    "name": "Lungi International Airport",
+    "city": "Freetown",
+    "country": "Sierra Leone"
+  },
+  {
+    "iata": "FPO",
+    "icao": "MYGF",
+    "name": "Grand Bahama Airport",
+    "city": "Freeport",
+    "country": "Bahamas"
+  },
+  {
+    "iata": "GIG",
+    "icao": "SBGL",
+    "name": "Tom Jobim Airport",
+    "city": "Rio de Janeiro",
+    "country": "Brazil"
+  },
+  {
+    "iata": "GRJ",
+    "icao": "FAGG",
+    "name": "George Airport",
+    "city": "George",
+    "country": "South Africa"
+  },
+  {
+    "iata": "HLA",
+    "icao": "FALA",
+    "name": "Lanseria Airport",
+    "city": "Johannesburg",
+    "country": "South Africa"
+  },
+  {
+    "iata": "HRG",
+    "icao": "HEGN",
+    "name": "Hurghada International Airport",
+    "city": "Hurghada",
+    "country": "Egypt"
+  },
+  {
+    "iata": "IKA",
+    "icao": "OIII",
+    "name": "Imam Khomeini International Airport",
+    "city": "Tehran",
+    "country": "Iran"
+  },
+  {
+    "iata": "JNB",
+    "icao": "FAOR",
+    "name": "O.R. Tambo International Airport",
+    "city": "Johannesburg",
+    "country": "South Africa"
+  },
+  {
+    "iata": "KJA",
+    "icao": "UNKL",
+    "name": "Krasnoyarsk International Airport",
+    "city": "Krasnoyarsk",
+    "country": "Russia"
+  },
+  {
+    "iata": "KMG",
+    "icao": "ZPPP",
+    "name": "Kunming Changshui International Airport",
+    "city": "Kunming",
+    "country": "China"
+  },
+  {
+    "iata": "KRT",
+    "icao": "HSNN",
+    "name": "Khartoum International Airport",
+    "city": "Khartoum",
+    "country": "Sudan"
+  },
+  {
+    "iata": "LBV",
+    "icao": "FOOO",
+    "name": "Libreville Leon M'ba Airport",
+    "city": "Libreville",
+    "country": "Gabon"
+  },
+  {
+    "iata": "LIM",
+    "icao": "SPIM",
+    "name": "Jorge Chavez International Airport",
+    "city": "Lima",
+    "country": "Peru"
+  },
+  {
+    "iata": "LXR",
+    "icao": "HELX",
+    "name": "Luxor International Airport",
+    "city": "Luxor",
+    "country": "Egypt"
+  },
+  {
+    "iata": "MBA",
+    "icao": "HKMO",
+    "name": "Mombasa Airport",
+    "city": "Mombasa",
+    "country": "Kenya"
+  },
+  {
+    "iata": "MOS",
+    "icao": "ORBM",
+    "name": "Mosul Airport",
+    "city": "Mosul",
+    "country": "Iraq"
+  },
+  {
+    "iata": "MRU",
+    "icao": "FIMP",
+    "name": "Sir Seewoosagur Ramgoolam Airport",
+    "city": "Port Louis",
+    "country": "Mauritius"
+  },
+  {
+    "iata": "MSQ",
+    "icao": "UMMS",
+    "name": "Minsk National Airport",
+    "city": "Minsk",
+    "country": "Belarus"
+  },
+  {
+    "iata": "NBO",
+    "icao": "HKJK",
+    "name": "Jomo Kenyatta International Airport",
+    "city": "Nairobi",
+    "country": "Kenya"
+  },
+  {
+    "iata": "NIM",
+    "icao": "DRRN",
+    "name": "Diori Hamani International Airport",
+    "city": "Niamey",
+    "country": "Niger"
+  },
+  {
+    "iata": "NQZ",
+    "icao": "UACC",
+    "name": "Nursultan Nazarbayev Airport",
+    "city": "Nursultan",
+    "country": "Kazakhstan"
+  },
+  {
+    "iata": "PHE",
+    "icao": "YPPD",
+    "name": "Port Hedland Airport",
+    "city": "Port Hedland",
+    "country": "Australia"
+  },
+  {
+    "iata": "PKC",
+    "icao": "UHPP",
+    "name": "Petropavlovsk Airport",
+    "city": "Petropavlovsk-Kamchatsky",
+    "country": "Russia"
+  },
+  {
+    "iata": "POS",
+    "icao": "TTPP",
+    "name": "Piarco International Airport",
+    "city": "Port of Spain",
+    "country": "Trinidad and Tobago"
+  },
+  {
+    "iata": "PTY",
+    "icao": "MPTO",
+    "name": "Tocumen International Airport",
+    "city": "Panama City",
+    "country": "Panama"
+  },
+  {
+    "iata": "REC",
+    "icao": "SBRF",
+    "name": "Guararapes International Airport",
+    "city": "Recife",
+    "country": "Brazil"
+  },
+  {
+    "iata": "SABR",
+    "icao": "SBRB",
+    "name": "Pl\u00e1cido de Castro Airport",
+    "latitude": -9.8668,
+    "longitude": -67.7981,
+    "category": "4C",
+    "runway": "09/27",
+    "runwayLength": 8200
+  },
+  {
+    "iata": "SAEI",
+    "icao": "SAEI",
+    "name": "Recife International Airport",
+    "latitude": -8.1269,
+    "longitude": -34.9236,
+    "category": "4E",
+    "runway": "14/32",
+    "runwayLength": 8800
+  },
+  {
+    "iata": "SAMI",
+    "icao": "SAMI",
+    "name": "Mount Pleasant Airport",
+    "latitude": -51.8228,
+    "longitude": -58.4472,
+    "category": "4C",
+    "runway": "09/27",
+    "runwayLength": 7800
+  },
+  {
+    "iata": "SAMM",
+    "icao": "SAMM",
+    "name": "Mar del Plata Airport",
+    "latitude": -37.7447,
+    "longitude": -57.6291,
+    "category": "4C",
+    "runway": "09/27",
+    "runwayLength": 6800
+  },
+  {
+    "iata": "SANT",
+    "icao": "SANT",
+    "name": "Tucum\u00e1n Airport",
+    "latitude": -26.84,
+    "longitude": -65.0968,
+    "category": "4C",
+    "runway": "07/25",
+    "runwayLength": 8200
+  },
+  {
+    "iata": "SAVC",
+    "icao": "SAVC",
+    "name": "Comodoro Rivadavia Airport",
+    "latitude": -45.785,
+    "longitude": -67.4608,
+    "category": "4C",
+    "runway": "07/25",
+    "runwayLength": 8500
+  },
+  {
+    "iata": "SBAR",
+    "icao": "SBAR",
+    "name": "Santa Maria Airport",
+    "latitude": -10.1879,
+    "longitude": -48.2641,
+    "category": "4C",
+    "runway": "08/26",
+    "runwayLength": 7500
+  },
+  {
+    "iata": "SBCY",
+    "icao": "SBCY",
+    "name": "Cuiab\u00e1 Airport",
+    "latitude": -15.595,
+    "longitude": -56.1199,
+    "category": "4C",
+    "runway": "13/31",
+    "runwayLength": 8200
+  },
+  {
+    "iata": "SBFN",
+    "icao": "SBFN",
+    "name": "Fernando de Noronha Airport",
+    "latitude": -3.8546,
+    "longitude": -32.4233,
+    "category": "4B",
+    "runway": "14/32",
+    "runwayLength": 5800
+  },
+  {
+    "iata": "SBGO",
+    "icao": "SBBG",
+    "name": "Governador Valadares Airport",
+    "latitude": -18.8953,
+    "longitude": -41.9231,
+    "category": "4C",
+    "runway": "03/21",
+    "runwayLength": 6500
+  },
+  {
+    "iata": "SBJU",
+    "icao": "SBJU",
+    "name": "Campo Grande Airport",
+    "latitude": -20.4692,
+    "longitude": -54.6719,
+    "category": "4C",
+    "runway": "05/23",
+    "runwayLength": 7800
+  },
+  {
+    "iata": "SBMC",
+    "icao": "SBMO",
+    "name": "Macei\u00f3 Airport",
+    "latitude": -9.5107,
+    "longitude": -35.7917,
+    "category": "4C",
+    "runway": "17/35",
+    "runwayLength": 7200
+  },
+  {
+    "iata": "SBMQ",
+    "icao": "SBMQ",
+    "name": "Macap\u00e1 Airport",
+    "latitude": 0.0506,
+    "longitude": -51.0722,
+    "category": "4C",
+    "runway": "09/27",
+    "runwayLength": 7200
+  },
+  {
+    "iata": "SBPN",
+    "icao": "SBCN",
+    "name": "Campina Grande Airport",
+    "latitude": -7.2689,
+    "longitude": -35.8963,
+    "category": "4B",
+    "runway": "11/29",
+    "runwayLength": 6000
+  },
+  {
+    "iata": "SBUL",
+    "icao": "SBBU",
+    "name": "Uberl\u00e2ndia Airport",
+    "latitude": -18.8839,
+    "longitude": -48.2253,
+    "category": "4C",
+    "runway": "08/26",
+    "runwayLength": 7500
+  },
+  {
+    "iata": "SBVT",
+    "icao": "SBVT",
+    "name": "Vit\u00f3ria Airport",
+    "latitude": -20.2593,
+    "longitude": -40.286,
+    "category": "4C",
+    "runway": "05/23",
+    "runwayLength": 7800
+  },
+  {
+    "iata": "SSA",
+    "icao": "SBPS",
+    "name": "Deputado Lu\u00eds Eduardo Magalh\u00e3es Airport",
+    "city": "Salvador",
+    "country": "Brazil"
+  },
+  {
+    "iata": "SSH",
+    "icao": "HEAL",
+    "name": "Sharm El Sheikh Airport",
+    "city": "Sharm El Sheikh",
+    "country": "Egypt"
+  },
+  {
+    "iata": "SVO",
+    "icao": "UUEE",
+    "name": "Sheremetyevo International Airport",
+    "city": "Moscow",
+    "country": "Russia"
+  },
+  {
+    "iata": "TBS",
+    "icao": "UGTB",
+    "name": "Tbilisi International Airport",
+    "city": "Tbilisi",
+    "country": "Georgia"
+  },
+  {
+    "iata": "TIP",
+    "icao": "HLLT",
+    "name": "Tripoli International Airport",
+    "city": "Tripoli",
+    "country": "Libya"
+  },
+  {
+    "iata": "TLV",
+    "icao": "LLBG",
+    "name": "Ben Gurion Airport",
+    "city": "Tel Aviv",
+    "country": "Israel"
+  },
+  {
+    "iata": "TUN",
+    "icao": "DTTA",
+    "name": "Tunis Carthage International Airport",
+    "city": "Tunis",
+    "country": "Tunisia"
+  },
+  {
+    "iata": "TUPA",
+    "icao": "TUPA",
+    "name": "Tabuk Airport",
+    "latitude": 28.4194,
+    "longitude": 36.6178,
+    "category": "4B",
+    "runway": "07/25",
+    "runwayLength": 6500
+  },
+  {
+    "iata": "VCP",
+    "icao": "SBKP",
+    "name": "Viracopos Airport",
+    "city": "Campinas",
+    "country": "Brazil"
+  },
+  {
+    "iata": "WITT",
+    "icao": "WITT",
+    "name": "Sultan Iskandar Airport",
+    "latitude": 1.6419,
+    "longitude": 103.6694,
+    "category": "4C",
+    "runway": "15/33",
+    "runwayLength": 7800
+  },
+  {
+    "iata": "YBHI",
+    "icao": "YBHI",
+    "name": "Broken Hill Airport",
+    "latitude": -31.8296,
+    "longitude": 141.4699,
+    "category": "4C",
+    "runway": "07/25",
+    "runwayLength": 6500
+  },
+  {
+    "iata": "LOS",
+    "icao": "DNMM",
+    "name": "Murtala Muhammed International Airport",
+    "latitude": 6.577417,
+    "longitude": 3.321917,
+    "category": "4C",
+    "runway": "18R/36L",
+    "runwayLength": 12467,
+    "runwayCode": "18R/36L"
+  },
+  {
+    "iata": "QUO",
+    "icao": "DNSO",
+    "name": "Sam Mbakwe Airport",
+    "latitude": 5.427167,
+    "longitude": 6.948167,
+    "category": "4C",
+    "runway": "03/21",
+    "runwayLength": 9843,
+    "runwayCode": "03/21"
+  },
+  {
+    "iata": "ASW",
+    "icao": "HEAS",
+    "name": "Aswan International Airport",
+    "latitude": 23.963889,
+    "longitude": 32.819722,
+    "category": "4C",
+    "runway": "17/35",
+    "runwayLength": 10827,
+    "runwayCode": "17/35"
+  },
+  {
+    "iata": "ADD",
+    "icao": "HAAB",
+    "name": "Addis Ababa Bole International Airport",
+    "latitude": 9.003333,
+    "longitude": 38.799444,
+    "category": "4F",
+    "runway": "07L/25R",
+    "runwayLength": 12467,
+    "runwayCode": "07L/25R"
+  },
+  {
+    "iata": "DIR",
+    "icao": "HADR",
+    "name": "Aba Tenna Dejazmatch Yilma Airport",
+    "latitude": 9.624722,
+    "longitude": 41.854167,
+    "category": "4C",
+    "runway": "08/26",
+    "runwayLength": 8858,
+    "runwayCode": "08/26"
+  },
+  {
+    "iata": "JUB",
+    "icao": "HSSJ",
+    "name": "Juba International Airport",
+    "latitude": 4.872006,
+    "longitude": 31.601111,
+    "category": "4C",
+    "runway": "11/29",
+    "runwayLength": 11483,
+    "runwayCode": "11/29"
+  },
+  {
+    "iata": "JRO",
+    "icao": "HTJK",
+    "name": "Kilimanjaro International Airport",
+    "latitude": -3.429444,
+    "longitude": 37.074167,
+    "category": "4C",
+    "runway": "09/27",
+    "runwayLength": 12136,
+    "runwayCode": "09/27"
+  },
+  {
+    "iata": "ZNZ",
+    "icao": "HTZA",
+    "name": "Abeid Amani Karume International Airport",
+    "latitude": -6.221944,
+    "longitude": 39.224722,
+    "category": "4C",
+    "runway": "09/27",
+    "runwayLength": 8202,
+    "runwayCode": "09/27"
+  },
+  {
+    "iata": "TNR",
+    "icao": "FMMI",
+    "name": "Ivato International Airport",
+    "latitude": -18.766944,
+    "longitude": 47.478611,
+    "category": "4C",
+    "runway": "17/35",
+    "runwayLength": 10827,
+    "runwayCode": "17/35"
+  },
+  {
+    "iata": "RUN",
+    "icao": "FMEE",
+    "name": "Roland Garros Airport",
+    "latitude": -20.887139,
+    "longitude": 55.510139,
+    "category": "4C",
+    "runway": "12/30",
+    "runwayLength": 10827,
+    "runwayCode": "12/30"
+  },
+  {
+    "iata": "CMN",
+    "icao": "GMMN",
+    "name": "Mohammed V International Airport",
+    "latitude": 33.3675,
+    "longitude": -7.589861,
+    "category": "4F",
+    "runway": "01L/19R",
+    "runwayLength": 12467,
+    "runwayCode": "01L/19R"
+  },
+  {
+    "iata": "RAK",
+    "icao": "GMMX",
+    "name": "Marrakesh Menara Airport",
+    "latitude": 31.606944,
+    "longitude": -8.036667,
+    "category": "4C",
+    "runway": "10/28",
+    "runwayLength": 11483,
+    "runwayCode": "10/28"
+  },
+  {
+    "iata": "RBA",
+    "icao": "GMTT",
+    "name": "Sale Airport",
+    "latitude": 34.051111,
+    "longitude": -6.747778,
+    "category": "4C",
+    "runway": "04/22",
+    "runwayLength": 11155,
+    "runwayCode": "04/22"
+  },
+  {
+    "iata": "ALG",
+    "icao": "DAAG",
+    "name": "Houari Boumediene Airport",
+    "latitude": 36.691,
+    "longitude": 3.215444,
+    "category": "4C",
+    "runway": "05/23",
+    "runwayLength": 11155,
+    "runwayCode": "05/23"
+  },
+  {
+    "iata": "ORN",
+    "icao": "DAOO",
+    "name": "Oran Es Senia Airport",
+    "latitude": 35.623889,
+    "longitude": -0.621111,
+    "category": "4C",
+    "runway": "07/25",
+    "runwayLength": 10827,
+    "runwayCode": "07/25"
+  },
+  {
+    "iata": "LAD",
+    "icao": "FNLU",
+    "name": "Quatro de Fevereiro Airport",
+    "latitude": -8.858333,
+    "longitude": 13.231167,
+    "category": "4C",
+    "runway": "07/25",
+    "runwayLength": 12136,
+    "runwayCode": "07/25"
+  },
+  {
+    "iata": "MPM",
+    "icao": "FQMA",
+    "name": "Maputo International Airport",
+    "latitude": -25.920833,
+    "longitude": 32.5725,
+    "category": "4C",
+    "runway": "17/35",
+    "runwayLength": 11483,
+    "runwayCode": "17/35"
+  },
+  {
+    "iata": "HRE",
+    "icao": "FVHA",
+    "name": "Robert Gabriel Mugabe International Airport",
+    "latitude": -17.897222,
+    "longitude": 31.0925,
+    "category": "4C",
+    "runway": "05/23",
+    "runwayLength": 10827,
+    "runwayCode": "05/23"
+  },
+  {
+    "iata": "LVI",
+    "icao": "FLLS",
+    "name": "Harry Mwanga Nkumbula International Airport",
+    "latitude": -17.821778,
+    "longitude": 25.822667,
+    "category": "4C",
+    "runway": "10/28",
+    "runwayLength": 11483,
+    "runwayCode": "10/28"
+  },
+  {
+    "iata": "DSS",
+    "icao": "GOBD",
+    "name": "Blaise Diagne International Airport",
+    "latitude": 14.671389,
+    "longitude": -17.071667,
+    "category": "4F",
+    "runway": "01L/19R",
+    "runwayLength": 11483,
+    "runwayCode": "01L/19R"
+  },
+  {
+    "iata": "DKR",
+    "icao": "GOOO",
+    "name": "Leopold Sedar Senghor International Airport",
+    "latitude": 14.670833,
+    "longitude": -17.490278,
+    "category": "4C",
+    "runway": "02/20",
+    "runwayLength": 11483,
+    "runwayCode": "02/20"
+  },
+  {
+    "iata": "ABV",
+    "icao": "DNAA",
+    "name": "Nnamdi Azikiwe International Airport",
+    "latitude": 9.006667,
+    "longitude": 7.263056,
+    "category": "4C",
+    "runway": "05/23",
+    "runwayLength": 11811,
+    "runwayCode": "05/23"
+  },
+  {
+    "iata": "PHC",
+    "icao": "DNPO",
+    "name": "Port Harcourt International Airport",
+    "latitude": 5.015389,
+    "longitude": 6.967583,
+    "category": "4C",
+    "runway": "03/21",
+    "runwayLength": 10827,
+    "runwayCode": "03/21"
+  },
+  {
+    "iata": "KGL",
+    "icao": "HRYR",
+    "name": "Kigali International Airport",
+    "latitude": -1.968628,
+    "longitude": 30.139444,
+    "category": "4C",
+    "runway": "29/11",
+    "runwayLength": 10827,
+    "runwayCode": "29/11"
+  },
+  {
+    "iata": "DLA",
+    "icao": "FKKD",
+    "name": "Douala International Airport",
+    "latitude": 4.006111,
+    "longitude": 9.719444,
+    "category": "4C",
+    "runway": "12/30",
+    "runwayLength": 10827,
+    "runwayCode": "12/30"
+  },
+  {
+    "iata": "NSI",
+    "icao": "FKYS",
+    "name": "Yaounde Nsimalen International Airport",
+    "latitude": 3.722556,
+    "longitude": 11.553278,
+    "category": "4C",
+    "runway": "03/21",
+    "runwayLength": 11483,
+    "runwayCode": "03/21"
+  },
+  {
+    "iata": "BJM",
+    "icao": "HBBA",
+    "name": "Bujumbura International Airport",
+    "latitude": -3.324,
+    "longitude": 29.318528,
+    "category": "4C",
+    "runway": "03/21",
+    "runwayLength": 11483,
+    "runwayCode": "03/21"
+  },
+  {
+    "iata": "EBB",
+    "icao": "HUEN",
+    "name": "Entebbe International Airport",
+    "latitude": 0.0425,
+    "longitude": 32.4435,
+    "category": "4C",
+    "runway": "17/35",
+    "runwayLength": 12136,
+    "runwayCode": "17/35"
+  },
+  {
+    "iata": "LUJ",
+    "icao": "FALU",
+    "name": "Lusaka International Airport",
+    "latitude": -15.330556,
+    "longitude": 28.4525,
+    "category": "4C",
+    "runway": "10/28",
+    "runwayLength": 13123,
+    "runwayCode": "10/28"
+  },
+  {
+    "iata": "LUN",
+    "icao": "FLLL",
+    "name": "Kenneth Kaunda International Airport",
+    "latitude": -15.386111,
+    "longitude": 28.452444,
+    "category": "4C",
+    "runway": "10/28",
+    "runwayLength": 13123,
+    "runwayCode": "10/28"
+  },
+  {
+    "iata": "FIH",
+    "icao": "FZAA",
+    "name": "Ndjili International Airport",
+    "latitude": -4.385556,
+    "longitude": 15.444444,
+    "category": "4C",
+    "runway": "06L/24R",
+    "runwayLength": 12136,
+    "runwayCode": "06L/24R"
+  },
+  {
+    "iata": "BZV",
+    "icao": "FCBB",
+    "name": "Maya-Maya Airport",
+    "latitude": -4.243889,
+    "longitude": 15.253056,
+    "category": "4C",
+    "runway": "03/21",
+    "runwayLength": 10827,
+    "runwayCode": "03/21"
+  }
+]

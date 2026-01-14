@@ -1,62 +1,78 @@
-import fs from 'fs';
-import path from 'path';
-
-const americanAirports = JSON.parse(fs.readFileSync(path.join(import.meta.dirname, '../data/americanAirports.json'), 'utf8'));
-const europeanAirports = JSON.parse(fs.readFileSync(path.join(import.meta.dirname, '../data/europeanAirports.json'), 'utf8'));
-const asianAirports = JSON.parse(fs.readFileSync(path.join(import.meta.dirname, '../data/asianAirports.json'), 'utf8'));
-const otherAirports = JSON.parse(fs.readFileSync(path.join(import.meta.dirname, '../data/otherAirports.json'), 'utf8'));
+import airportDatabase from '../data/airportDatabase.json';
 
 class AirportService {
   constructor(apiKey = '') {
-    this.airports = [
-      ...americanAirports.airports,
-      ...europeanAirports.airports,
-      ...asianAirports.airports,
-      ...otherAirports.airports
-    ];
+    this.allAirports = airportDatabase.airports;
     this.apiKey = apiKey;
     this.useLocalDatabase = !apiKey;
     this.freeTrialUsed = false;
   }
 
-  // Get all airports
   getAllAirports() {
-    return this.airports;
+    return this.allAirports;
   }
 
-  // Search airports by IATA, ICAO, name, or city
-  searchAirports(query) {
+  getNormalAirports() {
+    return this.allAirports.filter(airport => airport.type === 'normal');
+  }
+
+  getEmergencyAirports() {
+    return this.allAirports.filter(airport => airport.type === 'emergency');
+  }
+
+  searchAirports(query, options = {}) {
+    const { type = 'all', includeEmergency = false } = options;
+
     if (!query || query.trim().length < 2) {
       return [];
     }
 
+    let airportsToSearch = this.allAirports;
+
+    if (type === 'normal' || (!includeEmergency && type === 'all')) {
+      airportsToSearch = this.getNormalAirports();
+    } else if (type === 'emergency') {
+      airportsToSearch = this.getEmergencyAirports();
+    }
+
     const searchTerm = query.toLowerCase();
-    return this.airports.filter(airport => 
+    return airportsToSearch.filter(airport =>
       airport.iata.toLowerCase().includes(searchTerm) ||
       airport.icao.toLowerCase().includes(searchTerm) ||
       airport.name.toLowerCase().includes(searchTerm) ||
-      airport.city.toLowerCase().includes(searchTerm)
+      (airport.city && airport.city.toLowerCase().includes(searchTerm))
     );
   }
 
-  // Get airport by IATA or ICAO code
+  searchNormalAirports(query) {
+    return this.searchAirports(query, { type: 'normal' });
+  }
+
+  searchEmergencyAirports(query) {
+    return this.searchAirports(query, { type: 'emergency' });
+  }
+
   getAirportByCode(code) {
-    return this.airports.find(airport => 
-      airport.iata === code || airport.icao === code
+    return this.allAirports.find(airport =>
+      airport.iata.toUpperCase() === code.toUpperCase() ||
+      airport.icao.toUpperCase() === code.toUpperCase()
     );
   }
 
-  // Get popular airports (major international hubs)
+  getAirportType(code) {
+    const airport = this.getAirportByCode(code);
+    return airport ? airport.type : null;
+  }
+
   getPopularAirports() {
     const majorAirports = ['JFK', 'LAX', 'LHR', 'CDG', 'HND', 'DXB', 'SIN', 'SYD', 'FRA', 'ORD'];
-    return this.airports.filter(airport => majorAirports.includes(airport.iata));
+    return this.getNormalAirports().filter(airport => majorAirports.includes(airport.iata));
   }
 
-  // Calculate distance between two airports in nautical miles
   calculateDistance(departure, arrival) {
     if (!departure || !arrival) return 0;
-    
-    const R = 3440; // Earth's radius in nautical miles
+
+    const R = 3440;
     const lat1 = departure.latitude * Math.PI / 180;
     const lat2 = arrival.latitude * Math.PI / 180;
     const deltaLat = (arrival.latitude - departure.latitude) * Math.PI / 180;
@@ -66,13 +82,21 @@ class AirportService {
               Math.cos(lat1) * Math.cos(lat2) *
               Math.sin(deltaLon/2) * Math.sin(deltaLon/2);
     const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-    
+
     return Math.round(R * c);
   }
 
-  // Get airports within a certain radius
-  getAirportsWithinRadius(latitude, longitude, radiusNm) {
-    return this.airports.filter(airport => {
+  getAirportsWithinRadius(latitude, longitude, radiusNm, options = {}) {
+    const { type = 'all' } = options;
+
+    let airportsToSearch = this.allAirports;
+    if (type === 'normal') {
+      airportsToSearch = this.getNormalAirports();
+    } else if (type === 'emergency') {
+      airportsToSearch = this.getEmergencyAirports();
+    }
+
+    return airportsToSearch.filter(airport => {
       const distance = this.calculateDistance(
         { latitude, longitude },
         { latitude: airport.latitude, longitude: airport.longitude }
@@ -81,24 +105,44 @@ class AirportService {
     });
   }
 
-  // Get airports by category
-  getAirportsByCategory(category) {
-    return this.airports.filter(airport => airport.category === category);
+  getAirportsByCategory(category, options = {}) {
+    const { type = 'all' } = options;
+
+    let airportsToSearch = this.allAirports;
+    if (type === 'normal') {
+      airportsToSearch = this.getNormalAirports();
+    } else if (type === 'emergency') {
+      airportsToSearch = this.getEmergencyAirports();
+    }
+
+    return airportsToSearch.filter(airport => airport.category === category);
   }
 
-  // Get runway information for an airport
   getRunwayInfo(airportCode) {
     const airport = this.getAirportByCode(airportCode);
-    return airport ? airport.runways : [];
+    if (!airport) return [];
+
+    if (airport.runways && Array.isArray(airport.runways)) {
+      return airport.runways;
+    }
+
+    if (airport.runway && airport.runwayLength) {
+      return [{
+        name: airport.runway,
+        length: airport.runwayLength,
+        surface: 'Unknown',
+        category: airport.category
+      }];
+    }
+
+    return [];
   }
 
-  // Get frequency information for an airport
   getFrequencyInfo(airportCode) {
     const airport = this.getAirportByCode(airportCode);
-    return airport ? airport.frequencies : [];
+    return airport && airport.frequencies ? airport.frequencies : [];
   }
 
-  // Get suitable runways for aircraft category
   getSuitableRunways(airportCode, aircraftCategory) {
     const runways = this.getRunwayInfo(airportCode);
     return runways.filter(runway => {
@@ -108,21 +152,19 @@ class AirportService {
         case 'Medium':
           return runway.category === 'Medium' || runway.category === 'Heavy';
         case 'Light':
-          return true; // Light aircraft can use any runway
+          return true;
         default:
           return false;
       }
     });
   }
 
-  // Enhanced fallback data for major airports
   getEnhancedAirportData(airportCode) {
     const airport = this.getAirportByCode(airportCode);
     if (!airport) return null;
 
-    // Add additional metadata based on airport category
     const enhancedData = { ...airport };
-    
+
     if (airport.category === '4F') {
       enhancedData.facilities = [
         'Multiple Terminals',
@@ -144,6 +186,10 @@ class AirportService {
     }
 
     return enhancedData;
+  }
+
+  getDatabaseStats() {
+    return airportDatabase.metadata.statistics;
   }
 }
 

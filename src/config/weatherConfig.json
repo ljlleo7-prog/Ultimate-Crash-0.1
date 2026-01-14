@@ -31,22 +31,315 @@
   },
   "atisUpdateIntervalMinutes": 30,
   "extremeWeatherProbability": 0.01,
-  "seasonalVariations": {
-    "summer": {
-      "temperatureOffset": 15,
-      "windSpeedMultiplier": 0.8
+
+  "regionalVariations": [
+    {
+      "name": "EQ_TROPIC",
+      "latitudeRange": [-10, 10],
+      "longitudeRange": [-180, 180],
+      "temperatureOffset": 5,
+      "windSpeedMultiplier": 1.0,
+      "cloudCoverOffset": 30,
+      "visibilityOffset": -5000,
+      "typicalPhenomena": "Thunderstorms, heavy rain, deep convection",
+      "seasonalVariations": {
+        "summer": {
+          "temperatureOffset": 15,
+          "windSpeedMultiplier": 0.8
+        },
+        "winter": {
+          "temperatureOffset": -10,
+          "windSpeedMultiplier": 1.2
+        },
+        "spring": {
+          "temperatureOffset": 5,
+          "windSpeedMultiplier": 1
+        },
+        "autumn": {
+          "temperatureOffset": 5,
+          "windSpeedMultiplier": 1
+        }
+      }
     },
-    "winter": {
+    {
+      "name": "MONSOON_ASIA",
+      "latitudeRange": [5, 30],
+      "longitudeRange": [60, 100],
+      "temperatureOffset": 0,
+      "windSpeedMultiplier": 1.2,
+      "cloudCoverOffset": 40,
+      "visibilityOffset": -8000,
+      "typicalPhenomena": "Seasonal monsoon rains, strong convection",
+      "seasonalVariations": {
+        "summer": {
+          "temperatureOffset": 15,
+          "windSpeedMultiplier": 0.8
+        },
+        "winter": {
+          "temperatureOffset": -10,
+          "windSpeedMultiplier": 1.2
+        },
+        "spring": {
+          "temperatureOffset": 5,
+          "windSpeedMultiplier": 1
+        },
+        "autumn": {
+          "temperatureOffset": 5,
+          "windSpeedMultiplier": 1
+        }
+      }
+    },
+    {
+      "name": "SUBTROP_HIGH_N",
+      "latitudeRange": [25, 35],
+      "longitudeRange": [-180, 180],
+      "temperatureOffset": 10,
+      "windSpeedMultiplier": 0.7,
+      "cloudCoverOffset": -30,
+      "visibilityOffset": 2000,
+      "typicalPhenomena": "Clear skies, gentle winds, dust storms",
+      "seasonalVariations": {
+        "summer": {
+          "temperatureOffset": 15,
+          "windSpeedMultiplier": 0.8
+        },
+        "winter": {
+          "temperatureOffset": -10,
+          "windSpeedMultiplier": 1.2
+        },
+        "spring": {
+          "temperatureOffset": 5,
+          "windSpeedMultiplier": 1
+        },
+        "autumn": {
+          "temperatureOffset": 5,
+          "windSpeedMultiplier": 1
+        }
+      }
+    },
+    {
+      "name": "SUBTROP_HIGH_S",
+      "latitudeRange": [-35, -25],
+      "longitudeRange": [-180, 180],
+      "temperatureOffset": 10,
+      "windSpeedMultiplier": 0.7,
+      "cloudCoverOffset": -30,
+      "visibilityOffset": 2000,
+      "typicalPhenomena": "Clear skies, gentle winds, dust storms",
+      "seasonalVariations": {
+        "summer": {
+          "temperatureOffset": 15,
+          "windSpeedMultiplier": 0.8
+        },
+        "winter": {
+          "temperatureOffset": -10,
+          "windSpeedMultiplier": 1.2
+        },
+        "spring": {
+          "temperatureOffset": 5,
+          "windSpeedMultiplier": 1
+        },
+        "autumn": {
+          "temperatureOffset": 5,
+          "windSpeedMultiplier": 1
+        }
+      }
+    },
+    {
+      "name": "MIDLAT_NA",
+      "latitudeRange": [30, 60],
+      "longitudeRange": [-170, -30],
+      "temperatureOffset": 0,
+      "windSpeedMultiplier": 1.3,
+      "cloudCoverOffset": 10,
+      "visibilityOffset": 0,
+      "typicalPhenomena": "Fronts, jet stream CAT",
+      "seasonalVariations": {
+        "summer": {
+          "temperatureOffset": 15,
+          "windSpeedMultiplier": 0.8
+        },
+        "winter": {
+          "temperatureOffset": -10,
+          "windSpeedMultiplier": 1.2
+        },
+        "spring": {
+          "temperatureOffset": 5,
+          "windSpeedMultiplier": 1
+        },
+        "autumn": {
+          "temperatureOffset": 5,
+          "windSpeedMultiplier": 1
+        }
+      }
+    },
+    {
+      "name": "MIDLAT_EUROPE",
+      "latitudeRange": [35, 60],
+      "longitudeRange": [-10, 40],
+      "temperatureOffset": 0,
+      "windSpeedMultiplier": 1.2,
+      "cloudCoverOffset": 20,
+      "visibilityOffset": -3000,
+      "typicalPhenomena": "Extratropical storms, frontal rain/snow",
+      "seasonalVariations": {
+        "summer": {
+          "temperatureOffset": 15,
+          "windSpeedMultiplier": 0.8
+        },
+        "winter": {
+          "temperatureOffset": -10,
+          "windSpeedMultiplier": 1.2
+        },
+        "spring": {
+          "temperatureOffset": 5,
+          "windSpeedMultiplier": 1
+        },
+        "autumn": {
+          "temperatureOffset": 5,
+          "windSpeedMultiplier": 1
+        }
+      }
+    },
+    {
+      "name": "POLAR_NH",
+      "latitudeRange": [60, 90],
+      "longitudeRange": [-180, 180],
+      "temperatureOffset": -25,
+      "windSpeedMultiplier": 1.0,
+      "cloudCoverOffset": 10,
+      "visibilityOffset": -10000,
+      "typicalPhenomena": "Cold stable air, snow/ice fog",
+      "seasonalVariations": {
+        "summer": {
+          "temperatureOffset": 15,
+          "windSpeedMultiplier": 0.8
+        },
+        "winter": {
+          "temperatureOffset": -10,
+          "windSpeedMultiplier": 1.2
+        },
+        "spring": {
+          "temperatureOffset": 5,
+          "windSpeedMultiplier": 1
+        },
+        "autumn": {
+          "temperatureOffset": 5,
+          "windSpeedMultiplier": 1
+        }
+      }
+    },
+    {
+      "name": "OCEANIC_NATL",
+      "latitudeRange": [30, 60],
+      "longitudeRange": [-60, 0],
+      "temperatureOffset": -5,
+      "windSpeedMultiplier": 1.5,
+      "cloudCoverOffset": 40,
+      "visibilityOffset": -5000,
+      "typicalPhenomena": "Long frontal cloud bands, wind shear",
+      "seasonalVariations": {
+        "summer": {
+          "temperatureOffset": 15,
+          "windSpeedMultiplier": 0.8
+        },
+        "winter": {
+          "temperatureOffset": -10,
+          "windSpeedMultiplier": 1.2
+        },
+        "spring": {
+          "temperatureOffset": 5,
+          "windSpeedMultiplier": 1
+        },
+        "autumn": {
+          "temperatureOffset": 5,
+          "windSpeedMultiplier": 1
+        }
+      }
+    },
+    {
+      "name": "MOUNTAIN_WEST_ROCKIES",
+      "latitudeRange": [30, 50],
+      "longitudeRange": [-120, -105],
       "temperatureOffset": -10,
-      "windSpeedMultiplier": 1.2
+      "windSpeedMultiplier": 1.8,
+      "cloudCoverOffset": 30,
+      "visibilityOffset": -4000,
+      "typicalPhenomena": "Mountain waves, orographic precipitation",
+      "seasonalVariations": {
+        "summer": {
+          "temperatureOffset": 15,
+          "windSpeedMultiplier": 0.8
+        },
+        "winter": {
+          "temperatureOffset": -10,
+          "windSpeedMultiplier": 1.2
+        },
+        "spring": {
+          "temperatureOffset": 5,
+          "windSpeedMultiplier": 1
+        },
+        "autumn": {
+          "temperatureOffset": 5,
+          "windSpeedMultiplier": 1
+        }
+      }
     },
-    "spring": {
-      "temperatureOffset": 5,
-      "windSpeedMultiplier": 1
+    {
+      "name": "MOUNTAIN_WEST_ANDES",
+      "latitudeRange": [-50, 10],
+      "longitudeRange": [-80, -65],
+      "temperatureOffset": -10,
+      "windSpeedMultiplier": 1.8,
+      "cloudCoverOffset": 30,
+      "visibilityOffset": -4000,
+      "typicalPhenomena": "Mountain waves, orographic precipitation",
+      "seasonalVariations": {
+        "summer": {
+          "temperatureOffset": 15,
+          "windSpeedMultiplier": 0.8
+        },
+        "winter": {
+          "temperatureOffset": -10,
+          "windSpeedMultiplier": 1.2
+        },
+        "spring": {
+          "temperatureOffset": 5,
+          "windSpeedMultiplier": 1
+        },
+        "autumn": {
+          "temperatureOffset": 5,
+          "windSpeedMultiplier": 1
+        }
+      }
     },
-    "autumn": {
-      "temperatureOffset": 5,
-      "windSpeedMultiplier": 1
+    {
+      "name": "CYCLONE_ATL",
+      "latitudeRange": [10, 30],
+      "longitudeRange": [-80, -20],
+      "temperatureOffset": 8,
+      "windSpeedMultiplier": 2.5,
+      "cloudCoverOffset": 50,
+      "visibilityOffset": -15000,
+      "typicalPhenomena": "Tropical cyclone winds/rain (seasonal)",
+      "seasonalVariations": {
+        "summer": {
+          "temperatureOffset": 15,
+          "windSpeedMultiplier": 0.8
+        },
+        "winter": {
+          "temperatureOffset": -10,
+          "windSpeedMultiplier": 1.2
+        },
+        "spring": {
+          "temperatureOffset": 5,
+          "windSpeedMultiplier": 1
+        },
+        "autumn": {
+          "temperatureOffset": 5,
+          "windSpeedMultiplier": 1
+        }
+      }
     }
-  }
+  ]
 }

@@ -43,8 +43,8 @@ function getRandomValue(range, distribution) {
  * @param {string} paramName - The name of the parameter (e.g., "temperature").
  * @returns {number} The value with seasonal adjustments.
  */
-function applySeasonalVariation(value, season, paramName) {
-  const seasonalConfig = weatherConfig.seasonalVariations[season];
+function applySeasonalVariation(value, season, paramName, regionalAdjustments) {
+  const seasonalConfig = regionalAdjustments.seasonalVariations?.[season];
   if (!seasonalConfig) return value;
 
   switch (paramName) {
@@ -59,6 +59,32 @@ function applySeasonalVariation(value, season, paramName) {
 }
 
 /**
+ * Determines regional weather adjustments based on latitude and longitude.
+ * @param {number} latitude - The latitude for which to get regional adjustments.
+ * @param {number} longitude - The longitude for which to get regional adjustments.
+ * @returns {object} An object containing regional adjustments (temperatureOffset, windSpeedMultiplier, etc.).
+ */
+function getRegionalWeatherAdjustments(latitude, longitude) {
+  const defaultAdjustments = {
+    temperatureOffset: 0,
+    windSpeedMultiplier: 1,
+    cloudCoverOffset: 0,
+    visibilityOffset: 0,
+    typicalPhenomena: "Clear skies"
+  };
+
+  const region = weatherConfig.regionalVariations.find(
+    (r) =>
+      latitude >= r.latitudeRange[0] &&
+      latitude < r.latitudeRange[1] &&
+      longitude >= r.longitudeRange[0] &&
+      longitude < r.longitudeRange[1]
+  );
+
+  return region || defaultAdjustments;
+}
+
+/**
  * Generates initial weather data.
  * @param {number} latitude
  * @param {number} longitude
@@ -68,18 +94,37 @@ function applySeasonalVariation(value, season, paramName) {
  */
 export function generateInitialWeather(latitude, longitude, season, zuluTime) {
   const weather = {};
+  const regionalAdjustments = getRegionalWeatherAdjustments(latitude, longitude);
 
   for (const param in weatherConfig) {
     if (weatherConfig[param].range) {
       let value = getRandomValue(weatherConfig[param].range, weatherConfig[param].distribution);
-      value = applySeasonalVariation(value, season, param);
+      value = applySeasonalVariation(value, season, param, regionalAdjustments);
+      // Apply regional adjustments
+      switch (param) {
+        case 'temperature':
+          value += regionalAdjustments.temperatureOffset || 0;
+          break;
+        case 'windSpeed':
+        case 'windGust':
+          value *= regionalAdjustments.windSpeedMultiplier || 1;
+          break;
+        case 'cloudCover':
+          value += regionalAdjustments.cloudCoverOffset || 0;
+          break;
+        case 'visibility':
+          value += regionalAdjustments.visibilityOffset || 0;
+          break;
+      }
       weather[param] = parseFloat(value.toFixed(2));
     }
   }
 
   weather.season = season;
   weather.zuluTime = zuluTime;
-  weather.weatherCondition = getRandomWeatherCondition(); // Assign a random initial condition
+  weather.latitude = latitude;
+  weather.longitude = longitude;
+  weather.weatherCondition = getRandomWeatherCondition(regionalAdjustments.typicalPhenomena); // Assign a random initial condition
 
   return /** @type {WeatherData} */ (weather);
 }
@@ -98,6 +143,8 @@ export function updateWeather(currentWeather, timeDeltaMinutes) {
     return newWeather;
   }
 
+  const regionalAdjustments = getRegionalWeatherAdjustments(newWeather.latitude, newWeather.longitude);
+
   for (const param in weatherConfig) {
     if (weatherConfig[param].range && newWeather[param] !== undefined) {
       const config = weatherConfig[param];
@@ -106,7 +153,24 @@ export function updateWeather(currentWeather, timeDeltaMinutes) {
       let newValue = currentValue + variation * (timeDeltaMinutes / weatherConfig.atisUpdateIntervalMinutes);
 
       // Apply seasonal variation again to ensure it's always considered
-      newValue = applySeasonalVariation(newValue, newWeather.season, param);
+      newValue = applySeasonalVariation(newValue, newWeather.season, param, regionalAdjustments);
+
+      // Apply regional adjustments
+      switch (param) {
+        case 'temperature':
+          newValue += regionalAdjustments.temperatureOffset || 0;
+          break;
+        case 'windSpeed':
+        case 'windGust':
+          newValue *= regionalAdjustments.windSpeedMultiplier || 1;
+          break;
+        case 'cloudCover':
+          newValue += regionalAdjustments.cloudCoverOffset || 0;
+          break;
+        case 'visibility':
+          newValue += regionalAdjustments.visibilityOffset || 0;
+          break;
+      }
 
       // Clamp to range
       newValue = Math.max(config.range[0], Math.min(config.range[1], newValue));
@@ -116,7 +180,7 @@ export function updateWeather(currentWeather, timeDeltaMinutes) {
 
   // Randomly change weather condition
   if (Math.random() < weatherConfig.extremeWeatherProbability * (timeDeltaMinutes / weatherConfig.atisUpdateIntervalMinutes)) {
-    newWeather.weatherCondition = getRandomWeatherCondition();
+    newWeather.weatherCondition = getRandomWeatherCondition(regionalAdjustments.typicalPhenomena);
   }
 
   // Update Zulu time
@@ -128,10 +192,50 @@ export function updateWeather(currentWeather, timeDeltaMinutes) {
 }
 
 /**
- * Returns a random weather condition from the WeatherCondition enum.
+ * Returns a random weather condition from the WeatherCondition enum, potentially biased by typical phenomena.
+ * @param {string} [typicalPhenomena] - A string describing typical weather phenomena for the region.
  * @returns {WeatherCondition}
  */
-function getRandomWeatherCondition() {
+function getRandomWeatherCondition(typicalPhenomena = "") {
   const conditions = Object.values(WeatherCondition);
-  return conditions[Math.floor(Math.random() * conditions.length)];
+  let weightedConditions = [];
+
+  // Assign weights based on typical phenomena
+  if (typicalPhenomena.includes("Thunderstorms") || typicalPhenomena.includes("convection")) {
+    weightedConditions.push(...Array(5).fill(WeatherCondition.THUNDERSTORM));
+  }
+  if (typicalPhenomena.includes("rain") || typicalPhenomena.includes("monsoon")) {
+    weightedConditions.push(...Array(5).fill(WeatherCondition.RAIN));
+  }
+  if (typicalPhenomena.includes("snow") || typicalPhenomena.includes("ice fog")) {
+    weightedConditions.push(...Array(5).fill(WeatherCondition.SNOW));
+  }
+  if (typicalPhenomena.includes("fog") || typicalPhenomena.includes("mist")) {
+    weightedConditions.push(...Array(5).fill(WeatherCondition.FOG));
+  }
+  if (typicalPhenomena.includes("dust") || typicalPhenomena.includes("sand")) {
+    // Assuming 'Haze' or 'Mist' can represent dust/sand for now, or add a new enum if needed
+    weightedConditions.push(...Array(3).fill(WeatherCondition.MIST));
+  }
+  if (typicalPhenomena.includes("wind") || typicalPhenomena.includes("squalls") || typicalPhenomena.includes("wind shear") || typicalPhenomena.includes("cyclone")) {
+    weightedConditions.push(...Array(5).fill(WeatherCondition.WINDY));
+  }
+  if (typicalPhenomena.includes("Clear skies") || typicalPhenomena.includes("gentle winds")) {
+    weightedConditions.push(...Array(5).fill(WeatherCondition.CLEAR));
+  }
+  if (typicalPhenomena.includes("cloud bands") || typicalPhenomena.includes("Overcast")) {
+    weightedConditions.push(...Array(5).fill(WeatherCondition.OVERCAST));
+  }
+
+  // If no specific phenomena matched, or to add general variety, include all conditions
+  if (weightedConditions.length === 0) {
+    weightedConditions = conditions;
+  } else {
+    // Add a smaller weight for general conditions to ensure variety
+    weightedConditions.push(...Array(2).fill(WeatherCondition.CLEAR));
+    weightedConditions.push(...Array(2).fill(WeatherCondition.PARTLY_CLOUDY));
+    weightedConditions.push(...Array(2).fill(WeatherCondition.CLOUDY));
+  }
+
+  return weightedConditions[Math.floor(Math.random() * weightedConditions.length)];
 }

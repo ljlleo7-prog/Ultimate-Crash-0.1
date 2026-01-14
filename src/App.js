@@ -49,7 +49,14 @@ function App() {
   
   // New simulation state variables
   const [failureType, setFailureType] = useState('random');
-  const [weatherData, setWeatherData] = useState(null);
+  const [weatherData, setWeatherData] = useState({
+    type: 'clear',
+    windSpeed: 0,
+    visibility: 10,
+    ceiling: 5000,
+    precipitation: 0,
+    turbulence: 0
+  });
   const [crewCount, setCrewCount] = useState(2);
   const [simulationStarted, setSimulationStarted] = useState(false);
   const [cinematicPhase, setCinematicPhase] = useState('none');

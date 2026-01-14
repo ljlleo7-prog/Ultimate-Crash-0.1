@@ -506,7 +506,7 @@ const FlightInitialization = ({
       )
     ),
 
-    flightPlan && React.createElement('div', { className: 'flight-plan-summary' },
+    flightPlan && selectedDeparture && selectedArrival && React.createElement('div', { className: 'flight-plan-summary' },
       React.createElement('h2', null, 'Flight Plan Summary'),
       React.createElement('div', { className: 'plan-details' },
         React.createElement('p', null, `Route: ${selectedDeparture.iata} → ${selectedArrival.iata}`),

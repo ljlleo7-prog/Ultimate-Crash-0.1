@@ -18,18 +18,17 @@ const useAirportSearch = () => {
     setError(null);
 
     try {
-      // Search in local JSON database
       const filteredAirports = airportData.airports.filter(airport => {
         const searchTerm = query.toLowerCase();
         return (
           airport.iata.toLowerCase().includes(searchTerm) ||
           airport.icao.toLowerCase().includes(searchTerm) ||
-          airport.name.toLowerCase().includes(searchTerm) ||
-          airport.city.toLowerCase().includes(searchTerm)
+          (airport.name && airport.name.toLowerCase().includes(searchTerm)) ||
+          (airport.city && airport.city.toLowerCase().includes(searchTerm))
         );
       });
 
-      setSearchResults(filteredAirports);
+      setSearchResults(filteredAirports.slice(0, 10));
     } catch (err) {
       setError('Failed to search airports');
       setSearchResults([]);

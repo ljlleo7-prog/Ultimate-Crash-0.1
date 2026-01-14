@@ -1,45 +1,255 @@
 {
   "airports": [
     {
-      "iata": "DXB",
-      "icao": "OMDB",
-      "name": "Dubai International Airport",
-      "city": "Dubai",
-      "country": "United Arab Emirates",
-      "latitude": 25.2527999,
-      "longitude": 55.3643989,
-      "elevation": 10,
+      "iata": "SYD",
+      "icao": "YSSY",
+      "name": "Sydney Kingsford Smith Airport",
+      "city": "Sydney",
+      "country": "Australia",
+      "latitude": -33.9461002,
+      "longitude": 151.1772003,
+      "elevation": 39,
       "category": "4F",
       "runways": [
-        { "name": "12L/30R", "length": 12000, "surface": "Asphalt", "category": "Heavy" },
-        { "name": "12R/30L", "length": 12000, "surface": "Asphalt", "category": "Heavy" },
-        { "name": "14/32", "length": 12000, "surface": "Asphalt", "category": "Heavy" }
+        {
+          "name": "07L/25R",
+          "length": 11810,
+          "surface": "Asphalt",
+          "category": "Heavy"
+        },
+        {
+          "name": "07R/25L",
+          "length": 10500,
+          "surface": "Asphalt",
+          "category": "Heavy"
+        },
+        {
+          "name": "16/34",
+          "length": 8000,
+          "surface": "Asphalt",
+          "category": "Heavy"
+        }
       ],
       "frequencies": [
-        { "type": "ATIS", "frequency": 126.0 },
-        { "type": "Tower", "frequency": 118.2 },
-        { "type": "Ground", "frequency": 121.75 }
+        {
+          "type": "ATIS",
+          "frequency": 126.0
+        },
+        {
+          "type": "Tower",
+          "frequency": 118.2
+        },
+        {
+          "type": "Ground",
+          "frequency": 121.75
+        }
       ]
     },
     {
-      "iata": "IST",
-      "icao": "LTBA",
-      "name": "Istanbul Atatürk Airport",
-      "city": "Istanbul",
-      "country": "Turkey",
-      "latitude": 40.9769001,
-      "longitude": 28.8141994,
-      "elevation": 183,
+      "iata": "MEL",
+      "icao": "YMML",
+      "name": "Melbourne Airport",
+      "city": "Melbourne",
+      "country": "Australia",
+      "latitude": -37.6698989,
+      "longitude": 144.8439941,
+      "elevation": 360,
       "category": "4F",
       "runways": [
-        { "name": "05L/23R", "length": 12000, "surface": "Asphalt", "category": "Heavy" },
-        { "name": "05R/23L", "length": 12000, "surface": "Asphalt", "category": "Heavy" },
-        { "name": "06/24", "length": 12000, "surface": "Asphalt", "category": "Heavy" }
+        {
+          "name": "09/27",
+          "length": 10835,
+          "surface": "Asphalt",
+          "category": "Heavy"
+        },
+        {
+          "name": "16/34",
+          "length": 9000,
+          "surface": "Asphalt",
+          "category": "Heavy"
+        },
+        {
+          "name": "17/35",
+          "length": 10000,
+          "surface": "Asphalt",
+          "category": "Heavy"
+        }
       ],
       "frequencies": [
-        { "type": "ATIS", "frequency": 126.0 },
-        { "type": "Tower", "frequency": 118.2 },
-        { "type": "Ground", "frequency": 121.75 }
+        {
+          "type": "ATIS",
+          "frequency": 126.0
+        },
+        {
+          "type": "Tower",
+          "frequency": 118.2
+        },
+        {
+          "type": "Ground",
+          "frequency": 121.75
+        }
+      ]
+    },
+    {
+      "iata": "AKL",
+      "icao": "NZAA",
+      "name": "Auckland Airport",
+      "city": "Auckland",
+      "country": "New Zealand",
+      "latitude": -37.0089001,
+      "longitude": 174.780899,
+      "elevation": 92,
+      "category": "4E",
+      "runways": [
+        {
+          "name": "05L/23R",
+          "length": 10000,
+          "surface": "Asphalt",
+          "category": "Heavy"
+        },
+        {
+          "name": "05R/23L",
+          "length": 8000,
+          "surface": "Asphalt",
+          "category": "Heavy"
+        }
+      ],
+      "frequencies": [
+        {
+          "type": "ATIS",
+          "frequency": 126.0
+        },
+        {
+          "type": "Tower",
+          "frequency": 118.2
+        },
+        {
+          "type": "Ground",
+          "frequency": 121.75
+        }
+      ]
+    },
+    {
+      "iata": "GRU",
+      "icao": "SBGR",
+      "name": "S\u00e3o Paulo/Guarulhos International Airport",
+      "city": "S\u00e3o Paulo",
+      "country": "Brazil",
+      "latitude": -23.4356003,
+      "longitude": -46.4730988,
+      "elevation": 259,
+      "category": "4F",
+      "runways": [
+        {
+          "name": "09L/27R",
+          "length": 12000,
+          "surface": "Concrete",
+          "category": "Heavy"
+        },
+        {
+          "name": "09R/27L",
+          "length": 12000,
+          "surface": "Concrete",
+          "category": "Heavy"
+        },
+        {
+          "name": "15/33",
+          "length": 10000,
+          "surface": "Concrete",
+          "category": "Heavy"
+        }
+      ],
+      "frequencies": [
+        {
+          "type": "ATIS",
+          "frequency": 126.0
+        },
+        {
+          "type": "Tower",
+          "frequency": 118.2
+        },
+        {
+          "type": "Ground",
+          "frequency": 121.75
+        }
+      ]
+    },
+    {
+      "iata": "EZE",
+      "icao": "SAEZ",
+      "name": "Ministro Pistarini International Airport",
+      "city": "Buenos Aires",
+      "country": "Argentina",
+      "latitude": -34.8283005,
+      "longitude": -58.5371971,
+      "elevation": 20,
+      "category": "4F",
+      "runways": [
+        {
+          "name": "11/29",
+          "length": 12000,
+          "surface": "Concrete",
+          "category": "Heavy"
+        },
+        {
+          "name": "17/35",
+          "length": 10000,
+          "surface": "Concrete",
+          "category": "Heavy"
+        }
+      ],
+      "frequencies": [
+        {
+          "type": "ATIS",
+          "frequency": 126.0
+        },
+        {
+          "type": "Tower",
+          "frequency": 118.2
+        },
+        {
+          "type": "Ground",
+          "frequency": 121.75
+        }
+      ]
+    },
+    {
+      "iata": "SCL",
+      "icao": "SCEL",
+      "name": "Arturo Merino Ben\u00edtez International Airport",
+      "city": "Santiago",
+      "country": "Chile",
+      "latitude": -33.3930016,
+      "longitude": -70.7947006,
+      "elevation": 1735,
+      "category": "4F",
+      "runways": [
+        {
+          "name": "07L/25R",
+          "length": 12000,
+          "surface": "Concrete",
+          "category": "Heavy"
+        },
+        {
+          "name": "07R/25L",
+          "length": 12000,
+          "surface": "Concrete",
+          "category": "Heavy"
+        }
+      ],
+      "frequencies": [
+        {
+          "type": "ATIS",
+          "frequency": 126.0
+        },
+        {
+          "type": "Tower",
+          "frequency": 118.2
+        },
+        {
+          "type": "Ground",
+          "frequency": 121.75
+        }
       ]
     }
   ]
