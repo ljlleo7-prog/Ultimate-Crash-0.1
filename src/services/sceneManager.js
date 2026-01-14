@@ -5,6 +5,8 @@ export const FlightPhases = {
   BRIEFING: 'briefing',
   TAKEOFF: 'takeoff',
   CLIMB: 'climb',
+  INITIAL_CLIMB: 'initial_climb',
+  MAIN_CLIMB: 'main_climb',
   CRUISE: 'cruise',
   DESCENT: 'descent',
   APPROACH: 'approach',
@@ -22,6 +24,7 @@ const defaultScenario = {
   callsign: 'SKY123',
   departure: 'KJFK',
   arrival: 'KLAX',
+  targetCruiseAltitude: 35000, // New: Define target cruise altitude in feet
   
   // Flight phases with detailed parameters
   phases: [
@@ -55,19 +58,35 @@ const defaultScenario = {
       }
     },
     {
-      id: 'phase-climb',
-      name: 'Climb to Cruise',
-      type: FlightPhases.CLIMB,
-      durationSeconds: 120,
+      id: 'phase-initial-climb',
+      name: 'Initial Climb',
+      type: FlightPhases.INITIAL_CLIMB,
+      durationSeconds: 120, // Placeholder, will be condition-based
       physics: {
         mode: 'continuous',
-        initialAltitude: 1000,
-        targetAltitude: 35000,
-        targetSpeed: 250
+        initialAltitude: 3000, // Start of this phase
+        targetAltitude: 10000,
+        targetSpeed: 250 // IAS
       },
       narrative: {
-        title: 'Climbing to Cruise',
+        title: 'Initial Climb',
         content: '${callsign}, positive rate, gear up. Accelerate to 250 knots below 10,000 feet.'
+      }
+    },
+    {
+      id: 'phase-main-climb',
+      name: 'Main Climb',
+      type: FlightPhases.MAIN_CLIMB,
+      durationSeconds: 300, // Placeholder, will be condition-based
+      physics: {
+        mode: 'continuous',
+        initialAltitude: 10000, // Start of this phase
+        targetAltitude: 35000, // Example cruise altitude
+        targetSpeed: 270 // IAS
+      },
+      narrative: {
+        title: 'Main Climb',
+        content: '${callsign}, climbing through 10,000 feet. Accelerate to 270 knots.'
       }
     },
     {
@@ -79,7 +98,7 @@ const defaultScenario = {
         mode: 'continuous',
         initialAltitude: 35000,
         targetAltitude: 35000,
-        targetSpeed: 450
+        targetSpeed: 450 // TAS
       },
       narrative: {
         title: 'Cruise at FL350',
@@ -260,6 +279,22 @@ class SceneManager {
     }
   }
 
+  // Update the scenario with new flight parameters
+  updateScenario(newParams) {
+    this.scenario = {
+      ...this.scenario,
+      ...newParams
+    };
+    
+    // If running, update current phase narrative
+    const currentPhase = this.currentPhase();
+    if (currentPhase && currentPhase.narrative) {
+      this.publishNarrative(currentPhase.narrative);
+    }
+    
+    return this.scenario;
+  }
+
   update(dt, payload = null) {
     if (this.status !== 'running') {
       return;
@@ -303,13 +338,38 @@ class SceneManager {
     
     // Condition-based completion for specific phases
     if (phase.type === FlightPhases.TAKEOFF) {
-      // User requested: wait for 3000ft and AP engagement
-      // payload.position.z is altitude in meters
       const altitude_m = payload?.position?.z || 0;
       const altitude_ft = altitude_m * 3.28084;
+      const verticalSpeed_fps = payload?.velocity?.w || 0; // Vertical speed in ft/s
+      const verticalSpeed_fpm = verticalSpeed_fps * 60; // Vertical speed in ft/min
       const apEngaged = payload?.autopilot?.engaged || false;
+      const gearUp = payload?.gearValue === false; // gearValue is true for down, false for up
+      const flapsUp = payload?.flapsValue === 0; // flapsValue is 0 for up
       
-      if (altitude_ft >= 3000 && apEngaged) {
+      // Transition from TAKEOFF to INITIAL_CLIMB
+      if (
+        verticalSpeed_fpm > 500 && // Positive climb rate
+        gearUp &&
+        flapsUp &&
+        altitude_ft >= 3000 &&
+        apEngaged
+      ) {
+        isPhaseComplete = true;
+      }
+    } else if (phase.type === FlightPhases.INITIAL_CLIMB) {
+      const altitude_m = payload?.position?.z || 0;
+      const altitude_ft = altitude_m * 3.28084;
+      
+      // Transition from INITIAL_CLIMB to MAIN_CLIMB
+      if (altitude_ft >= 10000) {
+        isPhaseComplete = true;
+      }
+    } else if (phase.type === FlightPhases.MAIN_CLIMB) {
+      const altitude_m = payload?.position?.z || 0;
+      const altitude_ft = altitude_m * 3.28084;
+      
+      // Transition from MAIN_CLIMB to CRUISE
+      if (altitude_ft >= this.scenario.targetCruiseAltitude) {
         isPhaseComplete = true;
       }
     } else {
@@ -619,7 +679,8 @@ class SceneManager {
       phaseType: phase.type,
       initialConditions,
       targetAltitude: physics.targetAltitude ? physics.targetAltitude * 0.3048 : undefined,
-      targetSpeed: physics.targetSpeed ? physics.targetSpeed * 0.514444 : undefined
+      targetSpeed: physics.targetSpeed ? physics.targetSpeed * 0.514444 : undefined,
+      targetHeading: physics.targetHeading ? physics.targetHeading * Math.PI / 180 : undefined // Add target heading
     });
   }
 

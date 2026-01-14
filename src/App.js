@@ -191,6 +191,7 @@ function App() {
       difficulty: difficulty,
       selectedDeparture: selectedDeparture,
       selectedArrival: selectedArrival,
+      initialDeparture: selectedDeparture,
       flightPlan: flightPlan,
       airline: airline,
       pax: pax,

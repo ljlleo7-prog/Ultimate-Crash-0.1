@@ -132,9 +132,11 @@ export function useAircraftPhysics(config = {}, autoStart = true, model = 'reali
           thrust: finalAircraft.maxThrustPerEngine || 0
         });
         
+        const { initialLatitude, initialLongitude, ...restConfig } = config;
+
         const service = model === 'imaginary' ? 
           new SimpleFlightPhysicsService(finalAircraft) : 
-          new NewFlightPhysicsService(finalAircraft);
+          new NewFlightPhysicsService(finalAircraft, initialLatitude, initialLongitude);
         
         if (config && service && service.aircraft) {
           if (typeof config.payloadWeight === 'number' && !isNaN(config.payloadWeight) && config.payloadWeight >= 0) {
@@ -225,12 +227,14 @@ export function useAircraftPhysics(config = {}, autoStart = true, model = 'reali
         console.error('⚠️ Throttle is NaN in useAircraftPhysics update:', throttleValue);
       }
       
+      console.log('🎮 useAircraftPhysics: Calling physicsService.update()');
       const newState = physicsService.update({
         throttle: isNaN(throttleValue) ? 0 : throttleValue,
         pitch: currentControlsRef.current.pitch,
         roll: currentControlsRef.current.roll,
         yaw: currentControlsRef.current.yaw
       }, timeStep);
+      console.log('🎮 useAircraftPhysics: physicsService.update() returned:', newState);
 
       const altitude_m = Math.max(0, newState.position.z);
       const altitude = altitude_m * 3.28084;

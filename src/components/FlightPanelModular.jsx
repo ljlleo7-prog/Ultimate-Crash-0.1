@@ -12,7 +12,7 @@ import CentralPanel from './CentralPanel';
 import ControlSurfacePanel from './ControlSurfacePanel';
 import './FlightPanel.css';
 
-const FlightPanelModular = ({ flightData, onActionRequest, aircraftModel }) => {
+const FlightPanelModular = ({ flightData, onActionRequest, aircraftModel, selectedArrival }) => {
   // Use flightData from parent component instead of creating own physics service
   const [flightState, setFlightState] = useState({
     // Navigation
@@ -295,7 +295,7 @@ const FlightPanelModular = ({ flightData, onActionRequest, aircraftModel }) => {
         React.createElement(FlightPosePanel, { flightState }),
         
         // Navigation Panel (Middle)
-        React.createElement(NavigationPanel, { flightState }),
+        React.createElement(NavigationPanel, { flightState, selectedArrival }),
         
         // Central Panel (Right)
         React.createElement(CentralPanel, { flightState })

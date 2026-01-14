@@ -191,6 +191,25 @@ class SimpleFlightPhysicsService {
       validated[prop] = Number(validated[prop]) || defaults[prop];
     });
 
+    // Ensure flap profile is properly initialized with positions array
+    if (!validated.flapProfile) {
+      validated.flapProfile = {
+        positions: [
+          { angle: 0, clIncrement: 0, cdIncrement: 0, label: "UP" },
+          { angle: 10, clIncrement: 0.3, cdIncrement: 0.015, label: "1" },
+          { angle: 20, clIncrement: 0.6, cdIncrement: 0.035, label: "2" },
+          { angle: 30, clIncrement: 1.0, cdIncrement: 0.07, label: "FULL" }
+        ]
+      };
+    } else if (!Array.isArray(validated.flapProfile.positions)) {
+      validated.flapProfile.positions = [
+        { angle: 0, clIncrement: 0, cdIncrement: 0, label: "UP" },
+        { angle: 10, clIncrement: 0.3, cdIncrement: 0.015, label: "1" },
+        { angle: 20, clIncrement: 0.6, cdIncrement: 0.035, label: "2" },
+        { angle: 30, clIncrement: 1.0, cdIncrement: 0.07, label: "FULL" }
+      ];
+    }
+
     return validated;
   }
 
@@ -570,18 +589,17 @@ class SimpleFlightPhysicsService {
     let flapsCd = 0;
     
     // Get the flap profile from the aircraft data or use defaults if not available
-    const flapProfile = this.aircraft.flapProfile || {
-      positions: [
-        { angle: 0, clIncrement: 0, cdIncrement: 0, label: "UP" },
-        { angle: 10, clIncrement: 0.3, cdIncrement: 0.015, label: "1" },
-        { angle: 20, clIncrement: 0.6, cdIncrement: 0.035, label: "2" },
-        { angle: 30, clIncrement: 1.0, cdIncrement: 0.07, label: "FULL" }
-      ]
-    };
+    const flapProfile = this.aircraft.flapProfile || {};
+    const positions = Array.isArray(flapProfile.positions) ? flapProfile.positions : [
+      { angle: 0, clIncrement: 0, cdIncrement: 0, label: "UP" },
+      { angle: 10, clIncrement: 0.3, cdIncrement: 0.015, label: "1" },
+      { angle: 20, clIncrement: 0.6, cdIncrement: 0.035, label: "2" },
+      { angle: 30, clIncrement: 1.0, cdIncrement: 0.07, label: "FULL" }
+    ];
     
     // Get the current flap position index
-    const flapIndex = Math.max(0, Math.min(this.state.flaps, flapProfile.positions.length - 1));
-    const flapPosition = flapProfile.positions[flapIndex];
+    const flapIndex = Math.max(0, Math.min(this.state.flaps, positions.length - 1));
+    const flapPosition = positions[flapIndex];
     
     // Apply the lift and drag increments from the selected flap position
     flapsCl = flapPosition.clIncrement;
@@ -600,16 +618,15 @@ class SimpleFlightPhysicsService {
     let airbrakeCd = 0;
 
     // Get the airbrake profile from the aircraft data or use defaults
-    const airbrakeProfile = this.aircraft.airbrakeProfile || {
-      positions: [
-        { dragIncrement: 0, label: "RETRACTED" },
-        { dragIncrement: 0.02, label: "EXTENDED" }
-      ]
-    };
+    const airbrakeProfile = this.aircraft.airbrakeProfile || {};
+    const positions = Array.isArray(airbrakeProfile.positions) ? airbrakeProfile.positions : [
+      { dragIncrement: 0, label: "RETRACTED" },
+      { dragIncrement: 0.02, label: "EXTENDED" }
+    ];
 
     // Get the current airbrake position index
-    const airbrakeIndex = Math.max(0, Math.min(this.state.airBrakes, airbrakeProfile.positions.length - 1));
-    const airbrakePosition = airbrakeProfile.positions[airbrakeIndex];
+    const airbrakeIndex = Math.max(0, Math.min(this.state.airBrakes, positions.length - 1));
+    const airbrakePosition = positions[airbrakeIndex];
 
     // Apply the drag increment from the selected airbrake position
     airbrakeCd = airbrakePosition.dragIncrement;
@@ -746,7 +763,8 @@ class SimpleFlightPhysicsService {
    */
   setFlaps(flaps) {
     // Get the number of flap positions from the aircraft's flap profile or default to 4
-    const maxFlapPositions = this.aircraft.flapProfile?.positions?.length - 1 || 3;
+    const flapProfile = this.aircraft.flapProfile || { positions: [] };
+    const maxFlapPositions = (flapProfile.positions?.length || 1) - 1 || 3;
     this.state.flaps = Math.max(0, Math.min(maxFlapPositions, Math.round(flaps)));
   }
 

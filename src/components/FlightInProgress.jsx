@@ -14,6 +14,7 @@ const FlightInProgress = ({
   difficulty, 
   selectedDeparture, 
   selectedArrival, 
+  initialDeparture, // New prop
   flightPlan, 
   airline, 
   pax, 
@@ -53,7 +54,9 @@ const FlightInProgress = ({
     cruiseHeight,
     windSpeedKts: weatherData && typeof weatherData.windSpeed === 'number'
       ? weatherData.windSpeed
-      : 0
+      : 0,
+    initialLatitude: initialDeparture?.latitude || 0,
+    initialLongitude: initialDeparture?.longitude || 0
   };
 
   const {
@@ -165,6 +168,27 @@ const FlightInProgress = ({
 
     return () => clearInterval(interval);
   }, [weatherData, setWeatherData]);
+
+  // Update scene manager with selected flight parameters
+  useEffect(() => {
+    if (selectedDeparture && selectedArrival) {
+      console.log('✈️  FlightInProgress: Updating scene manager with flight parameters:', {
+        callsign: callsign,
+        departure: selectedDeparture.iata || selectedDeparture.icao,
+        arrival: selectedArrival.iata || selectedArrival.icao,
+        aircraftModel: aircraftModel
+      });
+      
+      sceneManager.updateScenario({
+        callsign: callsign,
+        departure: selectedDeparture.iata || selectedDeparture.icao,
+        arrival: selectedArrival.iata || selectedArrival.icao,
+        aircraftModel: aircraftModel
+      });
+      
+      console.log('✅ FlightInProgress: Scene manager updated successfully');
+    }
+  }, [callsign, selectedDeparture, selectedArrival, aircraftModel]);
 
   // Main update loop
   useEffect(() => {
@@ -508,6 +532,7 @@ const FlightInProgress = ({
         <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
           <FlightPanelModular
             flightData={flightData}
+            selectedArrival={selectedArrival}
             onActionRequest={(action, payload) => {
               const payloadStr = typeof payload === 'number' ? payload.toFixed(5) : JSON.stringify(payload);
               console.log(`📡 UI Action: ${action} = ${payloadStr}`);

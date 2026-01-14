@@ -88,16 +88,19 @@ class NewFlightPhysicsService {
     MAX_PITCH: 15 * Math.PI/180, // ±15° pitch limit
     MIN_PITCH: -5 * Math.PI/180, // Don't allow nose-down beyond -5°
     MAX_THROTTLE: 0.95,         // 95% max thrust
-    MIN_THROTTLE: 0.20          // 20% min thrust
+    MIN_THROTTLE: 0.20,          // 20% min thrust
+    MAX_TRIM: 0.5,               // Max trim adjustment
+    MIN_TRIM: -0.5               // Min trim adjustment
   };
 
   static DEFAULT_PID_PARAMETERS = {
     ALTITUDE: { Kp: 0.0003, Ki: 0, Kd: 0.001, min: -3, max: 3 },
-    SPEED: { Kp: 0.3, Ki: 0.03, Kd: 0.08, min: -0.3, max: 0.3 },
-    HEADING: { Kp: 0.8, Ki: 0.1, Kd: 0.3, min: -0.5, max: 0.5 }
+    SPEED: { Kp: 0.6, Ki: 0, Kd: 0.16, min: -0.3, max: 0.3 },
+    HEADING: { Kp: 0.8, Ki: 0.1, Kd: 0.3, min: -0.5, max: 0.5 },
+    VS: { Kp: 0.0001, Ki: 0, Kd: 0.0002, min: -0.1, max: 0.1 }
   };
 
-  constructor(aircraft) {
+  constructor(aircraft, initialLatitude = 0, initialLongitude = 0) {
     this.aircraft = this.validateAircraftData(aircraft);
     
     // ✅ FIXED: Proper mass calculation (empty weight + fuel + payload)
@@ -109,6 +112,10 @@ class NewFlightPhysicsService {
     this.AIR_GAS_CONSTANT = 287.05; // J/(kg·K) - specific gas constant for air
     this.dt = 1 / 60; // Fixed time step for physics integration (60 Hz)
     
+    // Store initial lat/lon for coordinate conversion
+    this.initialLatitude = initialLatitude;
+    this.initialLongitude = initialLongitude;
+
     // Debug tracking
     this.lastThrottleValue = 0.3; // Start with low throttle
     
@@ -124,7 +131,9 @@ class NewFlightPhysicsService {
       position: {
         x: 0,     // North position (m)
         y: 0,     // East position (m)
-        z: 0      // Altitude in meters (0 = on ground)
+        z: 0,      // Altitude in meters (0 = on ground)
+        latitude: initialLatitude,
+        longitude: initialLongitude
       },
       velocity: {
         u: 0,     // Forward velocity (0 KTS)
@@ -194,13 +203,16 @@ class NewFlightPhysicsService {
       targets: {
         altitude: 0,
         speed: 0,
-        heading: 0
+        heading: 0,
+        verticalSpeed: 0
       },
       limits: {
         maxPitch: NewFlightPhysicsService.DEFAULT_AUTOPILOT_LIMITS.MAX_PITCH, // ±15° pitch limit
         minPitch: NewFlightPhysicsService.DEFAULT_AUTOPILOT_LIMITS.MIN_PITCH, // Don't allow nose-down beyond -5°
         maxThrottle: NewFlightPhysicsService.DEFAULT_AUTOPILOT_LIMITS.MAX_THROTTLE,         // 95% max thrust
-        minThrottle: NewFlightPhysicsService.DEFAULT_AUTOPILOT_LIMITS.MIN_THROTTLE          // 20% min thrust
+        minThrottle: NewFlightPhysicsService.DEFAULT_AUTOPILOT_LIMITS.MIN_THROTTLE,          // 20% min thrust
+        maxTrim: NewFlightPhysicsService.DEFAULT_AUTOPILOT_LIMITS.MAX_TRIM,
+        minTrim: NewFlightPhysicsService.DEFAULT_AUTOPILOT_LIMITS.MIN_TRIM
       },
       unstableFrames: 0,
       disconnectAlert: ''
@@ -213,6 +225,7 @@ class NewFlightPhysicsService {
     const altitudeParams = pidParams.altitude || pidParams.ALTITUDE || NewFlightPhysicsService.DEFAULT_PID_PARAMETERS.ALTITUDE;
     const speedParams = pidParams.speed || pidParams.SPEED || NewFlightPhysicsService.DEFAULT_PID_PARAMETERS.SPEED;
     const headingParams = pidParams.heading || pidParams.HEADING || NewFlightPhysicsService.DEFAULT_PID_PARAMETERS.HEADING;
+    const vsParams = pidParams.vs || pidParams.VS || NewFlightPhysicsService.DEFAULT_PID_PARAMETERS.VS;
     
     this.pidControllers = {
       altitude: new PIDController(
@@ -235,6 +248,13 @@ class NewFlightPhysicsService {
         headingParams.Kd,    // Kd - damping
         headingParams.min,   // min roll
         headingParams.max     // max roll
+      ),
+      vs: new PIDController(
+        vsParams.Kp,    // Kp - VS error to trim response
+        vsParams.Ki,    // Ki - eliminate steady-state error
+        vsParams.Kd,    // Kd - damping
+        vsParams.min,   // min trim
+        vsParams.max     // max trim
       )
     };
     
@@ -314,6 +334,25 @@ class NewFlightPhysicsService {
       }
     });
     
+    // Ensure flap profile is properly initialized with positions array
+    if (!validated.flapProfile) {
+      validated.flapProfile = {
+        positions: [
+          { angle: 0, clIncrement: 0, cdIncrement: 0, label: "UP" },
+          { angle: 10, clIncrement: 0.3, cdIncrement: 0.015, label: "1" },
+          { angle: 20, clIncrement: 0.6, cdIncrement: 0.035, label: "2" },
+          { angle: 30, clIncrement: 1.0, cdIncrement: 0.07, label: "FULL" }
+        ]
+      };
+    } else if (!Array.isArray(validated.flapProfile.positions)) {
+      validated.flapProfile.positions = [
+        { angle: 0, clIncrement: 0, cdIncrement: 0, label: "UP" },
+        { angle: 10, clIncrement: 0.3, cdIncrement: 0.015, label: "1" },
+        { angle: 20, clIncrement: 0.6, cdIncrement: 0.035, label: "2" },
+        { angle: 30, clIncrement: 1.0, cdIncrement: 0.07, label: "FULL" }
+      ];
+    }
+
     return validated;
   }
 
@@ -391,7 +430,8 @@ class NewFlightPhysicsService {
       controlInputs = {
         ...manualControls,
         throttle: auto.throttle,
-        pitch: auto.pitch*0.05
+        pitch: auto.pitch * 0.05,
+        trim: auto.trim
       };
     } else {
       controlInputs = manualControls;
@@ -412,6 +452,16 @@ class NewFlightPhysicsService {
     // Sum forces and integrate motion
     this.sumForcesAndMoments();
     this.integrateMotion(timeStep);
+
+    // Update latitude and longitude based on new x, y position
+    const { latitude, longitude } = this._convertMetersToLatLon(
+      this.state.position.x,
+      this.state.position.y,
+      this.initialLatitude,
+      this.initialLongitude
+    );
+    this.state.position.latitude = latitude;
+    this.state.position.longitude = longitude;
 
     // Store debug physics data
     const airspeeds = this.calculateAirspeeds();
@@ -444,28 +494,21 @@ class NewFlightPhysicsService {
    * Calculate autopilot control inputs using PID controllers
    */
   calculateAutopilotControls(dt = this.dt) {
-    const altitude_m = Math.max(0, this.state.position.z);
-    const targetAltitude_m = this.autopilot.targets.altitude || altitude_m;
-    const altitudeError_m = targetAltitude_m - altitude_m;
-    const altitudeError_ft = altitudeError_m * 3.28084;
-
     const currentVS_mps = this.earthFrameVerticalVelocity || 0;
-    const currentVS_ftmin = currentVS_mps * 196.85;
+    const currentVS_ftmin = currentVS_mps * 196.85; // Convert m/s to ft/min
 
-    const vsGain = 0.3;
-    let targetVS_ftmin = altitudeError_ft * vsGain;
-    const maxVS = 1500;
-    if (targetVS_ftmin > maxVS) targetVS_ftmin = maxVS;
-    if (targetVS_ftmin < -maxVS) targetVS_ftmin = -maxVS;
-
+    const targetVS_ftmin = this.autopilot.targets.verticalSpeed;
     const vsError_ftmin = targetVS_ftmin - currentVS_ftmin;
-    const vsToPitch = 0.00003;
-    const pitchDelta = vsError_ftmin * vsToPitch;
 
-    const currentPitch = this.state.controls.pitch || 0;
-    const desiredPitch = Math.max(
-      this.autopilot.limits.minPitch,
-      Math.min(this.autopilot.limits.maxPitch, currentPitch + pitchDelta)
+    const trimCommand = this.pidControllers.vs.calculate(
+      targetVS_ftmin,
+      currentVS_ftmin,
+      dt
+    );
+
+    const limitedTrim = Math.max(
+      this.autopilot.limits.minTrim,
+      Math.min(this.autopilot.limits.maxTrim, this.state.controls.trim + trimCommand)
     );
 
     const airspeeds = this.calculateAirspeeds();
@@ -484,10 +527,10 @@ class NewFlightPhysicsService {
 
     return {
       throttle: limitedThrottle,
-      pitch: desiredPitch,
+      pitch: 0, // Pitch is now controlled by trim when autopilot is engaged
       roll: 0,
       yaw: 0,
-      trim: this.state.controls.trim
+      trim: limitedTrim
     };
   }
   
@@ -516,8 +559,8 @@ class NewFlightPhysicsService {
    * Set trim control from cockpit
    */
   setTrim(trimValue) {
-    // Apply safety limits: trim ranges from -1000 to +1000 to match UI
-    const trimmedValue = Math.max(-1000, Math.min(1000, trimValue || 0));
+    // Allow trim value to accumulate for circular input
+    const newTrimValue = trimValue || 0;
     
     // Smoothly apply trim change to avoid sudden jolts
     this.state.controls.trim = this.smoothInput(this.state.controls.trim, trimmedValue, 0.05);
@@ -774,7 +817,7 @@ class NewFlightPhysicsService {
     
     // Convert trim control to elevator deflection
     // elevatorTrim represents the deflection angle needed to generate the trim moment
-    const elevatorTrim = trimControl / 1000.0; // Scale trim control to radians/degrees equivalent
+    const elevatorTrim = trimControl / 10000.0; // Scale trim control to radians/degrees equivalent
     
     // ✅ SAFE: Angular moments with validation
     const rollInertia = Math.max(1000, this.aircraft.momentOfInertiaRoll || 10000);
@@ -784,7 +827,7 @@ class NewFlightPhysicsService {
     // ✅ ENHANCED: Calculate total pitching moment including trim effects
     // Multiply by dynamic pressure (q) for realistic moment generation
     // Magnify trim effect to be comparable with control surface authority
-    const trimMagnification = 5000; // Trim is usually less powerful than full elevator but still significant
+    const trimMagnification = 5; // Trim is usually less powerful than full elevator but still significant
     const trimMoment = controlPowerY * q * elevatorTrim * trimMagnification * (this.aircraft.wingArea / 10);
     const totalPitchingMomentWithTrim = aerodynamicPitchingMoment + trimMoment;
     
@@ -890,18 +933,17 @@ class NewFlightPhysicsService {
     let flapsCd = 0;
     
     // Get the flap profile from the aircraft data or use defaults if not available
-    const flapProfile = this.aircraft.flapProfile || {
-      positions: [
-        { angle: 0, clIncrement: 0, cdIncrement: 0, label: "UP" },
-        { angle: 10, clIncrement: 0.3, cdIncrement: 0.015, label: "1" },
-        { angle: 20, clIncrement: 0.6, cdIncrement: 0.035, label: "2" },
-        { angle: 30, clIncrement: 1.0, cdIncrement: 0.07, label: "FULL" }
-      ]
-    };
+    const flapProfile = this.aircraft.flapProfile || {};
+    const positions = Array.isArray(flapProfile.positions) ? flapProfile.positions : [
+      { angle: 0, clIncrement: 0, cdIncrement: 0, label: "UP" },
+      { angle: 10, clIncrement: 0.3, cdIncrement: 0.015, label: "1" },
+      { angle: 20, clIncrement: 0.6, cdIncrement: 0.035, label: "2" },
+      { angle: 30, clIncrement: 1.0, cdIncrement: 0.07, label: "FULL" }
+    ];
     
     // Get the current flap position index
-    const flapIndex = Math.max(0, Math.min(this.state.flaps, flapProfile.positions.length - 1));
-    const flapPosition = flapProfile.positions[flapIndex];
+    const flapIndex = Math.max(0, Math.min(this.state.flaps, positions.length - 1));
+    const flapPosition = positions[flapIndex];
     
     // Apply the lift and drag increments from the selected flap position
     flapsCl = flapPosition.clIncrement;
@@ -1057,7 +1099,8 @@ class NewFlightPhysicsService {
    */
   setFlaps(flaps) {
     // Get the number of flap positions from the aircraft's flap profile or default to 4
-    const maxFlapPositions = this.aircraft.flapProfile?.positions?.length - 1 || 3;
+    const flapProfile = this.aircraft.flapProfile || { positions: [] };
+    const maxFlapPositions = (flapProfile.positions?.length || 1) - 1 || 3;
     this.state.flaps = Math.max(0, Math.min(maxFlapPositions, Math.round(flaps)));
 
   }
@@ -1426,7 +1469,11 @@ class NewFlightPhysicsService {
       alarms: this.getAlarms(),
       
       // Physics data for compatibility
-      position: { ...this.state.position },
+      position: { 
+        ...this.state.position,
+        latitude: this.state.position.latitude,
+        longitude: this.state.position.longitude
+      },
       velocity: { ...this.state.velocity },
       orientation: { 
         theta: this.state.orientation.theta,
@@ -1528,21 +1575,7 @@ class NewFlightPhysicsService {
     if (Math.abs(altitudeErrorFt) > 5000) unstable = true;
     if (Math.abs(speedErrorKts) > 100) unstable = true;
     if (Math.abs(pitchDeg) > 35) unstable = true;
-    if (bankDeg > 60) unstable = true;
-    if (Math.abs(verticalSpeedFtMin) > 6000) unstable = true;
-    if (trimSaturated && Math.abs(altitudeErrorFt) > 2000) unstable = true;
-    if (throttleSaturated && Math.abs(speedErrorKts) > 60) unstable = true;
-    if (unstable) {
-      this.autopilot.unstableFrames = (this.autopilot.unstableFrames || 0) + 1;
-    } else {
-      this.autopilot.unstableFrames = 0;
-    }
-    if (this.autopilot.unstableFrames >= 100) {
-      this.autopilot.engaged = false;
-      this.autopilot.enabled = false;
-      this.autopilot.unstableFrames = 0;
-      this.autopilot.disconnectAlert = 'AP disconnected';
-    }
+
   }
   
   /**
@@ -1966,6 +1999,31 @@ class NewFlightPhysicsService {
       };
     }
     return null;
+  }
+
+  /**
+   * Converts x (North) and y (East) positions in meters relative to an initial
+   * latitude and longitude into new latitude and longitude coordinates.
+   * Uses a simplified equirectangular projection for small distances.
+   * @param {number} x_meters - Northward distance in meters.
+   * @param {number} y_meters - Eastward distance in meters.
+   * @param {number} initialLat - Initial latitude in degrees.
+   * @param {number} initialLon - Initial longitude in degrees.
+   * @returns {{latitude: number, longitude: number}} New latitude and longitude.
+   */
+  _convertMetersToLatLon(x_meters, y_meters, initialLat, initialLon) {
+    const earthRadius = 6378137; // Earth's radius in meters
+    const latRad = (initialLat * Math.PI) / 180;
+
+    // Calculate change in latitude
+    const deltaLat = x_meters / earthRadius;
+    const newLat = initialLat + (deltaLat * 180) / Math.PI;
+
+    // Calculate change in longitude, accounting for latitude
+    const deltaLon = y_meters / (earthRadius * Math.cos(latRad));
+    const newLon = initialLon + (deltaLon * 180) / Math.PI;
+
+    return { latitude: newLat, longitude: newLon };
   }
 }
 
