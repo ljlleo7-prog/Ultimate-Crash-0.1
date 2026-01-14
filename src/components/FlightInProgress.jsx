@@ -34,16 +34,7 @@ const FlightInProgress = ({
   failureType, 
   crewCount, 
   physicsModel = 'imaginary',
-  // Route-related props
-  selectedDepartureGate,
-  selectedDepartureTaxiway,
-  selectedDepartureRunway,
-  selectedSID,
-  selectedWaypoints,
-  selectedSTAR,
-  selectedArrivalRunway,
-  selectedArrivalTaxiway,
-  selectedArrivalGate
+  routeDetails
 }) => {
 
 
@@ -189,28 +180,16 @@ const FlightInProgress = ({
         aircraftModel: aircraftModel
       });
       
-      // Pass route data from parent component
-      const routeData = {
+      sceneManager.updateScenario({
         callsign: callsign,
         departure: selectedDeparture.iata || selectedDeparture.icao,
         arrival: selectedArrival.iata || selectedArrival.icao,
-        aircraftModel: aircraftModel,
-        departureGate: selectedDepartureGate,
-        departureTaxiway: selectedDepartureTaxiway,
-        departureRunway: selectedDepartureRunway,
-        SID: selectedSID,
-        waypoints: selectedWaypoints,
-        STAR: selectedSTAR,
-        arrivalRunway: selectedArrivalRunway,
-        arrivalTaxiway: selectedArrivalTaxiway,
-        arrivalGate: selectedArrivalGate
-      };
+        aircraftModel: aircraftModel
+      });
       
-      sceneManager.updateScenario(routeData);
-      
-      console.log('✅ FlightInProgress: Scene manager updated successfully with route data');
+      console.log('✅ FlightInProgress: Scene manager updated successfully');
     }
-  }, [callsign, selectedDeparture, selectedArrival, aircraftModel, selectedDepartureGate, selectedDepartureTaxiway, selectedDepartureRunway, selectedSID, selectedWaypoints, selectedSTAR, selectedArrivalRunway, selectedArrivalTaxiway, selectedArrivalGate]);
+  }, [callsign, selectedDeparture, selectedArrival, aircraftModel]);
 
   // Main update loop
   useEffect(() => {

@@ -72,7 +72,10 @@
       "hasTwoTier": true,
       "airPosition": { "dragIncrement": 0.06, "liftDecrement": -0.1 },
       "groundPosition": { "dragIncrement": 0.15, "liftDecrement": -0.2 }
-    }
+    },
+    "minNoseGearFailedPitch": -0.2,
+    "maxGroundPitch": 0.3,
+    "groundCollisionPitchTorqueFactor": 0.5
   },
     {"model": "Airbus A320-200",
       "type": "Narrow-body",
@@ -142,8 +145,11 @@
         "hasTwoTier": true,
         "airPosition": { "dragIncrement": 0.065, "liftDecrement": -0.12 },
         "groundPosition": { "dragIncrement": 0.18, "liftDecrement": -0.25 }
-      }
     },
+    "minNoseGearFailedPitch": -0.2,
+    "maxGroundPitch": 0.3,
+    "groundCollisionPitchTorqueFactor": 0.5
+  },
     {
       "model": "Boeing 777-300ER",
       "type": "Wide-body",
@@ -213,8 +219,11 @@
         "hasTwoTier": true,
         "airPosition": { "dragIncrement": 0.07, "liftDecrement": -0.15 },
         "groundPosition": { "dragIncrement": 0.22, "liftDecrement": -0.3 }
-      }
     },
+    "minNoseGearFailedPitch": -0.2,
+    "maxGroundPitch": 0.3,
+    "groundCollisionPitchTorqueFactor": 0.5
+  },
     {
       "model": "Airbus A350-900",
       "type": "Wide-body",
@@ -259,7 +268,10 @@
       },
       "momentOfInertiaRoll": 165000,
       "momentOfInertiaPitch": 230000,
-      "momentOfInertiaYaw": 295000
+      "momentOfInertiaYaw": 295000,
+      "minNoseGearFailedPitch": -0.2,
+      "maxGroundPitch": 0.3,
+      "groundCollisionPitchTorqueFactor": 0.5
     },
     {
       "model": "Embraer E190",
@@ -305,7 +317,10 @@
       },
       "momentOfInertiaRoll": 18000,
       "momentOfInertiaPitch": 28000,
-      "momentOfInertiaYaw": 42000
+      "momentOfInertiaYaw": 42000,
+      "minNoseGearFailedPitch": -0.2,
+      "maxGroundPitch": 0.3,
+      "groundCollisionPitchTorqueFactor": 0.5
     },
     {
       "model": "Cessna Citation X",
@@ -351,7 +366,10 @@
       },
       "momentOfInertiaRoll": 2500,
       "momentOfInertiaPitch": 3500,
-      "momentOfInertiaYaw": 5500
+      "momentOfInertiaYaw": 5500,
+      "minNoseGearFailedPitch": -0.2,
+      "maxGroundPitch": 0.3,
+      "groundCollisionPitchTorqueFactor": 0.5
     },
     {
       "model": "Boeing 747-400",
@@ -397,7 +415,10 @@
       },
       "momentOfInertiaRoll": 250000,
       "momentOfInertiaPitch": 380000,
-      "momentOfInertiaYaw": 450000
+      "momentOfInertiaYaw": 450000,
+      "minNoseGearFailedPitch": -0.2,
+      "maxGroundPitch": 0.3,
+      "groundCollisionPitchTorqueFactor": 0.5
     },
     {
       "model": "Airbus A380-800",
@@ -443,7 +464,10 @@
       },
       "momentOfInertiaRoll": 420000,
       "momentOfInertiaPitch": 580000,
-      "momentOfInertiaYaw": 680000
+      "momentOfInertiaYaw": 680000,
+      "minNoseGearFailedPitch": -0.2,
+      "maxGroundPitch": 0.3,
+      "groundCollisionPitchTorqueFactor": 0.5
     },
     {
       "model": "Airbus A330-300",
@@ -500,7 +524,10 @@
       },
       "momentOfInertiaRoll": 150000,
       "momentOfInertiaPitch": 210000,
-      "momentOfInertiaYaw": 280000
+      "momentOfInertiaYaw": 280000,
+      "minNoseGearFailedPitch": -0.2,
+      "maxGroundPitch": 0.3,
+      "groundCollisionPitchTorqueFactor": 0.5
     },
     {
       "model": "Airbus A340-600",
@@ -557,7 +584,10 @@
       },
       "momentOfInertiaRoll": 220000,
       "momentOfInertiaPitch": 320000,
-      "momentOfInertiaYaw": 390000
+      "momentOfInertiaYaw": 390000,
+      "minNoseGearFailedPitch": -0.2,
+      "maxGroundPitch": 0.3,
+      "groundCollisionPitchTorqueFactor": 0.5
     },
     {
       "model": "Boeing 757-200",
@@ -614,7 +644,10 @@
       },
       "momentOfInertiaRoll": 42000,
       "momentOfInertiaPitch": 65000,
-      "momentOfInertiaYaw": 95000
+      "momentOfInertiaYaw": 95000,
+      "minNoseGearFailedPitch": -0.2,
+      "maxGroundPitch": 0.3,
+      "groundCollisionPitchTorqueFactor": 0.5
     }
   ]
 }

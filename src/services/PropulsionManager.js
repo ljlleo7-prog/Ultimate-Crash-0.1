@@ -12,7 +12,7 @@ export class PropulsionManager {
     this.engineCount = aircraftConfig.engineCount || 2;
     this.engines = [];
     this.aircraft = null; // Will store fetched aircraft data
-    this.maxThrustPerEngine = aircraftConfig.maxThrustPerEngine || 120000; // Default to 120kN
+    this.maxThrustPerEngine = aircraftConfig.maxThrustPerEngine;
     
     // Determine engine configuration based on engine count
     if (this.engineCount === 2) {
@@ -116,6 +116,7 @@ export class PropulsionManager {
       // Create engines based on database configuration
       for (let i = 0; i < this.engineCount; i++) {
         const position = enginePositions[i] || { x: 0, y: 0, z: 0 };
+        this.log(`PropulsionManager: Creating Engine ${i} with maxThrust: ${this.maxThrustPerEngine}`);
         
         const engine = new Engine(i, {
             engineType: this.aircraft?.engineType || 'turbofan',
@@ -583,8 +584,6 @@ export class PropulsionManager {
    * Debug logging
    */
   log(message, data) {
-    if (process.env.NODE_ENV === 'development') {
-      console.log(`🚀 PropulsionManager: ${message}`, data || '');
-    }
+    console.log(`🚀 PropulsionManager: ${message}`, data || '');
   }
 }

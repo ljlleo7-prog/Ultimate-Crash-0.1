@@ -6,9 +6,10 @@ export class Engine {
   constructor(engineIndex, config = {}) {
     this.engineIndex = engineIndex;
     
+    console.log(`Engine ${this.engineIndex} initialized with maxThrust: ${config.maxThrust}`);
     // Basic configuration
     this.engineType = config.engineType || 'turbofan';
-    this.maxThrust = config.maxThrust || 85000; // N
+    this.maxThrust = config.maxThrust; // N
     this.engineWeight = config.engineWeight || 3000; // kg
     this.specificFuelConsumption = config.specificFuelConsumption || 0.0000021; // kg/N/s (SFC)
     
@@ -451,8 +452,6 @@ export class Engine {
    * Debug logging
    */
   log(message, data) {
-    if (process.env.NODE_ENV === 'development') {
-      console.log(`🔧 Engine ${this.engineIndex}: ${message}`, data || '');
-    }
+    console.log(`🔧 Engine ${this.engineIndex}: ${message}`, data || '');
   }
 }

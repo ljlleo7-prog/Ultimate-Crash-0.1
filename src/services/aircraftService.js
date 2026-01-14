@@ -278,7 +278,7 @@ class AircraftService {
         z: aircraft.emptyWeight * 2500
       },
       engine: {
-        maxThrust: aircraft.maxThrust || aircraft.emptyWeight * 9.81 * 0.3, // Estimate 30% of weight
+        maxThrust: aircraft.maxThrustPerEngine || aircraft.emptyWeight * 9.81 * 0.3, // Estimate 30% of weight
         specificFuelConsumption: aircraft.typicalFuelBurn / 1000 // Convert to kg/N/s
       }
     };

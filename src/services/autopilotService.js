@@ -69,7 +69,7 @@ class AutopilotService {
    */
   enable() {
     this.enabled = true;
-    console.log('🛩️ Autopilot ENABLED - Maintaining altitude and speed');
+    // console.log('🛩️ Autopilot ENABLED - Maintaining altitude and speed');
   }
   
   /**
@@ -77,7 +77,7 @@ class AutopilotService {
    */
   disable() {
     this.enabled = false;
-    console.log('✈️ Autopilot DISENGAGED - Manual control');
+    // console.log('✈️ Autopilot DISENGAGED - Manual control');
   }
   
   /**
@@ -86,7 +86,7 @@ class AutopilotService {
   setTargets(altitude, airspeed) {
     this.targetAltitude = altitude;
     this.targetAirspeed = airspeed;
-    console.log(`🎯 Autopilot targets updated: ${altitude}ft, ${airspeed} KTS TAS`);
+    // console.log(`🎯 Autopilot targets updated: ${altitude}ft, ${airspeed} KTS TAS`);
   }
   
   /**
@@ -243,9 +243,9 @@ class AutopilotService {
     const stableAltitude = Math.abs(altitudeError) < 50;
     const stableSpeed = Math.abs(airspeedError) < 10;
     
-    console.log(`🤖 Autopilot: Alt ${Math.round(currentAltitude)}ft (${Math.round(altitudeError)}ft err), ` +
+    // console.log(`🤖 Autopilot: Alt ${Math.round(currentAltitude)}ft (${Math.round(altitudeError)}ft err), ` +
                 `Speed ${Math.round(currentAirspeed)} KTS (${Math.round(airspeedError)} KTS err), ` +
-                `Elev ${(limitedElevator * 100).toFixed(1)}%, Throttle ${((this.flightPhysics.state.controls.throttle) * 100).toFixed(1)}%`);
+                 `Elev ${(limitedElevator * 100).toFixed(1)}%, Throttle ${((this.flightPhysics.state.controls.throttle) * 100).toFixed(1)}%`
   }
   
   /**
@@ -289,7 +289,7 @@ class AutopilotService {
     this.currentOutputs.throttleAdjustment = 0;
     this.stateHistory = [];
     
-    console.log('🔄 Autopilot reset to initial state');
+    // console.log('🔄 Autopilot reset to initial state');
   }
   
   /**
@@ -301,12 +301,12 @@ class AutopilotService {
       // System is unstable, reduce gains
       this.altitudePID.kp *= 0.95;
       this.airspeedPID.kp *= 0.95;
-      console.log('🟡 Autopilot tuning: Reducing gains for stability');
+      // console.log('🟡 Autopilot tuning: Reducing gains for stability');
     } else if (this.stabilityMetrics.stabilityScore < 1) {
       // System is very stable, can increase gains slightly
       this.altitudePID.kp *= 1.02;
       this.airspeedPID.kp *= 1.02;
-      console.log('🟢 Autopilot tuning: Increasing gains for better response');
+      // console.log('🟢 Autopilot tuning: Increasing gains for better response');
     }
     
     // Limit gains to reasonable bounds

@@ -1,0 +1,270 @@
+
+/* FlightInitialization.css */
+
+.flight-initialization {
+  background: #0d1117;
+  color: #c9d1d9;
+  font-family: 'Roboto Mono', monospace;
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 2rem;
+  border: 1px solid #30363d;
+  box-shadow: 0 0 40px rgba(0, 0, 0, 0.8);
+}
+
+.section-header {
+  color: #58a6ff;
+  font-size: 1.1rem;
+  letter-spacing: 2px;
+  border-bottom: 2px solid #30363d;
+  padding-bottom: 0.5rem;
+  margin-bottom: 1.5rem;
+  margin-top: 2rem;
+}
+
+.dispatch-section {
+  margin-bottom: 3rem;
+}
+
+/* 01. DIFFICULTY GRID */
+.difficulty-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 2rem;
+}
+
+.difficulty-buttons {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 0.5rem;
+}
+
+.difficulty-btn {
+  background: #161b22;
+  border: 1px solid #30363d;
+  color: #8b949e;
+  padding: 1rem;
+  cursor: pointer;
+  font-weight: bold;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  text-align: center;
+}
+
+.difficulty-btn:hover {
+  background: #21262d;
+  border-color: #58a6ff;
+  color: #c9d1d9;
+}
+
+.difficulty-btn.active {
+  background: rgba(88, 166, 255, 0.1);
+  border-color: #58a6ff;
+  color: #58a6ff;
+  box-shadow: 0 0 15px rgba(88, 166, 255, 0.2);
+}
+
+/* Difficulty specific active states */
+.difficulty-btn.rookie.active { border-color: #3fb950; color: #3fb950; background: rgba(63, 185, 80, 0.1); }
+.difficulty-btn.amateur.active { border-color: #d29922; color: #d29922; background: rgba(210, 153, 34, 0.1); }
+.difficulty-btn.devil.active { border-color: #f85149; color: #f85149; background: rgba(248, 81, 73, 0.1); }
+
+.intel-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.crew-intel-box {
+  background: rgba(48, 54, 61, 0.3);
+  border: 1px dashed #30363d;
+  padding: 1rem;
+  min-height: 80px;
+}
+
+.intel-label {
+  display: block;
+  font-size: 0.75rem;
+  color: #8b949e;
+  margin-bottom: 0.5rem;
+}
+
+.intel-text {
+  font-size: 0.9rem;
+  line-height: 1.5;
+  color: #c9d1d9;
+  margin: 0;
+  font-style: italic;
+}
+
+/* FORM ELEMENTS */
+.dispatch-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 1.5rem;
+}
+
+.parameter-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.parameter-group label {
+  font-size: 0.75rem;
+  color: #8b949e;
+  font-weight: bold;
+  text-transform: uppercase;
+}
+
+.dispatch-input, .dispatch-select {
+  background: #0d1117;
+  border: 1px solid #30363d;
+  color: #c9d1d9;
+  padding: 0.75rem;
+  font-family: 'Roboto Mono', monospace;
+  font-size: 0.9rem;
+}
+
+.dispatch-input:focus, .dispatch-select:focus {
+  outline: none;
+  border-color: #58a6ff;
+  background: #161b22;
+}
+
+.selected-airport-badge {
+  background: rgba(88, 166, 255, 0.15);
+  border: 1px solid #58a6ff;
+  padding: 0.5rem 1rem;
+  margin-top: 0.5rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.85rem;
+}
+
+.selected-airport-badge .airport-code {
+  color: #58a6ff;
+  font-weight: bold;
+}
+
+.selected-airport-badge .clear-btn {
+  background: none;
+  border: none;
+  color: #8b949e;
+  cursor: pointer;
+  font-size: 1.2rem;
+  margin-left: auto;
+  padding: 0 0.5rem;
+}
+
+.selected-airport-badge .clear-btn:hover {
+  color: #f85149;
+}
+
+.checkbox-input-group {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.checkbox-label {
+  font-size: 0.7rem;
+  color: #8b949e;
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  white-space: nowrap;
+}
+
+/* ROUTE SELECTION */
+.airport-selection-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 2rem;
+}
+
+/* SUMMARY PANEL */
+.dispatch-summary {
+  background: #161b22;
+  border: 2px solid #30363d;
+  padding: 1.5rem;
+  display: flex;
+  justify-content: space-around;
+  margin-bottom: 2rem;
+}
+
+.summary-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.summary-label {
+  font-size: 0.7rem;
+  color: #8b949e;
+}
+
+.summary-value {
+  font-size: 1.2rem;
+  color: #58a6ff;
+  font-weight: bold;
+}
+
+/* ACTIONS */
+.dispatch-actions {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  border-top: 1px solid #30363d;
+  padding-top: 2rem;
+}
+
+.dispatch-btn {
+  padding: 1rem 2rem;
+  border: 1px solid transparent;
+  cursor: pointer;
+  font-weight: bold;
+  font-family: 'Roboto Mono', monospace;
+  transition: all 0.2s;
+  text-transform: uppercase;
+}
+
+.dispatch-btn.primary {
+  background: #238636;
+  color: white;
+  flex: 2;
+}
+
+.dispatch-btn.primary:hover:not(:disabled) {
+  background: #2ea043;
+}
+
+.dispatch-btn.primary:disabled {
+  background: #21262d;
+  color: #484f58;
+  cursor: not-allowed;
+}
+
+.dispatch-btn.random {
+  background: #21262d;
+  color: #c9d1d9;
+  border-color: #30363d;
+  flex: 1;
+}
+
+.dispatch-btn.random:hover {
+  border-color: #8b949e;
+  background: #30363d;
+}
+
+@media (max-width: 900px) {
+  .difficulty-grid, .airport-selection-grid {
+    grid-template-columns: 1fr;
+  }
+  .dispatch-summary {
+    flex-direction: column;
+    gap: 1rem;
+    align-items: flex-start;
+  }
+}

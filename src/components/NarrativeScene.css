@@ -1,0 +1,116 @@
+
+.narrative-container {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: #050505;
+  color: #e2e8f0;
+  z-index: 2000;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  font-family: 'Courier New', Courier, monospace;
+  background-image: 
+    radial-gradient(circle at 50% 50%, rgba(20, 30, 50, 0.5) 0%, rgba(0, 0, 0, 0.9) 100%);
+}
+
+.narrative-content {
+  max-width: 800px;
+  width: 90%;
+  padding: 2rem;
+  display: flex;
+  flex-direction: column;
+  gap: 2.5rem;
+}
+
+.narrative-line {
+  opacity: 0;
+  transform: translateY(20px);
+  transition: opacity 1s cubic-bezier(0.4, 0, 0.2, 1), transform 1s cubic-bezier(0.4, 0, 0.2, 1);
+  font-size: 1.25rem;
+  line-height: 1.6;
+  border-left: 2px solid transparent;
+  padding-left: 1.5rem;
+  text-shadow: 0 0 10px rgba(0, 0, 0, 0.5);
+}
+
+.narrative-line.visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.narrative-line.role {
+  border-left-color: #3b82f6;
+  color: #bfdbfe;
+}
+
+.narrative-line.experience {
+  border-left-color: #10b981;
+  color: #a7f3d0;
+}
+
+.narrative-line.plan {
+  border-left-color: #f59e0b;
+  color: #fde68a;
+}
+
+.narrative-line.difficulty {
+  border-left-color: #ef4444;
+  color: #fecaca;
+}
+
+.label {
+  font-weight: 800;
+  opacity: 0.6;
+  margin-right: 0.8rem;
+  letter-spacing: 2px;
+  font-size: 0.9rem;
+  display: block;
+  margin-bottom: 0.25rem;
+}
+
+.narrative-action {
+  opacity: 0;
+  margin-top: 3rem;
+  text-align: center;
+  transition: opacity 1.5s ease;
+  transform: scale(0.95);
+}
+
+.narrative-action.visible {
+  opacity: 1;
+  transform: scale(1);
+}
+
+.accept-btn {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  color: #fff;
+  padding: 1rem 3rem;
+  font-family: inherit;
+  font-size: 1.1rem;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  letter-spacing: 3px;
+  text-transform: uppercase;
+  backdrop-filter: blur(5px);
+}
+
+.accept-btn:hover {
+  background: rgba(255, 255, 255, 0.9);
+  color: #000;
+  border-color: #fff;
+  box-shadow: 0 0 30px rgba(255, 255, 255, 0.3);
+  transform: translateY(-2px);
+}
+
+@media (max-width: 768px) {
+  .narrative-content {
+    gap: 1.5rem;
+  }
+  .narrative-line {
+    font-size: 1rem;
+  }
+}

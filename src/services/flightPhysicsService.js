@@ -248,7 +248,7 @@ class FlightPhysicsService {
     
     // DEBUG: Log the AoA calculation
     if (this.state.altitude >= 35000 && this.state.indicatedAirspeed >= 280) {
-      console.log(`DEBUG AoA: ${cruiseAoADegrees}° = ${cruiseAoARadians.toFixed(4)} rad`);
+      // console.log(`DEBUG AoA: ${cruiseAoADegrees}° = ${cruiseAoARadians.toFixed(4)} rad`);
     }
     
     this.aero.angleOfAttack = cruiseAoARadians;

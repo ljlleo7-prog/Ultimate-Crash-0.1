@@ -166,6 +166,8 @@ class NewFlightPhysicsService {
       gear: true,       // Landing gear DOWN for takeoff
       fuel: this.aircraft.fuelWeight || 2000, // Use flight plan fuel load or default to 2000kg
       frame: 0, // Debug frame counter
+      isStalling: false, // NEW: Stall status
+      stallWarning: false, // NEW: Stall warning status
       debugPhysics: { // NEW: Debug physics data
         theta: null,
         dynamicPressure_q: null,
@@ -688,9 +690,6 @@ class NewFlightPhysicsService {
     const aoaInfluence = this.aircraft.liftCurveSlope * safeAlpha;
     cl += aoaInfluence;
     
-    // Ensure CL stays within reasonable limits
-    cl = Math.max(0, Math.min(this.aircraft.maxLiftCoefficient, cl));
-    
     // ✅ ENHANCED: Drag coefficient with proper AoA effect
     // Cd = Cd₀ + k·Cl² + Cd_alpha·|α| (drag increases with AoA magnitude)
     // PLUS: Direct head-on area effect: sin(|α|) for frontal area increase
@@ -701,11 +700,33 @@ class NewFlightPhysicsService {
              this.aircraft.inducedDragFactor * cl * cl + 
              cdAlpha * safeAlpha * safeAlpha + // Linear increase with AoA magnitude
              frontalAreaFactor * Math.abs(Math.sin(safeAlpha)); // Head-on area effect
-    
+
     // ✅ NEW: Apply flaps and airbrake effects
     const flapsResult = this.calculateFlapsEffects(cl, cd);
     cl = flapsResult.cl;
     cd = flapsResult.cd;
+    
+    // Ensure CL stays within reasonable limits
+    cl = Math.max(0, Math.min(this.aircraft.maxLiftCoefficient, cl));
+
+    // ✅ NEW: Stall detection logic (disabled when on ground)
+    if (!this.isOnGround()) {
+      const stallThreshold = 0.8; // Percentage of maxLiftCoefficient to trigger warning
+      if (cl >= this.aircraft.maxLiftCoefficient) {
+        this.state.isStalling = true;
+        this.state.stallWarning = true;
+      } else if (cl >= this.aircraft.maxLiftCoefficient * stallThreshold) {
+        this.state.isStalling = false;
+        this.state.stallWarning = true;
+      } else {
+        this.state.isStalling = false;
+        this.state.stallWarning = false;
+      }
+    } else {
+      // Reset stall status when on the ground
+      this.state.isStalling = false;
+      this.state.stallWarning = false;
+    }
     
     const airbrakeResult = this.calculateAirbrakeEffects(cl, cd);
     cl = airbrakeResult.cl;
@@ -841,7 +862,7 @@ class NewFlightPhysicsService {
     
     // ✅ MAGNIFIED: Increased pitch control authority to counteract strong natural pitching moments
     const pitchMagnification = 25000; // Increased from 1.8 to 2.5 for better rotation authority
-    const rollMagnification = 0.8; 
+    const rollMagnification = 0.4; 
     
     // ✅ FIXED: Calculate control moments with consistent unit scaling
     // Multiply by dynamic pressure (q) for realistic moment generation
@@ -953,7 +974,7 @@ class NewFlightPhysicsService {
     flapsCd = flapPosition.cdIncrement;
     
     // Log flap effects for debugging
-    console.log(`Flaps: Index=${flapIndex}, Angle=${flapPosition.angle}, CL_Inc=${flapsCl}, CD_Inc=${flapsCd}`);
+    // console.log(`Flaps: Index=${flapIndex}, Angle=${flapPosition.angle}, CL_Inc=${flapsCl}, CD_Inc=${flapsCd}`);
     
     return {
       cl: cl + flapsCl,
@@ -1229,6 +1250,16 @@ class NewFlightPhysicsService {
     this.state.angularRates.p += alphaX * dt;
     this.state.angularRates.q += alphaY * dt;
     this.state.angularRates.r += alphaZ * dt;
+
+    // ✅ NEW: Ground pitch clamping logic
+    if (this.isOnGround()) {
+      // If pitch is negative, clamp it to 0 and reset angular rates and moments
+      if (this.state.orientation.theta < 0) {
+        this.state.orientation.theta = 0;
+        this.state.angularRates.q = 0; // Clamp pitch angular speed
+        this.moments.y = 0; // Clamp pitch angular torque
+      }
+    }
     
     // ✅ ENHANCED: Variable angular damping based on pitch angle to prevent tailspins
     // Increase damping at extreme pitch angles to prevent uncontrollable spins
@@ -1279,19 +1310,34 @@ class NewFlightPhysicsService {
     if (this.isOnGround()) {
       // Nose gear failure condition
       if (this.state.angularRates.q < NewFlightPhysicsService.NOSE_GEAR_PITCH_RATE_LIMIT) {
-        this.noseGearFailed = true;
+        if (!this.noseGearFailed) { // Only dispatch event once
+          this.noseGearFailed = true;
+          eventBus.dispatch(EventTypes.FAILURE_OCCURRED, {
+            type: 'Nose Gear Failure',
+            message: 'Nose gear has failed due to excessive pitch rate on ground!',
+            severity: 'critical'
+          });
+        }
       }
 
       if (this.noseGearFailed) {
         // Force nose down if gear failed
         this.state.orientation.theta = Math.min(this.state.orientation.theta, -0.2); // -0.2 radians is about -11 degrees
-        if (this.state.angularRates.q > 0) { // Prevent pitching up if nose gear failed
+        if (this.state.angularRates.q < 0) { // Prevent pitching down if nose gear failed
           this.state.angularRates.q = 0;
         }
-      } else if (this.state.orientation.theta < 0) {
-        this.state.orientation.theta = 0;
-        if (this.state.angularRates.q < 0) {
+      } else { // Normal ground clamping when nose gear is not failed
+        // Clamp pitch to non-negative
+        if (this.state.orientation.theta < 0) {
+          this.state.orientation.theta = 0;
+        }
+        // Clamp negative angular rates if pitch is at or below zero
+        if (this.state.orientation.theta <= 0 && this.state.angularRates.q < 0) {
           this.state.angularRates.q = 0;
+        }
+        // Clamp negative pitching moments if pitch is at or below zero
+        if (this.state.orientation.theta <= 0 && this.moments.y < 0) {
+          this.moments.y = 0;
         }
       }
     }
