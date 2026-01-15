@@ -216,12 +216,6 @@ const FlightPanel = ({ onActionRequest, aircraftModel, flightData }) => {
     }
   };
 
-  // Test Configuration Function - Updated to use parent's physics service
-  const setTestConfiguration = (altitude, ias) => {
-    // TODO: Implement control through parent component
-    console.log('Test configuration requested:', altitude, 'ft,', ias, 'kts IAS');
-  };
-
   // Main render function
   return React.createElement('div', { className: 'modern-flight-panel' },
     // Crash warning flash with cooldown and auto-hide

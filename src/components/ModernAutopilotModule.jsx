@@ -44,55 +44,167 @@ const ModernAutopilotModule = ({ flightState, setAutopilotTargets, toggleAutopil
     }
   };
 
-  return React.createElement('div', { className: 'modern-autopilot-module' },
-    React.createElement('div', { className: 'autopilot-header' },
+  return React.createElement('div', { 
+    className: 'modern-autopilot-module',
+    style: {
+      padding: '8px',
+      background: 'rgba(15, 23, 42, 0.9)',
+      borderRadius: '8px',
+      border: '1px solid #334155',
+      display: 'flex',
+      flexDirection: 'column',
+      gap: '8px',
+      width: 'fit-content'
+    }
+  },
+    // Header Row: Toggle and Mode Status
+    React.createElement('div', { 
+      style: { 
+        display: 'flex', 
+        alignItems: 'center', 
+        justifyContent: 'space-between',
+        gap: '12px',
+        borderBottom: '1px solid #334155',
+        paddingBottom: '6px'
+      } 
+    },
       React.createElement('button', {
-        className: `ap-toggle-btn ${flightState.autopilot ? 'ap-engaged' : 'ap-disengaged'}`,
+        style: {
+          padding: '4px 12px',
+          fontSize: '11px',
+          fontWeight: 'bold',
+          borderRadius: '4px',
+          cursor: 'pointer',
+          background: flightState.autopilot ? '#22c55e' : '#334155',
+          color: 'white',
+          border: flightState.autopilot ? '1px solid #4ade80' : '1px solid #475569',
+          boxShadow: flightState.autopilot ? '0 0 10px rgba(34, 197, 94, 0.4)' : 'none',
+          transition: 'all 0.2s'
+        },
         onClick: toggleAutopilot,
         disabled: flightState.hasCrashed
-      }, flightState.autopilot ? 'AP: ENGAGED' : 'AP: DISENGAGED'),
-      React.createElement('span', { className: 'ap-status' }, flightState.autopilot ? 'ACTIVE' : 'STANDBY')
+      }, flightState.autopilot ? 'AP ON' : 'AP OFF'),
+      React.createElement('div', {
+        style: {
+          fontSize: '10px',
+          color: flightState.autopilot ? '#22c55e' : '#94a3b8',
+          fontWeight: 'bold',
+          letterSpacing: '0.05em'
+        }
+      }, flightState.autopilot ? '● ACTIVE' : '○ STANDBY')
     ),
     
-    React.createElement('div', { className: 'target-controls' },
-      React.createElement('div', { className: 'target-group' },
-        React.createElement('label', null, 'IAS TGT'),
-        React.createElement('div', { className: 'target-control' },
+    // Controls Row: IAS, VS, ALT in a compact row
+    React.createElement('div', { 
+      style: { 
+        display: 'flex', 
+        gap: '16px',
+        alignItems: 'flex-start'
+      } 
+    },
+      // IAS Group
+      React.createElement('div', { style: { display: 'flex', flexDirection: 'column', gap: '2px', width: '70px' } },
+        React.createElement('label', { style: { fontSize: '9px', color: '#94a3b8', fontWeight: 'bold' } }, 'SPD (KTS)'),
+        React.createElement('div', { 
+          style: { 
+            display: 'flex', 
+            alignItems: 'center', 
+            background: '#0f172a',
+            borderRadius: '4px',
+            padding: '2px',
+            border: '1px solid #1e293b'
+          } 
+        },
           React.createElement('button', {
-            onClick: () => updateTarget('ias', Math.max(150, targets.ias - 10)),
+            style: { background: 'none', border: 'none', color: '#64748b', cursor: 'pointer', padding: '0 4px', fontSize: '14px' },
+            onClick: () => updateTarget('ias', Math.max(150, targets.ias - 5)),
             disabled: flightState.hasCrashed
           }, '-'),
-          React.createElement('span', { className: 'target-value' }, `${targets.ias.toFixed(0)}`),
+          React.createElement('span', { 
+            style: { 
+              flex: 1, 
+              textAlign: 'center', 
+              fontSize: '13px', 
+              color: '#f8fafc', 
+              fontFamily: 'monospace',
+              fontWeight: 'bold'
+            } 
+          }, `${targets.ias.toFixed(0)}`),
           React.createElement('button', {
-            onClick: () => updateTarget('ias', Math.min(350, targets.ias + 10)),
+            style: { background: 'none', border: 'none', color: '#64748b', cursor: 'pointer', padding: '0 4px', fontSize: '14px' },
+            onClick: () => updateTarget('ias', Math.min(350, targets.ias + 5)),
             disabled: flightState.hasCrashed
           }, '+')
         )
       ),
-      React.createElement('div', { className: 'target-group' },
-        React.createElement('label', null, 'VS TGT'),
-        React.createElement('div', { className: 'target-control' },
+
+      // VS Group
+      React.createElement('div', { style: { display: 'flex', flexDirection: 'column', gap: '2px', width: '85px' } },
+        React.createElement('label', { style: { fontSize: '9px', color: '#94a3b8', fontWeight: 'bold' } }, 'V/S (FPM)'),
+        React.createElement('div', { 
+          style: { 
+            display: 'flex', 
+            alignItems: 'center', 
+            background: '#0f172a',
+            borderRadius: '4px',
+            padding: '2px',
+            border: '1px solid #1e293b'
+          } 
+        },
           React.createElement('button', {
-            onClick: () => updateTarget('vs', Math.max(-4000, targets.vs - 500)),
+            style: { background: 'none', border: 'none', color: '#64748b', cursor: 'pointer', padding: '0 4px', fontSize: '14px' },
+            onClick: () => updateTarget('vs', Math.max(-4000, targets.vs - 100)),
             disabled: flightState.hasCrashed
           }, '-'),
-          React.createElement('span', { className: 'target-value' }, `${targets.vs >= 0 ? '+' : ''}${targets.vs.toFixed(0)}`),
+          React.createElement('span', { 
+            style: { 
+              flex: 1, 
+              textAlign: 'center', 
+              fontSize: '13px', 
+              color: '#f8fafc', 
+              fontFamily: 'monospace',
+              fontWeight: 'bold'
+            } 
+          }, `${targets.vs >= 0 ? '+' : ''}${targets.vs.toFixed(0)}`),
           React.createElement('button', {
-            onClick: () => updateTarget('vs', Math.min(4000, targets.vs + 500)),
+            style: { background: 'none', border: 'none', color: '#64748b', cursor: 'pointer', padding: '0 4px', fontSize: '14px' },
+            onClick: () => updateTarget('vs', Math.min(4000, targets.vs + 100)),
             disabled: flightState.hasCrashed
           }, '+')
         )
       ),
-      React.createElement('div', { className: 'target-group' },
-        React.createElement('label', null, 'ALT TGT'),
-        React.createElement('div', { className: 'target-control' },
+
+      // ALT Group
+      React.createElement('div', { style: { display: 'flex', flexDirection: 'column', gap: '2px', width: '80px' } },
+        React.createElement('label', { style: { fontSize: '9px', color: '#94a3b8', fontWeight: 'bold' } }, 'ALT (FT)'),
+        React.createElement('div', { 
+          style: { 
+            display: 'flex', 
+            alignItems: 'center', 
+            background: '#0f172a',
+            borderRadius: '4px',
+            padding: '2px',
+            border: '1px solid #1e293b'
+          } 
+        },
           React.createElement('button', {
-            onClick: () => updateTarget('altitude', Math.max(0, targets.altitude - 1000)),
+            style: { background: 'none', border: 'none', color: '#64748b', cursor: 'pointer', padding: '0 4px', fontSize: '14px' },
+            onClick: () => updateTarget('altitude', Math.max(0, targets.altitude - 100)),
             disabled: flightState.hasCrashed
           }, '-'),
-          React.createElement('span', { className: 'target-value' }, `${(targets.altitude / 1000).toFixed(1)}`),
+          React.createElement('span', { 
+            style: { 
+              flex: 1, 
+              textAlign: 'center', 
+              fontSize: '13px', 
+              color: '#f8fafc', 
+              fontFamily: 'monospace',
+              fontWeight: 'bold'
+            } 
+          }, `${targets.altitude.toFixed(0)}`),
           React.createElement('button', {
-            onClick: () => updateTarget('altitude', Math.min(45000, targets.altitude + 1000)),
+            style: { background: 'none', border: 'none', color: '#64748b', cursor: 'pointer', padding: '0 4px', fontSize: '14px' },
+            onClick: () => updateTarget('altitude', Math.min(45000, targets.altitude + 100)),
             disabled: flightState.hasCrashed
           }, '+')
         )

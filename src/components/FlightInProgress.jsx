@@ -86,6 +86,7 @@ const FlightInProgress = ({
   const [narrative, setNarrative] = useState(null);
   const [activeFailures, setActiveFailures] = useState([]);
   const [phaseName, setPhaseName] = useState('');
+  const [showDebugPhysics, setShowDebugPhysics] = useState(false);
 
   // Set up event listeners for narrative and failure updates
   useEffect(() => {
@@ -524,11 +525,34 @@ const FlightInProgress = ({
       </div>
 
       <div style={{ flex: 1, display: 'flex', position: 'relative' }}>
-        <DebugPhysicsPanel 
-          debugPhysicsData={flightData?.debugPhysics} 
-          thrust={flightData?.thrust}
-          drag={flightData?.drag}
-        />
+        {showDebugPhysics && (
+          <DebugPhysicsPanel 
+            debugPhysicsData={flightData?.debugPhysics} 
+            thrust={flightData?.thrust}
+            drag={flightData?.drag}
+          />
+        )}
+
+        <button
+          onClick={() => setShowDebugPhysics(!showDebugPhysics)}
+          style={{
+            position: 'absolute',
+            bottom: '10px',
+            right: '10px',
+            zIndex: 2000,
+            background: 'rgba(30, 41, 59, 0.8)',
+            color: showDebugPhysics ? '#38bdf8' : '#94a3b8',
+            border: `1px solid ${showDebugPhysics ? '#38bdf8' : '#334155'}`,
+            borderRadius: '4px',
+            padding: '4px 8px',
+            fontSize: '10px',
+            fontWeight: 'bold',
+            cursor: 'pointer',
+            transition: 'all 0.2s'
+          }}
+        >
+          {showDebugPhysics ? 'HIDE DEBUG' : 'SHOW DEBUG'}
+        </button>
 
         <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
           <FlightPanelModular

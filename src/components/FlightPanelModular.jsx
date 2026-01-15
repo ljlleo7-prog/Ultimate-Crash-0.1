@@ -6,6 +6,7 @@ import CrashPanel from './CrashPanel';
 import DraggableJoystick from './DraggableJoystick';
 import ThrustManager from './ThrustManager';
 import ModernAutopilotModule from './ModernAutopilotModule';
+import CommunicationModule from './CommunicationModule';
 import FlightPosePanel from './FlightPosePanel';
 import NavigationPanel from './NavigationPanel';
 import CentralPanel from './CentralPanel';
@@ -218,11 +219,6 @@ const FlightPanelModular = ({ flightData, onActionRequest, aircraftModel, select
     }
   };
 
-  const setTestConfiguration = (altitude, ias) => {
-    // TODO: Implement control through parent component
-    console.log('Test configuration requested:', altitude, 'ft,', ias, 'kts IAS');
-  };
-
   // Main render function
   return React.createElement('div', { className: 'modern-flight-panel', style: { userSelect: 'none' } },
     // Crash warning flash
@@ -230,41 +226,6 @@ const FlightPanelModular = ({ flightData, onActionRequest, aircraftModel, select
     
     // Crash panel (if crashed)
     React.createElement(CrashPanel, { showCrashPanel, resetFlight }),
-    
-    // **FIXED: ADD TEST BUTTONS**
-    React.createElement('div', { className: 'test-controls', style: { 
-      position: 'absolute', 
-      top: '10px', 
-      right: '10px', 
-      zIndex: 1000,
-      display: 'flex',
-      gap: '10px'
-    } },
-      React.createElement('button', {
-        onClick: () => setTestConfiguration(3000, 190),
-        style: {
-          padding: '8px 12px',
-          background: '#3b82f6',
-          color: 'white',
-          border: 'none',
-          borderRadius: '4px',
-          cursor: 'pointer',
-          fontSize: '12px'
-        }
-      }, 'Test: 3000ft, 190kts'),
-      React.createElement('button', {
-        onClick: () => setTestConfiguration(35000, 250),
-        style: {
-          padding: '8px 12px',
-          background: '#10b981',
-          color: 'white',
-          border: 'none',
-          borderRadius: '4px',
-          cursor: 'pointer',
-          fontSize: '12px'
-        }
-      }, 'Test: 35000ft, 250kts')
-    ),
 
     // Debug frame panel
     React.createElement('div', {
@@ -283,12 +244,26 @@ const FlightPanelModular = ({ flightData, onActionRequest, aircraftModel, select
     
     // Modern cockpit layout
     React.createElement('div', { className: 'modern-cockpit' },
-      // Autopilot module on top
-      React.createElement(ModernAutopilotModule, { 
-        flightState, 
-        setAutopilotTargets, 
-        toggleAutopilot 
-      }),
+      // Top Row: Autopilot + Comm
+      React.createElement('div', { 
+        style: { 
+          display: 'flex', 
+          gap: '8px', 
+          marginBottom: '8px',
+          width: '100%',
+          alignItems: 'stretch'
+        } 
+      },
+        React.createElement(ModernAutopilotModule, { 
+          flightState, 
+          setAutopilotTargets, 
+          toggleAutopilot 
+        }),
+        React.createElement(CommunicationModule, {
+          flightState,
+          setRadioFreq: (freq) => setFlightState(prev => ({ ...prev, radioFreq: freq }))
+        })
+      ),
       
       // Three parallel panels
       React.createElement('div', { className: 'main-panels' },

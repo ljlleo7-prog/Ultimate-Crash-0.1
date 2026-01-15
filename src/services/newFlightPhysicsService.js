@@ -410,11 +410,6 @@ class NewFlightPhysicsService {
       this.reset();
     }
     
-    // Handle test configuration inputs
-    if (input.testAltitude !== undefined || input.testIAS !== undefined) {
-      this.setTestConfiguration(input.testAltitude, input.testIAS);
-    }
-    
     // Handle autopilot engagement/disengagement
     if (input.autopilot !== undefined) {
       this.autopilot.engaged = input.autopilot;
@@ -1951,27 +1946,6 @@ class NewFlightPhysicsService {
     if (config.orientation.psi !== undefined) {
       this.autopilot.targets.heading = config.orientation.psi;
     }
-  }
-  
-  /**
-   * Set test configuration for specific flight conditions
-   */
-  setTestConfiguration(altitude_ft, ias_kts) {
-    if (altitude_ft !== undefined) {
-      // ✅ FIXED: Use position.z as positive altitude
-      const altitude_m = altitude_ft * 0.3048;
-      this.state.position.z = altitude_m;
-      this.autopilot.targets.altitude = altitude_m;
-    }
-    
-    if (ias_kts !== undefined) {
-      // Convert IAS from knots to m/s
-      const ias_ms = ias_kts * 0.514444;
-      this.state.velocity.u = ias_ms;
-      this.autopilot.targets.speed = ias_ms;
-    }
-    
-
   }
   
   /**
