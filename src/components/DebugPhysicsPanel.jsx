@@ -13,7 +13,12 @@ const DebugPhysicsPanel = ({ debugPhysicsData, thrust, drag }) => {
     altitude_z, 
     isOnGround,
     lift,
-    pitchTorque
+    pitchTorque,
+    alpha,
+    Cm,
+    CL,
+    elevator,
+    trim
   } = debugPhysicsData;
 
   return (
@@ -33,10 +38,16 @@ const DebugPhysicsPanel = ({ debugPhysicsData, thrust, drag }) => {
     }}>
       <div style={{ fontWeight: 'bold', marginBottom: '5px', borderBottom: '1px solid #444', paddingBottom: '3px' }}>DEBUG PHYSICS</div>
       <div>Pitch (θ): {typeof theta === 'number' ? (theta * 180 / Math.PI).toFixed(2) : 'N/A'} deg</div>
+      <div>Alpha (α): {typeof alpha === 'number' ? (alpha * 180 / Math.PI).toFixed(2) : 'N/A'} deg</div>
       <div>Pitch Rate (q): {typeof pitchRate_q === 'number' ? (pitchRate_q * 180 / Math.PI).toFixed(2) : 'N/A'} deg/s</div>
-      <div>Pitch Moment (My): {typeof pitchMoment_y === 'number' ? pitchMoment_y.toFixed(0) : 'N/A'} N·m</div>
-      <div>Pitch Torque: {typeof pitchTorque === 'number' ? pitchTorque.toFixed(0) : 'N/A'} N·m</div>
-      <div>Lift: {typeof lift === 'number' ? (lift / 1000).toFixed(1) : 'N/A'} kN</div>
+      <div>Pitch Moment: {typeof pitchMoment_y === 'number' ? pitchMoment_y.toFixed(0) : 'N/A'} N·m</div>
+      <div>Cm: {typeof Cm === 'number' ? Cm.toFixed(4) : 'N/A'}</div>
+      <div>Elevator: {typeof elevator === 'number' ? elevator.toFixed(2) : 'N/A'}</div>
+      <div>Trim: {typeof trim === 'number' ? trim.toFixed(2) : 'N/A'}</div>
+      
+      <div>Ground Moment Y: {debugPhysicsData.groundMomentY ? debugPhysicsData.groundMomentY.toFixed(0) : '0'}</div>
+
+      <div>Lift: {typeof lift === 'number' ? (lift / 1000).toFixed(1) : 'N/A'} kN (CL: {typeof CL === 'number' ? CL.toFixed(2) : 'N/A'})</div>
       <div>Dynamic Pressure (q): {typeof dynamicPressure_q === 'number' ? dynamicPressure_q.toFixed(2) : 'N/A'} Pa</div>
       <div>Altitude (Z): {typeof altitude_z === 'number' ? altitude_z.toFixed(2) : 'N/A'} m</div>
       <div>On Ground: {isOnGround ? 'YES' : 'NO'}</div>

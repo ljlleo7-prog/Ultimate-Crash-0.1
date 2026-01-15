@@ -22,7 +22,7 @@
   max-width: 800px;
   height: auto; /* Allow height to fit content */
   min-height: 80vh; /* Minimum presence */
-  padding: 3rem;
+  padding: 2rem;
   box-shadow: 0 10px 50px rgba(0,0,0,0.8), 0 0 100px rgba(255,255,255,0.05);
   position: relative;
   transform-style: preserve-3d;
@@ -30,7 +30,7 @@
   background-image: 
     linear-gradient(#eee .1rem, transparent .1rem),
     radial-gradient(#ddd 1px, transparent 1px);
-  background-size: 100% 2rem, 15px 15px;
+  background-size: 100% 1.25rem, 15px 15px;
 }
 
 /* Remove custom scrollbar from paper as container now scrolls */
@@ -57,18 +57,18 @@
 
 .fax-header {
   border-bottom: 4px solid #000;
-  margin-bottom: 2rem;
-  padding-bottom: 1rem;
+  margin-bottom: 1.5rem;
+  padding-bottom: 0.75rem;
   display: flex;
   justify-content: space-between;
   align-items: flex-end;
 }
 
 .fax-title {
-  font-size: 3rem;
+  font-size: 2rem;
   font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: -2px;
+  letter-spacing: -1px;
   margin: 0;
   color: #000;
 }
@@ -82,12 +82,12 @@
 
 .fax-content {
   display: grid;
-  gap: 2.5rem;
+  gap: 1.5rem;
 }
 
 .fax-section {
   border: 2px solid #000;
-  padding: 1.5rem;
+  padding: 1rem;
   position: relative;
 }
 
@@ -95,12 +95,12 @@
   background: #000;
   color: #fff;
   display: inline-block;
-  padding: 0.3rem 0.8rem;
+  padding: 0.2rem 0.6rem;
   font-weight: 700;
   text-transform: uppercase;
-  font-size: 1rem;
+  font-size: 0.8rem;
   position: absolute;
-  top: -1.2rem;
+  top: -1rem;
   left: 1rem;
   transform: none;
 }
@@ -116,13 +116,13 @@
   display: flex;
   justify-content: space-between;
   border-bottom: 1px solid #ddd;
-  padding: 0.4rem 0;
+  padding: 0.2rem 0;
 }
 
 .fax-label {
   font-weight: 700;
   text-transform: uppercase;
-  font-size: 0.9rem;
+  font-size: 0.7rem;
   color: #000;
 }
 
@@ -130,7 +130,7 @@
   font-family: 'Courier Prime', monospace;
   font-weight: 700;
   color: #000;
-  font-size: 1rem;
+  font-size: 0.8rem;
 }
 
 .stamp-box {
@@ -152,8 +152,8 @@
 }
 
 .situation-text {
-  font-size: 1.1rem;
-  line-height: 1.6;
+  font-size: 0.9rem;
+  line-height: 1.3;
   text-align: justify;
   color: #000;
 }
@@ -163,7 +163,7 @@
 }
 
 .countdown-footer {
-  margin-top: 4rem;
+  margin-top: 2rem;
   text-align: center;
   font-weight: 700;
   letter-spacing: 3px;

@@ -242,7 +242,8 @@ export function useAircraftPhysics(config = {}, autoStart = true, model = 'reali
         throttle: isNaN(throttleValue) ? 0 : throttleValue,
         pitch: currentControlsRef.current.pitch,
         roll: currentControlsRef.current.roll,
-        yaw: currentControlsRef.current.yaw
+        yaw: currentControlsRef.current.yaw,
+        trim: currentControlsRef.current.trim || 0
       }, timeStep);
       // console.log('🎮 useAircraftPhysics: physicsService.update() returned:', newState);
 
@@ -375,17 +376,23 @@ export function useAircraftPhysics(config = {}, autoStart = true, model = 'reali
 
 
   const setPitch = useCallback((value) => {
+    // Input is usually -1 to 1 (normalized) or percentage
     const normalizedValue = Math.abs(value) <= 1 ? value : value / 100;
-    currentControlsRef.current = { ...currentControlsRef.current, pitch: normalizedValue * Math.PI / 180 };
+    // Map -1..1 to -25..25 degrees (approx 0.44 rad) for full deflection
+    const maxDeflectionDeg = 25;
+    currentControlsRef.current = { ...currentControlsRef.current, pitch: normalizedValue * maxDeflectionDeg * Math.PI / 180 };
   }, []);
 
   const setRoll = useCallback((value) => {
     const normalizedValue = Math.abs(value) <= 1 ? value : value / 100;
-    currentControlsRef.current = { ...currentControlsRef.current, roll: normalizedValue * Math.PI / 2 };
+    const maxDeflectionDeg = 30; // Ailerons typically 20-30 deg
+    currentControlsRef.current = { ...currentControlsRef.current, roll: normalizedValue * maxDeflectionDeg * Math.PI / 180 };
   }, []);
 
   const setYaw = useCallback((value) => {
-    currentControlsRef.current = { ...currentControlsRef.current, yaw: value * Math.PI / 180 };
+    // Rudder typically 30 deg
+    const maxDeflectionDeg = 30; 
+    currentControlsRef.current = { ...currentControlsRef.current, yaw: value * maxDeflectionDeg * Math.PI / 180 };
   }, []);
 
   const setEngineThrottle = useCallback((engineIndex, value) => {
@@ -428,6 +435,7 @@ export function useAircraftPhysics(config = {}, autoStart = true, model = 'reali
     if (physicsServiceRef.current && typeof physicsServiceRef.current.setTrim === 'function') {
       physicsServiceRef.current.setTrim(value);
     }
+    currentControlsRef.current = { ...currentControlsRef.current, trim: value };
   }, []);
 
   const resetAircraft = useCallback(() => {

@@ -18,15 +18,21 @@ class EnginePhysicsService {
             spoolDownRate: 20, // % per second
             ...config
         };
+        
+        // Correct TSFC if it's likely in the wrong units (e.g., kg/N/h instead of kg/N/s)
+        // Typical TSFC is around 0.3-0.6 lb/lbf/hr or ~1.1e-5 to 1.7e-5 kg/N/s
+        if (this.config.tsfc > 0.001) {
+            this.config.tsfc /= 3600;
+        }
 
         this.state = {
-            n1: 0, // Fan Speed %
-            n2: 0, // Core Speed %
-            egt: 15, // Exhaust Gas Temp (C) - ambient start
+            n1: 20, // Fan Speed % (Idle)
+            n2: 22, // Core Speed %
+            egt: 400, // Exhaust Gas Temp (C) - Idle
             thrust: 0, // Newtons
             fuelFlow: 0, // kg/s
-            oilPressure: 0, // psi
-            running: false,
+            oilPressure: 45, // psi
+            running: true, // Default to running for immediate gameplay
             failed: false
         };
     }
@@ -81,8 +87,15 @@ class EnginePhysicsService {
         // Fuel Flow
         // FF = TSFC * Thrust (approx)
         // But engines burn fuel at idle too
-        const idleFuel = this.config.maxThrust * 0.05 * this.config.tsfc; 
+        // Ensure TSFC is used correctly for kg/s
+        const idleFuel = (this.config.maxThrust * 0.05) * this.config.tsfc; 
         this.state.fuelFlow = (this.state.thrust * this.config.tsfc) + (this.state.running ? idleFuel : 0);
+
+        // Limit fuel flow to a sane maximum (e.g., 5kg/s per engine for a 737 class)
+        const maxSaneFF = 5.0; 
+        if (this.state.fuelFlow > maxSaneFF) {
+            this.state.fuelFlow = maxSaneFF;
+        }
 
         // EGT
         // Increases with N1 and Mach

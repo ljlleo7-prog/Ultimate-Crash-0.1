@@ -56,7 +56,7 @@ if (state.derived.airspeed > 100) {
 
 // 3. Rotation
 console.log("\n--- Test 3: Rotation ---");
-service.controls.elevator = -0.5; // Pull up
+service.controls.elevator = -0.15; // Gentle pull up
 runSim(5.0, 0.05, "Rotate");
 state = service.getOutputState();
 if (state.position.z > 5) {
@@ -67,7 +67,7 @@ if (state.position.z > 5) {
 
 // 4. Climb
 console.log("\n--- Test 4: Climb ---");
-service.controls.elevator = -0.1; // Maintain pitch
+service.controls.elevator = -0.05; // Maintain gentle pitch
 service.controls.gear = false; // Gear up
 runSim(10.0, 0.05, "Climb");
 state = service.getOutputState();

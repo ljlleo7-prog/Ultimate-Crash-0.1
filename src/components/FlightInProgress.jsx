@@ -584,16 +584,14 @@ const FlightInProgress = ({
                 }
                 case 'set-autopilot-targets': {
                   if (physicsService && typeof physicsService.updateAutopilotTargets === 'function' && payload) {
-                    const altitudeFt = typeof payload.altitude === 'number'
-                      ? payload.altitude
-                      : (flightData && typeof flightData.altitude === 'number' ? flightData.altitude : 0);
-                    const iasKts = typeof payload.ias === 'number'
-                      ? payload.ias
-                      : (flightData && typeof flightData.indicatedAirspeed === 'number' ? flightData.indicatedAirspeed : 0);
+                    // Direct pass-through for RealisticAutopilotService (Imperial Units)
+                    // ModernAutopilotModule sends: { ias, vs, altitude }
                     const targets = {
-                      altitude: altitudeFt / 3.28084,
-                      speed: iasKts / 1.94384
+                      altitude: payload.altitude, // ft
+                      speed: payload.ias,         // kts
+                      vs: payload.vs              // ft/min
                     };
+                    
                     physicsService.updateAutopilotTargets(targets);
                   }
                   console.log(`📡 FlightPanel Action: ${action} = ${JSON.stringify(payload)}`);

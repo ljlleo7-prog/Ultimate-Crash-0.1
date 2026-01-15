@@ -12,6 +12,7 @@
  */
 
 import EnginePhysicsService from './EnginePhysicsService.js';
+import RealisticAutopilotService from './RealisticAutopilotService.js';
 
 // ==========================================
 // Math Utilities
@@ -167,6 +168,9 @@ class RealisticFlightPhysicsService {
         this.onGround = true;
         this.crashReason = "";
         this.time = 0;
+
+        // Autopilot
+        this.autopilot = new RealisticAutopilotService();
     }
 
     validateAndParseAircraft(data) {
@@ -198,9 +202,10 @@ class RealisticFlightPhysicsService {
             Cm0: 0.0, // Pitching moment at zero AoA
             Cma: -1.2, // Pitch stability (Increased from -0.5 to -1.2 for better stability)
             Cmq: -15.0, // Pitch damping
-            Cde: -0.4, // Elevator effectiveness (Reduced from -1.0 to -0.4 to prevent backflips)
+            Cde: -0.8, // Elevator effectiveness (Increased from -0.4 to -0.8 for better rotation authority)
             
-            Clb: -0.1, // Dihedral effect (Roll stability)
+            // Lateral/Directional
+            Clb: -0.1, // Dihedral effect (Roll due to sideslip)
             Clp: -0.4, // Roll damping
             Cda: 0.15, // Aileron effectiveness
             
@@ -229,7 +234,37 @@ class RealisticFlightPhysicsService {
         const subSteps = 5;
         const subDt = dt / subSteps;
 
-        this.processInputs(input, dt); // Process inputs once per frame
+        // --- Autopilot Update ---
+        // Compute essential derived values for AP
+        const v_earth = this.state.quat.rotate(this.state.vel);
+        const currentAirspeed = this.state.vel.magnitude() * 1.94384; // knots
+        const currentVS = -v_earth.z * 196.85; // m/s -> ft/min (z is down, so -z is up)
+        const euler = this.state.quat.toEuler();
+        
+        const apState = {
+            airspeed: currentAirspeed,
+            verticalSpeed: currentVS,
+            pitch: euler.theta,
+            roll: euler.phi,
+            altitude: -this.state.pos.z * 3.28084
+        };
+
+        const apOutputs = this.autopilot.update(apState, this.controls, dt);
+        
+        let finalInput = input;
+        if (apOutputs) {
+            // Override user inputs with AP outputs
+            finalInput = {
+                ...input,
+                throttle: apOutputs.throttle,
+                pitch: apOutputs.elevator, // Map Elevator Command to Pitch Input
+                roll: apOutputs.aileron,   // Map Aileron Command to Roll Input
+                trim: apOutputs.trim,
+                yaw: apOutputs.rudder
+            };
+        }
+
+        this.processInputs(finalInput, dt); // Process inputs once per frame
 
         for (let i = 0; i < subSteps; i++) {
             this.time += subDt;
@@ -241,7 +276,7 @@ class RealisticFlightPhysicsService {
             this.updateEngines(env, subDt);
 
             // 4. Calculate Forces and Moments
-            const { forces, moments, aeroForces, thrustForces, gravityForces, groundForces } = this.calculateAerodynamicsAndGround(env);
+            const { forces, moments, aeroForces, thrustForces, gravityForces, groundForces, debug } = this.calculateAerodynamicsAndGround(env);
             
             // Store last for UI
             if (i === subSteps - 1) {
@@ -249,6 +284,7 @@ class RealisticFlightPhysicsService {
                 this.thrustForces = thrustForces;
                 this.gravityForces = gravityForces;
                 this.groundForces = groundForces;
+                this.debugData = debug;
             }
 
             // 5. Integrate
@@ -366,7 +402,13 @@ class RealisticFlightPhysicsService {
         const c = this.aircraft.chord;
         const b = this.aircraft.wingSpan;
         const pitch_damping = this.aircraft.Cmq * (this.state.rates.y * c) / (2 * (V_airspeed + 0.1));
-        const Cm = this.aircraft.Cm0 + (this.aircraft.Cma * alpha) + pitch_damping + (this.aircraft.Cde * (this.controls.elevator + this.controls.trim));
+        
+        // Flaps Pitch Moment (Cm_flaps)
+        // Flaps typically cause a nose-down moment (negative Cm) due to aft shift of CP,
+        // though downwash on tail can counteract. User requested "slight downward pitch torque".
+        const Cm_flaps = this.controls.flaps * -0.05;
+        
+        const Cm = this.aircraft.Cm0 + (this.aircraft.Cma * alpha) + pitch_damping + (this.aircraft.Cde * (this.controls.elevator + this.controls.trim)) + Cm_flaps;
 
         // Roll (Cl)
         // Cl = Clb * beta + Clp * (p * b / 2V) + Cda * aileron
@@ -422,89 +464,67 @@ class RealisticFlightPhysicsService {
         const q_inv = new Quaternion(this.state.quat.w, -this.state.quat.x, -this.state.quat.y, -this.state.quat.z);
         const gravityBody = q_inv.rotate(gravityEarth);
 
-        // --- Ground Reaction ---
-        let F_ground = new Vector3(0,0,0);
-        let M_ground = new Vector3(0,0,0);
+        // --- Ground Interaction (Multi-Point Gear) ---
+        // Simulating 3-point landing gear for realistic ground handling and rotation
+        let F_ground = new Vector3(0, 0, 0);
+        let M_ground = new Vector3(0, 0, 0);
+        
+        // Gear Definitions (Position relative to CG in Body Frame)
+        // x: Forward, y: Right, z: Down (CG at 0,0,0)
+        const gears = [
+            { name: 'nose', pos: new Vector3(14.0, 0, 3.0), k: 180000, c: 20000 },  // Nose Gear
+            { name: 'mainL', pos: new Vector3(-2.0, -3.5, 3.0), k: 500000, c: 50000 }, // Main Left
+            { name: 'mainR', pos: new Vector3(-2.0, 3.5, 3.0), k: 500000, c: 50000 }  // Main Right
+        ];
+        
+        let onGroundAny = false;
 
-        // Detect ground contact
-        // Altitude = -state.pos.z.
-        // If z > -gearHeight, we are touching ground (since z is down)
-        // Let's say z=0 is ground level (runway). 
-        // If pos.z >= -this.aircraft.gearHeight (approx), wheel touches.
-        
-        // Simplify: Check Height Above Ground
-        const height = -this.state.pos.z; // Altitude
-        const gearExt = this.controls.gear * this.aircraft.gearHeight; // Extended length
-        
-        this.onGround = false;
-        
-        if (height < gearExt) {
-            this.onGround = true;
-            const compression = gearExt - height;
+        gears.forEach(gear => {
+            // 1. Calculate Gear Position in Earth Frame (Z-Down)
+            const P_body = gear.pos;
+            const P_offset_earth = this.state.quat.rotate(P_body);
+            const P_world_z = this.state.pos.z + P_offset_earth.z;
             
-            // Spring Force (Upward in Earth Frame, needs rotation to Body)
-            // F = k * x - c * v_vertical
-            // We need vertical velocity in Earth frame
-            const velEarth = this.state.quat.rotate(this.state.vel);
-            const v_vertical = velEarth.z; // Positive is Down
-            
-            // Spring acts Up (-z earth)
-            const springForce = this.aircraft.gearStiffness * compression;
-            const dampingForce = -this.aircraft.gearDamping * v_vertical;
-            let F_z_earth_ground = -(springForce + dampingForce);
-            
-            if (F_z_earth_ground > 0) F_z_earth_ground = 0; // Ground pulls? No. Only pushes.
-            
-            // Apply to body
-            // We treat this as a force at the CG for simplicity (for heave)
-            // But for pitch/roll moments, we need contact points.
-            // Simplified: 
-            // 1. Normal Force to stop falling.
-            // 2. Friction Force to stop sliding.
-            
-            // Transform normal force to body
-            const F_normal_earth = new Vector3(0, 0, F_z_earth_ground);
-            const F_normal_body = q_inv.rotate(F_normal_earth);
-            
-            F_ground = F_ground.add(F_normal_body);
-            
-            // Friction (Opposing horizontal velocity)
-            const friction = this.aircraft.frictionCoeff + (this.controls.brakes ? this.aircraft.brakingFriction : 0);
-            // We use body velocity x/y as approx for ground slide relative to wheels
-            const horizVel = new Vector3(this.state.vel.x, this.state.vel.y, 0); 
-            const groundSpeed = horizVel.magnitude();
-            
-            let frictionForce = new Vector3();
-            
-            // Static friction / Stop condition logic
-            if (groundSpeed < 0.5 && this.controls.throttle < 0.1) {
-                 // High damping to stop completely (simulate static friction/brakes holding)
-                 frictionForce = horizVel.scale(-5.0 * this.state.mass); 
-            } else {
-                 // Kinetic friction
-                 // F_f = -mu * N * v_hat
-                 if (groundSpeed > 0) {
-                    const dir = horizVel.normalize();
-                    const normalMag = Math.abs(F_normal_body.z); // Approx normal force component
-                    const frictionMag = friction * normalMag;
-                    frictionForce = dir.scale(-frictionMag);
-                 }
+            if (P_world_z > 0) {
+                onGroundAny = true;
+                const depth = P_world_z;
+                
+                // 2. Velocity at Contact Point (Body Frame -> Earth Frame Z)
+                const V_point_body = this.state.vel.add(this.state.rates.cross(P_body));
+                const V_point_earth = this.state.quat.rotate(V_point_body);
+                const v_vertical = V_point_earth.z; // Positive = Moving Down
+                
+                // 3. Normal Force (Spring + Damper)
+                let F_n = -(gear.k * depth + gear.c * v_vertical);
+                if (F_n > 0) F_n = 0;
+                
+                // 4. Friction (Horizontal Plane)
+                const vel_h = new Vector3(V_point_earth.x, V_point_earth.y, 0);
+                const speed_h = vel_h.magnitude();
+                let F_f_earth = new Vector3(0, 0, 0);
+                
+                if (speed_h > 0.01) {
+                    const isBraking = this.controls.brakes > 0.1 && gear.name.includes('main');
+                    const mu = isBraking ? 0.8 : 0.02;
+                    const frictionMag = Math.abs(F_n) * mu;
+                    F_f_earth = vel_h.normalize().scale(-frictionMag);
+                    
+                    if (speed_h < 0.2 && this.controls.throttle < 0.1) {
+                         F_f_earth = vel_h.scale(-1000 * Math.abs(F_n));
+                    }
+                }
+                
+                // 5. Transform Forces to Body Frame
+                const F_gear_earth = new Vector3(F_f_earth.x, F_f_earth.y, F_n);
+                const F_gear_body = q_inv.rotate(F_gear_earth);
+                
+                // 6. Accumulate
+                F_ground = F_ground.add(F_gear_body);
+                M_ground = M_ground.add(P_body.cross(F_gear_body));
             }
-            F_ground = F_ground.add(frictionForce);
-            
-            // Moments from Gear
-            // Restore Pitch/Roll to 0 if on ground (Self-leveling gear spring logic)
-            // This is a "hack" to simulate 3-point gear restoring moments
-            const euler = this.state.quat.toEuler();
-            const kp_ground = 100000;
-            const kd_ground = 100000;
-            
-            M_ground.x = -kp_ground * euler.phi - kd_ground * this.state.rates.x;
-            M_ground.y = -kp_ground * euler.theta - kd_ground * this.state.rates.y;
-            
-            // Nose wheel steering
-            // M_ground.z += this.controls.rudder * 50000; 
-        }
+        });
+
+        this.onGround = onGroundAny;
 
         // --- Totals ---
         const totalForces = new Vector3(
@@ -525,7 +545,14 @@ class RealisticFlightPhysicsService {
             aeroForces: new Vector3(Fx_aero, Fy_aero, Fz_aero),
             thrustForces: new Vector3(Fx_thrust, 0, 0),
             gravityForces: gravityBody,
-            groundForces: F_ground
+            groundForces: F_ground,
+            debug: {
+                alpha, beta, q, 
+                CL, CD, Cm, Cl, Cn,
+                lift: F_lift, drag: F_drag, side: F_side,
+                pitchMoment: My_aero,
+                groundMomentY: M_ground.y
+            }
         };
     }
 
@@ -655,10 +682,10 @@ class RealisticFlightPhysicsService {
             hasCrashed: this.crashed,
             crashWarning: this.crashReason,
             engineParams: {
-                n1: this.engines.map(e => e.n1),
-                n2: this.engines.map(e => e.n1), // Mock
-                egt: this.engines.map(e => 400 + e.n1 * 4),
-                fuelFlow: this.engines.map(e => e.n1 * 0.5)
+                n1: this.engines.map(e => e.state.n1),
+                n2: this.engines.map(e => e.state.n2), 
+                egt: this.engines.map(e => e.state.egt),
+                fuelFlow: this.engines.map(e => e.state.fuelFlow)
             },
             fuel: this.state.fuel,
             
@@ -667,6 +694,25 @@ class RealisticFlightPhysicsService {
                 altitude_ft: altitude * 3.28084,
                 airspeed: this.state.vel.magnitude() * 1.94384,
                 heading: (euler.psi * 180 / Math.PI + 360) % 360
+            },
+            
+            debugPhysics: {
+                theta: euler.theta,
+                dynamicPressure_q: this.debugData?.q || 0,
+                pitchMoment_y: this.debugData?.pitchMoment || 0,
+                pitchRate_q: this.state.rates.y,
+                altitude_z: altitude,
+                isOnGround: this.onGround,
+                lift: this.debugData?.lift || 0,
+                pitchTorque: this.debugData?.pitchMoment || 0,
+                
+                // Extended Debugging
+                alpha: this.debugData?.alpha || 0,
+                beta: this.debugData?.beta || 0,
+                Cm: this.debugData?.Cm || 0,
+                CL: this.debugData?.CL || 0,
+                elevator: this.controls.elevator,
+                trim: this.controls.trim
             }
         };
     }
@@ -676,7 +722,29 @@ class RealisticFlightPhysicsService {
     setGear(val) { this.controls.gear = val ? 1 : 0; }
     setAirBrakes(val) { this.controls.brakes = val; }
     setTrim(val) { this.controls.trim = val; }
-    setEngineThrottle(idx, val) { 
+    setAutopilot(engaged, targets) {
+        // If targets provided, set them
+        if (targets) {
+            this.autopilot.setTargets(targets);
+        }
+        // Set engagement
+        if (typeof engaged === 'boolean') {
+            this.autopilot.setEngaged(engaged);
+        }
+    }
+    
+    updateAutopilotTargets(targets) {
+        this.autopilot.setTargets(targets);
+    }
+    
+    getAutopilotStatus() {
+        return {
+            engaged: this.autopilot.engaged,
+            targets: this.autopilot.targets
+        };
+    }
+
+    setEngineThrottle(idx, val) {  
         // We simulate global throttle mostly, but can handle array if needed
         // For now, update global target which updateEngines uses
         // But if individual control is needed, updateEngines needs modification.
