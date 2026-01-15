@@ -580,20 +580,27 @@
 .manual-controls {
   display: flex;
   justify-content: center;
-  align-items: center;
+  align-items: stretch;
   gap: 15px;
   margin-top: 15px;
   flex-wrap: nowrap;
   width: 100%;
-  max-width: 1000px;
+  max-width: 1100px;
   margin-left: auto;
   margin-right: auto;
 }
 
 /* Reduced size for individual controls to fit in 75% view */
 .manual-controls > * {
-  transform: scale(0.85);
+  transform: scale(0.9);
   transform-origin: center center;
+  flex: 0 1 auto;
+}
+
+/* Specific alignment for ThrustManager to match others' height */
+.manual-controls .thrust-manager-wrapper {
+  display: flex;
+  align-items: center;
 }
 
 @media (max-width: 1024px) {

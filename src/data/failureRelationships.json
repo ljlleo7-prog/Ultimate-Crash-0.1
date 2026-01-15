@@ -1,0 +1,70 @@
+{
+  "interrelationships": [
+    {
+      "trigger": "UNCONTAINED_ENGINE_FAILURE",
+      "consequences": [
+        {
+          "target": "HYDRAULIC_SYSTEM",
+          "probability": 0.8,
+          "description": "Debris cuts hydraulic lines in the wing or fuselage."
+        },
+        {
+          "target": "FUEL_TANK",
+          "probability": 0.4,
+          "description": "Debris punctures wing fuel tanks, causing a leak or fire."
+        },
+        {
+          "target": "CONTROL_SURFACES",
+          "probability": 0.6,
+          "description": "Shrapnel damages flaps or aileron actuators."
+        }
+      ]
+    },
+    {
+      "trigger": "TOTAL_ELECTRICAL_FAILURE",
+      "consequences": [
+        {
+          "target": "AVIONICS",
+          "probability": 1.0,
+          "description": "Loss of all glass cockpit displays. Standby instruments only."
+        },
+        {
+          "target": "FUEL_PUMPS",
+          "probability": 0.9,
+          "description": "Loss of boost pumps; engines rely on gravity feed or suction."
+        },
+        {
+          "target": "FLIGHT_CONTROL_LAWS",
+          "probability": 1.0,
+          "description": "Reversion to Direct Law or Mechanical Backup."
+        }
+      ]
+    },
+    {
+      "trigger": "RAPID_DECOMPRESSION",
+      "consequences": [
+        {
+          "target": "CREW_PERFORMANCE",
+          "probability": 1.0,
+          "description": "Hypoxia risk. Mandatory oxygen mask usage. Cognitive load increases."
+        },
+        {
+          "target": "STRUCTURAL_INTEGRITY",
+          "probability": 0.3,
+          "description": "Pressure differential causes secondary structural damage (floor collapse)."
+        }
+      ]
+    }
+  ],
+  "cascading_triggers": {
+    "OVERWEIGHT_LANDING": ["BRAKE_OVERHEAT", "TIRE_BURST", "GEAR_COLLAPSE"],
+    "SEVERE_TURBULENCE": ["ENGINE_STALL", "STRUCTURAL_STRESS", "PASSENGER_INJURY"],
+    "FUEL_STARVATION": ["DUAL_ENGINE_FLAMEOUT", "ELECTRICAL_EMERGENCY", "LOSS_OF_HYDRAULICS"]
+  },
+  "complexity_levels": {
+    "rookie": "Isolated single-system failures (e.g., one radio fails).",
+    "intermediate": "Single critical system failure with clear checklist (e.g., Engine Fire).",
+    "advanced": "Interrelated system failures (e.g., Engine failure causing hydraulic loss).",
+    "devil": "Hidden or contradictory failures (e.g., Pitot blockage with false overspeed warnings and secondary electrical glitches)."
+  }
+}

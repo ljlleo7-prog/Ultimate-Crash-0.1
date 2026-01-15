@@ -188,15 +188,15 @@ const FlightInitialization = ({
     switch (difficulty) {
       case 'rookie':
       case 'amateur':
-        return ['imaginary'];
+        return ['imaginary', 'test_model1'];
       case 'intermediate':
       case 'advanced':
-        return ['imaginary', 'realistic'];
+        return ['imaginary', 'realistic', 'test_model1'];
       case 'pro':
       case 'devil':
-        return ['realistic'];
+        return ['realistic', 'test_model1'];
       default:
-        return ['imaginary'];
+        return ['imaginary', 'test_model1'];
     }
   };
 

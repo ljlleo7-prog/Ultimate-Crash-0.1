@@ -304,7 +304,9 @@ const FlightPanelModular = ({ flightData, onActionRequest, aircraftModel, select
       // Manual controls at bottom
       React.createElement('div', { className: 'manual-controls' },
         React.createElement(DraggableJoystick, { controlPitch, controlRoll, flightState }),
-        React.createElement(ThrustManager, { controlThrust, flightState }),
+        React.createElement('div', { className: 'thrust-manager-wrapper' },
+          React.createElement(ThrustManager, { controlThrust, flightState })
+        ),
         React.createElement(ControlSurfacePanel, {
           controlFlaps,
           controlGear,

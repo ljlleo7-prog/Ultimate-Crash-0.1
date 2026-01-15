@@ -64,22 +64,43 @@ const CinematicReview = ({ callsign, selectedDeparture, selectedArrival, aircraf
             </div>
           </div>
 
-          {/* Section 2: Route & Weather */}
+          {/* Section 2: Detailed Route */}
           <div className="fax-section">
-            <div className="fax-section-title">02. OPS & METAR</div>
+            <div className="fax-section-title">02. ROUTE LOGISTICS</div>
             <div className="fax-grid">
-              <div className="fax-row"><span className="fax-label">DEPARTURE RWY</span> <span className="fax-value">{routeDetails?.departureRunway || 'N/A'}</span></div>
-              <div className="fax-row"><span className="fax-label">ARRIVAL RWY</span> <span className="fax-value">{routeDetails?.landingRunway || 'N/A'}</span></div>
-              <div className="fax-row"><span className="fax-label">SID/STAR</span> <span className="fax-value">{routeDetails ? `${routeDetails.sid || '-'} / ${routeDetails.star || '-'}` : 'STD'}</span></div>
+              <div className="fax-row"><span className="fax-label">DEPARTURE GATE</span> <span className="fax-value">{routeDetails?.departureGate || 'AUTO'}</span></div>
+              <div className="fax-row"><span className="fax-label">ARRIVAL GATE</span> <span className="fax-value">{routeDetails?.arrivalGate || 'AUTO'}</span></div>
+              <div className="fax-row"><span className="fax-label">TAXIWAY OUT</span> <span className="fax-value">{routeDetails?.departureTaxiway || 'AUTO'}</span></div>
+              <div className="fax-row"><span className="fax-label">TAXIWAY IN</span> <span className="fax-value">{routeDetails?.landingTaxiway || 'AUTO'}</span></div>
+              <div className="fax-row"><span className="fax-label">DEPARTURE RWY</span> <span className="fax-value">{routeDetails?.departureRunway || 'DEFAULT'}</span></div>
+              <div className="fax-row"><span className="fax-label">LANDING RWY</span> <span className="fax-value">{routeDetails?.landingRunway || 'DEFAULT'}</span></div>
+              <div className="fax-row"><span className="fax-label">SID</span> <span className="fax-value">{routeDetails?.sid || 'N/A'}</span></div>
+              <div className="fax-row"><span className="fax-label">STAR</span> <span className="fax-value">{routeDetails?.star || 'N/A'}</span></div>
+            </div>
+            {routeDetails?.waypoints && routeDetails.waypoints.length > 0 && (
+              <div className="fax-row" style={{ marginTop: '1rem', borderBottom: 'none' }}>
+                <span className="fax-label">WAYPOINTS:</span>
+                <span className="fax-value" style={{ textAlign: 'right', fontSize: '0.8rem' }}>
+                  {routeDetails.waypoints.join(' > ')}
+                </span>
+              </div>
+            )}
+          </div>
+
+          {/* Section 3: METAR */}
+          <div className="fax-section">
+            <div className="fax-section-title">03. METAR & ENV</div>
+            <div className="fax-grid">
               <div className="fax-row"><span className="fax-label">WIND</span> <span className="fax-value">{safeWeatherData.windSpeed} KTS</span></div>
               <div className="fax-row"><span className="fax-label">VISIBILITY</span> <span className="fax-value">{safeWeatherData.visibility} MI</span></div>
               <div className="fax-row"><span className="fax-label">TURBULENCE</span> <span className="fax-value">{safeTurbulence.toUpperCase()}</span></div>
+              <div className="fax-row"><span className="fax-label">CLOUD COVER</span> <span className="fax-value">{safeWeatherData.cloudCover}%</span></div>
             </div>
           </div>
 
-          {/* Section 3: Risk Assessment */}
+          {/* Section 4: Risk Assessment */}
           <div className="fax-section">
-            <div className="fax-section-title">03. RISK ASSESSMENT</div>
+            <div className="fax-section-title">04. RISK ASSESSMENT</div>
             <div className="situation-text">
               <p>
                 <strong>MISSION PROFILE:</strong> {safeDifficulty.toUpperCase()} LEVEL SIMULATION. 

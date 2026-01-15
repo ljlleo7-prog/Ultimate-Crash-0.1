@@ -1,0 +1,105 @@
+{
+  "individual_failures": {
+    "propulsion": [
+      {
+        "id": "ENG_FLAMEOUT",
+        "name": "Engine Flameout",
+        "description": "Sudden extinction of the flame in the combustion chamber. Can be caused by water ingestion, heavy turbulence, or fuel starvation.",
+        "symptoms": ["RPM drop", "EGT drop", "Loss of thrust", "Generator failure on affected engine"],
+        "criticality": "high"
+      },
+      {
+        "id": "ENG_FIRE",
+        "name": "Engine Fire",
+        "description": "Uncontrolled combustion within the engine nacelle. Requires immediate shutoff and fire suppression.",
+        "symptoms": ["Fire warning light", "High EGT", "Visual smoke/flame", "Potential structural damage"],
+        "criticality": "emergency"
+      },
+      {
+        "id": "COMPRESSOR_STALL",
+        "name": "Compressor Stall",
+        "description": "Disruption of airflow through the compressor. Can lead to surging and engine damage.",
+        "symptoms": ["Loud bangs", "Engine vibration", "Fluctuating RPM", "EGT spikes"],
+        "criticality": "medium"
+      },
+      {
+        "id": "THRUST_REVERSER_DEPLOYMENT",
+        "name": "In-flight Thrust Reverser Deployment",
+        "description": "Extremely dangerous mechanical failure where reversers deploy while airborne.",
+        "symptoms": ["Violent yaw", "Sudden speed drop", "Severe control difficulty", "Buffeting"],
+        "criticality": "catastrophic"
+      }
+    ],
+    "hydraulics": [
+      {
+        "id": "HYD_LEAK_TOTAL",
+        "name": "Total Hydraulic System Loss",
+        "description": "Complete loss of fluid in all hydraulic lines, often due to a central point of failure (e.g., engine burst).",
+        "symptoms": ["Stiff controls", "Inoperative landing gear", "Loss of flaps/slats", "Brake failure"],
+        "criticality": "catastrophic"
+      },
+      {
+        "id": "HYD_PUMP_FAILURE",
+        "name": "Hydraulic Pump Failure",
+        "description": "Failure of an engine-driven or electric hydraulic pump.",
+        "symptoms": ["Slow control response", "Pressure warnings", "Reduced redundancy"],
+        "criticality": "medium"
+      }
+    ],
+    "avionics": [
+      {
+        "id": "PITOT_BLOCKAGE",
+        "name": "Pitot Tube Blockage",
+        "description": "Icing or insect nest blocking the pitot tubes, leading to erroneous airspeed readings.",
+        "symptoms": ["Erratic airspeed", "Overspeed/Stall warnings simultaneously", "Autopilot disconnect"],
+        "criticality": "high"
+      },
+      {
+        "id": "IRS_DRIFT",
+        "name": "Inertial Reference System Drift",
+        "description": "Slowly increasing error in position and attitude data.",
+        "sumptions": ["Navigation errors", "Incorrect horizon on PFD", "Autopilot weaving"],
+        "criticality": "medium"
+      }
+    ],
+    "structural": [
+      {
+        "id": "CARGO_DOOR_EXPLOSION",
+        "name": "Cargo Door Explosive Decompression",
+        "description": "Failure of cargo door latches leading to rapid loss of cabin pressure and potential floor collapse.",
+        "symptoms": ["Loud bang", "Fog in cabin", "Loss of control cables", "Structural deformation"],
+        "criticality": "catastrophic"
+      },
+      {
+        "id": "TAIL_STRIKE_DAMAGE",
+        "name": "Delayed Tail Strike Failure",
+        "description": "Damage from a previous tail strike causing a structural failure during pressurized flight.",
+        "symptoms": ["Pressure loss", "Unusual aerodynamic noise", "Loss of vertical stabilizer effectiveness"],
+        "criticality": "high"
+      }
+    ]
+  },
+  "failure_patterns": [
+    {
+      "id": "DUAL_ENGINE_LOSS",
+      "name": "Total Power Loss",
+      "description": "Loss of all engines due to bird strike, volcanic ash, or fuel contamination.",
+      "components": ["ENG_FLAMEOUT_L", "ENG_FLAMEOUT_R"],
+      "strategy": "Dead-stick landing or ditching required."
+    },
+    {
+      "id": "UNCONTAINED_ENGINE_FAILURE",
+      "name": "Uncontained Engine Failure",
+      "description": "Engine parts breach the nacelle, damaging other systems.",
+      "components": ["ENG_FIRE", "HYD_LEAK_TOTAL", "FUEL_LEAK"],
+      "strategy": "Immediate emergency descent and landing."
+    },
+    {
+      "id": "SENSORY_CHAOS",
+      "name": "Sensory Data Inconsistency",
+      "description": "Multiple sensors failing or providing conflicting data, overwhelming the crew.",
+      "components": ["PITOT_BLOCKAGE", "STATIC_PORT_BLOCKAGE", "ALTIMETER_ERROR"],
+      "strategy": "Fly by pitch and power settings."
+    }
+  ]
+}

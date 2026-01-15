@@ -1,6 +1,7 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
 import NewFlightPhysicsService from '../services/newFlightPhysicsService.js';
 import SimpleFlightPhysicsService from '../services/SimpleFlightPhysicsService.js';
+import RealisticFlightPhysicsService from '../services/RealisticFlightPhysicsService.js';
 import { loadAircraftData } from '../services/aircraftService.js';
 
 export function useAircraftPhysics(config = {}, autoStart = true, model = 'realistic') {
@@ -137,9 +138,15 @@ export function useAircraftPhysics(config = {}, autoStart = true, model = 'reali
         
         const { initialLatitude, initialLongitude, ...restConfig } = config;
 
-        const service = model === 'imaginary' ? 
-          new SimpleFlightPhysicsService(finalAircraft) : 
-          new NewFlightPhysicsService(finalAircraft, initialLatitude, initialLongitude);
+        let service;
+        if (model === 'imaginary' || model === 'simple') {
+            service = new SimpleFlightPhysicsService(finalAircraft);
+        } else if (model === 'realistic_v2' || model === 'ultra_realistic' || model === 'test_model1') {
+            service = new RealisticFlightPhysicsService(finalAircraft, initialLatitude, initialLongitude);
+        } else {
+            // Default or 'realistic' (legacy)
+            service = new NewFlightPhysicsService(finalAircraft, initialLatitude, initialLongitude);
+        }
         
         if (config && service && service.aircraft) {
           if (typeof config.payloadWeight === 'number' && !isNaN(config.payloadWeight) && config.payloadWeight >= 0) {
