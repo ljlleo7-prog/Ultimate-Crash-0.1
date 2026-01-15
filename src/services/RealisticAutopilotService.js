@@ -93,13 +93,21 @@ class RealisticAutopilotService {
         this.targets = { ...this.targets, ...targets };
     }
 
-    setEngaged(engaged) {
+    setEngaged(engaged, currentState = null) {
         if (engaged && !this.engaged) {
             // Reset PIDs on engagement to avoid jumps
             this.speedPID.reset();
             this.vsPID.reset();
             this.pitchPID.reset();
             this.rollPID.reset();
+
+            // If we have current state, capture targets if they are currently 0
+            // This provides a smooth takeover if the user hasn't set targets yet.
+            if (currentState) {
+                if (this.targets.speed === 0) this.targets.speed = Math.round(currentState.airspeed);
+                if (this.targets.vs === 0) this.targets.vs = Math.round(currentState.verticalSpeed / 100) * 100;
+                if (this.targets.altitude === 0) this.targets.altitude = Math.round(currentState.altitude / 100) * 100;
+            }
         }
         this.engaged = engaged;
     }
@@ -115,6 +123,14 @@ class RealisticAutopilotService {
         if (!this.engaged) return null;
 
         const { airspeed, verticalSpeed, pitch, roll } = state;
+        
+        // Ensure targets are initialized if they were somehow left at 0
+        if (this.targets.speed === 0) this.targets.speed = Math.round(airspeed);
+        if (this.targets.vs === 0 && Math.abs(verticalSpeed) > 100) {
+             // Only capture VS if it's significant, otherwise keep 0 (level flight)
+             this.targets.vs = Math.round(verticalSpeed / 100) * 100;
+        }
+
         const { speed: targetSpeed, vs: targetVS } = this.targets;
 
         // 1. Auto-Throttle (Speed Control)
@@ -125,34 +141,20 @@ class RealisticAutopilotService {
         // But for now, standard PID.
         const throttleCmd = this.speedPID.update(targetSpeed, airspeed, dt);
 
-        // 2. Vertical Speed Control (VS -> Pitch -> Elevator)
-        // Outer Loop: Calculate required pitch for target VS
+        // 2. Vertical Speed Control (VS -> Pitch -> Trim)
         const targetPitch = this.vsPID.update(targetVS, verticalSpeed, dt);
+        const pitchCmd = this.pitchPID.update(targetPitch, pitch, dt);
         
-        // Inner Loop: Calculate elevator for target pitch
-        const elevatorCmd = this.pitchPID.update(targetPitch, pitch, dt);
-
-        // 3. Auto-Trim (Offload Elevator)
-        // If elevator is consistently holding a value, move trim to zero it out.
-        // This simulates the pilot (or AP) using the trim wheel to relieve stick pressure.
-        let newTrim = currentControls.trim;
-        const trimRate = 0.2 * dt; // Trim moves slowly
-        const elevatorThreshold = 0.05; // Deadband
-
-        if (elevatorCmd > elevatorThreshold) {
-            // Elevator is Nose Up (+) -> We need Nose Up Trim (+)
-            // Wait, standard convention:
-            // Elevator > 0 usually means Pull Back -> Nose Up.
-            // Trim > 0 usually means Nose Up Trim.
-            newTrim += trimRate;
-        } else if (elevatorCmd < -elevatorThreshold) {
-            // Elevator is Nose Down (-) -> We need Nose Down Trim (-)
-            newTrim -= trimRate;
-        }
-
-        // Clamp Trim (-1 to 1)
-        if (newTrim > 1) newTrim = 1;
-        if (newTrim < -1) newTrim = -1;
+        // Trim rate in radians per second. 0.1 rad/s = 10 units/s.
+        const trimRate = 0.1;
+        let newTrim = currentControls.trim + (pitchCmd * trimRate * dt);
+        const maxTrim = 0.2;
+        if (newTrim > maxTrim) newTrim = maxTrim;
+        if (newTrim < -maxTrim) newTrim = -maxTrim;
+        
+        // Fine elevator assist to handle transients smoothly
+        // Elevator helps quickly while trim catches up
+        const elevatorCmd = pitchCmd * 0.1;
 
         // 4. Roll Hold (Level Wings)
         const aileronCmd = this.rollPID.update(0, roll, dt);

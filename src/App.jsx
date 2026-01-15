@@ -347,6 +347,10 @@ function App() {
         apiKey: apiKey,
         setApiKey: setApiKey
       })
+    ),
+    
+    React.createElement('footer', { className: 'app-footer' },
+      React.createElement('p', null, '©2026, GeeksProductionStudio. All Rights Reserved.')
     )
   );
 }

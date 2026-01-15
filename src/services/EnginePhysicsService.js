@@ -11,7 +11,7 @@ class EnginePhysicsService {
         this.config = {
             maxThrust: config.maxThrust || 120000, // Newtons
             bypassRatio: config.bypassRatio || 5.0,
-            tsfc: config.specificFuelConsumption || 0.000018, // kg/(N*s)
+            tsfc: config.specificFuelConsumption || 0.000011, // kg/(N*s) base at SL
             idleN1: 20, // %
             maxN1: 102, // %
             spoolUpRate: 15, // % per second
@@ -35,6 +35,8 @@ class EnginePhysicsService {
             running: true, // Default to running for immediate gameplay
             failed: false
         };
+        
+        this._prevFuelFlow = 0;
     }
 
     update(dt, throttle, mach, altitude, airDensityRatio, ambientTemp) {
@@ -46,8 +48,25 @@ class EnginePhysicsService {
         // Target N1 based on throttle
         // Idle at 0 throttle is not 0 RPM if engine is running
         let targetN1 = 0;
+        let isReverse = false;
+
         if (this.state.running) {
-            targetN1 = this.config.idleN1 + throttle * (this.config.maxN1 - this.config.idleN1);
+            if (throttle >= 0) {
+                // Forward Thrust: 0% to 100% Throttle -> 20% to 102% N1
+                targetN1 = this.config.idleN1 + throttle * (this.config.maxN1 - this.config.idleN1);
+            } else {
+                // Reverse Thrust: -0.7 (or less) to 0% Throttle
+                // User requirement: N1 20% to 75%
+                // Max Reverse Input assumed around -0.7 to -1.0. Let's Normalize.
+                // We'll treat anything negative as reverse range.
+                // Let's assume input -1.0 is MAX Reverse, but typically clamped to -0.7.
+                // We map -0.7 (input) -> 75% N1.
+                // Ratio = |throttle| / 0.7
+                isReverse = true;
+                const maxReverseN1 = 75;
+                const reverseRatio = Math.min(1, Math.abs(throttle) / 0.7); // Clamp ratio to 1
+                targetN1 = this.config.idleN1 + reverseRatio * (maxReverseN1 - this.config.idleN1);
+            }
         } else if (throttle > 0.1) {
             // Autostart logic simplified: if throttle > 10%, start engine
             this.state.running = true; 
@@ -79,23 +98,34 @@ class EnginePhysicsService {
             thrustFactor = Math.pow(n1Ratio, 2.5); // Thrust ~ RPM^2.5 approx
         }
 
+        // Apply Reverse Thrust Logic
+        if (isReverse && throttle < -0.01) { // Threshold to avoid flickering at 0
+             // User requirement: -70% Thrust at Max Reverse (75% N1)
+             // At 75% N1, thrustFactor is roughly (75/102)^2.5 ~= 0.45
+             // We want -0.70 total thrust factor.
+             // So we need to scale the physical thrust produced by N1 to match the reverse effectiveness.
+             // Scalar = 0.70 / 0.45 ~= 1.55
+             // Also apply negative sign.
+             const reverseScalar = 1.55; 
+             thrustFactor = -1 * thrustFactor * reverseScalar;
+        }
+
         const altitudeFactor = Math.pow(airDensityRatio, 0.7);
         const machFactor = Math.max(0, 1 - 0.2 * mach); // Ram drag effect simplified
 
         this.state.thrust = this.config.maxThrust * thrustFactor * altitudeFactor * machFactor;
 
-        // Fuel Flow
-        // FF = TSFC * Thrust (approx)
-        // But engines burn fuel at idle too
-        // Ensure TSFC is used correctly for kg/s
-        const idleFuel = (this.config.maxThrust * 0.05) * this.config.tsfc; 
-        this.state.fuelFlow = (this.state.thrust * this.config.tsfc) + (this.state.running ? idleFuel : 0);
-
-        // Limit fuel flow to a sane maximum (e.g., 5kg/s per engine for a 737 class)
-        const maxSaneFF = 5.0; 
-        if (this.state.fuelFlow > maxSaneFF) {
-            this.state.fuelFlow = maxSaneFF;
-        }
+        // Fuel Flow (environment-aware, N1-informed, always positive)
+        const tsfcEff = this.computeTSFC(this.config.tsfc, airDensityRatio, mach, this.state.n1);
+        const idleFlow = this.computeIdleFuelFlow(this.config.tsfc, airDensityRatio, this.state.n1);
+        
+        const thrustDemandAbs = Math.abs(this.state.thrust);
+        const rawFuelFlow = idleFlow + tsfcEff * thrustDemandAbs;
+        
+        const alpha = 0.35; // smoothing factor
+        const smoothed = this._prevFuelFlow * (1 - alpha) + rawFuelFlow * alpha;
+        this.state.fuelFlow = Math.max(idleFlow, smoothed);
+        this._prevFuelFlow = this.state.fuelFlow;
 
         // EGT
         // Increases with N1 and Mach
@@ -104,6 +134,19 @@ class EnginePhysicsService {
         this.state.egt = this.state.running ? runningEGT : baseEGT + (this.state.egt - baseEGT) * 0.99;
 
         return this.getOutput();
+    }
+    
+    computeTSFC(tsfc0, densityRatio, mach, n1) {
+        const f_alt = 0.6 + 0.4 * Math.max(0, Math.min(1, densityRatio));
+        const f_mach = 1 + 0.06 * Math.max(0, mach - 0.25);
+        const f_n1 = 0.8 + 0.25 * Math.max(0, Math.min(1, n1 / this.config.maxN1));
+        return tsfc0 * f_alt * f_mach * f_n1;
+    }
+    
+    computeIdleFuelFlow(tsfc0, densityRatio, n1) {
+        const idleRatio = Math.max(0.15, Math.min(0.4, n1 / this.config.maxN1));
+        const c_idle = 0.7;
+        return c_idle * tsfc0 * this.config.maxThrust * Math.pow(idleRatio, 1.8) * Math.max(0.5, densityRatio);
     }
 
     spoolDown(dt) {

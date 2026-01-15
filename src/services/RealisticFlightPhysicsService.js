@@ -142,7 +142,7 @@ class RealisticFlightPhysicsService {
             
             // Mass Properties
             mass: this.aircraft.mass,
-            fuel: this.aircraft.fuelWeight
+            fuel: (this.aircraft.fuelWeight ?? this.aircraft.maxFuelCapacity ?? 10000)
         };
 
         // Control State
@@ -177,6 +177,17 @@ class RealisticFlightPhysicsService {
         // Ensure defaults for critical physics parameters
         return {
             ...data,
+            specificFuelConsumption: (function() {
+                if (typeof data.specificFuelConsumption === 'number') return data.specificFuelConsumption;
+                const burnPerNm = data.typicalFuelBurn || 2.5; // kg per nautical mile
+                const cruiseKts = data.cruiseSpeed || 450; // knots
+                const engines = data.engineCount || 2;
+                const perEngineThrust = data.maxThrustPerEngine || 120000; // N
+                const totalThrust = engines * perEngineThrust;
+                const kgPerSec = (burnPerNm * cruiseKts) / 3600;
+                const sfc = totalThrust > 0 ? kgPerSec / totalThrust : 0.000015;
+                return sfc;
+            })(),
             mass: (data.emptyWeight || 40000) + (data.fuelWeight || 10000) + (data.payloadWeight || 0),
             wingArea: data.wingArea || 125,
             wingSpan: data.wingSpan || 35,
@@ -196,7 +207,7 @@ class RealisticFlightPhysicsService {
             CL0: data.basicLiftCoefficient || 0.2,
             CLa: data.liftCurveSlope || 5.5, // per radian
             CD0: data.zeroLiftDragCoefficient || 0.02,
-            K: data.inducedDragFactor || 0.04, // Induced drag factor (CD = CD0 + K * CL^2)
+            K: data.inducedDragFactor || 0.025, // Reduced from 0.04 to 0.025 to lower induced drag
             
             // Stability Derivatives (Approximated if missing)
             Cm0: 0.0, // Pitching moment at zero AoA
@@ -218,7 +229,15 @@ class RealisticFlightPhysicsService {
             gearStiffness: 3000000, // Increased to support ~80 tons (Weight ~800kN). Compression ~0.3m
             gearDamping: 300000, // Increased for stability
             frictionCoeff: 0.02,
-            brakingFriction: 0.8
+            brakingFriction: 0.8,
+            
+            // Flap Profile Fallback
+            flapProfile: data.flapProfile || {
+                positions: [
+                    { angle: 0, clIncrement: 0, cdIncrement: 0 },
+                    { angle: 35, clIncrement: 0.3, cdIncrement: 0.01 }
+                ]
+            }
         };
     }
 
@@ -237,7 +256,8 @@ class RealisticFlightPhysicsService {
         // --- Autopilot Update ---
         // Compute essential derived values for AP
         const v_earth = this.state.quat.rotate(this.state.vel);
-        const currentAirspeed = this.state.vel.magnitude() * 1.94384; // knots
+        const airspeedsForAP = this.calculateAirspeeds();
+        const currentAirspeed = airspeedsForAP.indicatedAirspeed; // IAS in knots
         const currentVS = -v_earth.z * 196.85; // m/s -> ft/min (z is down, so -z is up)
         const euler = this.state.quat.toEuler();
         
@@ -313,7 +333,10 @@ class RealisticFlightPhysicsService {
         // Systems
         if (input.flaps !== undefined) this.controls.flaps = input.flaps;
         if (input.gear !== undefined) this.controls.gear = input.gear ? 1 : 0;
-        this.controls.trim = input.trim || 0;
+        
+        // Trim smoothing
+        const targetTrim = input.trim !== undefined ? input.trim : this.controls.trim;
+        this.controls.trim += (targetTrim - this.controls.trim) * rate;
         
         // Brakes (simple logic: low throttle + on ground)
         if (this.onGround && this.controls.throttle < 0.1) {
@@ -343,7 +366,7 @@ class RealisticFlightPhysicsService {
         const mach = this.state.vel.magnitude() / speedOfSound;
         const airDensityRatio = env.density / this.CONSTANTS.SEA_LEVEL_DENSITY;
 
-        this.engines.forEach((engine, i) => {
+        this.engines.forEach((engine) => {
              // We can allow differential throttle if input structure supports it, 
              // for now use global throttle for all
              engine.update(dt, this.controls.throttle, mach, -this.state.pos.z, airDensityRatio, env.temp);
@@ -380,17 +403,40 @@ class RealisticFlightPhysicsService {
 
         // --- Aerodynamic Coefficients ---
         
+        // Flap Increments from Profile
+        const flapIncrements = this.getFlapIncrements();
+        const CL_flaps = flapIncrements.cl;
+        const CD_flaps_base = flapIncrements.cd;
+
         // Lift (CL)
         // CL = CL0 + CLa * alpha + CL_flaps + CL_elevator
-        const CL_flaps = this.controls.flaps * 0.5; // Approx flap lift
         const CL_stall_drop = Math.abs(alpha) > 0.3 ? -0.5 * Math.sin((Math.abs(alpha) - 0.3) * 5) : 0; // Simple stall drop
         let CL = this.aircraft.CL0 + this.aircraft.CLa * alpha + CL_flaps + (this.controls.elevator * 0.3) + CL_stall_drop;
 
         // Drag (CD)
         // CD = CD0 + K * CL^2 + CD_flaps + CD_gear
-        const CD_flaps = this.controls.flaps * 0.05;
-        const CD_gear = this.controls.gear * 0.02;
-        const CD = this.aircraft.CD0 + this.aircraft.K * CL * CL + CD_flaps + CD_gear;
+        
+        // Ground Effect on Induced Drag
+        const h = -this.state.pos.z; // Altitude (CG)
+        const wingSpan = this.aircraft.wingSpan;
+        let groundEffectFactor = 1.0;
+        
+        if (h < wingSpan) {
+            const r = h / wingSpan;
+            // Torenbeek's approximation for induced drag reduction
+            groundEffectFactor = (16 * r * r) / (1 + 16 * r * r);
+            // Clamp to avoid unrealistic zero drag (min 10% of induced drag)
+            if (groundEffectFactor < 0.1) groundEffectFactor = 0.1; 
+        }
+
+        const CD_flaps = CD_flaps_base; 
+        const CD_gear = this.controls.gear * 0.015; 
+        
+        // Clamp CL for induced drag to prevent runaway drag at high angles (stall region)
+        const CL_induced_calc = Math.min(Math.abs(CL), 1.35); // Cap effective CL for induced drag
+        const CD_induced = this.aircraft.K * CL_induced_calc * CL_induced_calc * groundEffectFactor;
+        
+        const CD = this.aircraft.CD0 + CD_induced + CD_flaps + CD_gear;
 
         // Side Force (CY)
         // CY = CYb * beta + CYdr * rudder
@@ -406,7 +452,7 @@ class RealisticFlightPhysicsService {
         // Flaps Pitch Moment (Cm_flaps)
         // Flaps typically cause a nose-down moment (negative Cm) due to aft shift of CP,
         // though downwash on tail can counteract. User requested "slight downward pitch torque".
-        const Cm_flaps = this.controls.flaps * -0.05;
+        const Cm_flaps = this.controls.flaps * -0.01;
         
         const Cm = this.aircraft.Cm0 + (this.aircraft.Cma * alpha) + pitch_damping + (this.aircraft.Cde * (this.controls.elevator + this.controls.trim)) + Cm_flaps;
 
@@ -588,8 +634,6 @@ class RealisticFlightPhysicsService {
         this.state.pos = this.state.pos.add(v_earth.scale(dt));
         
         // Quaternion dot = 0.5 * q * w (quaternion multiplication)
-        // w as pure quaternion (0, p, q, r)
-        const qw = new Quaternion(0, this.state.rates.x, this.state.rates.y, this.state.rates.z);
         // q_dot = 0.5 * q * qw
         
         const currentQ = this.state.quat;
@@ -645,6 +689,7 @@ class RealisticFlightPhysicsService {
         const v_earth = this.state.quat.rotate(this.state.vel);
         const vs = -v_earth.z;
 
+        const autopilotStatus = this.getAutopilotStatus ? this.getAutopilotStatus() : { engaged: false, targets: {} };
         return {
             position: {
                 x: this.state.pos.x, // North
@@ -681,6 +726,8 @@ class RealisticFlightPhysicsService {
             verticalSpeed: vs * 196.85, // m/s -> ft/min
             hasCrashed: this.crashed,
             crashWarning: this.crashReason,
+            autopilot: autopilotStatus,
+            autopilotTargets: autopilotStatus.targets,
             engineParams: {
                 n1: this.engines.map(e => e.state.n1),
                 n2: this.engines.map(e => e.state.n2), 
@@ -729,12 +776,49 @@ class RealisticFlightPhysicsService {
         }
         // Set engagement
         if (typeof engaged === 'boolean') {
-            this.autopilot.setEngaged(engaged);
+            const v_earth = this.state.quat.rotate(this.state.vel);
+            const airspeeds = this.calculateAirspeeds();
+            const euler = this.state.quat.toEuler();
+            
+            const currentState = {
+                airspeed: airspeeds.indicatedAirspeed,
+                verticalSpeed: -v_earth.z * 196.85,
+                pitch: euler.theta,
+                roll: euler.phi,
+                altitude: -this.state.pos.z * 3.28084
+            };
+            
+            this.autopilot.setEngaged(engaged, currentState);
         }
     }
     
     updateAutopilotTargets(targets) {
         this.autopilot.setTargets(targets);
+    }
+    
+    getFlapIncrements() {
+        const profile = this.aircraft.flapProfile;
+        if (!profile || !profile.positions || profile.positions.length === 0) {
+            return { cl: 0, cd: 0 };
+        }
+
+        const flapInput = this.controls.flaps; // 0 to 1
+        const positions = profile.positions;
+        const numPositions = positions.length;
+
+        if (flapInput <= 0) return { cl: positions[0].clIncrement || 0, cd: positions[0].cdIncrement || 0 };
+        if (flapInput >= 1) return { cl: positions[numPositions - 1].clIncrement || 0, cd: positions[numPositions - 1].cdIncrement || 0 };
+
+        // Linear interpolation between profile positions
+        const scaledInput = flapInput * (numPositions - 1);
+        const idx1 = Math.floor(scaledInput);
+        const idx2 = Math.min(idx1 + 1, numPositions - 1);
+        const frac = scaledInput - idx1;
+
+        const cl = positions[idx1].clIncrement + (positions[idx2].clIncrement - positions[idx1].clIncrement) * frac;
+        const cd = positions[idx1].cdIncrement + (positions[idx2].cdIncrement - positions[idx1].cdIncrement) * frac;
+
+        return { cl, cd };
     }
     
     getAutopilotStatus() {
@@ -744,7 +828,7 @@ class RealisticFlightPhysicsService {
         };
     }
 
-    setEngineThrottle(idx, val) {  
+    setEngineThrottle() {  
         // We simulate global throttle mostly, but can handle array if needed
         // For now, update global target which updateEngines uses
         // But if individual control is needed, updateEngines needs modification.

@@ -42,7 +42,7 @@
       "y": 1.5,
       "z": 1.0
     },
-    "specificFuelConsumption": 0.000021,
+    "specificFuelConsumption": 0.000013,
     "elevatorEffectiveness": 0.00105,
     "aileronEffectiveness": 0.00052,
     "rudderEffectiveness": 0.00031,
@@ -59,13 +59,13 @@
     "flapProfile": {
       "positions": [
         { "angle": 0, "clIncrement": 0, "cdIncrement": 0, "label": "UP" },
-        { "angle": 5, "clIncrement": 0.1, "cdIncrement": 0.005, "label": "1" },
-        { "angle": 10, "clIncrement": 0.3, "cdIncrement": 0.01, "label": "5" },
-        { "angle": 15, "clIncrement": 0.5, "cdIncrement": 0.02, "label": "10" },
-        { "angle": 20, "clIncrement": 0.8, "cdIncrement": 0.03, "label": "15" },
-        { "angle": 25, "clIncrement": 1.1, "cdIncrement": 0.05, "label": "25" },
-        { "angle": 30, "clIncrement": 1.3, "cdIncrement": 0.08, "label": "30" },
-        { "angle": 35, "clIncrement": 1.5, "cdIncrement": 0.12, "label": "40" }
+        { "angle": 5, "clIncrement": 0.02, "cdIncrement": 0.0005, "label": "1" },
+        { "angle": 10, "clIncrement": 0.05, "cdIncrement": 0.001, "label": "5" },
+        { "angle": 15, "clIncrement": 0.1, "cdIncrement": 0.002, "label": "10" },
+        { "angle": 20, "clIncrement": 0.15, "cdIncrement": 0.004, "label": "15" },
+        { "angle": 25, "clIncrement": 0.2, "cdIncrement": 0.006, "label": "25" },
+        { "angle": 30, "clIncrement": 0.25, "cdIncrement": 0.008, "label": "30" },
+        { "angle": 35, "clIncrement": 0.3, "cdIncrement": 0.01, "label": "40" }
       ]
     },
     "airbrakeProfile": {
@@ -118,7 +118,7 @@
         "y": 1.5,
         "z": 1.0
       },
-      "specificFuelConsumption": 0.000018,
+      "specificFuelConsumption": 0.000014,
       "elevatorEffectiveness": 0.00102,
       "aileronEffectiveness": 0.00051,
       "rudderEffectiveness": 0.00030,
@@ -135,10 +135,10 @@
       "flapProfile": {
         "positions": [
           { "angle": 0, "clIncrement": 0, "cdIncrement": 0, "label": "UP" },
-          { "angle": 18, "clIncrement": 0.4, "cdIncrement": 0.02, "label": "1" },
-          { "angle": 20, "clIncrement": 0.6, "cdIncrement": 0.035, "label": "2" },
-          { "angle": 25, "clIncrement": 0.8, "cdIncrement": 0.05, "label": "3" },
-          { "angle": 30, "clIncrement": 1.0, "cdIncrement": 0.07, "label": "FULL" }
+          { "angle": 18, "clIncrement": 0.1, "cdIncrement": 0.002, "label": "1" },
+          { "angle": 20, "clIncrement": 0.18, "cdIncrement": 0.004, "label": "2" },
+          { "angle": 25, "clIncrement": 0.25, "cdIncrement": 0.007, "label": "3" },
+          { "angle": 30, "clIncrement": 0.35, "cdIncrement": 0.012, "label": "FULL" }
         ]
       },
       "airbrakeProfile": {
@@ -192,7 +192,7 @@
         "y": 1.5,
         "z": 1.0
       },
-      "specificFuelConsumption": 0.000016,
+      "specificFuelConsumption": 0.000010,
       "elevatorEffectiveness": 0.00088,
       "aileronEffectiveness": 0.00044,
       "rudderEffectiveness": 0.00026,
@@ -209,10 +209,10 @@
       "flapProfile": {
         "positions": [
           { "angle": 0, "clIncrement": 0, "cdIncrement": 0, "label": "UP" },
-          { "angle": 10, "clIncrement": 0.3, "cdIncrement": 0.015, "label": "TO1" },
-          { "angle": 15, "clIncrement": 0.5, "cdIncrement": 0.025, "label": "TO2" },
-          { "angle": 20, "clIncrement": 0.7, "cdIncrement": 0.04, "label": "LDG" },
-          { "angle": 30, "clIncrement": 1.0, "cdIncrement": 0.075, "label": "FULL" }
+          { "angle": 10, "clIncrement": 0.1, "cdIncrement": 0.002, "label": "TO1" },
+          { "angle": 15, "clIncrement": 0.18, "cdIncrement": 0.004, "label": "TO2" },
+          { "angle": 20, "clIncrement": 0.25, "cdIncrement": 0.008, "label": "LDG" },
+          { "angle": 30, "clIncrement": 0.35, "cdIncrement": 0.015, "label": "FULL" }
         ]
       },
       "airbrakeProfile": {
@@ -269,6 +269,15 @@
       "momentOfInertiaRoll": 165000,
       "momentOfInertiaPitch": 230000,
       "momentOfInertiaYaw": 295000,
+      "flapProfile": {
+        "positions": [
+          { "angle": 0, "clIncrement": 0, "cdIncrement": 0, "label": "UP" },
+          { "angle": 10, "clIncrement": 0.1, "cdIncrement": 0.002, "label": "1" },
+          { "angle": 15, "clIncrement": 0.2, "cdIncrement": 0.005, "label": "2" },
+          { "angle": 20, "clIncrement": 0.3, "cdIncrement": 0.01, "label": "3" },
+          { "angle": 30, "clIncrement": 0.4, "cdIncrement": 0.015, "label": "FULL" }
+        ]
+      },
       "minNoseGearFailedPitch": -0.2,
       "maxGroundPitch": 0.3,
       "groundCollisionPitchTorqueFactor": 0.5
@@ -318,6 +327,14 @@
       "momentOfInertiaRoll": 18000,
       "momentOfInertiaPitch": 28000,
       "momentOfInertiaYaw": 42000,
+      "flapProfile": {
+        "positions": [
+          { "angle": 0, "clIncrement": 0, "cdIncrement": 0, "label": "UP" },
+          { "angle": 10, "clIncrement": 0.1, "cdIncrement": 0.002, "label": "1" },
+          { "angle": 20, "clIncrement": 0.2, "cdIncrement": 0.005, "label": "2" },
+          { "angle": 35, "clIncrement": 0.3, "cdIncrement": 0.01, "label": "FULL" }
+        ]
+      },
       "minNoseGearFailedPitch": -0.2,
       "maxGroundPitch": 0.3,
       "groundCollisionPitchTorqueFactor": 0.5
@@ -367,6 +384,13 @@
       "momentOfInertiaRoll": 2500,
       "momentOfInertiaPitch": 3500,
       "momentOfInertiaYaw": 5500,
+      "flapProfile": {
+        "positions": [
+          { "angle": 0, "clIncrement": 0, "cdIncrement": 0, "label": "UP" },
+          { "angle": 15, "clIncrement": 0.1, "cdIncrement": 0.003, "label": "1" },
+          { "angle": 35, "clIncrement": 0.25, "cdIncrement": 0.008, "label": "FULL" }
+        ]
+      },
       "minNoseGearFailedPitch": -0.2,
       "maxGroundPitch": 0.3,
       "groundCollisionPitchTorqueFactor": 0.5
@@ -416,6 +440,17 @@
       "momentOfInertiaRoll": 250000,
       "momentOfInertiaPitch": 380000,
       "momentOfInertiaYaw": 450000,
+      "flapProfile": {
+        "positions": [
+          { "angle": 0, "clIncrement": 0, "cdIncrement": 0, "label": "UP" },
+          { "angle": 5, "clIncrement": 0.05, "cdIncrement": 0.001, "label": "1" },
+          { "angle": 10, "clIncrement": 0.1, "cdIncrement": 0.002, "label": "5" },
+          { "angle": 15, "clIncrement": 0.18, "cdIncrement": 0.004, "label": "10" },
+          { "angle": 20, "clIncrement": 0.25, "cdIncrement": 0.007, "label": "20" },
+          { "angle": 25, "clIncrement": 0.35, "cdIncrement": 0.012, "label": "25" },
+          { "angle": 30, "clIncrement": 0.45, "cdIncrement": 0.018, "label": "30" }
+        ]
+      },
       "minNoseGearFailedPitch": -0.2,
       "maxGroundPitch": 0.3,
       "groundCollisionPitchTorqueFactor": 0.5
@@ -465,6 +500,15 @@
       "momentOfInertiaRoll": 420000,
       "momentOfInertiaPitch": 580000,
       "momentOfInertiaYaw": 680000,
+      "flapProfile": {
+        "positions": [
+          { "angle": 0, "clIncrement": 0, "cdIncrement": 0, "label": "UP" },
+          { "angle": 10, "clIncrement": 0.1, "cdIncrement": 0.002, "label": "1" },
+          { "angle": 15, "clIncrement": 0.2, "cdIncrement": 0.005, "label": "2" },
+          { "angle": 25, "clIncrement": 0.35, "cdIncrement": 0.012, "label": "3" },
+          { "angle": 35, "clIncrement": 0.5, "cdIncrement": 0.02, "label": "FULL" }
+        ]
+      },
       "minNoseGearFailedPitch": -0.2,
       "maxGroundPitch": 0.3,
       "groundCollisionPitchTorqueFactor": 0.5
@@ -511,7 +555,7 @@
         "y": 1.5,
         "z": 1.0
       },
-      "specificFuelConsumption": 0.000057,
+      "specificFuelConsumption": 0.000017,
       "elevatorEffectiveness": 0.00095,
       "aileronEffectiveness": 0.00047,
       "rudderEffectiveness": 0.00028,
@@ -525,6 +569,14 @@
       "momentOfInertiaRoll": 150000,
       "momentOfInertiaPitch": 210000,
       "momentOfInertiaYaw": 280000,
+      "flapProfile": {
+        "positions": [
+          { "angle": 0, "clIncrement": 0, "cdIncrement": 0, "label": "UP" },
+          { "angle": 10, "clIncrement": 0.1, "cdIncrement": 0.002, "label": "1" },
+          { "angle": 15, "clIncrement": 0.2, "cdIncrement": 0.005, "label": "2" },
+          { "angle": 25, "clIncrement": 0.35, "cdIncrement": 0.012, "label": "FULL" }
+        ]
+      },
       "minNoseGearFailedPitch": -0.2,
       "maxGroundPitch": 0.3,
       "groundCollisionPitchTorqueFactor": 0.5
@@ -571,7 +623,7 @@
         "y": 1.5,
         "z": 1.0
       },
-      "specificFuelConsumption": 0.000054,
+      "specificFuelConsumption": 0.000019,
       "elevatorEffectiveness": 0.0009,
       "aileronEffectiveness": 0.00045,
       "rudderEffectiveness": 0.00027,
@@ -585,6 +637,14 @@
       "momentOfInertiaRoll": 220000,
       "momentOfInertiaPitch": 320000,
       "momentOfInertiaYaw": 390000,
+      "flapProfile": {
+        "positions": [
+          { "angle": 0, "clIncrement": 0, "cdIncrement": 0, "label": "UP" },
+          { "angle": 10, "clIncrement": 0.1, "cdIncrement": 0.002, "label": "1" },
+          { "angle": 15, "clIncrement": 0.2, "cdIncrement": 0.005, "label": "2" },
+          { "angle": 25, "clIncrement": 0.35, "cdIncrement": 0.012, "label": "FULL" }
+        ]
+      },
       "minNoseGearFailedPitch": -0.2,
       "maxGroundPitch": 0.3,
       "groundCollisionPitchTorqueFactor": 0.5
@@ -620,6 +680,16 @@
       "zeroLiftDragCoefficient": 0.026,
       "inducedDragFactor": 0.041,
       "basicLiftCoefficient": 0.24,
+      "flapProfile": {
+        "positions": [
+          { "angle": 0, "clIncrement": 0, "cdIncrement": 0, "label": "UP" },
+          { "angle": 1, "clIncrement": 0.05, "cdIncrement": 0.001, "label": "1" },
+          { "angle": 5, "clIncrement": 0.1, "cdIncrement": 0.002, "label": "5" },
+          { "angle": 15, "clIncrement": 0.2, "cdIncrement": 0.005, "label": "15" },
+          { "angle": 25, "clIncrement": 0.3, "cdIncrement": 0.01, "label": "25" },
+          { "angle": 30, "clIncrement": 0.4, "cdIncrement": 0.015, "label": "30" }
+        ]
+      },
       "horizontalStabilizerArea": 35,
       "horizontalStabilizerCL": -0.1,
       "horizontalStabilizerMomentArm": 14.0,
@@ -631,7 +701,7 @@
         "y": 1.5,
         "z": 1.0
       },
-      "specificFuelConsumption": 0.00006,
+      "specificFuelConsumption": 0.000016,
       "elevatorEffectiveness": 0.001,
       "aileronEffectiveness": 0.0005,
       "rudderEffectiveness": 0.0003,

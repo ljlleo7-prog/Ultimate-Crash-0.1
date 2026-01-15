@@ -432,10 +432,16 @@ export function useAircraftPhysics(config = {}, autoStart = true, model = 'reali
   }, []);
 
   const setTrim = useCallback((value) => {
+    // Trim sensitivity adjustment
+    // Map -1..1 to -0.2..0.2 radians (approx +/- 11.5 degrees)
+    const normalizedValue = Math.abs(value) <= 1 ? value : value / 100;
+    const maxTrimRad = 0.2; 
+    const scaledTrim = normalizedValue * maxTrimRad;
+
     if (physicsServiceRef.current && typeof physicsServiceRef.current.setTrim === 'function') {
-      physicsServiceRef.current.setTrim(value);
+      physicsServiceRef.current.setTrim(scaledTrim);
     }
-    currentControlsRef.current = { ...currentControlsRef.current, trim: value };
+    currentControlsRef.current = { ...currentControlsRef.current, trim: scaledTrim };
   }, []);
 
   const resetAircraft = useCallback(() => {

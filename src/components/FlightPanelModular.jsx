@@ -109,13 +109,14 @@ const FlightPanelModular = ({ flightData, onActionRequest, aircraftModel, select
         flapsValue: flightData.flapsValue,
         gearValue: flightData.gearValue,
         airBrakesValue: flightData.airBrakesValue,
+        trimValue: typeof flightData.trimValue === 'number' ? flightData.trimValue : prevState.trimValue,
         
         // Autopilot - Update from physics service status
         autopilot: flightData.autopilotEngaged || false, // ✅ Use physics service status
         flightDirector: prevState.flightDirector,
         altitudeHold: prevState.altitudeHold,
         headingHold: prevState.headingHold,
-        autopilotTargets: prevState.autopilotTargets,
+        autopilotTargets: flightData.autopilotTargets || prevState.autopilotTargets,
         frame: typeof flightData.frame === 'number' ? flightData.frame : prevState.frame
       }));
     }

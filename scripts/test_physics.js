@@ -24,7 +24,8 @@ function runSim(duration, dt = 0.05, label = "") {
         }, dt);
     }
     const state = service.getOutputState();
-    console.log(`[${label}] T=${service.time.toFixed(1)}s | Alt: ${state.position.z.toFixed(1)}m | TAS: ${state.derived.airspeed.toFixed(1)}kts | Pitch: ${(state.orientation.theta * 180 / Math.PI).toFixed(1)}deg`);
+    const totalFF = (state.engineParams.fuelFlow || []).reduce((s, v) => s + v, 0);
+    console.log(`[${label}] T=${service.time.toFixed(1)}s | Alt: ${state.position.z.toFixed(1)}m | TAS: ${state.derived.airspeed.toFixed(1)}kts | Pitch: ${(state.orientation.theta * 180 / Math.PI).toFixed(1)}deg | FuelFlow: ${totalFF.toFixed(3)} kg/s | Fuel: ${state.fuel.toFixed(1)} kg`);
     return state;
 }
 

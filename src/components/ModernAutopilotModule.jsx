@@ -1,11 +1,40 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 
 const ModernAutopilotModule = ({ flightState, setAutopilotTargets, toggleAutopilot }) => {
-  const [targets, setTargets] = useState({
-    ias: flightState.indicatedAirspeed,
-    vs: flightState.verticalSpeed,
-    altitude: flightState.altitude
-  });
+  const initialTargets = flightState?.autopilotTargets
+    ? {
+        ias: Number(flightState.autopilotTargets.ias) || Number(flightState.indicatedAirspeed) || 0,
+        vs: Number(flightState.autopilotTargets.vs) || Number(flightState.verticalSpeed) || 0,
+        altitude: Number(flightState.autopilotTargets.altitude) || Number(flightState.altitude) || 0
+      }
+    : {
+        ias: Number(flightState.indicatedAirspeed) || 0,
+        vs: Number(flightState.verticalSpeed) || 0,
+        altitude: Number(flightState.altitude) || 0
+      };
+
+  const [targets, setTargets] = useState(initialTargets);
+
+  // Only sync targets from flightState if they are explicitly provided by the physics service
+  // and differ from our local state. We remove current airspeed/alt/vs from dependencies
+  // to prevent the target from "following" the current state.
+  useEffect(() => {
+    if (flightState?.autopilotTargets) {
+      setTargets(prev => {
+        const newIas = Number(flightState.autopilotTargets.ias);
+        const newVs = Number(flightState.autopilotTargets.vs);
+        const newAlt = Number(flightState.autopilotTargets.altitude);
+        
+        // Only update if the values are actually different and not zero
+         // (0 is often the default before targets are set)
+         return {
+           ias: (!isNaN(newIas) && newIas > 0) ? newIas : prev.ias,
+           vs: !isNaN(newVs) ? newVs : prev.vs,
+           altitude: (!isNaN(newAlt) && newAlt > 0) ? newAlt : prev.altitude
+         };
+       });
+     }
+   }, [flightState?.autopilotTargets]);
 
   const updateTarget = (type, value) => {
     const newTargets = { ...targets, [type]: value };
@@ -26,7 +55,6 @@ const ModernAutopilotModule = ({ flightState, setAutopilotTargets, toggleAutopil
     ),
     
     React.createElement('div', { className: 'target-controls' },
-      // IAS Target
       React.createElement('div', { className: 'target-group' },
         React.createElement('label', null, 'IAS TGT'),
         React.createElement('div', { className: 'target-control' },
@@ -41,8 +69,6 @@ const ModernAutopilotModule = ({ flightState, setAutopilotTargets, toggleAutopil
           }, '+')
         )
       ),
-      
-      // VS Target
       React.createElement('div', { className: 'target-group' },
         React.createElement('label', null, 'VS TGT'),
         React.createElement('div', { className: 'target-control' },
@@ -57,8 +83,6 @@ const ModernAutopilotModule = ({ flightState, setAutopilotTargets, toggleAutopil
           }, '+')
         )
       ),
-      
-      // Altitude Target
       React.createElement('div', { className: 'target-group' },
         React.createElement('label', null, 'ALT TGT'),
         React.createElement('div', { className: 'target-control' },

@@ -109,7 +109,7 @@ Contributions are welcome! Please feel free to submit a Pull Request.
 
 ## License
 
-MIT License - (c)2026, GeeksProductionStudio. All Rights Reserved.
+MIT License - ©2026, GeeksProductionStudio. All Rights Reserved.
 
 ## Credits
 
