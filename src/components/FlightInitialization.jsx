@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import './FlightInitialization.css';
 import AirportSearchInput from './AirportSearchInput.jsx';
 import { randomFlightService } from '../services/randomFlightService.js';
@@ -28,6 +28,9 @@ const FlightInitialization = ({
   apiKey, setApiKey
 }) => {
   
+  // Fuel Reserve State (hours)
+  const [reserveHours, setReserveHours] = useState(1.0);
+
   const generateRandomTime = () => {
     const hours = Math.floor(Math.random() * 24).toString().padStart(2, '0');
     const minutes = Math.floor(Math.random() * 60).toString().padStart(2, '0');
@@ -186,6 +189,47 @@ const FlightInitialization = ({
   useEffect(() => {
     // Difficulty logic here if needed in future
   }, [difficulty]);
+
+  // Calculate flight plan when route or parameters change
+  useEffect(() => {
+    const calculatePlan = async () => {
+      if (selectedDeparture && selectedArrival) {
+        // Calculate distance
+        const distance = distanceCalculator.calculateDistance(
+          selectedDeparture.lat, selectedDeparture.lon,
+          selectedArrival.lat, selectedArrival.lon
+        );
+        
+        // Calculate fuel (pass reserveHours)
+        const fuel = await distanceCalculator.calculateFuelConsumption(
+          distance.nauticalMiles, 
+          aircraftModel, 
+          payload,
+          reserveHours // Use state value
+        );
+        
+        // Calculate flight time (simple estimation)
+        // Note: Fuel calculation now handles more complex time estimation, we should sync this if possible
+        // For now, distanceCalculator uses a basic speed/distance.
+        // Let's use the fuel object's implied time if available, or basic.
+        // The fuel object from aircraftService (via distanceCalculator) doesn't return time yet in all paths,
+        // but let's assume standard cruise.
+        const speed = 450; // knots (approx)
+        const timeHours = distance.nauticalMiles / speed;
+        
+        setFlightPlan({
+          distance,
+          fuel,
+          time: {
+            hours: Math.floor(timeHours),
+            minutes: Math.round((timeHours % 1) * 60)
+          }
+        });
+      }
+    };
+    
+    calculatePlan();
+  }, [selectedDeparture, selectedArrival, aircraftModel, payload, reserveHours]);
 
   return (
     <div className="flight-initialization">
@@ -368,6 +412,17 @@ const FlightInitialization = ({
           </div>
 
           <div className="parameter-group">
+            <label>RESERVE FUEL (HOURS)</label>
+            <input
+              type="number"
+              value={reserveHours}
+              onChange={(e) => setReserveHours(parseFloat(e.target.value) || 1.0)}
+              className="dispatch-input"
+              min="0.5" max="5.0" step="0.1"
+            />
+          </div>
+
+          <div className="parameter-group">
             <label>ZULU TIME</label>
             <div className="checkbox-input-group">
               <input
@@ -465,7 +520,11 @@ const FlightInitialization = ({
           </div>
           <div className="summary-item">
             <span className="summary-label">FUEL REQ:</span>
-            <span className="summary-value">{formatFuel(flightPlan.fuel)}</span>
+            <span className="summary-value" style={{fontSize: '0.9em'}}>
+              TRIP: {flightPlan.fuel.tripFuel}kg | RSV: {flightPlan.fuel.reserveFuel}kg
+              <br/>
+              TOTAL: {formatFuel(flightPlan.fuel)}
+            </span>
           </div>
         </div>
       )}

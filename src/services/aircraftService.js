@@ -2,7 +2,7 @@
 // Provides aircraft-specific performance data for fuel calculations
 
 // Import aircraft database directly
-import aircraftData from '../data/aircraftDatabase.json' assert { type: 'json' };
+import aircraftData from '../data/aircraftDatabase.json' with { type: 'json' };
 
 // Load aircraft database
 let aircraftDatabase = null;
@@ -116,24 +116,40 @@ class AircraftService {
     // 1. Determine baseline weights (assume typicalBurn is for ~50% load)
     const emptyWeight = aircraft.emptyWeight || 40000;
     const maxPayload = aircraft.maxPayload || 20000;
-    const typicalWeight = emptyWeight + (maxPayload * 0.5) + (aircraft.typicalFuelBurn * aircraft.cruiseSpeed * 1.5); // 1.5h fuel mean
+    const typicalWeight = emptyWeight + (maxPayload * 0.5) + (aircraft.typicalFuelBurn * aircraft.cruiseSpeed * 1.5); 
 
     // 2. Estimate flight specific weight
     const estFuelMass = aircraft.typicalFuelBurn * distance;
     const flightAvgWeight = emptyWeight + payload + (estFuelMass * 0.5);
 
     // 3. Weight Correction Factor (Fuel flow ~ Weight)
+    // Fuel burn scales roughly linearly with weight for small variations
     const weightFactor = flightAvgWeight / typicalWeight;
 
-    // 4. Cycle Penalty (Takeoff/Climb inefficiency) - approx 15 mins cruise equivalent
-    const cyclePenaltyKg = (aircraft.typicalFuelBurn * aircraft.cruiseSpeed) * 0.25;
+    // 4. Flight Time Calculation with Cycle Overhead
+    // Overhead: Taxi (15m) + Climb/Descent inefficiency (20m equivalent cruise time penalty)
+    // Real-world ZSPD-ZBAA (600nm) takes ~1h50m block time. 600/450 = 1h20m air time.
+    // So we add ~30 mins overhead to flight time estimation
+    const cruiseTimeHours = distance / aircraft.cruiseSpeed;
+    const overheadHours = 0.5; // 30 minutes fixed overhead for taxi/climb/descent
+    const totalFlightHours = cruiseTimeHours + overheadHours;
 
     // 5. Final Calculation
-    const adjustedBurnPerNm = aircraft.typicalFuelBurn * weightFactor;
-    const tripFuel = (adjustedBurnPerNm * distance) + cyclePenaltyKg;
+    // Base burn rate (kg/hr) adjusted for weight
+    const baseBurnRateKgHr = (aircraft.typicalFuelBurn * aircraft.cruiseSpeed);
+    const adjustedBurnRateKgHr = baseBurnRateKgHr * weightFactor;
     
-    // Calculate reserve fuel (5% by default)
-    const reserveFuel = tripFuel * fuelReserve;
+    // Trip Fuel = Rate * Time
+    const tripFuel = adjustedBurnRateKgHr * totalFlightHours;
+    
+    // Calculate reserve fuel (Time-based: default 60 mins or user specified)
+    // fuelReserve param is now treated as HOURS if > 1, or % if < 1 (legacy support)
+    let reserveHours = 1.0;
+    if (fuelReserve > 1) reserveHours = fuelReserve;
+    else if (fuelReserve > 0 && fuelReserve <= 1) reserveHours = 1.0; // Default to 1 hr if small decimal passed (legacy 0.05 case handled safely)
+    
+    // If legacy 0.05 was passed, we might want to convert, but let's just stick to 1 hour standard for now unless specified
+    const reserveFuel = adjustedBurnRateKgHr * reserveHours;
     
     // Calculate total fuel requirement
     const totalFuel = tripFuel + reserveFuel;

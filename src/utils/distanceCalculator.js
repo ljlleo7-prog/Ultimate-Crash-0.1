@@ -34,7 +34,7 @@ function calculateFlightTime(distance, averageSpeed = 450) {
 }
 
 // Enhanced fuel calculation with aircraft-specific parameters
-async function calculateFuelConsumption(distance, aircraftModel, payload = 0, reserves = 0.1) {
+async function calculateFuelConsumption(distance, aircraftModel, payload = 0, reserves = 1.0) {
   try {
     const fuelData = await aircraftService.calculateFuelRequirements(aircraftModel, distance, payload, reserves);
     return fuelData;
