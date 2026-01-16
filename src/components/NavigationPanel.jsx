@@ -93,9 +93,10 @@ const NavigationPanel = ({ flightState, selectedArrival, flightPlan }) => {
 
       ctx.strokeStyle = '#00aa00';
       ctx.lineWidth = 1;
-      for (let i = 1; i <= 3; i++) {
+      const ringCount = 4; // 4 rings for 320nm = 80nm per ring
+      for (let i = 1; i <= ringCount; i++) {
         ctx.beginPath();
-        ctx.arc(0, 0, radius * i / 3, 0, Math.PI * 2);
+        ctx.arc(0, 0, radius * i / ringCount, 0, Math.PI * 2);
         ctx.stroke();
       }
 
@@ -150,14 +151,14 @@ const NavigationPanel = ({ flightState, selectedArrival, flightPlan }) => {
           const x = Math.cos(φ1) * Math.sin(φ2) - Math.sin(φ1) * Math.cos(φ2) * Math.cos(Δλ);
           return (toDeg(Math.atan2(y, x)) + 360) % 360;
         };
-        const maxRangeNm = 200;
+        const maxRangeNm = 320; // Updated to 320nm as requested
         const points = waypoints.map(wp => {
           const distNm = calculateDistance(flightState.latitude, flightState.longitude, wp.latitude, wp.longitude);
           const brg = bearingTo(flightState.latitude, flightState.longitude, wp.latitude, wp.longitude) * Math.PI / 180;
           const r = Math.min(1, distNm / maxRangeNm) * radius;
           const x = r * Math.sin(brg);
           const y = -r * Math.cos(brg);
-          return { x, y, name: wp.name };
+          return { x, y, name: wp.name, distNm };
         });
         if (points.length > 0) {
           ctx.strokeStyle = '#00ff88';
@@ -186,6 +187,10 @@ const NavigationPanel = ({ flightState, selectedArrival, flightPlan }) => {
             ctx.textAlign = 'center';
             ctx.textBaseline = 'bottom';
             ctx.fillText(points[i].name, 0, -8);
+            // Optional: Show distance for waypoints
+            // ctx.font = '9px Arial';
+            // ctx.fillStyle = '#aaaaaa';
+            // ctx.fillText(`${points[i].distNm.toFixed(0)}nm`, 0, 5);
             ctx.restore();
           }
         }
@@ -196,15 +201,27 @@ const NavigationPanel = ({ flightState, selectedArrival, flightPlan }) => {
       ctx.save();
       ctx.translate(center, center);
       
+      // Draw Aircraft Symbol (Fixed Upwards)
       ctx.beginPath();
-      ctx.moveTo(0, -radius);
-      ctx.lineTo(5, -radius + 15);
-      ctx.lineTo(-5, -radius + 15);
+      ctx.moveTo(0, -10);
+      ctx.lineTo(6, 5);
+      ctx.lineTo(0, 0);
+      ctx.lineTo(-6, 5);
       ctx.closePath();
-      ctx.fillStyle = '#ff0000';
+      ctx.fillStyle = '#ff0000'; // Red plane for visibility
       ctx.fill();
 
       ctx.restore();
+      
+      // Draw Range and Mode Labels (Fixed on Screen)
+      ctx.font = '10px monospace';
+      ctx.fillStyle = '#00ff00';
+      ctx.textAlign = 'left';
+      ctx.textBaseline = 'top';
+      ctx.fillText('RANGE: 320NM', 5, 5);
+      
+      ctx.textAlign = 'right';
+      ctx.fillText('HDG UP', size - 5, 5);
     };
 
     drawRadar();

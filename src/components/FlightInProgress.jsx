@@ -542,12 +542,14 @@ const FlightInProgress = ({
       </div>
 
       <div style={{ flex: 1, display: 'flex', position: 'relative' }}>
-        {showDebugPhysics && (
+        {/* Debug Panel - Always shown as requested or toggleable */}
+        {true && (
           <DebugPhysicsPanel 
-            debugPhysicsData={flightData?.debugPhysics} 
+            debugPhysicsData={flightData?.debugPhysics}
             thrust={flightData?.thrust}
             drag={flightData?.drag}
-            waypoints={flightPlan?.waypoints || []}
+            waypoints={aircraftConfig.flightPlan}
+            flightData={flightData}
           />
         )}
 

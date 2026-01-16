@@ -327,6 +327,7 @@ export function useAircraftPhysics(config = {}, autoStart = true, model = 'reali
         drag: Math.max(0, -(physicsService.aeroForces?.x || 0)),
         thrust: physicsService.thrustForces?.x || 0,
         weight: 0,
+        position: newState.position,
         cg: {
           x: newState.position.x,
           y: newState.position.y,

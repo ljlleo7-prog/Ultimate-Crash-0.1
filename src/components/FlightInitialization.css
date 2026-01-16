@@ -66,6 +66,9 @@
 /* Difficulty specific active states */
 .difficulty-btn.rookie.active { border-color: #3fb950; color: #3fb950; background: rgba(63, 185, 80, 0.1); }
 .difficulty-btn.amateur.active { border-color: #d29922; color: #d29922; background: rgba(210, 153, 34, 0.1); }
+.difficulty-btn.intermediate.active { border-color: #58a6ff; color: #58a6ff; background: rgba(88, 166, 255, 0.1); }
+.difficulty-btn.advanced.active { border-color: #a371f7; color: #a371f7; background: rgba(163, 113, 247, 0.1); }
+.difficulty-btn.pro.active { border-color: #ff7b72; color: #ff7b72; background: rgba(255, 123, 114, 0.1); }
 .difficulty-btn.devil.active { border-color: #f85149; color: #f85149; background: rgba(248, 81, 73, 0.1); }
 
 .intel-panel {

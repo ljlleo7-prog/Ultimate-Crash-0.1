@@ -20,6 +20,8 @@ const ModernAutopilotModule = ({ flightState, setAutopilotTargets, toggleAutopil
   // Only sync targets from flightState if they are explicitly provided by the physics service
   // and differ from our local state. We remove current airspeed/alt/vs from dependencies
   // to prevent the target from "following" the current state.
+  const currentMode = flightState.autopilotMode || 'LNAV';
+
   useEffect(() => {
     if (flightState?.autopilotTargets) {
       setTargets(prev => {
@@ -28,17 +30,19 @@ const ModernAutopilotModule = ({ flightState, setAutopilotTargets, toggleAutopil
         const newAlt = Number(flightState.autopilotTargets.altitude);
         const newHdg = Number(flightState.autopilotTargets.heading);
         
-        // Only update if the values are actually different and not zero
-         // (0 is often the default before targets are set)
-         return {
+        // In HDG mode, do NOT update heading from props unless local heading is invalid (0).
+        // This prevents the "sync with flight direction" issue if the backend echos current heading.
+        const shouldUpdateHeading = !isNaN(newHdg) && (currentMode === 'LNAV' || prev.heading === 0);
+
+        return {
            ias: (!isNaN(newIas) && newIas > 0) ? newIas : prev.ias,
            vs: !isNaN(newVs) ? newVs : prev.vs,
            altitude: (!isNaN(newAlt) && newAlt > 0) ? newAlt : prev.altitude,
-           heading: !isNaN(newHdg) ? newHdg : prev.heading
+           heading: shouldUpdateHeading ? newHdg : prev.heading
          };
        });
      }
-   }, [flightState?.autopilotTargets]);
+   }, [flightState?.autopilotTargets, currentMode]);
 
   const updateTarget = (type, value) => {
     const newTargets = { ...targets, [type]: value };
@@ -48,7 +52,7 @@ const ModernAutopilotModule = ({ flightState, setAutopilotTargets, toggleAutopil
     }
   };
   
-  const currentMode = flightState.autopilotMode || 'LNAV';
+  // const currentMode = flightState.autopilotMode || 'LNAV'; // Moved up
 
   return React.createElement('div', { 
     className: 'modern-autopilot-module',

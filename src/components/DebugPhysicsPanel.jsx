@@ -1,6 +1,6 @@
 import React from 'react';
 
-const DebugPhysicsPanel = ({ debugPhysicsData, thrust, drag, waypoints = [] }) => {
+const DebugPhysicsPanel = ({ debugPhysicsData, thrust, drag, waypoints = [], flightData }) => {
   if (!debugPhysicsData) {
     return null;
   }
@@ -21,6 +21,20 @@ const DebugPhysicsPanel = ({ debugPhysicsData, thrust, drag, waypoints = [] }) =
     trim
   } = debugPhysicsData;
 
+  // Extract LNAV/Autopilot info
+  const autopilotMode = flightData?.autopilotMode || 'N/A';
+  const targetHeading = flightData?.autopilotTargets?.heading !== undefined ? flightData.autopilotTargets.heading : 'N/A';
+  const currentHeading = flightData?.heading !== undefined ? flightData.heading : 'N/A';
+  const currentLat = flightData?.position?.latitude;
+  const currentLon = flightData?.position?.longitude;
+  const currentWaypointIndex = flightData?.currentWaypointIndex;
+  
+  // Find next waypoint
+  let nextWaypoint = null;
+  if (waypoints && typeof currentWaypointIndex === 'number' && waypoints[currentWaypointIndex]) {
+    nextWaypoint = waypoints[currentWaypointIndex];
+  }
+
   return (
     <div style={{
       position: 'absolute',
@@ -34,9 +48,24 @@ const DebugPhysicsPanel = ({ debugPhysicsData, thrust, drag, waypoints = [] }) =
       borderRadius: '5px',
       zIndex: 1000,
       border: '1px solid #333',
-      minWidth: '220px'
+      minWidth: '220px',
+      maxHeight: '90vh',
+      overflowY: 'auto'
     }}>
-      <div style={{ fontWeight: 'bold', marginBottom: '5px', borderBottom: '1px solid #444', paddingBottom: '3px' }}>DEBUG PHYSICS</div>
+      <div style={{ fontWeight: 'bold', marginBottom: '5px', borderBottom: '1px solid #444', paddingBottom: '3px', color: '#cyan' }}>NAV / LNAV DEBUG</div>
+      <div>Mode: <span style={{ color: autopilotMode === 'LNAV' ? '#3b82f6' : '#8b5cf6', fontWeight: 'bold' }}>{autopilotMode}</span></div>
+      <div>Lat: {typeof currentLat === 'number' ? currentLat.toFixed(4) : 'N/A'}</div>
+      <div>Lon: {typeof currentLon === 'number' ? currentLon.toFixed(4) : 'N/A'}</div>
+      <div>Hdg (Cur): {typeof currentHeading === 'number' ? currentHeading.toFixed(1) : 'N/A'}°</div>
+      <div>Hdg (Tgt): {typeof targetHeading === 'number' ? targetHeading.toFixed(1) : 'N/A'}°</div>
+      <div>Next WP: {nextWaypoint ? (nextWaypoint.label || nextWaypoint.name || `Idx ${currentWaypointIndex}`) : 'None'}</div>
+      {nextWaypoint && (
+        <div style={{ paddingLeft: '8px', fontSize: '10px', color: '#aaa' }}>
+          Loc: {nextWaypoint.latitude?.toFixed(4)}, {nextWaypoint.longitude?.toFixed(4)}
+        </div>
+      )}
+      
+      <div style={{ fontWeight: 'bold', marginTop: '8px', marginBottom: '5px', borderBottom: '1px solid #444', paddingBottom: '3px' }}>DEBUG PHYSICS</div>
       <div>Pitch (θ): {typeof theta === 'number' ? (theta * 180 / Math.PI).toFixed(2) : 'N/A'} deg</div>
       <div>Alpha (α): {typeof alpha === 'number' ? (alpha * 180 / Math.PI).toFixed(2) : 'N/A'} deg</div>
       <div>Pitch Rate (q): {typeof pitchRate_q === 'number' ? (pitchRate_q * 180 / Math.PI).toFixed(2) : 'N/A'} deg/s</div>
