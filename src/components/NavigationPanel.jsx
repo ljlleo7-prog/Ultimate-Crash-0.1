@@ -128,19 +128,6 @@ const NavigationPanel = ({ flightState, selectedArrival, flightPlan }) => {
         }
       }
 
-      ctx.restore();
-
-      ctx.save();
-      ctx.translate(center, center);
-      
-      ctx.beginPath();
-      ctx.moveTo(0, -radius);
-      ctx.lineTo(5, -radius + 15);
-      ctx.lineTo(-5, -radius + 15);
-      ctx.closePath();
-      ctx.fillStyle = '#ff0000';
-      ctx.fill();
-
       if (Array.isArray(waypoints) && waypoints.length > 0 && typeof flightState?.latitude === 'number' && typeof flightState?.longitude === 'number') {
         const toRad = (d) => d * Math.PI / 180;
         const toDeg = (r) => r * 180 / Math.PI;
@@ -176,9 +163,35 @@ const NavigationPanel = ({ flightState, selectedArrival, flightPlan }) => {
             ctx.arc(points[i].x, points[i].y, isNext ? 5 : 3, 0, Math.PI * 2);
             ctx.fillStyle = isNext ? '#ffdd00' : '#00ff88';
             ctx.fill();
+
+            // Draw label
+            ctx.save();
+            ctx.translate(points[i].x, points[i].y);
+            // Counter-rotate the label so it appears upright on screen
+            ctx.rotate(heading * Math.PI / 180);
+            
+            ctx.fillStyle = '#ffffff';
+            ctx.font = '10px Arial';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'bottom';
+            ctx.fillText(points[i].name, 0, -8);
+            ctx.restore();
           }
         }
       }
+
+      ctx.restore();
+
+      ctx.save();
+      ctx.translate(center, center);
+      
+      ctx.beginPath();
+      ctx.moveTo(0, -radius);
+      ctx.lineTo(5, -radius + 15);
+      ctx.lineTo(-5, -radius + 15);
+      ctx.closePath();
+      ctx.fillStyle = '#ff0000';
+      ctx.fill();
 
       ctx.restore();
     };

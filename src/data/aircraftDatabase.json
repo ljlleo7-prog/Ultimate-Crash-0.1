@@ -69,9 +69,12 @@
       ]
     },
     "airbrakeProfile": {
-      "hasTwoTier": true,
-      "airPosition": { "dragIncrement": 0.06, "liftDecrement": -0.1 },
-      "groundPosition": { "dragIncrement": 0.15, "liftDecrement": -0.2 }
+      "positions": [
+        { "label": "RET", "dragIncrement": 0, "liftDecrement": 0 },
+        { "label": "ARM", "dragIncrement": 0.01, "liftDecrement": -0.02 },
+        { "label": "FLT", "dragIncrement": 0.06, "liftDecrement": -0.1 },
+        { "label": "GND", "dragIncrement": 0.15, "liftDecrement": -0.2 }
+      ]
     },
     "minNoseGearFailedPitch": -0.2,
     "maxGroundPitch": 0.3,
@@ -142,9 +145,13 @@
         ]
       },
       "airbrakeProfile": {
-        "hasTwoTier": true,
-        "airPosition": { "dragIncrement": 0.065, "liftDecrement": -0.12 },
-        "groundPosition": { "dragIncrement": 0.18, "liftDecrement": -0.25 }
+        "positions": [
+          { "label": "RET", "dragIncrement": 0, "liftDecrement": 0 },
+          { "label": "ARM", "dragIncrement": 0.01, "liftDecrement": -0.02 },
+          { "label": "1/2", "dragIncrement": 0.03, "liftDecrement": -0.06 },
+          { "label": "FULL", "dragIncrement": 0.065, "liftDecrement": -0.12 },
+          { "label": "GND", "dragIncrement": 0.18, "liftDecrement": -0.25 }
+        ]
     },
     "minNoseGearFailedPitch": -0.2,
     "maxGroundPitch": 0.3,
@@ -216,9 +223,12 @@
         ]
       },
       "airbrakeProfile": {
-        "hasTwoTier": true,
-        "airPosition": { "dragIncrement": 0.07, "liftDecrement": -0.15 },
-        "groundPosition": { "dragIncrement": 0.22, "liftDecrement": -0.3 }
+        "positions": [
+          { "label": "DN", "dragIncrement": 0, "liftDecrement": 0 },
+          { "label": "ARM", "dragIncrement": 0.01, "liftDecrement": -0.02 },
+          { "label": "FLT", "dragIncrement": 0.07, "liftDecrement": -0.15 },
+          { "label": "UP", "dragIncrement": 0.22, "liftDecrement": -0.3 }
+        ]
     },
     "minNoseGearFailedPitch": -0.2,
     "maxGroundPitch": 0.3,
@@ -278,6 +288,14 @@
           { "angle": 30, "clIncrement": 0.4, "cdIncrement": 0.015, "label": "FULL" }
         ]
       },
+      "airbrakeProfile": {
+        "positions": [
+          { "label": "RET", "dragIncrement": 0, "liftDecrement": 0 },
+          { "label": "1/2", "dragIncrement": 0.03, "liftDecrement": -0.05 },
+          { "label": "FULL", "dragIncrement": 0.065, "liftDecrement": -0.13 },
+          { "label": "GND", "dragIncrement": 0.2, "liftDecrement": -0.28 }
+        ]
+      },
       "minNoseGearFailedPitch": -0.2,
       "maxGroundPitch": 0.3,
       "groundCollisionPitchTorqueFactor": 0.5
@@ -335,6 +353,13 @@
           { "angle": 35, "clIncrement": 0.3, "cdIncrement": 0.01, "label": "FULL" }
         ]
       },
+      "airbrakeProfile": {
+        "positions": [
+          { "label": "CL", "dragIncrement": 0, "liftDecrement": 0 },
+          { "label": "OP", "dragIncrement": 0.05, "liftDecrement": -0.1 },
+          { "label": "GND", "dragIncrement": 0.15, "liftDecrement": -0.25 }
+        ]
+      },
       "minNoseGearFailedPitch": -0.2,
       "maxGroundPitch": 0.3,
       "groundCollisionPitchTorqueFactor": 0.5
@@ -389,6 +414,12 @@
           { "angle": 0, "clIncrement": 0, "cdIncrement": 0, "label": "UP" },
           { "angle": 15, "clIncrement": 0.1, "cdIncrement": 0.003, "label": "1" },
           { "angle": 35, "clIncrement": 0.25, "cdIncrement": 0.008, "label": "FULL" }
+        ]
+      },
+      "airbrakeProfile": {
+        "positions": [
+          { "label": "RET", "dragIncrement": 0, "liftDecrement": 0 },
+          { "label": "EXT", "dragIncrement": 0.05, "liftDecrement": -0.05 }
         ]
       },
       "minNoseGearFailedPitch": -0.2,
@@ -451,6 +482,14 @@
           { "angle": 30, "clIncrement": 0.45, "cdIncrement": 0.018, "label": "30" }
         ]
       },
+      "airbrakeProfile": {
+        "positions": [
+          { "label": "DN", "dragIncrement": 0, "liftDecrement": 0 },
+          { "label": "ARM", "dragIncrement": 0.01, "liftDecrement": -0.02 },
+          { "label": "FLT", "dragIncrement": 0.08, "liftDecrement": -0.15 },
+          { "label": "UP", "dragIncrement": 0.25, "liftDecrement": -0.35 }
+        ]
+      },
       "minNoseGearFailedPitch": -0.2,
       "maxGroundPitch": 0.3,
       "groundCollisionPitchTorqueFactor": 0.5
@@ -505,8 +544,16 @@
           { "angle": 0, "clIncrement": 0, "cdIncrement": 0, "label": "UP" },
           { "angle": 10, "clIncrement": 0.1, "cdIncrement": 0.002, "label": "1" },
           { "angle": 15, "clIncrement": 0.2, "cdIncrement": 0.005, "label": "2" },
-          { "angle": 25, "clIncrement": 0.35, "cdIncrement": 0.012, "label": "3" },
-          { "angle": 35, "clIncrement": 0.5, "cdIncrement": 0.02, "label": "FULL" }
+          { "angle": 20, "clIncrement": 0.3, "cdIncrement": 0.01, "label": "3" },
+          { "angle": 30, "clIncrement": 0.4, "cdIncrement": 0.015, "label": "FULL" }
+        ]
+      },
+      "airbrakeProfile": {
+        "positions": [
+          { "label": "RET", "dragIncrement": 0, "liftDecrement": 0 },
+          { "label": "1/2", "dragIncrement": 0.04, "liftDecrement": -0.08 },
+          { "label": "FULL", "dragIncrement": 0.08, "liftDecrement": -0.16 },
+          { "label": "GND", "dragIncrement": 0.22, "liftDecrement": -0.32 }
         ]
       },
       "minNoseGearFailedPitch": -0.2,
@@ -577,6 +624,14 @@
           { "angle": 25, "clIncrement": 0.35, "cdIncrement": 0.012, "label": "FULL" }
         ]
       },
+      "airbrakeProfile": {
+        "positions": [
+          { "label": "RET", "dragIncrement": 0, "liftDecrement": 0 },
+          { "label": "1/2", "dragIncrement": 0.03, "liftDecrement": -0.06 },
+          { "label": "FULL", "dragIncrement": 0.07, "liftDecrement": -0.15 },
+          { "label": "GND", "dragIncrement": 0.22, "liftDecrement": -0.32 }
+        ]
+      },
       "minNoseGearFailedPitch": -0.2,
       "maxGroundPitch": 0.3,
       "groundCollisionPitchTorqueFactor": 0.5
@@ -645,6 +700,14 @@
           { "angle": 25, "clIncrement": 0.35, "cdIncrement": 0.012, "label": "FULL" }
         ]
       },
+      "airbrakeProfile": {
+        "positions": [
+          { "label": "RET", "dragIncrement": 0, "liftDecrement": 0 },
+          { "label": "1/2", "dragIncrement": 0.03, "liftDecrement": -0.06 },
+          { "label": "FULL", "dragIncrement": 0.07, "liftDecrement": -0.15 },
+          { "label": "GND", "dragIncrement": 0.22, "liftDecrement": -0.32 }
+        ]
+      },
       "minNoseGearFailedPitch": -0.2,
       "maxGroundPitch": 0.3,
       "groundCollisionPitchTorqueFactor": 0.5
@@ -688,6 +751,14 @@
           { "angle": 15, "clIncrement": 0.2, "cdIncrement": 0.005, "label": "15" },
           { "angle": 25, "clIncrement": 0.3, "cdIncrement": 0.01, "label": "25" },
           { "angle": 30, "clIncrement": 0.4, "cdIncrement": 0.015, "label": "30" }
+        ]
+      },
+      "airbrakeProfile": {
+        "positions": [
+          { "label": "RET", "dragIncrement": 0, "liftDecrement": 0 },
+          { "label": "1/2", "dragIncrement": 0.03, "liftDecrement": -0.06 },
+          { "label": "FULL", "dragIncrement": 0.07, "liftDecrement": -0.14 },
+          { "label": "GND", "dragIncrement": 0.22, "liftDecrement": -0.32 }
         ]
       },
       "horizontalStabilizerArea": 35,

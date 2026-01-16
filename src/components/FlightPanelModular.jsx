@@ -195,6 +195,12 @@ const FlightPanelModular = ({ flightData, onActionRequest, aircraftModel, select
     }
   };
 
+  const setAutopilotMode = (mode) => {
+    if (onActionRequest) {
+      onActionRequest('set-autopilot-mode', mode);
+    }
+  };
+
   const controlFlaps = (position) => {
     if (onActionRequest) {
       onActionRequest('flaps', position);
@@ -261,7 +267,8 @@ const FlightPanelModular = ({ flightData, onActionRequest, aircraftModel, select
         React.createElement(ModernAutopilotModule, { 
           flightState, 
           setAutopilotTargets, 
-          toggleAutopilot 
+          toggleAutopilot,
+          setAutopilotMode 
         }),
         React.createElement(CommunicationModule, {
           flightState,

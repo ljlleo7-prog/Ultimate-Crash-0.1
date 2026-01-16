@@ -667,7 +667,12 @@ class SceneManager {
       initialConditions.gear = true; // Explicitly DOWN for takeoff
       
       // Set initial heading based on departure airport runway (default to 130 degrees for runway 13R)
-      const runwayHeading = this.getDepartureRunwayHeading() || 130;
+      let runwayHeading = 130;
+      if (this.scenario.initialHeading !== undefined) {
+        runwayHeading = this.scenario.initialHeading;
+      } else {
+        runwayHeading = this.getDepartureRunwayHeading() || 130;
+      }
       initialConditions.orientation.psi = runwayHeading * Math.PI / 180;
       
       // Apply takeoff configuration - set to idle for startup

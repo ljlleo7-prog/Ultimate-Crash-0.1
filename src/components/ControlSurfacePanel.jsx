@@ -348,11 +348,18 @@ const ControlSurfacePanel = ({ controlFlaps, controlGear, controlAirBrakes, cont
   const flapMax = (flapProfile?.positions.length || 3) - 1;
 
   // Prepare Airbrake Labels
-  const airbrakeLabels = airbrakeProfile?.hasTwoTier 
-    ? { 0: 'RET', 1: 'ARM', 2: 'FLT', 3: 'GND' } 
-    : { 0: 'RET', 1: 'EXT' };
+  const airbrakeLabels = airbrakeProfile?.positions 
+    ? airbrakeProfile.positions.reduce((acc, pos, idx) => {
+        acc[idx] = pos.label;
+        return acc;
+      }, {})
+    : (airbrakeProfile?.hasTwoTier 
+        ? { 0: 'RET', 1: 'ARM', 2: 'FLT', 3: 'GND' } 
+        : { 0: 'RET', 1: 'EXT' });
   
-  const airbrakeMax = airbrakeProfile?.hasTwoTier ? 3 : 1;
+  const airbrakeMax = airbrakeProfile?.positions 
+    ? airbrakeProfile.positions.length - 1
+    : (airbrakeProfile?.hasTwoTier ? 3 : 1);
 
   return React.createElement('div', { 
     className: 'control-surface-panel',

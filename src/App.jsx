@@ -113,6 +113,41 @@ function App() {
   };
 
   const handleRouteConfirm = (routeData) => {
+    // Insert 10nm approach fix
+    if (routeData.landingRunway && selectedArrival) {
+       const runwayHdg = getRunwayHeading(routeData.landingRunway);
+       const approachHdg = (runwayHdg + 180) % 360; // Reciprocal
+       const distance = 10; // NM
+       
+       // Calculate coordinate
+       const lat1 = selectedArrival.latitude * Math.PI / 180;
+       const lon1 = selectedArrival.longitude * Math.PI / 180;
+       const brng = approachHdg * Math.PI / 180;
+       const d = distance;
+       const R = 3440.065; // Earth radius in NM
+       
+       const lat2 = Math.asin(Math.sin(lat1)*Math.cos(d/R) + Math.cos(lat1)*Math.sin(d/R)*Math.cos(brng));
+       const lon2 = lon1 + Math.atan2(Math.sin(brng)*Math.sin(d/R)*Math.cos(lat1), Math.cos(d/R)-Math.sin(lat1)*Math.sin(lat2));
+       
+       const approachFix = {
+         name: `FINAL`,
+         latitude: lat2 * 180 / Math.PI,
+         longitude: lon2 * 180 / Math.PI
+       };
+       
+       const runwayFix = {
+          name: routeData.landingRunway || 'RWY',
+          latitude: selectedArrival.latitude,
+          longitude: selectedArrival.longitude
+       };
+       
+       // Append approach fix then runway to waypoints
+       if (!routeData.waypoints) routeData.waypoints = [];
+       routeData.waypoints.push(approachFix);
+       routeData.waypoints.push(runwayFix);
+       console.log('✅ Added 10nm approach fix and runway:', approachFix, runwayFix);
+    }
+
     setDetailedRoute(routeData);
     setShowRouteSelection(false);
     setFlightPlan(prev => {

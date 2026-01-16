@@ -408,13 +408,18 @@ class RealisticFlightPhysicsService {
         const CL_flaps = flapIncrements.cl;
         const CD_flaps_base = flapIncrements.cd;
 
+        // Airbrake Increments
+        const airbrakeIncrements = this.getAirbrakeIncrements();
+        const CL_brakes = airbrakeIncrements.cl;
+        const CD_brakes = airbrakeIncrements.cd;
+
         // Lift (CL)
-        // CL = CL0 + CLa * alpha + CL_flaps + CL_elevator
+        // CL = CL0 + CLa * alpha + CL_flaps + CL_elevator + CL_brakes
         const CL_stall_drop = Math.abs(alpha) > 0.3 ? -0.5 * Math.sin((Math.abs(alpha) - 0.3) * 5) : 0; // Simple stall drop
-        let CL = this.aircraft.CL0 + this.aircraft.CLa * alpha + CL_flaps + (this.controls.elevator * 0.3) + CL_stall_drop;
+        let CL = this.aircraft.CL0 + this.aircraft.CLa * alpha + CL_flaps + CL_brakes + (this.controls.elevator * 0.3) + CL_stall_drop;
 
         // Drag (CD)
-        // CD = CD0 + K * CL^2 + CD_flaps + CD_gear
+        // CD = CD0 + K * CL^2 + CD_flaps + CD_gear + CD_brakes
         
         // Ground Effect on Induced Drag
         const h = -this.state.pos.z; // Altitude (CG)
@@ -436,7 +441,7 @@ class RealisticFlightPhysicsService {
         const CL_induced_calc = Math.min(Math.abs(CL), 1.35); // Cap effective CL for induced drag
         const CD_induced = this.aircraft.K * CL_induced_calc * CL_induced_calc * groundEffectFactor;
         
-        const CD = this.aircraft.CD0 + CD_induced + CD_flaps + CD_gear;
+        const CD = this.aircraft.CD0 + CD_induced + CD_flaps + CD_gear + CD_brakes;
 
         // Side Force (CY)
         // CY = CYb * beta + CYdr * rudder
@@ -802,21 +807,103 @@ class RealisticFlightPhysicsService {
             return { cl: 0, cd: 0 };
         }
 
-        const flapInput = this.controls.flaps; // 0 to 1
+        let flapInput = this.controls.flaps; // Interpreted as Index (0 to MaxIndex)
         const positions = profile.positions;
         const numPositions = positions.length;
+        const maxIndex = numPositions - 1;
 
-        if (flapInput <= 0) return { cl: positions[0].clIncrement || 0, cd: positions[0].cdIncrement || 0 };
-        if (flapInput >= 1) return { cl: positions[numPositions - 1].clIncrement || 0, cd: positions[numPositions - 1].cdIncrement || 0 };
+        // Clamp input to valid range
+        if (flapInput < 0) flapInput = 0;
+        if (flapInput > maxIndex) flapInput = maxIndex;
 
         // Linear interpolation between profile positions
-        const scaledInput = flapInput * (numPositions - 1);
-        const idx1 = Math.floor(scaledInput);
-        const idx2 = Math.min(idx1 + 1, numPositions - 1);
-        const frac = scaledInput - idx1;
+        const idx1 = Math.floor(flapInput);
+        const idx2 = Math.min(idx1 + 1, maxIndex);
+        const frac = flapInput - idx1;
 
-        const cl = positions[idx1].clIncrement + (positions[idx2].clIncrement - positions[idx1].clIncrement) * frac;
-        const cd = positions[idx1].cdIncrement + (positions[idx2].cdIncrement - positions[idx1].cdIncrement) * frac;
+        const pos1 = positions[idx1];
+        const pos2 = positions[idx2];
+
+        // Safely access increments
+        const cl1 = pos1.clIncrement || 0;
+        const cd1 = pos1.cdIncrement || 0;
+        const cl2 = pos2.clIncrement || 0;
+        const cd2 = pos2.cdIncrement || 0;
+
+        const cl = cl1 + (cl2 - cl1) * frac;
+        const cd = cd1 + (cd2 - cd1) * frac;
+
+        return { cl, cd };
+    }
+
+    getAirbrakeIncrements() {
+        const profile = this.aircraft.airbrakeProfile;
+        
+        // Handle legacy profile structure (fallback)
+        if (profile && profile.airPosition && !profile.positions) {
+            const brakeInput = this.controls.brakes;
+            
+            if (profile.hasTwoTier) {
+                // Map indices to legacy behavior roughly
+                // 0=RET, 1=ARM(0%), 2=FLT(Air), 3=GND(Ground)
+                if (brakeInput <= 1) return { cl: 0, cd: 0 };
+                if (brakeInput === 2) {
+                     return { 
+                        cl: (profile.airPosition.liftDecrement || 0), 
+                        cd: (profile.airPosition.dragIncrement || 0) 
+                    };
+                }
+                if (brakeInput >= 3) {
+                     return { 
+                        cl: (profile.groundPosition.liftDecrement || 0), 
+                        cd: (profile.groundPosition.dragIncrement || 0) 
+                    };
+                }
+                return { cl: 0, cd: 0 };
+            } else {
+                 // Simple 0-1 extension
+                 if (this.onGround) {
+                    return { 
+                        cl: (profile.groundPosition.liftDecrement || 0) * brakeInput, 
+                        cd: (profile.groundPosition.dragIncrement || 0) * brakeInput 
+                    };
+                } else {
+                    return { 
+                        cl: (profile.airPosition.liftDecrement || 0) * brakeInput, 
+                        cd: (profile.airPosition.dragIncrement || 0) * brakeInput 
+                    };
+                }
+            }
+        }
+
+        if (!profile || !profile.positions || profile.positions.length === 0) {
+            return { cl: 0, cd: 0 };
+        }
+
+        let brakeInput = this.controls.brakes; // Interpreted as Index (0 to MaxIndex)
+        const positions = profile.positions;
+        const numPositions = positions.length;
+        const maxIndex = numPositions - 1;
+
+        // Clamp input
+        if (brakeInput < 0) brakeInput = 0;
+        if (brakeInput > maxIndex) brakeInput = maxIndex;
+
+        // Linear interpolation
+        const idx1 = Math.floor(brakeInput);
+        const idx2 = Math.min(idx1 + 1, maxIndex);
+        const frac = brakeInput - idx1;
+        
+        const pos1 = positions[idx1];
+        const pos2 = positions[idx2];
+
+        const cl1 = pos1.liftDecrement || 0;
+        const cd1 = pos1.dragIncrement || 0;
+        const cl2 = pos2.liftDecrement || 0;
+        const cd2 = pos2.dragIncrement || 0;
+
+        const cl = cl1 + (cl2 - cl1) * frac;
+        const cd = cd1 + (cd2 - cd1) * frac;
 
         return { cl, cd };
     }

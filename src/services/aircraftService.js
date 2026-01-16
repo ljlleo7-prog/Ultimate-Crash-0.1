@@ -393,9 +393,11 @@ class AircraftService {
 
     // Return the airbrake profile if it exists, otherwise return default values
     return aircraft.airbrakeProfile || {
-      hasTwoTier: true,
-      airPosition: { dragIncrement: 0.06, liftDecrement: -0.1 },
-      groundPosition: { dragIncrement: 0.15, liftDecrement: -0.2 }
+      positions: [
+        { label: "RET", dragIncrement: 0, liftDecrement: 0 },
+        { label: "EXT", dragIncrement: 0.06, liftDecrement: -0.1 },
+        { label: "GND", dragIncrement: 0.15, liftDecrement: -0.2 }
+      ]
     };
   }
 

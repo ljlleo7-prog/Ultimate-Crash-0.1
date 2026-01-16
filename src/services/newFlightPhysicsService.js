@@ -208,6 +208,7 @@ class NewFlightPhysicsService {
     this.autopilot = {
       enabled: false,
       engaged: false,
+      mode: 'LNAV', // 'LNAV' or 'HDG'
       targets: {
         altitude: 0,
         speed: 0,
@@ -533,8 +534,8 @@ class NewFlightPhysicsService {
     // --- HEADING / LNAV LOGIC ---
     let targetHeading = this.autopilot.targets.heading;
 
-    // LNAV: Follow waypoints if flight plan exists
-    if (this.flightPlan && this.flightPlan.length > 0 && this.currentWaypointIndex < this.flightPlan.length) {
+    // LNAV: Follow waypoints if flight plan exists AND mode is LNAV
+    if (this.autopilot.mode === 'LNAV' && this.flightPlan && this.flightPlan.length > 0 && this.currentWaypointIndex < this.flightPlan.length) {
       const nextWaypoint = this.flightPlan[this.currentWaypointIndex];
       const currentLat = this.state.position.latitude;
       const currentLon = this.state.position.longitude;
@@ -555,7 +556,8 @@ class NewFlightPhysicsService {
            targetHeading = this._calculateBearing(currentLat, currentLon, nextWaypoint.latitude, nextWaypoint.longitude);
         }
         
-        // Update target heading for UI display
+        // Update target heading for UI display but keep internal separate if needed
+        // For now, we update it so the HDG bug moves to where the plane is going
         this.autopilot.targets.heading = targetHeading;
       }
     }
@@ -649,6 +651,7 @@ class NewFlightPhysicsService {
     return {
       enabled: this.autopilot.engaged,  // ✅ FIXED: Return engaged state
       engaged: this.autopilot.engaged,
+      mode: this.autopilot.mode,
       targets: { ...this.autopilot.targets },
       limits: { ...this.autopilot.limits },
       controllers: {

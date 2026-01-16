@@ -188,7 +188,8 @@ const FlightInProgress = ({
         arrival: selectedArrival.iata || selectedArrival.icao,
         aircraftModel: aircraftModel,
         departureRunway: routeDetails?.departureRunway,
-        landingRunway: routeDetails?.landingRunway
+        landingRunway: routeDetails?.landingRunway,
+        initialHeading: runwayHeadingDeg
       });
       
       sceneManager.updateScenario({
@@ -197,12 +198,13 @@ const FlightInProgress = ({
         arrival: selectedArrival.iata || selectedArrival.icao,
         aircraftModel: aircraftModel,
         departureRunway: routeDetails?.departureRunway,
-        landingRunway: routeDetails?.landingRunway
+        landingRunway: routeDetails?.landingRunway,
+        initialHeading: runwayHeadingDeg
       });
       
       console.log('✅ FlightInProgress: Scene manager updated successfully');
     }
-  }, [callsign, selectedDeparture, selectedArrival, aircraftModel, routeDetails]);
+  }, [callsign, selectedDeparture, selectedArrival, aircraftModel, routeDetails, runwayHeadingDeg]);
 
   // Main update loop
   useEffect(() => {
@@ -618,6 +620,13 @@ const FlightInProgress = ({
                     physicsService.setAutopilot(!engaged);
                   }
                   console.log(`📡 FlightPanel Action: ${action}`);
+                  break;
+                }
+                case 'set-autopilot-mode': {
+                  if (physicsService && typeof physicsService.setAutopilotMode === 'function') {
+                    physicsService.setAutopilotMode(payload);
+                  }
+                  console.log(`📡 FlightPanel Action: ${action} = ${payload}`);
                   break;
                 }
                 case 'set-autopilot-targets': {

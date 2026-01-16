@@ -61,8 +61,8 @@ export const getRunways = (airport) => {
 export const getRunwayHeading = (runwayName) => {
   if (!runwayName) return 0;
   // Format is typically "09L", "27R", "36", etc.
-  // Extract the first 2 digits.
-  const match = runwayName.match(/^(\d{2})/);
+  // Extract the first 2 digits found in the string
+  const match = runwayName.match(/(\d{2})/);
   if (match) {
     return parseInt(match[1]) * 10;
   }
