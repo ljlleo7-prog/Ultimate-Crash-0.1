@@ -246,6 +246,26 @@ class RealisticFlightPhysicsService {
      * @param {Object} input - Control inputs
      * @param {number} dt - Time step (seconds)
      */
+    // --- Helper Methods ---
+    _calculateDistance(lat1, lon1, lat2, lon2) {
+        const R = 6371000; // Earth radius in meters
+        const dLat = (lat2 - lat1) * Math.PI / 180;
+        const dLon = (lon2 - lon1) * Math.PI / 180;
+        const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+            Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+            Math.sin(dLon / 2) * Math.sin(dLon / 2);
+        const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+        return R * c;
+    }
+
+    _calculateBearing(lat1, lon1, lat2, lon2) {
+        const y = Math.sin((lon2 - lon1) * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180);
+        const x = Math.cos(lat1 * Math.PI / 180) * Math.sin(lat2 * Math.PI / 180) -
+            Math.sin(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.cos((lon2 - lon1) * Math.PI / 180);
+        const brng = Math.atan2(y, x) * 180 / Math.PI;
+        return (brng + 360) % 360;
+    }
+
     update(input, dt) {
         if (this.crashed) return this.getOutputState();
 
@@ -260,17 +280,45 @@ class RealisticFlightPhysicsService {
         const currentAirspeed = airspeedsForAP.indicatedAirspeed; // IAS in knots
         const currentVS = -v_earth.z * 196.85; // m/s -> ft/min (z is down, so -z is up)
         const euler = this.state.quat.toEuler();
+        const currentHeading = (euler.psi * 180 / Math.PI + 360) % 360;
         
         const apState = {
             airspeed: currentAirspeed,
             verticalSpeed: currentVS,
             pitch: euler.theta,
             roll: euler.phi,
-            altitude: -this.state.pos.z * 3.28084
+            altitude: -this.state.pos.z * 3.28084,
+            heading: currentHeading
         };
 
+        // --- Waypoint Sequencing & LNAV ---
+        if (this.flightPlan && this.flightPlan.length > 0) {
+            // Ensure index is valid. If flight plan has multiple points (e.g. Origin -> WP1), start at 1 to avoid targeting origin.
+            if (this.currentWaypointIndex === undefined) {
+                this.currentWaypointIndex = (this.flightPlan.length > 1) ? 1 : 0;
+            }
+            
+            if (this.currentWaypointIndex < this.flightPlan.length) {
+                const nextWaypoint = this.flightPlan[this.currentWaypointIndex];
+                const dist = this._calculateDistance(this.state.geo.lat, this.state.geo.lon, nextWaypoint.latitude, nextWaypoint.longitude);
+                
+                // Switch to next waypoint if within 2km
+                if (dist < 2000) {
+                    this.currentWaypointIndex++;
+                    console.log(`📍 Reached waypoint ${nextWaypoint.label || this.currentWaypointIndex - 1}. Sequencing to index ${this.currentWaypointIndex}`);
+                }
+
+                // If LNAV is engaged, update target heading to waypoint bearing
+                if (this.autopilot.mode === 'LNAV' && this.currentWaypointIndex < this.flightPlan.length) {
+                    const targetWP = this.flightPlan[this.currentWaypointIndex];
+                    const bearing = this._calculateBearing(this.state.geo.lat, this.state.geo.lon, targetWP.latitude, targetWP.longitude);
+                    this.autopilot.setTargets({ heading: bearing });
+                }
+            }
+        }
+
         const apOutputs = this.autopilot.update(apState, this.controls, dt);
-        
+
         let finalInput = input;
         if (apOutputs) {
             // Override user inputs with AP outputs
@@ -288,6 +336,16 @@ class RealisticFlightPhysicsService {
 
         for (let i = 0; i < subSteps; i++) {
             this.time += subDt;
+
+            // 1. Position Update (Geo)
+            // NED to Geo approximation
+            const v_ned = this.state.quat.rotate(this.state.vel);
+            const latRad = this.state.geo.lat * Math.PI / 180;
+            const metersPerLat = 111132.92 - 559.82 * Math.cos(2 * latRad) + 1.175 * Math.cos(4 * latRad);
+            const metersPerLon = 111412.84 * Math.cos(latRad) - 93.5 * Math.cos(3 * latRad);
+            
+            this.state.geo.lat += (v_ned.x * subDt) / metersPerLat;
+            this.state.geo.lon += (v_ned.y * subDt) / metersPerLon;
 
             // 2. Environment
             const env = this.calculateEnvironment(this.state.pos.z);
@@ -660,13 +718,6 @@ class RealisticFlightPhysicsService {
             this.state.vel = new Vector3(0, 0, 0);
             this.state.rates = new Vector3(0, 0, 0);
         }
-
-        // Update Geo position (Approximate)
-        // 1 degree lat ~ 111111 meters
-        const dLat = v_earth.x * dt / 111111;
-        const dLon = v_earth.y * dt / (111111 * Math.cos(this.state.geo.lat * Math.PI / 180));
-        this.state.geo.lat += dLat;
-        this.state.geo.lon += dLon;
     }
 
     checkConstraints() {
@@ -733,6 +784,7 @@ class RealisticFlightPhysicsService {
             crashWarning: this.crashReason,
             autopilot: autopilotStatus,
             autopilotTargets: autopilotStatus.targets,
+            autopilotDebug: this.autopilot.debugState,
             engineParams: {
                 n1: this.engines.map(e => e.state.n1),
                 n2: this.engines.map(e => e.state.n2), 
@@ -740,6 +792,7 @@ class RealisticFlightPhysicsService {
                 fuelFlow: this.engines.map(e => e.state.fuelFlow)
             },
             fuel: this.state.fuel,
+            currentWaypointIndex: this.currentWaypointIndex || 0,
             
             // Debug / Derived
             derived: {
@@ -794,6 +847,43 @@ class RealisticFlightPhysicsService {
             };
             
             this.autopilot.setEngaged(engaged, currentState);
+        }
+    }
+
+    /**
+     * Set initial flight conditions
+     */
+    setInitialConditions(conditions) {
+        if (!conditions) return;
+
+        // Position
+        if (conditions.latitude !== undefined) this.state.geo.lat = conditions.latitude;
+        if (conditions.longitude !== undefined) this.state.geo.lon = conditions.longitude;
+        
+        // Orientation (psi = yaw in radians)
+        if (conditions.orientation && conditions.orientation.psi !== undefined) {
+            this.state.quat = Quaternion.fromEuler(0, 0, conditions.orientation.psi);
+        }
+
+        // Flight Plan
+        if (conditions.flightPlan) {
+            this.flightPlan = conditions.flightPlan;
+            this.currentWaypointIndex = 0;
+        }
+
+        // Altitude
+        if (conditions.position && conditions.position.z !== undefined) {
+            this.state.pos.z = -conditions.position.z; // NED uses Z-down
+        }
+
+        // Reset velocities and rates for initial state
+        this.state.vel = new Vector3(0, 0, 0);
+        this.state.rates = new Vector3(0, 0, 0);
+        
+        // Update autopilot targets if available
+        if (conditions.orientation && conditions.orientation.psi !== undefined) {
+            const headingDeg = (conditions.orientation.psi * 180 / Math.PI + 360) % 360;
+            this.autopilot.setTargets({ heading: headingDeg === 0 ? 360 : headingDeg });
         }
     }
     
@@ -908,9 +998,14 @@ class RealisticFlightPhysicsService {
         return { cl, cd };
     }
     
+    setAutopilotMode(mode) {
+        this.autopilot.setTargets({ mode: mode });
+    }
+
     getAutopilotStatus() {
         return {
             engaged: this.autopilot.engaged,
+            mode: this.autopilot.mode,
             targets: this.autopilot.targets
         };
     }
@@ -927,6 +1022,7 @@ class RealisticFlightPhysicsService {
         this.state.rates = new Vector3(0, 0, 0);
         this.state.quat = new Quaternion();
         this.crashed = false;
+        this.currentWaypointIndex = 0;
         this.engines.forEach(e => { e.n1 = 0; e.thrust = 0; });
     }
     calculateAirspeeds() {

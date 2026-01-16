@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { airportService } from '../services/airportService';
 
 // Knob Component
 const FrequencyKnob = ({ label, size, innerSize, onChange, sensitivity = 1, color = '#cbd5e1' }) => {
@@ -115,8 +116,75 @@ const FrequencyKnob = ({ label, size, innerSize, onChange, sensitivity = 1, colo
   );
 };
 
-const CommunicationModule = ({ flightState, setRadioFreq }) => {
+const CommunicationModule = ({ flightState, setRadioFreq, flightPlan }) => {
   const currentFreq = flightState?.radioFreq || 121.500;
+  const [connectionStatus, setConnectionStatus] = useState({ name: 'No Signal', type: '', connected: false });
+
+  // Update connection status
+  useEffect(() => {
+    const lat = flightState?.latitude;
+    const lon = flightState?.longitude;
+    
+    if (lat === undefined || lon === undefined) return;
+
+    // 1000km is approximately 540 nautical miles
+    const detectionRadiusNm = 540;
+    
+    // Check nearby airports
+    const nearbyAirports = airportService.getAirportsWithinRadius(lat, lon, detectionRadiusNm);
+    
+    let found = null;
+    
+    // 1. Check Airports
+    for (const airport of nearbyAirports) {
+      if (airport.frequencies) {
+        // Use a small epsilon for float comparison
+        const match = airport.frequencies.find(f => Math.abs(f.frequency - currentFreq) < 0.01);
+        if (match) {
+          found = { 
+            name: airport.name, 
+            type: `${match.type} (${airport.iata})`, 
+            connected: true 
+          };
+          break;
+        }
+      }
+    }
+    
+    // 2. Check Waypoints
+    if (!found && flightPlan) {
+      // Check Departure
+      if (flightPlan.departure && flightPlan.departure.frequency) {
+         if (Math.abs(flightPlan.departure.frequency - currentFreq) < 0.01) {
+             found = { name: flightPlan.departure.name, type: 'Departure', connected: true };
+         }
+      }
+      
+      // Check Arrival
+      if (!found && flightPlan.arrival && flightPlan.arrival.frequency) {
+         if (Math.abs(flightPlan.arrival.frequency - currentFreq) < 0.01) {
+             found = { name: flightPlan.arrival.name, type: 'Arrival', connected: true };
+         }
+      }
+
+      // Check standard waypoints
+      if (!found && flightPlan.waypoints) {
+        for (const wp of flightPlan.waypoints) {
+          if (wp.frequency && Math.abs(wp.frequency - currentFreq) < 0.01) {
+             found = { name: wp.name, type: 'Waypoint ATC', connected: true };
+             break;
+          }
+        }
+      }
+    }
+
+    if (found) {
+      setConnectionStatus(found);
+    } else {
+      setConnectionStatus({ name: 'No Signal', type: '', connected: false });
+    }
+    
+  }, [currentFreq, flightState?.latitude, flightState?.longitude, flightPlan]);
 
   // Handlers for frequency change
   const handleCoarseChange = (steps) => {
@@ -161,7 +229,7 @@ const CommunicationModule = ({ flightState, setRadioFreq }) => {
       flex: 1 // Take remaining space
     }
   },
-    // Left: Communication Details (Placeholder for now)
+    // Left: Communication Details
     React.createElement('div', {
       style: {
         flex: 1,
@@ -175,8 +243,23 @@ const CommunicationModule = ({ flightState, setRadioFreq }) => {
       }
     },
       React.createElement('div', { style: { fontSize: '10px', fontWeight: 'bold', color: '#94a3b8' } }, 'ACTIVE COMM'),
-      React.createElement('div', { style: { fontSize: '12px', color: '#f8fafc' } }, 'ATC: Seattle Center'),
-      React.createElement('div', { style: { fontSize: '11px', marginTop: '4px' } }, 'Status: Connected')
+      React.createElement('div', { 
+        style: { 
+          fontSize: '12px', 
+          color: connectionStatus.connected ? '#38bdf8' : '#64748b',
+          whiteSpace: 'nowrap',
+          overflow: 'hidden',
+          textOverflow: 'ellipsis',
+          maxWidth: '180px'
+        } 
+      }, connectionStatus.name),
+      React.createElement('div', { 
+        style: { 
+          fontSize: '11px', 
+          marginTop: '4px',
+          color: connectionStatus.connected ? '#4ade80' : '#64748b'
+        } 
+      }, connectionStatus.connected ? `${connectionStatus.type} - Connected` : 'Searching...')
     ),
 
     // Right: Frequency Controls

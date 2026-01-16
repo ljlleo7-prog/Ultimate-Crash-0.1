@@ -71,25 +71,38 @@ class RealisticAutopilotService {
         this.pitchPID = new PIDController(-5.0, -0.5, -0.2, -1.0, 1.0);
 
         // Roll Hold (Roll -> Aileron)
-        // Positive Roll -> Need Left Roll (Negative Aileron?) -> Check Cda
-        // Cda = 0.15. Cl = ... + Cda * aileron.
-        // Positive Aileron -> Positive Cl (Right Roll).
-        // Error = Target(0) - Current(Positive). Error is Negative.
-        // We need Negative Aileron (Left Roll).
-        // Negative Error * Kp = Negative Output.
-        // So Kp should be positive.
         this.rollPID = new PIDController(3.0, 0.1, 0.1, -1.0, 1.0);
 
+        // Heading Hold (Heading -> Roll)
+        // Error in degrees. Output: Target Roll (radians).
+        // 10 deg error -> 15 deg roll? 0.26 rad.
+        // Kp ~ 0.26 / 10 = 0.026
+        this.headingPID = new PIDController(0.026, 0.005, 0.01, -30 * Math.PI / 180, 30 * Math.PI / 180);
+
         this.engaged = false;
+        this.mode = 'HDG'; // Default mode
         this.targets = {
             speed: 0, // Knots
             vs: 0,    // ft/min
-            altitude: 0, // ft (Optional, if we implement Alt Hold later)
+            altitude: 0, // ft (Optional)
             heading: 0 // degrees
+        };
+        
+        this.debugState = {
+            headingError: 0,
+            targetRoll: 0,
+            pitchError: 0,
+            targetPitch: 0,
+            speedError: 0,
+            throttleCmd: 0,
+            vsError: 0
         };
     }
 
     setTargets(targets) {
+        if (targets.mode) {
+            this.mode = targets.mode;
+        }
         this.targets = { ...this.targets, ...targets };
     }
 
@@ -100,13 +113,17 @@ class RealisticAutopilotService {
             this.vsPID.reset();
             this.pitchPID.reset();
             this.rollPID.reset();
+            this.headingPID.reset();
 
             // If we have current state, capture targets if they are currently 0
-            // This provides a smooth takeover if the user hasn't set targets yet.
             if (currentState) {
                 if (this.targets.speed === 0) this.targets.speed = Math.round(currentState.airspeed);
                 if (this.targets.vs === 0) this.targets.vs = Math.round(currentState.verticalSpeed / 100) * 100;
                 if (this.targets.altitude === 0) this.targets.altitude = Math.round(currentState.altitude / 100) * 100;
+                if (this.targets.heading === 0) {
+                    const heading = (currentState.heading !== undefined) ? currentState.heading : 0;
+                    this.targets.heading = heading === 0 ? 360 : heading;
+                }
             }
         }
         this.engaged = engaged;
@@ -114,7 +131,7 @@ class RealisticAutopilotService {
 
     /**
      * Calculate Control Outputs
-     * @param {Object} state - Current aircraft state { airspeed (kts), verticalSpeed (ft/min), pitch (rad), roll (rad), altitude (ft) }
+     * @param {Object} state - Current aircraft state { airspeed (kts), verticalSpeed (ft/min), pitch (rad), roll (rad), altitude (ft), heading (deg) }
      * @param {Object} currentControls - Current control inputs { throttle, elevator, trim, aileron } (for trim offloading)
      * @param {number} dt - Time step
      * @returns {Object} New control inputs { throttle, elevator, trim, aileron } or null if not engaged
@@ -122,49 +139,69 @@ class RealisticAutopilotService {
     update(state, currentControls, dt) {
         if (!this.engaged) return null;
 
-        const { airspeed, verticalSpeed, pitch, roll } = state;
+        const { airspeed, verticalSpeed, pitch, roll, heading } = state;
         
         // Ensure targets are initialized if they were somehow left at 0
         if (this.targets.speed === 0) this.targets.speed = Math.round(airspeed);
         if (this.targets.vs === 0 && Math.abs(verticalSpeed) > 100) {
-             // Only capture VS if it's significant, otherwise keep 0 (level flight)
              this.targets.vs = Math.round(verticalSpeed / 100) * 100;
         }
+        if (this.targets.heading === 0) {
+            this.targets.heading = heading === 0 ? 360 : heading;
+        }
 
-        const { speed: targetSpeed, vs: targetVS } = this.targets;
+        const { speed: targetSpeed, vs: targetVS, heading: targetHeading } = this.targets;
 
         // 1. Auto-Throttle (Speed Control)
-        // Output is absolute throttle position
-        // We initialize the PID integrator with the current throttle to ensure smooth takeover?
-        // Or just let it run. Let's rely on the PID.
-        // If we want smooth takeover, we can pre-seed the integrator.
-        // But for now, standard PID.
         const throttleCmd = this.speedPID.update(targetSpeed, airspeed, dt);
 
         // 2. Vertical Speed Control (VS -> Pitch -> Trim)
         const targetPitch = this.vsPID.update(targetVS, verticalSpeed, dt);
         const pitchCmd = this.pitchPID.update(targetPitch, pitch, dt);
         
-        // Trim rate in radians per second. 0.1 rad/s = 10 units/s.
         const trimRate = 0.1;
         let newTrim = currentControls.trim + (pitchCmd * trimRate * dt);
         const maxTrim = 0.2;
         if (newTrim > maxTrim) newTrim = maxTrim;
         if (newTrim < -maxTrim) newTrim = -maxTrim;
         
-        // Fine elevator assist to handle transients smoothly
-        // Elevator helps quickly while trim catches up
         const elevatorCmd = pitchCmd * 0.1;
 
-        // 4. Roll Hold (Level Wings)
-        const aileronCmd = this.rollPID.update(0, roll, dt);
+        // 3. Directional Control (Heading/LNAV -> Roll -> Aileron)
+        let targetRoll = 0;
+        let headingError = 0;
+        if (this.mode === 'HDG' || this.mode === 'LNAV') {
+            // Calculate heading error with wrap-around
+            headingError = targetHeading - heading;
+            if (headingError > 180) headingError -= 360;
+            if (headingError < -180) headingError += 360;
+            
+            targetRoll = this.headingPID.update(headingError, 0, dt); // Target heading vs current heading
+        }
+
+        const aileronCmd = this.rollPID.update(targetRoll, roll, dt);
+
+        // Update Debug State
+        this.debugState = {
+            headingError,
+            targetRoll: targetRoll * 180 / Math.PI, // Convert to deg for display
+            pitchError: (targetPitch - pitch) * 180 / Math.PI,
+            targetPitch: targetPitch * 180 / Math.PI,
+            speedError: targetSpeed - airspeed,
+            throttleCmd,
+            vsError: targetVS - verticalSpeed,
+            aileronCmd,
+            elevatorCmd,
+            mode: this.mode,
+            engaged: this.engaged
+        };
 
         return {
             throttle: throttleCmd,
             elevator: elevatorCmd,
             trim: newTrim,
             aileron: aileronCmd,
-            rudder: 0 // Coordinate turns later
+            rudder: 0
         };
     }
 }

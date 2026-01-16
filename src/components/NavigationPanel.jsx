@@ -32,21 +32,32 @@ const NavigationPanel = ({ flightState, selectedArrival, flightPlan }) => {
       const currentLon = flightState.longitude;
 
       if (currentLat !== undefined && currentLon !== undefined) {
-        let closestWaypoint = null;
-        let minDistance = Infinity;
+        let activeWaypoint = null;
+        let distanceToActive = Infinity;
 
-        for (let i = 0; i < waypoints.length; i++) {
-          const wp = waypoints[i];
-          const dist = calculateDistance(currentLat, currentLon, wp.latitude, wp.longitude);
-          if (dist < minDistance) {
-            minDistance = dist;
-            closestWaypoint = wp;
+        // Priority 1: Use the actual active waypoint index from flight physics
+        if (typeof flightState.currentWaypointIndex === 'number' && 
+            flightState.currentWaypointIndex >= 0 && 
+            flightState.currentWaypointIndex < waypoints.length) {
+          activeWaypoint = waypoints[flightState.currentWaypointIndex];
+          distanceToActive = calculateDistance(currentLat, currentLon, activeWaypoint.latitude, activeWaypoint.longitude);
+        } else {
+          // Priority 2: Fallback to closest waypoint (legacy behavior)
+          let minDistance = Infinity;
+          for (let i = 0; i < waypoints.length; i++) {
+            const wp = waypoints[i];
+            const dist = calculateDistance(currentLat, currentLon, wp.latitude, wp.longitude);
+            if (dist < minDistance) {
+              minDistance = dist;
+              activeWaypoint = wp;
+              distanceToActive = dist;
+            }
           }
         }
 
-        if (closestWaypoint) {
-          setCurrentNextWaypointName(closestWaypoint.name);
-          setCurrentDistanceToNextWaypoint(minDistance);
+        if (activeWaypoint) {
+          setCurrentNextWaypointName(activeWaypoint.name);
+          setCurrentDistanceToNextWaypoint(distanceToActive);
         }
       }
     }

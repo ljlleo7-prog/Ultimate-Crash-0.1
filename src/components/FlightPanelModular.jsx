@@ -51,6 +51,7 @@ const FlightPanelModular = ({ flightData, onActionRequest, aircraftModel, select
     
     // Autopilot
     autopilot: true,
+    autopilotMode: flightData?.autopilotMode || 'LNAV',
     flightDirector: true,
     altitudeHold: true,
     headingHold: true,
@@ -118,6 +119,7 @@ const FlightPanelModular = ({ flightData, onActionRequest, aircraftModel, select
         
         // Autopilot - Update from physics service status
         autopilot: flightData.autopilotEngaged || false, // ✅ Use physics service status
+        autopilotMode: flightData.autopilotMode || prevState.autopilotMode || 'LNAV',
         flightDirector: prevState.flightDirector,
         altitudeHold: prevState.altitudeHold,
         headingHold: prevState.headingHold,
@@ -272,7 +274,8 @@ const FlightPanelModular = ({ flightData, onActionRequest, aircraftModel, select
         }),
         React.createElement(CommunicationModule, {
           flightState,
-          setRadioFreq: (freq) => setFlightState(prev => ({ ...prev, radioFreq: freq }))
+          setRadioFreq: (freq) => setFlightState(prev => ({ ...prev, radioFreq: freq })),
+          flightPlan
         })
       ),
       

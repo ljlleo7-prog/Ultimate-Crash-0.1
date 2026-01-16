@@ -35,6 +35,7 @@ const RouteSelectionFrame = ({
       setAvailableRunwaysArr(arrRunways);
 
       const waypoints = generateRouteWaypoints(departure, arrival);
+      console.log('📍 Generated route waypoints:', waypoints);
       setGeneratedWaypoints(waypoints);
 
       const sid = generateSID((waypoints[0] && waypoints[0].name) || 'ABC');
@@ -43,6 +44,10 @@ const RouteSelectionFrame = ({
       const arrGate = generateGate();
       const depTaxi = generateTaxiway();
       const arrTaxi = generateTaxiway();
+
+      const isEastward = arrival.longitude > departure.longitude;
+      const bestDepRunway = depRunways.length > 0 ? [...depRunways].sort((a, b) => parseInt(a) - parseInt(b))[isEastward ? 0 : depRunways.length - 1] : '';
+      const bestArrRunway = arrRunways.length > 0 ? [...arrRunways].sort((a, b) => parseInt(a) - parseInt(b))[isEastward ? 0 : arrRunways.length - 1] : '';
 
       // Pre-fill based on difficulty to assist user
       // Or leave empty if "must set".
@@ -56,11 +61,11 @@ const RouteSelectionFrame = ({
       setRouteData({
         departureGate: isAmateurOrHigher ? '' : depGate, // Amateur+ must set
         departureTaxiway: depTaxi,
-        departureRunway: isAmateurOrHigher ? '' : depRunways[0], // Amateur+ must set
+        departureRunway: isAmateurOrHigher ? '' : bestDepRunway, // Amateur+ must set
         sid: isAdvancedOrHigher ? '' : sid, // Advanced+ must set
         waypoints: isIntermediateOrHigher ? [] : waypoints, // Intermediate+ must set
         star: isAdvancedOrHigher ? '' : star, // Advanced+ must set
-        landingRunway: isAmateurOrHigher ? '' : arrRunways[0], // Amateur+ must set
+        landingRunway: isAmateurOrHigher ? '' : bestArrRunway, // Amateur+ must set
         landingTaxiway: arrTaxi,
         arrivalGate: isAmateurOrHigher ? '' : arrGate // Amateur+ must set
       });

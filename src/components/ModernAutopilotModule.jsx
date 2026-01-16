@@ -106,7 +106,7 @@ const ModernAutopilotModule = ({ flightState, setAutopilotTargets, toggleAutopil
             transition: 'all 0.2s'
           },
           onClick: () => setAutopilotMode && setAutopilotMode(currentMode === 'LNAV' ? 'HDG' : 'LNAV'),
-          disabled: flightState.hasCrashed || !flightState.autopilot
+          disabled: flightState.hasCrashed
         }, currentMode)
       ),
       
@@ -180,7 +180,7 @@ const ModernAutopilotModule = ({ flightState, setAutopilotTargets, toggleAutopil
           React.createElement('button', {
             style: { background: 'none', border: 'none', color: '#64748b', cursor: 'pointer', padding: '0 4px', fontSize: '14px' },
             onClick: () => updateTarget('heading', (targets.heading - 5 + 360) % 360),
-            disabled: flightState.hasCrashed || currentMode === 'LNAV'
+            disabled: flightState.hasCrashed
           }, '-'),
           React.createElement('span', { 
             style: { 
@@ -195,7 +195,7 @@ const ModernAutopilotModule = ({ flightState, setAutopilotTargets, toggleAutopil
           React.createElement('button', {
             style: { background: 'none', border: 'none', color: '#64748b', cursor: 'pointer', padding: '0 4px', fontSize: '14px' },
             onClick: () => updateTarget('heading', (targets.heading + 5) % 360),
-            disabled: flightState.hasCrashed || currentMode === 'LNAV'
+            disabled: flightState.hasCrashed
           }, '+')
         )
       ),

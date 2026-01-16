@@ -10,6 +10,7 @@ import FlightInProgress from './components/FlightInProgress.jsx';
 import RouteSelectionFrame from './components/RouteSelectionFrame.jsx';
 import NarrativeScene from './components/NarrativeScene.jsx';
 import { generateInitialWeather, updateWeather } from './services/weatherService';
+import { getRunwayHeading } from './utils/routeGenerator';
 
 import { FadeOverlay, CinematicReview } from './components/CinematicComponents.jsx';
 
@@ -20,8 +21,33 @@ function App() {
   // Development mode bypass - directly initialize flight
   const handleDevStart = () => {
     console.log('🚀 Development Mode: Starting flight simulation directly');
-    setFlightInitialized(true);
-    setCinematicPhase('none');
+    
+    // Set default airports for dev mode (KSFO -> KLAX)
+    const devDeparture = getAirportByCode('KSFO') || getAirportByCode('KATL');
+    const devArrival = getAirportByCode('KLAX') || getAirportByCode('KJFK');
+    
+    if (devDeparture && devArrival) {
+      console.log('📍 Dev Mode: Using default airports', devDeparture.iata, '->', devArrival.iata);
+      selectDeparture(devDeparture);
+      selectArrival(devArrival);
+      
+      // We need to wait for state update or force it through props
+      // Since setState is async, we can't rely on selectedDeparture being set immediately for FlightInProgress
+      // But FlightInProgress uses the selectedDeparture from the hook which will update
+      
+      // However, we set flightInitialized to true immediately. 
+      // This might cause a race condition where FlightInProgress renders before selectedDeparture updates.
+      // To be safe, we'll delay the initialization slightly
+      
+      setTimeout(() => {
+        setFlightInitialized(true);
+        setCinematicPhase('none');
+      }, 100);
+    } else {
+      console.warn('⚠️ Dev Mode: Could not find default airports');
+      setFlightInitialized(true);
+      setCinematicPhase('none');
+    }
   };
   
   // Flight initialization state
@@ -44,7 +70,7 @@ function App() {
   const [flightPlan, setFlightPlan] = useState(null);
   
   // Airport search state
-  const { searchResults, selectedDeparture, selectedArrival, searchAirports, selectDeparture, selectArrival, clearSelection } = useAirportSearch();
+  const { searchResults, selectedDeparture, selectedArrival, searchAirports, selectDeparture, selectArrival, clearSelection, getAirportByCode } = useAirportSearch();
   
   // Aircraft suggestions
   const [aircraftSuggestions, setAircraftSuggestions] = useState([]);
@@ -62,7 +88,6 @@ function App() {
   const [crewCount, setCrewCount] = useState(2);
   const [simulationStarted, setSimulationStarted] = useState(false);
   const [cinematicPhase, setCinematicPhase] = useState('none');
-  const [physicsModel, setPhysicsModel] = useState('realistic');
   
   // Route Selection State
   const [showRouteSelection, setShowRouteSelection] = useState(false);
@@ -114,8 +139,10 @@ function App() {
 
   const handleRouteConfirm = (routeData) => {
     // Insert 10nm approach fix
-    if (routeData.landingRunway && selectedArrival) {
-       const runwayHdg = getRunwayHeading(routeData.landingRunway);
+    if (routeData.landingRunway && selectedArrival && selectedDeparture) {
+       const isEastward = selectedArrival.longitude > selectedDeparture.longitude;
+       const runwayHdg = getRunwayHeading(routeData.landingRunway, isEastward);
+       console.log(`✈️ Approach for ${routeData.landingRunway}: Heading ${runwayHdg} (Eastward: ${isEastward})`);
        const approachHdg = (runwayHdg + 180) % 360; // Reciprocal
        const distance = 10; // NM
        
@@ -303,7 +330,6 @@ function App() {
       setWeatherData: setWeatherData,
       failureType: failureType,
       crewCount: crewCount,
-      physicsModel: physicsModel,
       routeDetails: detailedRoute
     });
   }
@@ -397,8 +423,6 @@ function App() {
         aircraftSuggestions: aircraftSuggestions,
         handleInitializeFlight: handleInitializeFlight,
         handleSearch: handleSearch,
-        physicsModel: physicsModel,
-        setPhysicsModel: setPhysicsModel,
         apiKey: apiKey,
         setApiKey: setApiKey
       })

@@ -1,6 +1,4 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
-import NewFlightPhysicsService from '../services/newFlightPhysicsService.js';
-import SimpleFlightPhysicsService from '../services/SimpleFlightPhysicsService.js';
 import RealisticFlightPhysicsService from '../services/RealisticFlightPhysicsService.js';
 import { loadAircraftData } from '../services/aircraftService.js';
 
@@ -138,23 +136,19 @@ export function useAircraftPhysics(config = {}, autoStart = true, model = 'reali
         
         const { initialLatitude, initialLongitude, ...restConfig } = config;
 
-        let service;
-        if (model === 'imaginary' || model === 'simple') {
-            service = new SimpleFlightPhysicsService(finalAircraft);
-        } else if (model === 'realistic_v2' || model === 'ultra_realistic' || model === 'test_model1') {
-            service = new RealisticFlightPhysicsService(finalAircraft, initialLatitude, initialLongitude);
-        } else {
-            // Default or 'realistic' (legacy)
-            service = new NewFlightPhysicsService(finalAircraft, initialLatitude, initialLongitude);
-        }
+        // Use RealisticFlightPhysicsService exclusively as requested
+        const service = new RealisticFlightPhysicsService(finalAircraft, initialLatitude, initialLongitude);
         
         // Apply initial conditions from config
         if (service && typeof service.setInitialConditions === 'function') {
+           // Convert initialHeading (degrees) to radians for psi
+           const headingRad = (config.initialHeading || 0) * Math.PI / 180;
+           
            service.setInitialConditions({
                latitude: initialLatitude,
                longitude: initialLongitude,
                orientation: {
-                   psi: config.initialHeading || 0,
+                   psi: headingRad,
                    theta: 0,
                    phi: 0
                },
@@ -272,6 +266,7 @@ export function useAircraftPhysics(config = {}, autoStart = true, model = 'reali
 
       const autopilotStatus = newState.autopilot || {};
       const autopilotEngaged = !!autopilotStatus.engaged;
+      const autopilotMode = autopilotStatus.mode || 'LNAV';
 
       let actualThrottle = throttleValue;
       if (
@@ -349,11 +344,13 @@ export function useAircraftPhysics(config = {}, autoStart = true, model = 'reali
         engineN2: newState.engineParams?.n2 !== undefined ? newState.engineParams.n2 : [45, 45],
         engineEGT: newState.engineParams?.egt !== undefined ? newState.engineParams.egt : [400, 400],
         fuel: newState.fuel !== undefined ? newState.fuel : 100,
+        currentWaypointIndex: newState.currentWaypointIndex || 0,
         hasCrashed,
         timeToCrash: typeof newState.timeToCrash === 'number' ? newState.timeToCrash : null,
         crashWarning,
         alarms,
         autopilotEngaged,
+        autopilotMode,
         autopilotTargets,
         debugPhysics: newState.debugPhysics
       };

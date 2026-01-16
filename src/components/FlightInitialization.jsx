@@ -25,7 +25,6 @@ const FlightInitialization = ({
   aircraftSuggestions,
   handleInitializeFlight,
   handleSearch,
-  physicsModel, setPhysicsModel,
   apiKey, setApiKey
 }) => {
   
@@ -183,45 +182,9 @@ const FlightInitialization = ({
     }
   };
 
-  // Get available physics models based on difficulty
-  const getAvailablePhysicsModels = () => {
-    switch (difficulty) {
-      case 'rookie':
-      case 'amateur':
-        return ['imaginary', 'realistic', 'test_model1'];
-      case 'intermediate':
-      case 'advanced':
-        return ['imaginary', 'realistic', 'test_model1'];
-      case 'pro':
-      case 'devil':
-        return ['realistic', 'test_model1'];
-      default:
-        return ['imaginary', 'realistic', 'test_model1'];
-    }
-  };
-
-  // Get default physics model based on difficulty
-  const getDefaultPhysicsModel = () => {
-    switch (difficulty) {
-      case 'rookie':
-      case 'amateur':
-      case 'intermediate':
-      case 'advanced':
-        return 'realistic';
-      case 'pro':
-      case 'devil':
-        return 'realistic';
-      default:
-        return 'realistic';
-    }
-  };
-
   // Handle difficulty change
   useEffect(() => {
-    const availableModels = getAvailablePhysicsModels();
-    if (!availableModels.includes(physicsModel)) {
-      setPhysicsModel(getDefaultPhysicsModel());
-    }
+    // Difficulty logic here if needed in future
   }, [difficulty]);
 
   return (
@@ -243,21 +206,6 @@ const FlightInitialization = ({
           </div>
           
           <div className="intel-panel">
-            <div className="parameter-group">
-              <label>Physics Engine:</label>
-              <select 
-                value={physicsModel} 
-                onChange={(e) => setPhysicsModel(e.target.value)}
-                className="dispatch-select"
-              >
-                {getAvailablePhysicsModels().map((model) => (
-                  <option key={model} value={model}>
-                    {model.toUpperCase()} MODEL
-                  </option>
-                ))}
-              </select>
-            </div>
-            
             <div className="crew-intel-box">
               <span className="intel-label">CREW INTELLIGENCE:</span>
               <p className="intel-text">

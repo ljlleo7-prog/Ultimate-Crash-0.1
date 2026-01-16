@@ -51,7 +51,8 @@ const FlightInProgress = ({
 
   // Calculate initial heading from runway
   const runwayName = (routeDetails?.departureRunway) || (flightPlan?.departure?.runways?.[0]?.name) || '36L';
-  const runwayHeadingDeg = getRunwayHeading(runwayName);
+  const isEastward = selectedArrival && selectedDeparture ? selectedArrival.longitude > selectedDeparture.longitude : null;
+  const runwayHeadingDeg = getRunwayHeading(runwayName, isEastward);
   const runwayHeadingRad = runwayHeadingDeg * Math.PI / 180;
 
   const aircraftConfig = {
@@ -62,9 +63,11 @@ const FlightInProgress = ({
     windSpeedKts: weatherData && typeof weatherData.windSpeed === 'number'
       ? weatherData.windSpeed
       : 0,
-    initialLatitude: initialDeparture?.latitude || 0,
-    initialLongitude: initialDeparture?.longitude || 0,
-    initialHeading: runwayHeadingRad,
+    // Fallback to KSFO if latitude/longitude are missing (prevents 0,0 initialization)
+    initialLatitude: initialDeparture?.latitude || 37.6188,
+    initialLongitude: initialDeparture?.longitude || -122.3750,
+    // Pass heading in degrees, as useAircraftPhysics converts it to radians
+    initialHeading: runwayHeadingDeg,
     flightPlan: (routeDetails?.waypoints || flightPlan?.waypoints || [])
   };
 
@@ -652,6 +655,96 @@ const FlightInProgress = ({
 
         </div>
       </div>
+      
+      {/* Debug Panel for LNAV/PID */}
+      {flightData && (
+        <div style={{
+          position: 'absolute',
+          top: '90px',
+          right: '20px',
+          background: 'rgba(10, 15, 30, 0.85)',
+          color: '#4ade80',
+          padding: '12px',
+          fontFamily: 'monospace',
+          fontSize: '11px',
+          borderRadius: '6px',
+          border: '1px solid rgba(74, 222, 128, 0.3)',
+          zIndex: 100,
+          pointerEvents: 'none',
+          width: '220px',
+          boxShadow: '0 4px 6px rgba(0,0,0,0.3)'
+        }}>
+          <div style={{ 
+            fontSize: '12px', 
+            fontWeight: 'bold', 
+            borderBottom: '1px solid rgba(74, 222, 128, 0.3)',
+            paddingBottom: '4px',
+            marginBottom: '8px',
+            display: 'flex',
+            justifyContent: 'space-between'
+          }}>
+            <span>FLIGHT DATA & LNAV</span>
+            <span>{flightData.derived?.heading.toFixed(0)}°</span>
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 8px' }}>
+            <span style={{ color: '#9ca3af' }}>Lat:</span>
+            <span>{flightData.position?.latitude?.toFixed(5)}</span>
+            
+            <span style={{ color: '#9ca3af' }}>Lon:</span>
+            <span>{flightData.position?.longitude?.toFixed(5)}</span>
+            
+            <span style={{ color: '#9ca3af' }}>Alt:</span>
+            <span>{flightData.derived?.altitude_ft?.toFixed(0)} ft</span>
+            
+            <span style={{ color: '#9ca3af' }}>Spd:</span>
+            <span>{flightData.derived?.airspeed?.toFixed(0)} kts</span>
+          </div>
+
+          <div style={{ margin: '8px 0', borderTop: '1px solid rgba(74, 222, 128, 0.2)' }}></div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: '4px 8px' }}>
+            <span style={{ color: '#9ca3af' }}>Mode:</span>
+            <span style={{ fontWeight: 'bold' }}>{flightData.autopilotDebug?.mode || 'OFF'}</span>
+            
+            <span style={{ color: '#9ca3af' }}>Engaged:</span>
+            <span style={{ color: flightData.autopilotDebug?.engaged ? '#4ade80' : '#ef4444' }}>
+              {flightData.autopilotDebug?.engaged ? 'ACTIVE' : 'OFF'}
+            </span>
+            
+            <span style={{ color: '#9ca3af' }}>Target Hdg:</span>
+            <span>{flightData.autopilotTargets?.heading?.toFixed(1) || '---'}°</span>
+            
+            <span style={{ color: '#9ca3af' }}>Hdg Error:</span>
+            <span style={{ color: Math.abs(flightData.autopilotDebug?.headingError) > 5 ? '#f59e0b' : '#4ade80' }}>
+              {flightData.autopilotDebug?.headingError?.toFixed(2) || '0.00'}°
+            </span>
+            
+            <span style={{ color: '#9ca3af' }}>Tgt Roll:</span>
+            <span>{flightData.autopilotDebug?.targetRoll?.toFixed(1) || '0.0'}°</span>
+            
+            <span style={{ color: '#9ca3af' }}>Act Roll:</span>
+            <span>{(flightData.orientation?.phi * 180 / Math.PI).toFixed(1)}°</span>
+          </div>
+          
+          <div style={{ margin: '8px 0', borderTop: '1px solid rgba(74, 222, 128, 0.2)' }}></div>
+          
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+             <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+               <span style={{ color: '#9ca3af' }}>Next WP:</span>
+               <span>
+                 {(routeDetails?.waypoints || flightPlan?.waypoints || [])[flightData.currentWaypointIndex]?.name || 
+                  (routeDetails?.waypoints || flightPlan?.waypoints || [])[flightData.currentWaypointIndex]?.id || 
+                  `IDX ${flightData.currentWaypointIndex}`}
+               </span>
+             </div>
+             <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+               <span style={{ color: '#9ca3af' }}>WP Index:</span>
+               <span>{flightData.currentWaypointIndex} / {(routeDetails?.waypoints || flightPlan?.waypoints || []).length}</span>
+             </div>
+          </div>
+        </div>
+      )}
 
       {isCrashed && (
         <div className="end-scene-overlay">

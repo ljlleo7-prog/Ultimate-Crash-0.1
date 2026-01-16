@@ -1,5 +1,22 @@
 
 /**
+ * Generates a unique VHF frequency for ATC communications
+ * Range: 118.000 to 136.975 MHz, in 25kHz steps
+ */
+export const generateUniqueFrequency = () => {
+  const min = 118000;
+  const max = 136975;
+  const step = 25;
+  
+  // Calculate total number of steps
+  const totalSteps = Math.floor((max - min) / step);
+  const randomStep = Math.floor(Math.random() * (totalSteps + 1));
+  
+  const freqKhz = min + (randomStep * step);
+  return freqKhz / 1000;
+};
+
+/**
  * Generates route components including SID, STAR, Waypoints, and Gates.
  */
 
@@ -48,24 +65,70 @@ export const generateTaxiway = () => {
 };
 
 export const getRunways = (airport) => {
+  let runwayNames = [];
   if (airport && airport.runways && Array.isArray(airport.runways) && airport.runways.length > 0) {
-    return airport.runways.map(r => r.name);
+    runwayNames = airport.runways.map(r => r.name);
+  } else if (airport && airport.runway) {
+    runwayNames = [airport.runway];
+  } else {
+    runwayNames = ['09L/27R', '18L/36R'];
   }
-  if (airport && airport.runway) {
-    return [airport.runway];
-  }
-  // Fallback generation if no data
-  return ['09L', '27R', '18L', '36R'];
+
+  // Split pairs into individual runways (e.g., "09L/27R" -> ["09L", "27R"])
+  const individualRunways = [];
+  runwayNames.forEach(name => {
+    if (name.includes('/')) {
+      name.split('/').forEach(part => individualRunways.push(part.trim()));
+    } else if (name.includes('-')) {
+      name.split('-').forEach(part => individualRunways.push(part.trim()));
+    } else {
+      individualRunways.push(name);
+    }
+  });
+
+  return individualRunways;
 };
 
-export const getRunwayHeading = (runwayName) => {
-  if (!runwayName) return 0;
-  // Format is typically "09L", "27R", "36", etc.
-  // Extract the first 2 digits found in the string
-  const match = runwayName.match(/(\d{2})/);
-  if (match) {
-    return parseInt(match[1]) * 10;
+/**
+ * Extracts a heading from a runway name, handling pairs like "09L/27R"
+ * @param {string} runwayName - Runway name or pair
+ * @param {boolean|null} isEastward - Direction preference (true for smaller number, false for bigger)
+ * @returns {number} Magnetic heading in degrees
+ */
+export const getRunwayHeading = (runwayName, isEastward = null) => {
+  if (!runwayName) {
+    console.warn('⚠️ getRunwayHeading called with empty runwayName');
+    return 0;
   }
+
+  // Handle pairs like "09L/27R" or "06R-24L"
+  const parts = runwayName.split(/[\/\-]/);
+  
+  if (parts.length > 1 && isEastward !== null) {
+    const headings = parts.map(p => {
+      const match = p.match(/(\d{1,2})/);
+      return match ? parseInt(match[1]) * 10 : null;
+    }).filter(h => h !== null);
+
+    if (headings.length >= 2) {
+      // User: "if destination is eastward, use smaller number; if westward, use bigger number"
+      headings.sort((a, b) => a - b);
+      const selected = isEastward ? headings[0] : headings[headings.length - 1];
+      console.log(`🧭 Runway Pair [${runwayName}] -> Preferred: ${selected} (Eastward: ${isEastward})`);
+      // Return 360 instead of 0 for North
+      const h = selected % 360;
+      return h === 0 ? 360 : h;
+    }
+  }
+
+  // Single runway or no preference
+  const match = runwayName.match(/(\d{1,2})/);
+  if (match) {
+    const h = (parseInt(match[1]) * 10) % 360;
+    return h === 0 ? 360 : h;
+  }
+
+  console.warn(`⚠️ Could not parse runway heading from: ${runwayName}`);
   return 0;
 };
 
@@ -153,7 +216,8 @@ export const generateRouteWaypoints = (startAirport, endAirport) => {
       name: names[i-1] || `WPT${i}`,
       latitude: point.latitude,
       longitude: point.longitude,
-      type: 'WAYPOINT'
+      type: 'WAYPOINT',
+      frequency: generateUniqueFrequency()
     });
   }
   
