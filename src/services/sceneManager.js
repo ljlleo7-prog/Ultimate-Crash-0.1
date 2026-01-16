@@ -1,4 +1,5 @@
-import eventBus, { EventTypes, EventCategories } from './eventBus.js';
+import eventBus, { EventTypes } from './eventBus.js';
+import { getRunwayHeading } from '../utils/routeGenerator';
 
 // Flight phases with typical parameters
 export const FlightPhases = {
@@ -685,8 +686,11 @@ class SceneManager {
   }
 
   getDepartureRunwayHeading() {
-    // This would ideally come from the scenario's departure airport data
-    return 130; // Default for KJFK 13R
+    const runway = this.scenario?.departureRunway;
+    if (typeof runway === 'string' && runway.length > 0) {
+      return getRunwayHeading(runway);
+    }
+    return 130;
   }
 }
 

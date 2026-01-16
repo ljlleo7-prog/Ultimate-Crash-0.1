@@ -1,6 +1,6 @@
 import React from 'react';
 
-const DebugPhysicsPanel = ({ debugPhysicsData, thrust, drag }) => {
+const DebugPhysicsPanel = ({ debugPhysicsData, thrust, drag, waypoints = [] }) => {
   if (!debugPhysicsData) {
     return null;
   }
@@ -55,6 +55,17 @@ const DebugPhysicsPanel = ({ debugPhysicsData, thrust, drag }) => {
       <div style={{ fontWeight: 'bold', marginTop: '8px', marginBottom: '5px', borderBottom: '1px solid #444', paddingBottom: '3px' }}>FORCES</div>
       <div>Thrust: {typeof thrust === 'number' ? (thrust / 1000).toFixed(1) : '0.0'} kN</div>
       <div>Drag: {typeof drag === 'number' ? (drag / 1000).toFixed(1) : '0.0'} kN</div>
+      
+      {Array.isArray(waypoints) && waypoints.length > 0 && (
+        <div style={{ marginTop: '8px', borderTop: '1px solid #444', paddingTop: '3px' }}>
+          <div style={{ fontWeight: 'bold', marginBottom: '4px' }}>WAYPOINTS ({waypoints.length})</div>
+          {waypoints.map((wp, idx) => (
+            <div key={idx}>
+              {wp.name} ({typeof wp.latitude === 'number' ? wp.latitude.toFixed(2) : 'N/A'}, {typeof wp.longitude === 'number' ? wp.longitude.toFixed(2) : 'N/A'})
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 };

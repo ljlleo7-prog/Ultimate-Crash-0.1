@@ -62,7 +62,7 @@ function App() {
   const [crewCount, setCrewCount] = useState(2);
   const [simulationStarted, setSimulationStarted] = useState(false);
   const [cinematicPhase, setCinematicPhase] = useState('none');
-  const [physicsModel, setPhysicsModel] = useState('imaginary'); // Default to imaginary model
+  const [physicsModel, setPhysicsModel] = useState('realistic');
   
   // Route Selection State
   const [showRouteSelection, setShowRouteSelection] = useState(false);
@@ -115,6 +115,26 @@ function App() {
   const handleRouteConfirm = (routeData) => {
     setDetailedRoute(routeData);
     setShowRouteSelection(false);
+    setFlightPlan(prev => {
+      if (!prev) return prev;
+      const merged = { ...prev };
+      if (Array.isArray(routeData.waypoints) && routeData.waypoints.length > 0) {
+        merged.waypoints = routeData.waypoints;
+      }
+      if (routeData?.departureRunway) {
+        merged.departure = {
+          ...merged.departure,
+          runways: [{ name: routeData.departureRunway }]
+        };
+      }
+      if (routeData?.landingRunway) {
+        merged.arrival = {
+          ...merged.arrival,
+          runways: [{ name: routeData.landingRunway }]
+        };
+      }
+      return merged;
+    });
     startSimulation(routeData);
   };
 

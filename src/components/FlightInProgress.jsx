@@ -7,6 +7,7 @@ import DebugPhysicsPanel from './DebugPhysicsPanel';
 import commandDatabase from '../commandDatabase.json';
 import sceneManager from '../services/sceneManager.js';
 import eventBus from '../services/eventBus.js';
+import { getRunwayHeading } from '../utils/routeGenerator';
 
 const FlightInProgress = ({ 
   callsign, 
@@ -33,7 +34,7 @@ const FlightInProgress = ({
   setWeatherData, 
   failureType, 
   crewCount, 
-  physicsModel = 'imaginary',
+  physicsModel = 'realistic',
   routeDetails
 }) => {
 
@@ -48,6 +49,11 @@ const FlightInProgress = ({
     ? flightPlan.fuel.totalFuel
     : 0;
 
+  // Calculate initial heading from runway
+  const runwayName = (routeDetails?.departureRunway) || (flightPlan?.departure?.runways?.[0]?.name) || '36L';
+  const runwayHeadingDeg = getRunwayHeading(runwayName);
+  const runwayHeadingRad = runwayHeadingDeg * Math.PI / 180;
+
   const aircraftConfig = {
     aircraftModel,
     payloadWeight: totalPayloadWeight,
@@ -57,7 +63,9 @@ const FlightInProgress = ({
       ? weatherData.windSpeed
       : 0,
     initialLatitude: initialDeparture?.latitude || 0,
-    initialLongitude: initialDeparture?.longitude || 0
+    initialLongitude: initialDeparture?.longitude || 0,
+    initialHeading: runwayHeadingRad,
+    flightPlan: (routeDetails?.waypoints || flightPlan?.waypoints || [])
   };
 
   const {
@@ -178,19 +186,23 @@ const FlightInProgress = ({
         callsign: callsign,
         departure: selectedDeparture.iata || selectedDeparture.icao,
         arrival: selectedArrival.iata || selectedArrival.icao,
-        aircraftModel: aircraftModel
+        aircraftModel: aircraftModel,
+        departureRunway: routeDetails?.departureRunway,
+        landingRunway: routeDetails?.landingRunway
       });
       
       sceneManager.updateScenario({
         callsign: callsign,
         departure: selectedDeparture.iata || selectedDeparture.icao,
         arrival: selectedArrival.iata || selectedArrival.icao,
-        aircraftModel: aircraftModel
+        aircraftModel: aircraftModel,
+        departureRunway: routeDetails?.departureRunway,
+        landingRunway: routeDetails?.landingRunway
       });
       
       console.log('✅ FlightInProgress: Scene manager updated successfully');
     }
-  }, [callsign, selectedDeparture, selectedArrival, aircraftModel]);
+  }, [callsign, selectedDeparture, selectedArrival, aircraftModel, routeDetails]);
 
   // Main update loop
   useEffect(() => {
@@ -530,6 +542,7 @@ const FlightInProgress = ({
             debugPhysicsData={flightData?.debugPhysics} 
             thrust={flightData?.thrust}
             drag={flightData?.drag}
+            waypoints={flightPlan?.waypoints || []}
           />
         )}
 
@@ -558,6 +571,7 @@ const FlightInProgress = ({
           <FlightPanelModular
             flightData={flightData}
             selectedArrival={selectedArrival}
+            flightPlan={flightPlan}
             onActionRequest={(action, payload) => {
               const payloadStr = typeof payload === 'number' ? payload.toFixed(5) : JSON.stringify(payload);
               console.log(`📡 UI Action: ${action} = ${payloadStr}`);

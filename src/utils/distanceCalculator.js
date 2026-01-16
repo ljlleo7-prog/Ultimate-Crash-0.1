@@ -2,6 +2,7 @@
 // Enhanced with aircraft-specific fuel calculations
 
 import aircraftService from '../services/aircraftService';
+import { generateRouteWaypoints } from './routeGenerator';
 
 // Haversine formula to calculate great-circle distance between two coordinates in nautical miles
 function calculateDistance(lat1, lon1, lat2, lon2) {
@@ -84,6 +85,9 @@ async function calculateFlightPlan(departureAirport, arrivalAirport, aircraftMod
   const aircraft = await aircraftService.getAircraftByModel(aircraftModel);
   const performance = aircraft ? await aircraftService.calculateFlightPerformance(aircraftModel, distance, payload) : null;
 
+  // Generate route waypoints
+  const waypoints = generateRouteWaypoints(departureAirport, arrivalAirport);
+
   return {
     departure: {
       airport: departureAirport.iata || departureAirport.icao,
@@ -117,6 +121,7 @@ async function calculateFlightPlan(departureAirport, arrivalAirport, aircraftMod
       maxPassengers: aircraft.maxPassengers
     } : null,
     performance: performance ? performance.performance : null,
+    waypoints: waypoints,
     validation: performance ? await aircraftService.validateRoute(aircraftModel, distance, payload) : null
   };
 }

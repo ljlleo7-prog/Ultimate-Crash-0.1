@@ -13,7 +13,7 @@ import CentralPanel from './CentralPanel';
 import ControlSurfacePanel from './ControlSurfacePanel';
 import './FlightPanel.css';
 
-const FlightPanelModular = ({ flightData, onActionRequest, aircraftModel, selectedArrival }) => {
+const FlightPanelModular = ({ flightData, onActionRequest, aircraftModel, selectedArrival, flightPlan }) => {
   // Use flightData from parent component instead of creating own physics service
   const [flightState, setFlightState] = useState({
     // Navigation
@@ -21,6 +21,8 @@ const FlightPanelModular = ({ flightData, onActionRequest, aircraftModel, select
     trueAirspeed: flightData?.airspeed || 450,
     groundSpeed: flightData?.airspeed || 430,
     indicatedAirspeed: flightData?.indicatedAirspeed || 280,
+    latitude: (flightData && flightData.position && typeof flightData.position.latitude === 'number') ? flightData.position.latitude : 0,
+    longitude: (flightData && flightData.position && typeof flightData.position.longitude === 'number') ? flightData.position.longitude : 0,
     radioFreq: 121.5,
     
     // Flight Pose
@@ -87,6 +89,8 @@ const FlightPanelModular = ({ flightData, onActionRequest, aircraftModel, select
         groundSpeed: flightData.airspeed,
         indicatedAirspeed: flightData.indicatedAirspeed || 0, // FIXED: Ensure IAS is always a number
         radioFreq: prevState.radioFreq,
+        latitude: (flightData && flightData.position && typeof flightData.position.latitude === 'number') ? flightData.position.latitude : prevState.latitude,
+        longitude: (flightData && flightData.position && typeof flightData.position.longitude === 'number') ? flightData.position.longitude : prevState.longitude,
         
         // Flight Pose
         pitch: flightData.pitch || 0, // FIXED: Ensure pitch is always a number
@@ -271,7 +275,7 @@ const FlightPanelModular = ({ flightData, onActionRequest, aircraftModel, select
         React.createElement(FlightPosePanel, { flightState }),
         
         // Navigation Panel (Middle)
-        React.createElement(NavigationPanel, { flightState, selectedArrival }),
+        React.createElement(NavigationPanel, { flightState, selectedArrival, flightPlan }),
         
         // Central Panel (Right)
         React.createElement(CentralPanel, { flightState })

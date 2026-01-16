@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import './RouteSelectionFrame.css';
-import { generateWaypoints, generateSID, generateSTAR, generateGate, generateTaxiway, getRunways } from '../utils/routeGenerator';
+import { generateWaypoints, generateSID, generateSTAR, generateGate, generateTaxiway, getRunways, generateRouteWaypoints } from '../utils/routeGenerator';
 
 const RouteSelectionFrame = ({ 
   isOpen, 
@@ -34,11 +34,11 @@ const RouteSelectionFrame = ({
       setAvailableRunwaysDep(depRunways);
       setAvailableRunwaysArr(arrRunways);
 
-      const waypoints = generateWaypoints(5);
+      const waypoints = generateRouteWaypoints(departure, arrival);
       setGeneratedWaypoints(waypoints);
 
-      const sid = generateSID(waypoints[0]);
-      const star = generateSTAR(waypoints[waypoints.length - 1]);
+      const sid = generateSID((waypoints[0] && waypoints[0].name) || 'ABC');
+      const star = generateSTAR((waypoints[waypoints.length - 1] && waypoints[waypoints.length - 1].name) || 'ABC');
       const depGate = generateGate();
       const arrGate = generateGate();
       const depTaxi = generateTaxiway();
@@ -72,13 +72,13 @@ const RouteSelectionFrame = ({
   };
 
   const handleGenerateWaypoints = () => {
-     const wps = generateWaypoints();
+     const wps = generateRouteWaypoints(departure, arrival);
      setGeneratedWaypoints(wps);
      handleChange('waypoints', wps);
      
      // Also update SID/STAR if they depend on waypoints
-     if (!routeData.sid) handleChange('sid', generateSID(wps[0]));
-     if (!routeData.star) handleChange('star', generateSTAR(wps[wps.length - 1]));
+     if (!routeData.sid) handleChange('sid', generateSID((wps[0] && wps[0].name) || 'ABC'));
+     if (!routeData.star) handleChange('star', generateSTAR((wps[wps.length - 1] && wps[wps.length - 1].name) || 'ABC'));
   };
 
   const isFormValid = () => {
@@ -168,7 +168,7 @@ const RouteSelectionFrame = ({
                   onChange={(e) => handleChange('sid', e.target.value)}
                   placeholder="e.g. OMA12D"
                 />
-                <button className="generate-btn" onClick={() => handleChange('sid', generateSID(routeData.waypoints[0] || 'ABC'))}>🎲</button>
+                <button className="generate-btn" onClick={() => handleChange('sid', generateSID((routeData.waypoints[0] && routeData.waypoints[0].name) || 'ABC'))}>🎲</button>
               </div>
             )}
           </div>
@@ -180,7 +180,9 @@ const RouteSelectionFrame = ({
               <div className="form-group full-width">
                  <label>Waypoints</label>
                  <div className="waypoints-display">
-                    {routeData.waypoints.join(' ➝ ')}
+                    {Array.isArray(routeData.waypoints) && routeData.waypoints.length > 0
+                      ? routeData.waypoints.map(wp => typeof wp === 'string' ? wp : (wp.name || 'WPT')).join(' ➝ ')
+                      : ''}
                  </div>
                  <button className="action-btn" onClick={handleGenerateWaypoints}>
                    Generate New Route
@@ -202,7 +204,7 @@ const RouteSelectionFrame = ({
                   onChange={(e) => handleChange('star', e.target.value)}
                   placeholder="e.g. DXB45A"
                 />
-                <button className="generate-btn" onClick={() => handleChange('star', generateSTAR(routeData.waypoints[routeData.waypoints.length-1] || 'ABC'))}>🎲</button>
+                <button className="generate-btn" onClick={() => handleChange('star', generateSTAR(((routeData.waypoints[routeData.waypoints.length-1] && routeData.waypoints[routeData.waypoints.length-1].name) || 'ABC')))}>🎲</button>
               </div>
             )}
 

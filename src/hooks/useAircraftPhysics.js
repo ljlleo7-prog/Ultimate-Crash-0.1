@@ -148,6 +148,20 @@ export function useAircraftPhysics(config = {}, autoStart = true, model = 'reali
             service = new NewFlightPhysicsService(finalAircraft, initialLatitude, initialLongitude);
         }
         
+        // Apply initial conditions from config
+        if (service && typeof service.setInitialConditions === 'function') {
+           service.setInitialConditions({
+               latitude: initialLatitude,
+               longitude: initialLongitude,
+               orientation: {
+                   psi: config.initialHeading || 0,
+                   theta: 0,
+                   phi: 0
+               },
+               flightPlan: config.flightPlan
+           });
+        }
+        
         if (config && service && service.aircraft) {
           if (typeof config.payloadWeight === 'number' && !isNaN(config.payloadWeight) && config.payloadWeight >= 0) {
             service.aircraft.payloadWeight = config.payloadWeight;
@@ -309,7 +323,7 @@ export function useAircraftPhysics(config = {}, autoStart = true, model = 'reali
         verticalSpeed: verticalSpeed,
         pitch: newState.orientation.theta * 180 / Math.PI,
         roll: newState.orientation.phi * 180 / Math.PI,
-        heading: newState.orientation.psi * 180 / Math.PI,
+        heading: typeof newState.heading === 'number' ? newState.heading : (newState.orientation.psi * 180 / Math.PI + 360) % 360,
         throttle: actualThrottle * 100,
         elevator: currentControlsRef.current.pitch * 180 / Math.PI,
         aileron: currentControlsRef.current.roll * 180 / Math.PI,

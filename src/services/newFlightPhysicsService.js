@@ -178,6 +178,9 @@ class NewFlightPhysicsService {
       }
     };
     
+    this.flightPlan = [];
+    this.currentWaypointIndex = 0;
+    
     // Environment parameters at sea level (will be updated dynamically)
     this.environment = {
       density: 1.225,   // kg/m³ at sea level
@@ -431,6 +434,8 @@ class NewFlightPhysicsService {
         ...manualControls,
         throttle: auto.throttle,
         pitch: auto.pitch * 0.05,
+        roll: auto.roll,
+        yaw: auto.yaw,
         trim: auto.trim
       };
     } else {
@@ -525,11 +530,61 @@ class NewFlightPhysicsService {
       Math.min(this.autopilot.limits.maxThrottle, this.state.controls.throttle + throttleCommand)
     );
 
+    // --- HEADING / LNAV LOGIC ---
+    let targetHeading = this.autopilot.targets.heading;
+
+    // LNAV: Follow waypoints if flight plan exists
+    if (this.flightPlan && this.flightPlan.length > 0 && this.currentWaypointIndex < this.flightPlan.length) {
+      const nextWaypoint = this.flightPlan[this.currentWaypointIndex];
+      const currentLat = this.state.position.latitude;
+      const currentLon = this.state.position.longitude;
+      
+      if (currentLat !== undefined && currentLon !== undefined) {
+        // Calculate distance and bearing to waypoint
+        const distance = this._calculateDistance(currentLat, currentLon, nextWaypoint.latitude, nextWaypoint.longitude);
+        
+        // Switch to next waypoint if within 2km (approx 1 NM)
+        if (distance < 2000) {
+           this.currentWaypointIndex++;
+           // If we have more waypoints, recalculate for the new one immediately
+           if (this.currentWaypointIndex < this.flightPlan.length) {
+             const newNext = this.flightPlan[this.currentWaypointIndex];
+             targetHeading = this._calculateBearing(currentLat, currentLon, newNext.latitude, newNext.longitude);
+           }
+        } else {
+           targetHeading = this._calculateBearing(currentLat, currentLon, nextWaypoint.latitude, nextWaypoint.longitude);
+        }
+        
+        // Update target heading for UI display
+        this.autopilot.targets.heading = targetHeading;
+      }
+    }
+
+    // Heading Control (Bank Angle Limit: 15 degrees)
+    const currentHeading = (this.state.orientation.psi * 180 / Math.PI + 360) % 360;
+    let headingError = targetHeading - currentHeading;
+    
+    // Normalize error to [-180, 180]
+    while (headingError > 180) headingError -= 360;
+    while (headingError < -180) headingError += 360;
+    
+    // Calculate desired bank angle from heading error
+    const desiredBank = Math.max(-20, Math.min(20, headingError * 0.8));
+    
+    // Use PID to generate aileron command to achieve desired bank
+    const currentBank = this.state.orientation.phi * 180 / Math.PI;
+    const bankError = desiredBank - currentBank;
+    const aileronPID = this.pidControllers.heading.calculate(0, -bankError, dt);
+    const limitedRoll = Math.max(-1, Math.min(1, aileronPID));
+    
+    // Simple yaw damper to stabilize yaw rate
+    const yawDamper = Math.max(-0.3, Math.min(0.3, -this.state.angularRates.r * 0.05));
+
     return {
       throttle: limitedThrottle,
       pitch: 0, // Pitch is now controlled by trim when autopilot is engaged
-      roll: 0,
-      yaw: 0,
+      roll: limitedRoll,
+      yaw: yawDamper,
       trim: limitedTrim
     };
   }
@@ -555,16 +610,7 @@ class NewFlightPhysicsService {
     };
   }
   
-  /**
-   * Set trim control from cockpit
-   */
-  setTrim(trimValue) {
-    // Allow trim value to accumulate for circular input
-    const newTrimValue = trimValue || 0;
-    
-    // Smoothly apply trim change to avoid sudden jolts
-    this.state.controls.trim = this.smoothInput(this.state.controls.trim, trimmedValue, 0.05);
-  }
+ 
 
   /**
    * Update autopilot targets
@@ -1944,7 +1990,11 @@ class NewFlightPhysicsService {
       this.autopilot.targets.speed = config.velocity.u;
     }
     if (config.orientation.psi !== undefined) {
-      this.autopilot.targets.heading = config.orientation.psi;
+      this.autopilot.targets.heading = (config.orientation.psi * 180 / Math.PI + 360) % 360;
+    }
+    if (Array.isArray(config.flightPlan)) {
+      this.flightPlan = config.flightPlan;
+      this.currentWaypointIndex = 0;
     }
   }
   
@@ -2064,6 +2114,37 @@ class NewFlightPhysicsService {
     const newLon = initialLon + (deltaLon * 180) / Math.PI;
 
     return { latitude: newLat, longitude: newLon };
+  }
+
+  /**
+   * Calculate distance between two points in meters
+   */
+  _calculateDistance(lat1, lon1, lat2, lon2) {
+    const R = 6378137; // Earth radius in meters
+    const dLat = (lat2 - lat1) * Math.PI / 180;
+    const dLon = (lon2 - lon1) * Math.PI / 180;
+    const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+              Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+              Math.sin(dLon / 2) * Math.sin(dLon / 2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    return R * c;
+  }
+
+  /**
+   * Calculate bearing from point 1 to point 2 in degrees (0-360)
+   */
+  _calculateBearing(lat1, lon1, lat2, lon2) {
+    const φ1 = lat1 * Math.PI / 180;
+    const φ2 = lat2 * Math.PI / 180;
+    const Δλ = (lon2 - lon1) * Math.PI / 180;
+
+    const y = Math.sin(Δλ) * Math.cos(φ2);
+    const x = Math.cos(φ1) * Math.sin(φ2) -
+              Math.sin(φ1) * Math.cos(φ2) * Math.cos(Δλ);
+    
+    const θ = Math.atan2(y, x);
+    const bearing = (θ * 180 / Math.PI + 360) % 360;
+    return bearing;
   }
 }
 

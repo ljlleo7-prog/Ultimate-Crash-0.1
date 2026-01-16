@@ -188,7 +188,7 @@ const FlightInitialization = ({
     switch (difficulty) {
       case 'rookie':
       case 'amateur':
-        return ['imaginary', 'test_model1'];
+        return ['imaginary', 'realistic', 'test_model1'];
       case 'intermediate':
       case 'advanced':
         return ['imaginary', 'realistic', 'test_model1'];
@@ -196,7 +196,7 @@ const FlightInitialization = ({
       case 'devil':
         return ['realistic', 'test_model1'];
       default:
-        return ['imaginary', 'test_model1'];
+        return ['imaginary', 'realistic', 'test_model1'];
     }
   };
 
@@ -207,12 +207,12 @@ const FlightInitialization = ({
       case 'amateur':
       case 'intermediate':
       case 'advanced':
-        return 'imaginary';
+        return 'realistic';
       case 'pro':
       case 'devil':
         return 'realistic';
       default:
-        return 'imaginary';
+        return 'realistic';
     }
   };
 
