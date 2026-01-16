@@ -112,8 +112,25 @@ class AircraftService {
       throw new Error(`Aircraft model '${aircraftModel}' not found`);
     }
 
-    // Calculate trip fuel based on typical fuel burn
-    const tripFuel = aircraft.typicalFuelBurn * distance;
+    // Calculate trip fuel using enhanced algorithm
+    // 1. Determine baseline weights (assume typicalBurn is for ~50% load)
+    const emptyWeight = aircraft.emptyWeight || 40000;
+    const maxPayload = aircraft.maxPayload || 20000;
+    const typicalWeight = emptyWeight + (maxPayload * 0.5) + (aircraft.typicalFuelBurn * aircraft.cruiseSpeed * 1.5); // 1.5h fuel mean
+
+    // 2. Estimate flight specific weight
+    const estFuelMass = aircraft.typicalFuelBurn * distance;
+    const flightAvgWeight = emptyWeight + payload + (estFuelMass * 0.5);
+
+    // 3. Weight Correction Factor (Fuel flow ~ Weight)
+    const weightFactor = flightAvgWeight / typicalWeight;
+
+    // 4. Cycle Penalty (Takeoff/Climb inefficiency) - approx 15 mins cruise equivalent
+    const cyclePenaltyKg = (aircraft.typicalFuelBurn * aircraft.cruiseSpeed) * 0.25;
+
+    // 5. Final Calculation
+    const adjustedBurnPerNm = aircraft.typicalFuelBurn * weightFactor;
+    const tripFuel = (adjustedBurnPerNm * distance) + cyclePenaltyKg;
     
     // Calculate reserve fuel (5% by default)
     const reserveFuel = tripFuel * fuelReserve;

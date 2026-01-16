@@ -577,6 +577,7 @@ const FlightInProgress = ({
         <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
           <FlightPanelModular
             flightData={flightData}
+            aircraftModel={aircraftModel}
             selectedArrival={selectedArrival}
             flightPlan={flightPlan}
             onActionRequest={(action, payload) => {

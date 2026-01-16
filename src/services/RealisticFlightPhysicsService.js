@@ -431,7 +431,9 @@ class RealisticFlightPhysicsService {
              
              // Consume Fuel
              // fuelFlow is kg/s
-             const fuelBurned = engine.state.fuelFlow * dt;
+             // Apply a consumption coefficient to balance fuel cost (User reported ~2x over-consumption)
+             const FUEL_CONSUMPTION_COEFFICIENT = 0.6;
+             const fuelBurned = engine.state.fuelFlow * dt * FUEL_CONSUMPTION_COEFFICIENT;
              this.state.fuel -= fuelBurned;
         });
         
