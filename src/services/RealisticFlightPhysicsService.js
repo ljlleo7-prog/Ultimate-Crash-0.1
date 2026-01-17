@@ -14,6 +14,7 @@
 import EnginePhysicsService from './EnginePhysicsService.js';
 import RealisticAutopilotService from './RealisticAutopilotService.js';
 import FailureSystem from './FailureSystem.js';
+import WarningSystem from './WarningSystem.js';
 
 // ==========================================
 // Math Utilities
@@ -200,6 +201,7 @@ class RealisticFlightPhysicsService {
         
         // Failure System
         this.failureSystem = new FailureSystem();
+        this.warningSystem = new WarningSystem();
         this.sensors = { pitotBlocked: false };
 
         // Aircraft Systems State
@@ -1227,7 +1229,8 @@ class RealisticFlightPhysicsService {
         const airspeeds = this.calculateAirspeeds();
 
         const autopilotStatus = this.getAutopilotStatus ? this.getAutopilotStatus() : { engaged: false, targets: {} };
-        return {
+        
+        const outputState = {
             position: {
                 x: this.state.pos.x, // North
                 y: this.state.pos.y, // East
@@ -1311,6 +1314,12 @@ class RealisticFlightPhysicsService {
                 trim: this.controls.trim
             }
         };
+
+        if (this.warningSystem) {
+             outputState.activeWarnings = this.warningSystem.update(outputState, 0.016);
+        }
+
+        return outputState;
     }
     
     // Interface methods required by the hook

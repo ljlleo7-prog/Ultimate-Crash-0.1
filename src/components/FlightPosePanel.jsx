@@ -204,8 +204,8 @@ const FlightPosePanel = ({ flightState }) => {
             React.createElement('span', { className: 'current-value' }, `${altitude20ft}`)
           ),
           
-          // Terrain Text (AGL)
-          React.createElement('div', {
+          // Terrain Text (AGL) - Only show when below 2500ft
+          agl < 2500 && React.createElement('div', {
             style: {
               position: 'absolute',
               bottom: '5px',

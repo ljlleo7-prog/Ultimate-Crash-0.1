@@ -52,6 +52,7 @@ const FlightPanelModular = ({ flightData, weatherData, onActionRequest, aircraft
       instruments: true
     },
     alarms: [], // FIXED: Initialize alarms as empty array
+    activeWarnings: [],
     
     // Autopilot
     autopilot: true,
@@ -117,6 +118,7 @@ const FlightPanelModular = ({ flightData, weatherData, onActionRequest, aircraft
         hydraulicPressure: flightData.hydraulicPressure || prevState.hydraulicPressure,
         circuitBreakers: prevState.circuitBreakers,
         alarms: flightData.alarms || prevState.alarms,
+        activeWarnings: flightData.activeWarnings || [],
         
         // Surface controls
         flapsValue: flightData.flapsValue,
@@ -145,16 +147,30 @@ const FlightPanelModular = ({ flightData, weatherData, onActionRequest, aircraft
 
   // Handle crash warnings and alerts
   useEffect(() => {
-    if (!flightData?.crashWarning) {
+    let warningMsg = null;
+    
+    // Priority 1: Crash
+    if (flightData?.crashWarning) {
+        warningMsg = flightData.crashWarning;
+    } 
+    // Priority 2: Flashing Warnings
+    else if (flightData?.activeWarnings) {
+        const flashWarning = flightData.activeWarnings.find(w => w.isFlashing);
+        if (flashWarning) {
+            warningMsg = flashWarning.message;
+        }
+    }
+
+    if (!warningMsg) {
       return;
     }
     const now = Date.now();
     if (now - lastAlertTime < alertCooldown) {
       return;
     }
-    setFlashText(flightData.crashWarning);
+    setFlashText(warningMsg);
     setFlashActive(true);
-  }, [flightData?.crashWarning, lastAlertTime]);
+  }, [flightData?.crashWarning, flightData?.activeWarnings, lastAlertTime]);
 
   const handleAlertComplete = useCallback(() => {
     setFlashActive(false);

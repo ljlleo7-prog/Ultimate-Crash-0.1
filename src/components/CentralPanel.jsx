@@ -9,6 +9,22 @@ const CentralPanel = ({ flightState, onToggleSystems }) => {
   const engineN2 = flightState.engineN2 || [0, 0];
   const engineEGT = flightState.engineEGT || [0, 0];
   const fuel = flightState.fuel || 0;
+
+  // Combine all warnings for display
+  const activeWarnings = flightState.activeWarnings || [];
+  const allWarnings = [...activeWarnings];
+  // Add crash warning if present (as critical)
+  if (crashWarning) {
+    if (!allWarnings.find(w => w.message === crashWarning)) {
+      allWarnings.unshift({ id: 'CRASH_WARN', message: crashWarning, level: 'CRITICAL' });
+    }
+  }
+  // Add legacy alarms
+  alarms.forEach((alarm, i) => {
+    if (!allWarnings.find(w => w.message === alarm)) {
+      allWarnings.push({ id: `ALARM_${i}`, message: alarm, level: 'WARNING' });
+    }
+  });
   
   // Get engine count from the arrays (supports 2, 3, or 4 engines)
   const engineCount = Math.max(2, Math.min(4, engineN1.length || 2));
@@ -166,7 +182,11 @@ const CentralPanel = ({ flightState, onToggleSystems }) => {
         background: 'rgba(0, 0, 0, 0.3)',
         border: '1px solid #444',
         borderRadius: '6px',
-        padding: '10px'
+        padding: '10px',
+        flexGrow: 1, // Fill remaining space
+        display: 'flex',
+        flexDirection: 'column',
+        maxHeight: '200px' // Limit height
       }
     },
       React.createElement('div', { 
@@ -174,43 +194,66 @@ const CentralPanel = ({ flightState, onToggleSystems }) => {
           marginBottom: '8px', 
           fontSize: '12px', 
           color: '#ffaa00',
-          fontWeight: 'bold'
+          fontWeight: 'bold',
+          borderBottom: '1px solid #555',
+          paddingBottom: '4px'
         } 
-      }, 'SYSTEM STATUS'),
-      React.createElement('div', { className: 'status-items' },
-        crashWarning 
-          ? React.createElement('div', { 
-              className: 'alarm-item', 
-              style: {
-                color: '#ff4444',
-                marginBottom: '4px',
-                fontSize: '12px',
-                fontWeight: 'bold',
-                textTransform: 'uppercase'
+      }, 'SYSTEM STATUS / ALERTS'),
+      
+      React.createElement('div', { 
+        className: 'status-items',
+        style: {
+            display: 'grid',
+            gridTemplateColumns: '1fr 1fr',
+            gap: '8px',
+            overflowY: 'auto',
+            height: '100%',
+            paddingRight: '5px'
+        }
+      },
+        allWarnings.length > 0 
+          ? allWarnings.map((warning, index) => {
+              // Determine color based on level
+              let color = '#ffff00'; // Advisory/Info
+              let bg = 'rgba(255, 255, 0, 0.1)';
+              
+              if (warning.level === 'CRITICAL') {
+                  color = '#ff4444';
+                  bg = 'rgba(255, 0, 0, 0.1)';
+              } else if (warning.level === 'WARNING') {
+                  color = '#ff9900';
+                  bg = 'rgba(255, 153, 0, 0.1)';
               }
-            }, `WARN: ${crashWarning}`)
-          : null,
-        alarms.length > 0 
-          ? alarms.map((alarm, index) =>
-              React.createElement('div', { 
-                key: `alarm-${index}`, 
+
+              return React.createElement('div', { 
+                key: warning.id || `warn-${index}`, 
                 className: 'alarm-item', 
                 style: {
-                  color: '#ff9999',
-                  marginBottom: '2px',
-                  fontSize: '10px',
+                  color: color,
+                  backgroundColor: bg,
+                  padding: '4px 6px',
+                  borderRadius: '3px',
+                  fontSize: '11px',
                   fontWeight: 'bold',
-                  textTransform: 'uppercase'
+                  textTransform: 'uppercase',
+                  border: `1px solid ${color}`,
+                  textAlign: 'center',
+                  whiteSpace: 'nowrap',
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis'
                 }
-              }, index + 1, ': ', alarm)
-            )
-          : !crashWarning && React.createElement('span', { 
+              }, warning.message);
+            })
+          : React.createElement('div', { 
               className: 'status-ok', 
               style: {
+                gridColumn: '1 / -1', // Span both columns
                 color: '#00ff00',
                 fontSize: '12px',
                 fontWeight: 'bold',
-                textAlign: 'center'
+                textAlign: 'center',
+                padding: '10px',
+                fontStyle: 'italic'
               }
             }, 'ALL SYSTEMS NORMAL')
       ),
