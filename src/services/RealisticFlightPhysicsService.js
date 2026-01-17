@@ -939,8 +939,8 @@ class RealisticFlightPhysicsService {
         const Fz_aero = -F_drag * sinA - F_lift * cosA;
 
         // Dimensional Moments
-        const Mx_aero = q * S * b * Cl;
-        const My_aero = q * S * c * Cm;
+        let Mx_aero = q * S * b * Cl;
+        let My_aero = q * S * c * Cm;
         let Mz_aero = q * S * b * Cn;
         
         // --- Ground Steering (Nose Wheel) ---
@@ -968,12 +968,12 @@ class RealisticFlightPhysicsService {
              
              // Steering Force Calculation
              // Apply mass-based torque for consistent handling across aircraft types
-             // INCREASED: from 15 to 60 for torque, 5 to 25 for side force
-             const steeringTorque = this.state.mass * 60 * this.controls.rudder * steerFactor * damping;
+             // REDUCED: from 60 to 30 for torque, 25 to 15 for side force to prevent twitchiness
+             const steeringTorque = this.state.mass * 30 * this.controls.rudder * steerFactor * damping;
              Mz_steering = steeringTorque;
              
              // Side force to initiate turn
-             const steeringSideForce = this.state.mass * 25 * this.controls.rudder * steerFactor * damping;
+             const steeringSideForce = this.state.mass * 15 * this.controls.rudder * steerFactor * damping;
              Fy_steering = steeringSideForce;
              
              // Debug log occasionally
@@ -1035,9 +1035,9 @@ class RealisticFlightPhysicsService {
         // x: Forward, y: Right, z: Down (CG at 0,0,0)
         // Tuned for stability: Softer springs, higher damping
         const gears = [
-            { name: 'nose', pos: new Vector3(14.0, 0, 3.0), k: 120000, c: 35000 },  // Softer nose
-            { name: 'mainL', pos: new Vector3(-2.0, -3.5, 3.0), k: 350000, c: 80000 }, // Softer main, higher damping
-            { name: 'mainR', pos: new Vector3(-2.0, 3.5, 3.0), k: 350000, c: 80000 }
+            { name: 'nose', pos: new Vector3(14.0, 0, 3.0), k: 80000, c: 35000 },  // Softer nose
+            { name: 'mainL', pos: new Vector3(-2.0, -3.5, 3.0), k: 150000, c: 150000 }, // Softer main, critical damping
+            { name: 'mainR', pos: new Vector3(-2.0, 3.5, 3.0), k: 150000, c: 150000 }
         ];
         
         let onGroundAny = false;
@@ -1102,6 +1102,22 @@ class RealisticFlightPhysicsService {
                     mu_roll *= (1 - 0.4 * rainFactor);
                     mu_slide *= (1 - 0.4 * rainFactor);
                 }
+
+                // Grass Friction Adjustment
+                if (this.groundStatus && this.groundStatus.status === 'GRASS') {
+                    // Increase rolling resistance significantly on grass (Soft ground)
+                    mu_roll = 0.08; // Was 0.02
+                    
+                    // Reduce sliding friction (Slippery grass)
+                    mu_slide = 0.5; // Was 0.9
+                    
+                    // Add "bumpiness" noise to normal force to simulate uneven terrain
+                    // Only if moving
+                    if (this.state.vel.length() > 1) {
+                        const noise = (Math.random() - 0.5) * 0.2; // +/- 10% variation
+                        F_n *= (1 + noise);
+                    }
+                }
                 
                 // Friction Forces (Wheel Frame)
                 // Use a "stiction" zone for low speeds to prevent oscillation
@@ -1122,7 +1138,11 @@ class RealisticFlightPhysicsService {
                 // Lateral (Sliding) - Critical for wind resistance
                 // High stiffness for cornering
                 if (Math.abs(vy_wheel) < v_threshold) {
-                     Fy_wheel = -vy_wheel * F_normal_mag * 200; // Very strong holding power (increased from 50)
+                     // Reduced from 200 to 30 to prevent ejection, clamped to slide limit
+                     let stiffForce = -vy_wheel * F_normal_mag * 30;
+                     const maxStiff = F_normal_mag * mu_slide;
+                     if (Math.abs(stiffForce) > maxStiff) stiffForce = Math.sign(stiffForce) * maxStiff;
+                     Fy_wheel = stiffForce;
                 } else {
                      Fy_wheel = -Math.sign(vy_wheel) * F_normal_mag * mu_slide;
                 }
@@ -1143,25 +1163,102 @@ class RealisticFlightPhysicsService {
                     F_normal_body.z
                 );
                 
+                // Store force magnitude for pivot logic
+                gear.forceMag = F_n; // F_n is negative (upward force on plane), so magnitude is abs(F_n)
+                if (F_n < 0) gear.forceMag = Math.abs(F_n);
+                else gear.forceMag = 0;
+
                 // 6. Accumulate
                 F_ground = F_ground.add(F_gear_body);
                 M_ground = M_ground.add(P_body.cross(F_gear_body));
+            } else {
+                gear.forceMag = 0;
             }
         });
 
         this.onGround = onGroundAny;
 
-        // --- Ground Stabilizer (Anti-Wobble) ---
-        // Artificially damp angular rates when firmly on ground to prevent jitter
-        if (this.onGround) {
-             const groundDamping = 200000; // Strong angular damping
-             M_ground.x -= this.state.rates.x * groundDamping;
-             M_ground.y -= this.state.rates.y * groundDamping;
-             M_ground.z -= this.state.rates.z * groundDamping;
+        // --- Main-Gear Pivot Logic (User Request) ---
+        // Ensure rotation happens around main wheels, not CG.
+        // Rotation Phase: Nose is light/off (Force ~ 0), Mains are heavy
+        const noseGear = gears[0]; 
+        const mainGears = [gears[1], gears[2]];
+        
+        // Threshold: Nose < 10% of weight, Mains > 50% of weight
+        // Mass * 9.81 = Weight. 
+        const weight = this.state.mass * 9.81;
+        
+        if (this.onGround && noseGear.forceMag < weight * 0.1 && (mainGears[0].forceMag + mainGears[1].forceMag) > weight * 0.5) {
+             // We are rotating!
+             // Calculate pivot point (midpoint of main wheels in Body Frame)
+             const pivotPos = mainGears[0].pos.add(mainGears[1].pos).scale(0.5);
              
-             // Also damp vertical oscillation if very close to ground equilibrium
+             // Calculate Vertical Velocity at Pivot Point (Body Frame Z)
+             // V_pivot_z = V_cg_z + (q * pivot_x) - (p * pivot_y is 0)
+             // Positive Z is down.
+             const v_pivot_z = this.state.vel.z + (this.state.rates.y * pivotPos.x);
+             
+             // Apply constraint force to keep pivot attached to ground (V_z ~ 0)
+             // High damping gain to kill vertical velocity at pivot
+             const pivotDamping = 100000; // N/(m/s)
+             const F_constraint_z = -v_pivot_z * pivotDamping;
+             
+             // Apply this force at the Pivot Point
+             // Force vector (Body Frame): (0, 0, F_constraint_z)
+             // Moment = r x F = (pivot_x, pivot_y, pivot_z) x (0, 0, F)
+             // My = pivot_x * 0 - 0 * F = 0 ??? No.
+             // Cross Product:
+             // x: y*Fz - z*Fy
+             // y: z*Fx - x*Fz  <-- Pitch Moment
+             // z: x*Fy - y*Fx
+             
+             // My_constraint = -pivotPos.x * F_constraint_z
+             const My_constraint = -pivotPos.x * F_constraint_z;
+             
+             // Add to totals
+             F_ground.z += F_constraint_z;
+             M_ground.y += My_constraint;
+             
+             // Debug
+             // if (Math.random() < 0.01) console.log(`Pivot Active: V_p=${v_pivot_z.toFixed(3)}, F=${F_constraint_z.toFixed(0)}, M=${My_constraint.toFixed(0)}`);
+        }
+
+        // --- Low Altitude Stability Assistant (User Request) ---
+        // Rigidly suppress roll/yaw aero forces near ground to prevent wind drift/flipping
+        const heightAGL = this.currentGroundZ - this.state.pos.z;
+        const cutoffHeight = 6.1; // 20 ft
+        
+        if (heightAGL < cutoffHeight || this.onGround) {
+            // Linear fade: 0.0 on ground -> 1.0 at 20ft
+            let stabilityFactor = Math.max(0, Math.min(1, heightAGL / cutoffHeight));
+            
+            // If firmly on ground, allow 20% authority for crosswind correction
+            if (this.onGround) stabilityFactor = 0.2;
+            
+            // Apply suppression to Aerodynamic Moments (Wind + Control Surfaces)
+            // We keep Pitch (My) active for rotation/flare
+            Mx_aero *= stabilityFactor; 
+            Mz_aero *= stabilityFactor;
+        }
+
+        // --- Ground Stabilizer (Inertia-Based Damping) ---
+        // Uses Inertia Tensor to provide consistent damping regardless of aircraft mass
+        if (this.onGround) {
+             const Ix = this.aircraft.Ix || 1000000;
+             const Iy = this.aircraft.Iy || 2000000;
+             const Iz = this.aircraft.Iz || 3000000;
+             
+             // Damping Factor (1/s) - Controls how fast rotation decays
+             // Reduced from 5.0 to 1.0 to prevent magnifying noise/vibration
+             const dampingFactor = 1.0; 
+
+             M_ground.x -= this.state.rates.x * (Ix * dampingFactor);
+             M_ground.y -= this.state.rates.y * (Iy * dampingFactor);
+             M_ground.z -= this.state.rates.z * (Iz * dampingFactor);
+             
+             // Vertical Damping (Mass-based)
              if (Math.abs(this.state.vel.z) < 0.5) {
-                  F_ground.z -= this.state.vel.z * 50000; 
+                  F_ground.z -= this.state.vel.z * (this.state.mass * 5.0); 
              }
         }
 
