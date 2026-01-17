@@ -116,13 +116,23 @@ const FrequencyKnob = ({ label, size, innerSize, onChange, sensitivity = 1, colo
   );
 };
 
-const CommunicationModule = ({ flightState, setRadioFreq, flightPlan }) => {
+const CommunicationModule = ({ flightState, setRadioFreq, flightPlan, radioMessages = [] }) => {
   const currentFreq = flightState?.radioFreq || 121.500;
   const [connectionStatus, setConnectionStatus] = useState({ name: 'No Signal', type: '', connected: false });
   const [availableStations, setAvailableStations] = useState([]);
   const [nearbyAirports, setNearbyAirports] = useState([]);
   const [referencePos, setReferencePos] = useState(null);
+  const [viewMode, setViewMode] = useState('LOG'); // 'LOG' or 'SIGNALS'
+  const logContainerRef = useRef(null);
   const lastCheckPos = useRef({ lat: null, lon: null });
+
+  // Auto-scroll log
+  useEffect(() => {
+    if (viewMode === 'LOG' && logContainerRef.current) {
+      logContainerRef.current.scrollTop = logContainerRef.current.scrollHeight;
+    }
+  }, [radioMessages, viewMode]);
+
 
   // 1. Optimize: Update nearby airports only when position changes significantly
   useEffect(() => {
@@ -355,7 +365,7 @@ const CommunicationModule = ({ flightState, setRadioFreq, flightPlan }) => {
       }, connectionStatus.connected ? `${connectionStatus.type} - Connected` : 'Searching...')
     ),
 
-    // Middle: Nearby Frequencies
+    // Middle: Communication Log & Nearby Signals
     React.createElement('div', {
       style: {
         flex: 1,
@@ -363,57 +373,125 @@ const CommunicationModule = ({ flightState, setRadioFreq, flightPlan }) => {
         flexDirection: 'column',
         borderRight: '1px solid #334155',
         height: '100%',
-        padding: '0 8px',
-        overflow: 'hidden'
+        padding: '0', // Removed padding to let tabs flush
+        overflow: 'hidden',
+        position: 'relative'
       }
     },
-      React.createElement('div', { style: { fontSize: '10px', fontWeight: 'bold', color: '#94a3b8', marginBottom: '4px' } }, 'NEARBY SIGNALS'),
+      // Tabs Header
       React.createElement('div', {
-        className: 'no-scrollbar',
         style: {
-          flex: 1,
-          overflowY: 'auto',
           display: 'flex',
-          flexDirection: 'column',
-          gap: '2px'
+          borderBottom: '1px solid #334155',
+          background: 'rgba(15, 23, 42, 0.5)'
         }
       },
-        availableStations.length > 0 ? availableStations.map((station, idx) => 
-          React.createElement('div', {
-            key: idx,
-            onClick: () => setRadioFreq(station.frequency),
+        ['LOG', 'SIGNALS'].map(mode => 
+          React.createElement('button', {
+            key: mode,
+            onClick: () => setViewMode(mode),
             style: {
+              flex: 1,
+              background: viewMode === mode ? 'transparent' : 'rgba(30, 41, 59, 0.5)',
+              border: 'none',
+              borderBottom: viewMode === mode ? '2px solid #38bdf8' : 'none',
+              color: viewMode === mode ? '#38bdf8' : '#64748b',
               fontSize: '10px',
-              color: Math.abs(station.frequency - currentFreq) < 0.01 ? '#4ade80' : '#64748b',
-              cursor: 'pointer',
-              display: 'flex',
-              justifyContent: 'space-between',
-              padding: '2px 4px',
-              borderRadius: '2px',
-              backgroundColor: Math.abs(station.frequency - currentFreq) < 0.01 ? 'rgba(74, 222, 128, 0.1)' : 'transparent',
-              transition: 'background-color 0.2s'
-            },
-            onMouseEnter: (e) => {
-               if (Math.abs(station.frequency - currentFreq) >= 0.01) e.currentTarget.style.backgroundColor = 'rgba(148, 163, 184, 0.1)';
-            },
-            onMouseLeave: (e) => {
-               if (Math.abs(station.frequency - currentFreq) >= 0.01) e.currentTarget.style.backgroundColor = 'transparent';
+              fontWeight: 'bold',
+              padding: '4px',
+              cursor: 'pointer'
             }
-          },
-            React.createElement('span', { style: { whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', marginRight: '8px' } }, station.desc),
-            React.createElement('span', { style: { fontFamily: 'monospace' } }, station.frequency.toFixed(3))
-          )
-        ) : React.createElement('div', { style: { fontSize: '10px', color: '#475569', fontStyle: 'italic' } }, 'No signals detected')
+          }, mode)
+        )
+      ),
+
+      // Content
+      viewMode === 'SIGNALS' ? (
+        // Existing Nearby Signals Logic
+        React.createElement('div', {
+          className: 'no-scrollbar',
+          style: {
+            flex: 1,
+            overflowY: 'auto',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '2px',
+            padding: '4px 8px'
+          }
+        },
+          availableStations.length > 0 ? availableStations.map((station, idx) => 
+            React.createElement('div', {
+              key: idx,
+              onClick: () => setRadioFreq(station.frequency),
+              style: {
+                fontSize: '10px',
+                color: Math.abs(station.frequency - currentFreq) < 0.01 ? '#4ade80' : '#64748b',
+                cursor: 'pointer',
+                display: 'flex',
+                justifyContent: 'space-between',
+                padding: '2px 4px',
+                borderRadius: '2px',
+                backgroundColor: Math.abs(station.frequency - currentFreq) < 0.01 ? 'rgba(74, 222, 128, 0.1)' : 'transparent',
+                transition: 'background-color 0.2s'
+              },
+              onMouseEnter: (e) => {
+                 if (Math.abs(station.frequency - currentFreq) >= 0.01) e.currentTarget.style.backgroundColor = 'rgba(148, 163, 184, 0.1)';
+              },
+              onMouseLeave: (e) => {
+                 if (Math.abs(station.frequency - currentFreq) >= 0.01) e.currentTarget.style.backgroundColor = 'transparent';
+              }
+            },
+              React.createElement('span', { style: { whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', marginRight: '8px' } }, station.desc),
+              React.createElement('span', { style: { fontFamily: 'monospace' } }, station.frequency.toFixed(3))
+            )
+          ) : React.createElement('div', { style: { fontSize: '10px', color: '#475569', fontStyle: 'italic', padding: '4px' } }, 'No signals detected')
+        )
+      ) : (
+        // LOG VIEW
+        React.createElement('div', {
+          ref: logContainerRef,
+          className: 'no-scrollbar',
+          style: {
+            flex: 1,
+            overflowY: 'auto',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '6px',
+            padding: '8px'
+          }
+        },
+          radioMessages.length > 0 ? radioMessages.map((msg, idx) => 
+            React.createElement('div', {
+              key: idx,
+              style: {
+                alignSelf: msg.sender === 'Pilot' ? 'flex-end' : 'flex-start',
+                maxWidth: '85%',
+                padding: '4px 8px',
+                borderRadius: '4px',
+                background: msg.sender === 'Pilot' ? 'rgba(56, 189, 248, 0.1)' : 'rgba(255, 255, 255, 0.05)',
+                border: msg.sender === 'Pilot' ? '1px solid rgba(56, 189, 248, 0.2)' : '1px solid rgba(148, 163, 184, 0.2)',
+                color: msg.sender === 'Pilot' ? '#bae6fd' : '#e2e8f0',
+                fontSize: '11px',
+                lineHeight: '1.4'
+              }
+            },
+              React.createElement('div', { style: { fontSize: '9px', opacity: 0.7, marginBottom: '2px' } }, msg.sender),
+              msg.text
+            )
+          ) : React.createElement('div', { style: { fontSize: '10px', color: '#475569', fontStyle: 'italic', textAlign: 'center', marginTop: '10px' } }, 'Radio silent')
+        )
       )
     ),
 
-    // Right: Frequency Controls
+    // Right: Frequency Controls (Compact)
     React.createElement('div', {
       style: {
         display: 'flex',
         flexDirection: 'column',
         alignItems: 'center',
-        gap: '8px'
+        justifyContent: 'center',
+        gap: '4px',
+        width: '90px' // Fixed smaller width
       }
     },
       // Frequency Display
@@ -422,14 +500,14 @@ const CommunicationModule = ({ flightState, setRadioFreq, flightPlan }) => {
           background: '#0f172a',
           border: '1px solid #1e293b',
           borderRadius: '4px',
-          padding: '4px 8px',
+          padding: '2px 6px',
           fontFamily: 'monospace',
-          fontSize: '18px',
+          fontSize: '14px', // Smaller font
           color: '#38bdf8',
           fontWeight: 'bold',
           letterSpacing: '1px',
           boxShadow: 'inset 0 2px 4px rgba(0,0,0,0.5)',
-          minWidth: '100px',
+          minWidth: '80px',
           textAlign: 'center'
         }
       }, currentFreq.toFixed(3)),
@@ -438,19 +516,19 @@ const CommunicationModule = ({ flightState, setRadioFreq, flightPlan }) => {
       React.createElement('div', {
         style: {
           display: 'flex',
-          gap: '12px',
+          gap: '8px',
           alignItems: 'flex-end'
         }
       },
         React.createElement(FrequencyKnob, {
           label: 'MHz',
-          size: 32,
+          size: 24, // Smaller knob
           onChange: handleCoarseChange,
           color: '#94a3b8'
         }),
         React.createElement(FrequencyKnob, {
           label: 'kHz',
-          size: 24,
+          size: 18, // Smaller knob
           onChange: handleFineChange,
           color: '#cbd5e1'
         })

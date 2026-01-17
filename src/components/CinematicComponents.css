@@ -6,23 +6,22 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: flex-start; /* Changed from center to allow scrolling from top */
-  min-height: 100vh;
-  padding: 4rem 2rem; /* More vertical padding */
+  justify-content: center; /* Center content to prevent scrolling */
+  height: 100vh; /* Use fixed height instead of min-height */
+  padding: 2rem; /* Reduced padding to fit content */
   background-color: #000;
   color: #000;
   font-family: 'Courier Prime', 'Courier New', monospace;
   perspective: 1000px;
-  overflow-y: auto; /* Allow the main container to scroll */
+  overflow-y: hidden; /* Disable scrolling to prevent flickering */
 }
 
 .fax-paper {
   background-color: #fcfaf5;
   width: 90%;
-  max-width: 800px;
-  height: auto; /* Allow height to fit content */
-  min-height: 80vh; /* Minimum presence */
-  padding: 2rem;
+  max-width: 800px; /* Slightly smaller max-width */
+  max-height: 85vh; /* Limit height to fit viewport */
+  padding: 1.5rem; /* Reduced padding */
   box-shadow: 0 10px 50px rgba(0,0,0,0.8), 0 0 100px rgba(255,255,255,0.05);
   position: relative;
   transform-style: preserve-3d;
@@ -31,6 +30,7 @@
     linear-gradient(#eee .1rem, transparent .1rem),
     radial-gradient(#ddd 1px, transparent 1px);
   background-size: 100% 1.25rem, 15px 15px;
+  overflow: hidden; /* Prevent internal overflow */
 }
 
 /* Remove custom scrollbar from paper as container now scrolls */
@@ -56,16 +56,16 @@
 }
 
 .fax-header {
-  border-bottom: 4px solid #000;
-  margin-bottom: 1.5rem;
-  padding-bottom: 0.75rem;
+  border-bottom: 3px solid #000;
+  margin-bottom: 1rem;
+  padding-bottom: 0.5rem;
   display: flex;
   justify-content: space-between;
   align-items: flex-end;
 }
 
 .fax-title {
-  font-size: 2rem;
+  font-size: 1.5rem;
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: -1px;
@@ -75,19 +75,19 @@
 
 .fax-meta {
   text-align: right;
-  font-size: 0.9rem;
+  font-size: 0.7rem;
   font-weight: 700;
   color: #000;
 }
 
 .fax-content {
   display: grid;
-  gap: 1.5rem;
+  gap: 1rem;
 }
 
 .fax-section {
   border: 2px solid #000;
-  padding: 1rem;
+  padding: 0.75rem;
   position: relative;
 }
 
@@ -95,20 +95,20 @@
   background: #000;
   color: #fff;
   display: inline-block;
-  padding: 0.2rem 0.6rem;
+  padding: 0.15rem 0.5rem;
   font-weight: 700;
   text-transform: uppercase;
-  font-size: 0.8rem;
+  font-size: 0.7rem;
   position: absolute;
-  top: -1rem;
-  left: 1rem;
+  top: -0.8rem;
+  left: 0.75rem;
   transform: none;
 }
 
 .fax-grid {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
-  gap: 0.5rem 2.5rem;
+  gap: 0.3rem 1.5rem;
   margin-top: 0;
 }
 
@@ -116,13 +116,13 @@
   display: flex;
   justify-content: space-between;
   border-bottom: 1px solid #ddd;
-  padding: 0.2rem 0;
+  padding: 0.15rem 0;
 }
 
 .fax-label {
   font-weight: 700;
   text-transform: uppercase;
-  font-size: 0.7rem;
+  font-size: 0.6rem;
   color: #000;
 }
 
@@ -130,7 +130,7 @@
   font-family: 'Courier Prime', monospace;
   font-weight: 700;
   color: #000;
-  font-size: 0.8rem;
+  font-size: 0.7rem;
 }
 
 .stamp-box {
@@ -152,8 +152,8 @@
 }
 
 .situation-text {
-  font-size: 0.9rem;
-  line-height: 1.3;
+  font-size: 0.7rem;
+  line-height: 1.2;
   text-align: justify;
   color: #000;
 }
@@ -163,13 +163,13 @@
 }
 
 .countdown-footer {
-  margin-top: 2rem;
+  margin-top: 1rem;
   text-align: center;
   font-weight: 700;
-  letter-spacing: 3px;
+  letter-spacing: 2px;
   color: #000;
   animation: blink 1s infinite;
-  font-size: 1.1rem;
+  font-size: 0.8rem;
 }
 
 @keyframes paperSlideIn {

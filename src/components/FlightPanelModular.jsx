@@ -14,7 +14,7 @@ import ControlSurfacePanel from './ControlSurfacePanel';
 import OverheadPanel from './OverheadPanel';
 import './FlightPanel.css';
 
-const FlightPanelModular = ({ flightData, onActionRequest, aircraftModel, selectedArrival, flightPlan }) => {
+const FlightPanelModular = ({ flightData, onActionRequest, aircraftModel, selectedArrival, flightPlan, radioMessages, onRadioFreqChange }) => {
   // Use flightData from parent component instead of creating own physics service
   const [showOverhead, setShowOverhead] = useState(false);
   const [flightState, setFlightState] = useState({
@@ -290,8 +290,12 @@ const FlightPanelModular = ({ flightData, onActionRequest, aircraftModel, select
         }),
         React.createElement(CommunicationModule, {
           flightState,
-          setRadioFreq: (freq) => setFlightState(prev => ({ ...prev, radioFreq: freq })),
-          flightPlan
+          setRadioFreq: (freq) => {
+            setFlightState(prev => ({ ...prev, radioFreq: freq }));
+            if (onRadioFreqChange) onRadioFreqChange(freq);
+          },
+          flightPlan,
+          radioMessages
         })
       ),
       

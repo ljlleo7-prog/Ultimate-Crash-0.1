@@ -1,0 +1,200 @@
+
+import React, { useState, useEffect } from 'react';
+import { RADIO_TEMPLATES } from '../data/radioTemplates';
+
+const RadioActionPanel = ({ onTransmit, currentStation = 'Unicom', callsign = 'Cessna 172' }) => {
+  const [activeTab, setActiveTab] = useState('REQUEST');
+  const [selectedTemplate, setSelectedTemplate] = useState(null);
+  const [paramValues, setParamValues] = useState({});
+
+  const handleTabChange = (tab) => {
+    setActiveTab(tab);
+    setSelectedTemplate(null);
+    setParamValues({});
+  };
+
+  const handleTemplateSelect = (template) => {
+    setSelectedTemplate(template);
+    // Initialize params
+    const initialParams = {};
+    if (template.params) {
+      template.params.forEach(p => initialParams[p] = '');
+    }
+    setParamValues(initialParams);
+  };
+
+  const handleParamChange = (param, value) => {
+    setParamValues(prev => ({
+      ...prev,
+      [param]: value
+    }));
+  };
+
+  const handleSend = (e) => {
+    e.preventDefault();
+    if (!selectedTemplate) return;
+
+    // Construct message
+    let text = selectedTemplate.template;
+    
+    // Replace context
+    text = text.replace('{station}', currentStation);
+    text = text.replace('{callsign}', callsign);
+
+    // Replace params
+    Object.keys(paramValues).forEach(key => {
+      text = text.replace(`{${key}}`, paramValues[key]);
+    });
+
+    onTransmit({
+      type: selectedTemplate.type,
+      templateId: selectedTemplate.id,
+      text: text,
+      params: paramValues,
+      sender: 'Pilot',
+      timestamp: Date.now()
+    });
+
+    // Reset selection (optional, or keep for rapid fire)
+    setSelectedTemplate(null);
+    setParamValues({});
+  };
+
+  return (
+    <div style={{
+      display: 'flex',
+      flexDirection: 'column',
+      height: '100%',
+      background: 'rgba(15, 23, 42, 0.95)',
+      borderRadius: '8px',
+      border: '1px solid #334155',
+      overflow: 'hidden',
+      color: '#e2e8f0'
+    }}>
+      {/* Tabs */}
+      <div style={{ display: 'flex', borderBottom: '1px solid #334155' }}>
+        {Object.keys(RADIO_TEMPLATES).map(tab => (
+          <button
+            key={tab}
+            onClick={() => handleTabChange(tab)}
+            style={{
+              flex: 1,
+              padding: '8px 4px',
+              background: activeTab === tab ? '#1e293b' : 'transparent',
+              border: 'none',
+              borderBottom: activeTab === tab ? '2px solid #38bdf8' : 'none',
+              color: activeTab === tab ? '#38bdf8' : '#94a3b8',
+              fontSize: '11px',
+              fontWeight: 'bold',
+              cursor: 'pointer'
+            }}
+          >
+            {tab}
+          </button>
+        ))}
+      </div>
+
+      {/* Content Area */}
+      <div style={{ flex: 1, padding: '8px', overflowY: 'auto' }}>
+        {!selectedTemplate ? (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+            {RADIO_TEMPLATES[activeTab].map(template => (
+              <button
+                key={template.id}
+                onClick={() => handleTemplateSelect(template)}
+                style={{
+                  textAlign: 'left',
+                  padding: '8px',
+                  background: '#1e293b',
+                  border: '1px solid #334155',
+                  borderRadius: '4px',
+                  color: '#e2e8f0',
+                  fontSize: '12px',
+                  cursor: 'pointer',
+                  transition: 'background 0.2s'
+                }}
+              >
+                <div style={{ fontWeight: 'bold', marginBottom: '2px' }}>{template.label}</div>
+                <div style={{ fontSize: '10px', color: '#94a3b8', fontStyle: 'italic' }}>
+                  {template.template}
+                </div>
+              </button>
+            ))}
+          </div>
+        ) : (
+          <form onSubmit={handleSend} style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span style={{ fontSize: '12px', fontWeight: 'bold', color: '#38bdf8' }}>{selectedTemplate.label}</span>
+              <button 
+                type="button" 
+                onClick={() => setSelectedTemplate(null)}
+                style={{ background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer', fontSize: '10px' }}
+              >
+                Cancel
+              </button>
+            </div>
+
+            {/* Params Inputs */}
+            {selectedTemplate.params && selectedTemplate.params.map(param => (
+              <div key={param} style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                <label style={{ fontSize: '10px', textTransform: 'uppercase', color: '#94a3b8' }}>{param}</label>
+                <input
+                  type="text"
+                  value={paramValues[param]}
+                  onChange={(e) => handleParamChange(param, e.target.value)}
+                  placeholder={`Enter ${param}...`}
+                  style={{
+                    background: '#0f172a',
+                    border: '1px solid #334155',
+                    borderRadius: '4px',
+                    padding: '6px',
+                    color: 'white',
+                    fontSize: '12px'
+                  }}
+                  autoFocus={param === selectedTemplate.params[0]}
+                />
+              </div>
+            ))}
+
+            {/* Preview */}
+            <div style={{ 
+              fontSize: '11px', 
+              color: '#94a3b8', 
+              background: '#0f172a', 
+              padding: '6px', 
+              borderRadius: '4px',
+              border: '1px dashed #334155',
+              marginTop: '4px'
+            }}>
+              Preview: "
+              {selectedTemplate.template
+                .replace('{station}', currentStation)
+                .replace('{callsign}', callsign)
+                .replace(/{(\w+)}/g, (match, key) => paramValues[key] || match)
+              }"
+            </div>
+
+            <button
+              type="submit"
+              style={{
+                marginTop: '4px',
+                padding: '8px',
+                background: '#38bdf8',
+                color: '#0f172a',
+                border: 'none',
+                borderRadius: '4px',
+                fontWeight: 'bold',
+                fontSize: '12px',
+                cursor: 'pointer'
+              }}
+            >
+              TRANSMIT
+            </button>
+          </form>
+        )}
+      </div>
+    </div>
+  );
+};
+
+export default RadioActionPanel;

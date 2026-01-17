@@ -8,6 +8,8 @@ import commandDatabase from '../commandDatabase.json';
 import sceneManager from '../services/sceneManager.js';
 import eventBus from '../services/eventBus.js';
 import { getRunwayHeading } from '../utils/routeGenerator';
+import RadioActionPanel from './RadioActionPanel';
+import { atcManager } from '../services/ATCLogic';
 
 const FlightInProgress = ({ 
   callsign, 
@@ -96,8 +98,26 @@ const FlightInProgress = ({
   // Control state for UI components
   const [throttleControl, setThrottleControl] = useState(47);
   const [commandInput, setCommandInput] = useState('');
+  const [radioMessages, setRadioMessages] = useState([]);
+  const [currentFreq, setCurrentFreq] = useState(121.500);
   const [sceneState, setSceneState] = useState(sceneManager.getState());
   const [narrative, setNarrative] = useState(null);
+
+  const handleRadioTransmit = (message) => {
+    setRadioMessages(prev => [...prev, message]);
+    
+    // Trigger ATC Logic
+    const context = {
+      callsign: callsign || 'N12345',
+      altitude: Math.round(flightData.altitude),
+      heading: Math.round(flightData.heading),
+      airspeed: Math.round(flightData.indicatedAirspeed || flightData.airspeed)
+    };
+    
+    atcManager.processMessage(message, context, (response) => {
+      setRadioMessages(prev => [...prev, response]);
+    });
+  };
   const [activeFailures, setActiveFailures] = useState([]);
   const [phaseName, setPhaseName] = useState('');
   const [showDebugPhysics, setShowDebugPhysics] = useState(false);
@@ -437,117 +457,13 @@ const FlightInProgress = ({
             </div>
           )}
         </div>
-        <form
-          onSubmit={handleCommandSubmit}
-          style={{
-            flex: 1.3,
-            minWidth: '260px',
-            display: 'flex',
-            flexDirection: 'column',
-            gap: '6px'
-          }}
-        >
-          <label
-            style={{
-              fontSize: '12px',
-              textTransform: 'uppercase',
-              letterSpacing: '0.12em',
-              color: '#9CA3AF'
-            }}
-          >
-            Captain command
-          </label>
-          <div style={{ display: 'flex', gap: '8px' }}>
-            <input
-              type="text"
-              value={commandInput}
-              onChange={(event) => setCommandInput(event.target.value)}
-              placeholder="Placeholder: type your decision or cockpit command"
-              style={{
-                flex: 1,
-                padding: '8px 10px',
-                borderRadius: '6px',
-                border: '1px solid rgba(148,163,184,0.6)',
-                background: 'rgba(15,23,42,0.9)',
-                color: '#E5E7EB',
-                fontSize: '13px',
-                outline: 'none'
-              }}
-            />
-            <button
-              type="submit"
-              style={{
-                padding: '8px 14px',
-                borderRadius: '6px',
-                border: 'none',
-                background: 'linear-gradient(135deg, #DC2626, #F97316)',
-                color: 'white',
-                fontWeight: 600,
-                fontSize: '13px',
-                cursor: 'pointer',
-                whiteSpace: 'nowrap',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center'
-              }}
-            >
-              ➤
-            </button>
-          </div>
-          <div
-            style={{
-              marginTop: '6px',
-              fontSize: '11px',
-              color: '#9CA3AF'
-            }}
-          >
-            Placeholder: commands are logged only for now, not yet linked to systems.
-          </div>
-          {commandInput.trim().length > 0 && (
-            <div
-              style={{
-                marginTop: '6px',
-                borderRadius: '6px',
-                border: '1px solid rgba(148,163,184,0.4)',
-                background: 'rgba(15,23,42,0.9)',
-                maxHeight: '140px',
-                overflowY: 'auto'
-              }}
-            >
-              {commandDatabase
-                .filter((template) => {
-                  const value = commandInput.trim().toLowerCase();
-                  const abbr = template.abbr.toLowerCase();
-                  const full = template.template.toLowerCase();
-                  return abbr.startsWith(value) || full.startsWith(value);
-                })
-                .map((template) => (
-                  <button
-                    key={template.id}
-                    type="button"
-                    onClick={() => setCommandInput(template.template)}
-                    style={{
-                      width: '100%',
-                      textAlign: 'left',
-                      padding: '6px 8px',
-                      border: 'none',
-                      background: 'transparent',
-                      cursor: 'pointer',
-                      color: '#E5E7EB',
-                      fontSize: '11px',
-                      borderBottom: '1px solid rgba(31,41,55,0.8)'
-                    }}
-                  >
-                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '2px' }}>
-                      <span style={{ fontWeight: 600, color: '#BFDBFE' }}>{template.abbr}</span>
-                      <span style={{ color: '#9CA3AF' }}>{template.template}</span>
-                    </div>
-                    <div style={{ color: '#9CA3AF', fontSize: '10px' }}>{template.description}</div>
-                  </button>
-                ))}
-            </div>
-          )}
-        </form>
+        <div style={{ flex: 1.3, minWidth: '260px', height: '180px' }}>
+          <RadioActionPanel 
+            onTransmit={handleRadioTransmit}
+            currentStation={currentFreq.toFixed(3)}
+            callsign={callsign || 'N12345'}
+          />
+        </div>
       </div>
 
       <div style={{ flex: 1, display: 'flex', position: 'relative' }}>
@@ -589,6 +505,8 @@ const FlightInProgress = ({
             aircraftModel={aircraftModel}
             selectedArrival={selectedArrival}
             flightPlan={flightPlan}
+            radioMessages={radioMessages}
+            onRadioFreqChange={setCurrentFreq}
             onActionRequest={(action, payload) => {
               const payloadStr = typeof payload === 'number' ? payload.toFixed(5) : JSON.stringify(payload);
               console.log(`📡 UI Action: ${action} = ${payloadStr}`);
