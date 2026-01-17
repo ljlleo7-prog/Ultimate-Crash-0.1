@@ -1,10 +1,13 @@
 import React, { useRef, useEffect, useState } from 'react';
 import { calculateDistance } from '../utils/distanceCalculator';
+import { airportService } from '../services/airportService';
 
 // Navigation Panel Component
 const NavigationPanel = ({ flightState, selectedArrival, flightPlan }) => {
   const radarCanvasRef = useRef(null);
   const [distanceToWaypoint, setDistanceToWaypoint] = useState(0);
+  const [mapRange, setMapRange] = useState(40); // Default 40nm
+  const [nearbyRunways, setNearbyRunways] = useState([]);
 
   const groundSpeed = flightState?.groundSpeed || 0;
   const trueAirspeed = flightState?.trueAirspeed || 0;
@@ -13,6 +16,58 @@ const NavigationPanel = ({ flightState, selectedArrival, flightPlan }) => {
   const waypoints = flightPlan?.waypoints || [];
   const [currentNextWaypointName, setCurrentNextWaypointName] = useState('N/A');
   const [currentDistanceToNextWaypoint, setCurrentDistanceToNextWaypoint] = useState(0);
+
+  // Range options (Exponential)
+  const rangeOptions = [5, 10, 20, 40, 80, 160, 320, 640];
+
+  const cycleRange = () => {
+    const currentIndex = rangeOptions.indexOf(mapRange);
+    const nextIndex = (currentIndex + 1) % rangeOptions.length;
+    setMapRange(rangeOptions[nextIndex]);
+  };
+
+  // Effect to find nearby runways
+  useEffect(() => {
+    if (!flightState?.latitude || !flightState?.longitude) return;
+
+    // Throttle: Only run if we haven't run in the last 2 seconds, 
+    // or use a simpler approach: Run every time but inside a debounce/interval? 
+    // Since flightState updates frequently, we should throttle.
+    // For now, let's just run it. The service is local and fast enough for < 10 airports.
+    
+    // Optimization: Only check every 60 frames (~1s) or check distance changes.
+    // We'll rely on the fact that getAirportsWithinRadius is efficient.
+    
+    // Only search if range is small enough to matter, or always?
+    // User wants "within 10nm", so we must search when near.
+    
+    const airports = airportService.getAirportsWithinRadius(flightState.latitude, flightState.longitude, 15); // Search 15nm
+    const runways = [];
+
+    airports.forEach(airport => {
+      // Get all runways for this airport
+      let airportRunways = [];
+      if (airport.runways && Array.isArray(airport.runways)) {
+        airportRunways = airport.runways;
+      } else if (airport.runway) {
+        airportRunways = [{ name: airport.runway, length: airport.runwayLength }];
+      } else {
+        // Default mock if nothing exists
+        airportRunways = [{ name: "09/27", length: 8000 }];
+      }
+
+      airportRunways.forEach(r => {
+        const geom = airportService.getRunwayGeometry(airport.iata || airport.icao, r.name);
+        if (geom) {
+          runways.push(geom);
+        }
+      });
+    });
+
+    setNearbyRunways(runways);
+
+  }, [flightState?.latitude, flightState?.longitude]); // Depends on position
+
 
   useEffect(() => {
     if (flightState && selectedArrival) {
@@ -93,7 +148,7 @@ const NavigationPanel = ({ flightState, selectedArrival, flightPlan }) => {
 
       ctx.strokeStyle = '#00aa00';
       ctx.lineWidth = 1;
-      const ringCount = 4; // 4 rings for 320nm = 80nm per ring
+      const ringCount = 4; // 4 rings
       for (let i = 1; i <= ringCount; i++) {
         ctx.beginPath();
         ctx.arc(0, 0, radius * i / ringCount, 0, Math.PI * 2);
@@ -140,18 +195,50 @@ const NavigationPanel = ({ flightState, selectedArrival, flightPlan }) => {
         }
       }
 
-      if (Array.isArray(waypoints) && waypoints.length > 0 && typeof flightState?.latitude === 'number' && typeof flightState?.longitude === 'number') {
-        const toRad = (d) => d * Math.PI / 180;
-        const toDeg = (r) => r * 180 / Math.PI;
-        const bearingTo = (lat1, lon1, lat2, lon2) => {
+      const toRad = (d) => d * Math.PI / 180;
+      const toDeg = (r) => r * 180 / Math.PI;
+      const bearingTo = (lat1, lon1, lat2, lon2) => {
           const φ1 = toRad(lat1);
           const φ2 = toRad(lat2);
           const Δλ = toRad(lon2 - lon1);
           const y = Math.sin(Δλ) * Math.cos(φ2);
           const x = Math.cos(φ1) * Math.sin(φ2) - Math.sin(φ1) * Math.cos(φ2) * Math.cos(Δλ);
           return (toDeg(Math.atan2(y, x)) + 360) % 360;
-        };
-        const maxRangeNm = 320; // Updated to 320nm as requested
+      };
+
+      // Draw Runways (Purple Lines)
+      if (nearbyRunways.length > 0 && typeof flightState?.latitude === 'number') {
+         ctx.strokeStyle = '#d8b4fe'; // Light Purple
+         ctx.lineWidth = 3;
+
+         nearbyRunways.forEach(rw => {
+            // Check distance to runway start
+            const distNm = calculateDistance(flightState.latitude, flightState.longitude, rw.thresholdStart.latitude, rw.thresholdStart.longitude);
+            
+            if (distNm < 10) { // Only show if within 10nm
+                 // Calculate Start Point
+                 const brgStart = bearingTo(flightState.latitude, flightState.longitude, rw.thresholdStart.latitude, rw.thresholdStart.longitude) * Math.PI / 180;
+                 const rStart = Math.min(1, distNm / mapRange) * radius;
+                 const xStart = rStart * Math.sin(brgStart);
+                 const yStart = -rStart * Math.cos(brgStart);
+
+                 // Calculate End Point
+                 const distEnd = calculateDistance(flightState.latitude, flightState.longitude, rw.thresholdEnd.latitude, rw.thresholdEnd.longitude);
+                 const brgEnd = bearingTo(flightState.latitude, flightState.longitude, rw.thresholdEnd.latitude, rw.thresholdEnd.longitude) * Math.PI / 180;
+                 const rEnd = Math.min(1, distEnd / mapRange) * radius;
+                 const xEnd = rEnd * Math.sin(brgEnd);
+                 const yEnd = -rEnd * Math.cos(brgEnd);
+
+                 ctx.beginPath();
+                 ctx.moveTo(xStart, yStart);
+                 ctx.lineTo(xEnd, yEnd);
+                 ctx.stroke();
+            }
+         });
+      }
+
+      if (Array.isArray(waypoints) && waypoints.length > 0 && typeof flightState?.latitude === 'number' && typeof flightState?.longitude === 'number') {
+        const maxRangeNm = mapRange; 
         const points = waypoints.map(wp => {
           const distNm = calculateDistance(flightState.latitude, flightState.longitude, wp.latitude, wp.longitude);
           const brg = bearingTo(flightState.latitude, flightState.longitude, wp.latitude, wp.longitude) * Math.PI / 180;
@@ -218,14 +305,14 @@ const NavigationPanel = ({ flightState, selectedArrival, flightPlan }) => {
       ctx.fillStyle = '#00ff00';
       ctx.textAlign = 'left';
       ctx.textBaseline = 'top';
-      ctx.fillText('RANGE: 320NM', 5, 5);
+      ctx.fillText(`RANGE: ${mapRange}NM`, 5, 5);
       
       ctx.textAlign = 'right';
       ctx.fillText('HDG UP', size - 5, 5);
     };
 
     drawRadar();
-  }, [flightState, heading, waypoints, currentNextWaypointName]);
+  }, [flightState, heading, waypoints, currentNextWaypointName, mapRange, nearbyRunways]);
   
   return React.createElement('div', { className: 'navigation-panel' },
     React.createElement('div', { className: 'radar-display-container' },
@@ -249,34 +336,78 @@ const NavigationPanel = ({ flightState, selectedArrival, flightPlan }) => {
     React.createElement('div', {
       style: {
         marginTop: '15px',
-        padding: '5px',
-        background: 'rgba(0, 0, 0, 0.4)',
-        borderRadius: '8px',
-        maxHeight: '80px',
-        overflowY: 'auto',
-        border: '1px solid #00aa00'
+        display: 'flex',
+        gap: '5px',
+        height: '90px'
       }
     },
-      React.createElement('h4', { style: { color: '#00ff00', marginBottom: '5px', textAlign: 'center', fontSize: '12px' } }, 'Flight Plan Waypoints'),
-      waypoints.length > 0 ? (
-        React.createElement('ul', { style: { listStyleType: 'none', padding: 0, margin: 0 } },
-          waypoints.map((wp, index) =>
-            React.createElement('li', {
-              key: index,
-              style: {
-                color: '#e6e6e6',
-                fontSize: '12px',
-                padding: '4px 0',
-                borderBottom: index < waypoints.length - 1 ? '1px dashed rgba(0, 170, 0, 0.3)' : 'none'
-              }
-            },
-              React.createElement('span', { style: { fontWeight: 'bold', color: '#00ff00' } }, wp.name),
-              ` (${wp.latitude.toFixed(2)}, ${wp.longitude.toFixed(2)})`
+      // Waypoint List
+      React.createElement('div', {
+        style: {
+          flex: 1,
+          padding: '5px',
+          background: 'rgba(0, 0, 0, 0.4)',
+          borderRadius: '8px',
+          overflowY: 'auto',
+          border: '1px solid #00aa00'
+        }
+      },
+        React.createElement('h4', { style: { color: '#00ff00', marginBottom: '5px', textAlign: 'center', fontSize: '12px', margin: '0 0 5px 0' } }, 'Flight Plan'),
+        waypoints.length > 0 ? (
+          React.createElement('ul', { style: { listStyleType: 'none', padding: 0, margin: 0 } },
+            waypoints.map((wp, index) =>
+              React.createElement('li', {
+                key: index,
+                style: {
+                  color: '#e6e6e6',
+                  fontSize: '11px',
+                  padding: '2px 0',
+                  borderBottom: index < waypoints.length - 1 ? '1px dashed rgba(0, 170, 0, 0.3)' : 'none',
+                  display: 'flex',
+                  justifyContent: 'space-between'
+                }
+              },
+                React.createElement('span', { style: { fontWeight: 'bold', color: wp.name === currentNextWaypointName ? '#ffdd00' : '#00ff00' } }, wp.name),
+                React.createElement('span', { style: { color: '#aaaaaa' } }, `${wp.latitude.toFixed(2)}, ${wp.longitude.toFixed(2)}`)
+              )
             )
           )
+        ) : (
+          React.createElement('p', { style: { color: '#e6e6e6', fontSize: '12px', textAlign: 'center' } }, 'No Waypoints')
         )
-      ) : (
-        React.createElement('p', { style: { color: '#e6e6e6', fontSize: '12px', textAlign: 'center' } }, 'No waypoints generated.')
+      ),
+      
+      // Range Switch
+      React.createElement('div', {
+        style: {
+            display: 'flex',
+            flexDirection: 'column',
+            justifyContent: 'center',
+            alignItems: 'center',
+            width: '50px',
+            background: 'rgba(0, 0, 0, 0.4)',
+            borderRadius: '8px',
+            border: '1px solid #00aa00',
+            padding: '2px'
+        }
+      },
+        React.createElement('span', { style: { color: '#00ff00', fontSize: '10px', marginBottom: '4px', fontWeight: 'bold' } }, 'RNG'),
+        React.createElement('button', {
+            onClick: cycleRange,
+            style: {
+                background: '#003300',
+                border: '1px solid #00ff00',
+                color: '#00ff00',
+                borderRadius: '4px',
+                padding: '4px 2px',
+                fontSize: '11px',
+                cursor: 'pointer',
+                width: '40px',
+                textAlign: 'center',
+                fontWeight: 'bold',
+                boxShadow: '0 0 5px rgba(0, 255, 0, 0.3)'
+            }
+        }, mapRange)
       )
     )
   );

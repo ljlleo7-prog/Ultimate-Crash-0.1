@@ -1061,32 +1061,82 @@ class RealisticFlightPhysicsService {
                 let F_n = -(gear.k * depth + gear.c * v_vertical);
                 if (F_n > 0) F_n = 0;
                 
-                // 4. Friction (Horizontal Plane)
-                const vel_h = new Vector3(V_point_earth.x, V_point_earth.y, 0);
-                const speed_h = vel_h.magnitude();
-                let F_f_earth = new Vector3(0, 0, 0);
+                // 4. Friction (Anisotropic: Rolling vs Lateral)
+                // Calculate in Body Frame for correct orientation relative to wheels
                 
-                if (speed_h > 0.01) {
-                    const isBraking = this.controls.brakes > 0.1 && gear.name.includes('main');
-                    let mu = isBraking ? 0.8 : 0.02;
-                    
-                    // Rain reduction (Braking Effect)
-                    if (this.environment && this.environment.precipitation > 0) {
-                        const rainFactor = Math.min(this.environment.precipitation, 10) / 10; // 0 to 1
-                        mu = mu * (1 - 0.4 * rainFactor); // Up to 40% friction loss
-                    }
+                // Steering Angle (Nose Gear only)
+                let steeringAngle = 0;
+                if (gear.name === 'nose') {
+                    // Map rudder to steering (-1 to 1 -> -70 to 70 degrees)
+                    // Fade out steering at speed to prevent twitchiness? 
+                    // Or trust user input. Real planes reduce nose wheel authority at speed.
+                    steeringAngle = this.controls.rudder * 70 * Math.PI / 180;
+                }
 
-                    const frictionMag = Math.abs(F_n) * mu;
-                    F_f_earth = vel_h.normalize().scale(-frictionMag);
-                    
-                    if (speed_h < 0.2 && this.controls.throttle < 0.1) {
-                         F_f_earth = vel_h.scale(-1000 * Math.abs(F_n));
-                    }
+                // Velocity at wheel in Body Frame
+                // V_point_body includes aircraft vel + rotation effect
+                // We assume ground is flat, so we care about X and Y in body frame (approx)
+                // For exactness on sloped ground, we should project V_point_earth onto surface tangent,
+                // but Body XY is close enough for flat runway.
+                
+                // Rotate velocity into Wheel Frame (if steered)
+                const cosS = Math.cos(steeringAngle);
+                const sinS = Math.sin(steeringAngle);
+                
+                const vx_wheel = V_point_body.x * cosS + V_point_body.y * sinS;
+                const vy_wheel = -V_point_body.x * sinS + V_point_body.y * cosS;
+                
+                // Friction Coefficients
+                const isBraking = this.controls.brakes > 0.1 && gear.name.includes('main');
+                let mu_roll = isBraking ? this.aircraft.brakingFriction : this.aircraft.frictionCoeff; // 0.8 or 0.02
+                let mu_slide = 0.9; // High lateral friction (0.9 for dry tarmac)
+                
+                // Rain reduction
+                if (this.environment && this.environment.precipitation > 0) {
+                    const rainFactor = Math.min(this.environment.precipitation, 10) / 10;
+                    mu_roll *= (1 - 0.4 * rainFactor);
+                    mu_slide *= (1 - 0.4 * rainFactor);
                 }
                 
-                // 5. Transform Forces to Body Frame
-                const F_gear_earth = new Vector3(F_f_earth.x, F_f_earth.y, F_n);
-                const F_gear_body = q_inv.rotate(F_gear_earth);
+                // Friction Forces (Wheel Frame)
+                // Use a "stiction" zone for low speeds to prevent oscillation
+                const v_threshold = 0.1;
+                
+                let Fx_wheel = 0;
+                let Fy_wheel = 0;
+                
+                const F_normal_mag = Math.abs(F_n);
+                
+                // Longitudinal (Rolling)
+                if (Math.abs(vx_wheel) < v_threshold) {
+                     Fx_wheel = -vx_wheel * F_normal_mag * 50; // Linear damping at stop
+                } else {
+                     Fx_wheel = -Math.sign(vx_wheel) * F_normal_mag * mu_roll;
+                }
+                
+                // Lateral (Sliding) - Critical for wind resistance
+                // High stiffness for cornering
+                if (Math.abs(vy_wheel) < v_threshold) {
+                     Fy_wheel = -vy_wheel * F_normal_mag * 200; // Very strong holding power (increased from 50)
+                } else {
+                     Fy_wheel = -Math.sign(vy_wheel) * F_normal_mag * mu_slide;
+                }
+                
+                // Rotate Forces back to Body Frame
+                const Fx_body_fric = Fx_wheel * cosS - Fy_wheel * sinS;
+                const Fy_body_fric = Fx_wheel * sinS + Fy_wheel * cosS;
+                
+                // Total Gear Force in Body Frame
+                // Z component is Normal Force (Approximate, assuming Body Z is roughly Earth Z)
+                // To be precise: F_n is Earth Z. We need to rotate (0,0,F_n) from Earth to Body.
+                // q_inv.rotate(0,0,F_n)
+                const F_normal_body = q_inv.rotate(new Vector3(0, 0, F_n));
+                
+                const F_gear_body = new Vector3(
+                    Fx_body_fric + F_normal_body.x,
+                    Fy_body_fric + F_normal_body.y,
+                    F_normal_body.z
+                );
                 
                 // 6. Accumulate
                 F_ground = F_ground.add(F_gear_body);
@@ -1312,7 +1362,8 @@ class RealisticFlightPhysicsService {
                 CL: this.debugData?.CL || 0,
                 elevator: this.controls.elevator,
                 trim: this.controls.trim
-            }
+            },
+            runwayGeometry: this.runwayGeometry
         };
 
         if (this.warningSystem) {

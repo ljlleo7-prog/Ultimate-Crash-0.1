@@ -92,7 +92,7 @@ const FlightPanelModular = ({ flightData, weatherData, onActionRequest, aircraft
         // Navigation
         heading: flightData.heading,
         trueAirspeed: flightData.airspeed,
-        groundSpeed: flightData.airspeed,
+        groundSpeed: flightData.groundSpeed !== undefined ? flightData.groundSpeed : flightData.airspeed,
         indicatedAirspeed: flightData.indicatedAirspeed || 0, // FIXED: Ensure IAS is always a number
         radioFreq: prevState.radioFreq,
         latitude: (flightData && flightData.position && typeof flightData.position.latitude === 'number') ? flightData.position.latitude : prevState.latitude,

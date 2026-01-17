@@ -317,6 +317,7 @@ export function useAircraftPhysics(config = {}, autoStart = true, model = 'reali
       
       const trueAirspeed = isNaN(airspeeds?.trueAirspeed) ? 450 : airspeeds.trueAirspeed;
       const indicatedAirspeed = isNaN(airspeeds?.indicatedAirspeed) ? 280 : airspeeds.indicatedAirspeed;
+      const groundSpeed = isNaN(airspeeds?.groundSpeed) ? 0 : airspeeds.groundSpeed;
       
       const verticalSpeed = newState.verticalSpeed || 0;
 
@@ -371,6 +372,7 @@ export function useAircraftPhysics(config = {}, autoStart = true, model = 'reali
         altitude: altitude,
         airspeed: trueAirspeed,
         indicatedAirspeed: indicatedAirspeed,
+        groundSpeed: groundSpeed,
         verticalSpeed: verticalSpeed,
         pitch: newState.orientation.theta * 180 / Math.PI,
         roll: newState.orientation.phi * 180 / Math.PI,
