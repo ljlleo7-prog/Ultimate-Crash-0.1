@@ -262,6 +262,18 @@ const FlightInProgress = ({
 
   // Terrain update effect
   useEffect(() => {
+    // FORCE DISABLE TERRAIN FOR DEBUGGING as requested
+    const DISABLE_TERRAIN = true;
+    
+    if (DISABLE_TERRAIN) {
+        if (physicsService) {
+             // Assume flat ground at initial airport elevation
+             // If initialDeparture elevation is missing, default to 0
+             physicsService.terrainElevation = initialDeparture?.elevation || 0;
+        }
+        return;
+    }
+
     const fetchTerrain = async () => {
        if (!physicsService || !physicsService.state || !physicsService.state.geo) return;
        
@@ -270,17 +282,13 @@ const FlightInProgress = ({
        try {
            const ele = await terrainService.getElevation(lat, lon);
            if (ele !== null && typeof ele === 'number') {
-               // Update physics service directly
                physicsService.terrainElevation = ele;
            }
        } catch (e) {
-           console.warn("Terrain fetch failed", e);
+           console.error("❌ Terrain fetch failed", e);
        }
     };
-
-    // Initial fetch
-    fetchTerrain();
-
+    
     // Loop every 1 second
     const interval = setInterval(fetchTerrain, 1000);
     return () => clearInterval(interval);

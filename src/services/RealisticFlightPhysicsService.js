@@ -1033,10 +1033,11 @@ class RealisticFlightPhysicsService {
         
         // Gear Definitions (Position relative to CG in Body Frame)
         // x: Forward, y: Right, z: Down (CG at 0,0,0)
+        // Tuned for stability: Softer springs, higher damping
         const gears = [
-            { name: 'nose', pos: new Vector3(14.0, 0, 3.0), k: 180000, c: 20000 },  // Nose Gear
-            { name: 'mainL', pos: new Vector3(-2.0, -3.5, 3.0), k: 500000, c: 50000 }, // Main Left
-            { name: 'mainR', pos: new Vector3(-2.0, 3.5, 3.0), k: 500000, c: 50000 }  // Main Right
+            { name: 'nose', pos: new Vector3(14.0, 0, 3.0), k: 120000, c: 35000 },  // Softer nose
+            { name: 'mainL', pos: new Vector3(-2.0, -3.5, 3.0), k: 350000, c: 80000 }, // Softer main, higher damping
+            { name: 'mainR', pos: new Vector3(-2.0, 3.5, 3.0), k: 350000, c: 80000 }
         ];
         
         let onGroundAny = false;
@@ -1059,8 +1060,12 @@ class RealisticFlightPhysicsService {
                 
                 // 3. Normal Force (Spring + Damper)
                 let F_n = -(gear.k * depth + gear.c * v_vertical);
-                if (F_n > 0) F_n = 0;
+                if (F_n > 0) F_n = 0; // Don't pull ground
                 
+                // Clamp Normal Force to prevent explosion (max 4G per gear approx)
+                const maxForce = this.state.mass * 9.81 * 4;
+                if (Math.abs(F_n) > maxForce) F_n = -maxForce;
+
                 // 4. Friction (Anisotropic: Rolling vs Lateral)
                 // Calculate in Body Frame for correct orientation relative to wheels
                 
@@ -1145,6 +1150,20 @@ class RealisticFlightPhysicsService {
         });
 
         this.onGround = onGroundAny;
+
+        // --- Ground Stabilizer (Anti-Wobble) ---
+        // Artificially damp angular rates when firmly on ground to prevent jitter
+        if (this.onGround) {
+             const groundDamping = 200000; // Strong angular damping
+             M_ground.x -= this.state.rates.x * groundDamping;
+             M_ground.y -= this.state.rates.y * groundDamping;
+             M_ground.z -= this.state.rates.z * groundDamping;
+             
+             // Also damp vertical oscillation if very close to ground equilibrium
+             if (Math.abs(this.state.vel.z) < 0.5) {
+                  F_ground.z -= this.state.vel.z * 50000; 
+             }
+        }
 
         // --- Totals ---
         const totalForces = new Vector3(
@@ -1249,7 +1268,13 @@ class RealisticFlightPhysicsService {
                  this.crashReason = "Hard Landing / Crash";
             } else {
                 // Reset to surface if just minor penetration (handled by ground spring mostly)
-                if (this.state.pos.z > this.currentGroundZ) this.state.pos.z = this.currentGroundZ;
+                // DISABLED HARD RESET to prevent energy injection/jitter
+                // Instead, rely on the spring forces we calculated in calculateForces
+                // Only clamp if deep underground to prevent falling through world
+                if (this.state.pos.z > this.currentGroundZ + 2.0) {
+                     this.state.pos.z = this.currentGroundZ;
+                     this.state.vel.z = 0; // Stop downward momentum if hard reset
+                }
             }
         }
 
