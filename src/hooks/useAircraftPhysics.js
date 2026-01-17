@@ -1,6 +1,7 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
 import RealisticFlightPhysicsService from '../services/RealisticFlightPhysicsService.js';
 import { loadAircraftData } from '../services/aircraftService.js';
+import { airportService } from '../services/airportService.js';
 
 export function useAircraftPhysics(config = {}, autoStart = true, model = 'realistic') {
   console.log('🎮 useAircraftPhysics: HOOK CALLED', {
@@ -162,38 +163,51 @@ export function useAircraftPhysics(config = {}, autoStart = true, model = 'reali
            });
            
            // Set Runway Geometry for Ground Status
-           if (config.flightPlan) {
-               // Determine relevant airport (Departure or Arrival)
-               // Simple heuristic: If initial altitude is low (< 5000ft) and we are near one of them.
-               // For now, check distance to Departure and Arrival if coordinates available
-               const depCode = config.flightPlan.departure?.iata || config.flightPlan.departure;
-               const arrCode = config.flightPlan.arrival?.iata || config.flightPlan.arrival;
+           // Try to find target airport (Departure, Arrival, or Nearest)
+           let targetAirport = config.departure?.iata || config.departure?.icao || config.flightPlan?.departure?.iata || config.flightPlan?.departure;
+           let runwayName = config.departureRunway || config.flightPlan?.departureRunway;
+
+           // Check Arrival if Departure not found, or if we are closer to arrival
+           const arrCode = config.arrival?.iata || config.arrival?.icao || config.flightPlan?.arrival?.iata || config.flightPlan?.arrival;
+           
+           if (targetAirport && arrCode && initialLatitude && initialLongitude) {
+               // If both exist, check which is closer
+               const dep = airportService.getAirportByCode(targetAirport);
+               const arr = airportService.getAirportByCode(arrCode);
                
-               let targetAirport = depCode;
-               
-               // If we have coordinates, check which one is closer
-               if (initialLatitude && initialLongitude && depCode && arrCode) {
-                    const dep = airportService.getAirportByCode(depCode);
-                    const arr = airportService.getAirportByCode(arrCode);
-                    
-                    if (dep && arr) {
-                        const distToDep = Math.sqrt(Math.pow(dep.latitude - initialLatitude, 2) + Math.pow(dep.longitude - initialLongitude, 2));
-                        const distToArr = Math.sqrt(Math.pow(arr.latitude - initialLatitude, 2) + Math.pow(arr.longitude - initialLongitude, 2));
-                        
-                        if (distToArr < distToDep) {
-                            targetAirport = arrCode;
-                        }
-                    }
-               }
-               
-               if (targetAirport) {
-                   // Try to get runway name from flight plan if available, else let service pick default
-                   // Flight plan might store selected runway?
-                   const runwayName = (targetAirport === depCode) ? config.flightPlan.departureRunway : config.flightPlan.arrivalRunway;
-                   const geometry = airportService.getRunwayGeometry(targetAirport, runwayName);
-                   if (geometry) {
-                       service.setRunwayGeometry(geometry);
+               if (dep && arr) {
+                   const distToDep = Math.sqrt(Math.pow(dep.latitude - initialLatitude, 2) + Math.pow(dep.longitude - initialLongitude, 2));
+                   const distToArr = Math.sqrt(Math.pow(arr.latitude - initialLatitude, 2) + Math.pow(arr.longitude - initialLongitude, 2));
+                   
+                   if (distToArr < distToDep) {
+                       targetAirport = arrCode;
+                       runwayName = config.arrivalRunway || config.flightPlan?.arrivalRunway;
                    }
+               }
+           } else if (!targetAirport && arrCode) {
+               targetAirport = arrCode;
+               runwayName = config.arrivalRunway || config.flightPlan?.arrivalRunway;
+           }
+
+           // If still no airport, find nearest
+           if (!targetAirport && initialLatitude && initialLongitude) {
+                const nearby = airportService.getAirportsWithinRadius(initialLatitude, initialLongitude, 20); // 20nm radius
+                if (nearby && nearby.length > 0) {
+                     // Sort by distance
+                     nearby.sort((a, b) => {
+                         const distA = Math.pow(a.latitude - initialLatitude, 2) + Math.pow(a.longitude - initialLongitude, 2);
+                         const distB = Math.pow(b.latitude - initialLatitude, 2) + Math.pow(b.longitude - initialLongitude, 2);
+                         return distA - distB;
+                     });
+                     targetAirport = nearby[0].iata || nearby[0].icao;
+                     console.log(`🎮 useAircraftPhysics: Auto-detected nearest airport: ${targetAirport}`);
+                }
+           }
+
+           if (targetAirport) {
+               const geometry = airportService.getRunwayGeometry(targetAirport, runwayName);
+               if (geometry) {
+                   service.setRunwayGeometry(geometry);
                }
            }
         }

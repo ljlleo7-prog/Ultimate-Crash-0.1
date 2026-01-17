@@ -12,6 +12,7 @@ import NavigationPanel from './NavigationPanel';
 import CentralPanel from './CentralPanel';
 import ControlSurfacePanel from './ControlSurfacePanel';
 import OverheadPanel from './OverheadPanel';
+import RudderPedal from './RudderPedal';
 import './FlightPanel.css';
 
 const FlightPanelModular = ({ flightData, weatherData, onActionRequest, aircraftModel, selectedArrival, flightPlan, radioMessages, onRadioFreqChange }) => {
@@ -179,6 +180,12 @@ const FlightPanelModular = ({ flightData, weatherData, onActionRequest, aircraft
     }
   };
 
+  const controlYaw = (amount) => {
+    if (onActionRequest) {
+      onActionRequest('yaw', amount);
+    }
+  };
+
   const controlThrust = (engineIndex, throttleValue) => {
     // ✅ CLEAN ARCHITECTURE: Pass throttle in 0-1 range to parent
     console.log('📡 FlightPanelModular: Thrust control:', {
@@ -321,7 +328,14 @@ const FlightPanelModular = ({ flightData, weatherData, onActionRequest, aircraft
       
       // Manual controls at bottom
       React.createElement('div', { className: 'manual-controls' },
-        React.createElement(DraggableJoystick, { controlPitch, controlRoll, flightState }),
+        // Joystick & Rudder Group
+        React.createElement('div', { 
+          className: 'control-group-stick',
+          style: { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '5px' }
+        },
+          React.createElement(DraggableJoystick, { controlPitch, controlRoll, flightState }),
+          React.createElement(RudderPedal, { controlYaw, flightState })
+        ),
         React.createElement('div', { className: 'thrust-manager-wrapper' },
           React.createElement(ThrustManager, { controlThrust, flightState })
         ),

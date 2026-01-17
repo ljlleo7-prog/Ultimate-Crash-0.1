@@ -327,14 +327,14 @@ const CommunicationModule = ({ flightState, setRadioFreq, flightPlan, radioMessa
       gap: '12px',
       alignItems: 'center',
       // height: 'fit-content', // Allow stretching
-      minHeight: '84px', // Match Autopilot height roughly
+      minHeight: '60px', // Compact height (approx 1 message + header)
       flex: 1 // Take remaining space
     }
   },
     // Left: Communication Details
     React.createElement('div', {
       style: {
-        width: '140px',
+        width: '120px', // Slightly narrower
         flexShrink: 0,
         display: 'flex',
         flexDirection: 'column',
@@ -345,10 +345,10 @@ const CommunicationModule = ({ flightState, setRadioFreq, flightPlan, radioMessa
         color: '#64748b'
       }
     },
-      React.createElement('div', { style: { fontSize: '10px', fontWeight: 'bold', color: '#94a3b8' } }, 'ACTIVE COMM'),
+      React.createElement('div', { style: { fontSize: '9px', fontWeight: 'bold', color: '#94a3b8' } }, 'ACTIVE COMM'),
       React.createElement('div', { 
         style: { 
-          fontSize: '12px', 
+          fontSize: '11px', 
           color: connectionStatus.connected ? '#38bdf8' : '#64748b',
           whiteSpace: 'nowrap',
           overflow: 'hidden',
@@ -358,8 +358,8 @@ const CommunicationModule = ({ flightState, setRadioFreq, flightPlan, radioMessa
       }, connectionStatus.name),
       React.createElement('div', { 
         style: { 
-          fontSize: '11px', 
-          marginTop: '4px',
+          fontSize: '10px', 
+          marginTop: '2px',
           color: connectionStatus.connected ? '#4ade80' : '#64748b'
         } 
       }, connectionStatus.connected ? `${connectionStatus.type} - Connected` : 'Searching...')
@@ -383,7 +383,8 @@ const CommunicationModule = ({ flightState, setRadioFreq, flightPlan, radioMessa
         style: {
           display: 'flex',
           borderBottom: '1px solid #334155',
-          background: 'rgba(15, 23, 42, 0.5)'
+          background: 'rgba(15, 23, 42, 0.5)',
+          height: '20px' // Fixed small header height
         }
       },
         ['LOG', 'SIGNALS'].map(mode => 
@@ -396,9 +397,9 @@ const CommunicationModule = ({ flightState, setRadioFreq, flightPlan, radioMessa
               border: 'none',
               borderBottom: viewMode === mode ? '2px solid #38bdf8' : 'none',
               color: viewMode === mode ? '#38bdf8' : '#64748b',
-              fontSize: '10px',
+              fontSize: '9px',
               fontWeight: 'bold',
-              padding: '4px',
+              padding: '0 4px',
               cursor: 'pointer'
             }
           }, mode)
@@ -456,29 +457,30 @@ const CommunicationModule = ({ flightState, setRadioFreq, flightPlan, radioMessa
             overflowY: 'auto',
             display: 'flex',
             flexDirection: 'column',
-            gap: '6px',
-            padding: '8px'
+            gap: '2px',
+            padding: '2px 4px',
+            background: 'rgba(0,0,0,0.2)'
           }
         },
           radioMessages.length > 0 ? radioMessages.map((msg, idx) => 
             React.createElement('div', {
               key: idx,
               style: {
-                alignSelf: msg.sender === 'Pilot' ? 'flex-end' : 'flex-start',
-                maxWidth: '85%',
-                padding: '4px 8px',
-                borderRadius: '4px',
-                background: msg.sender === 'Pilot' ? 'rgba(56, 189, 248, 0.1)' : 'rgba(255, 255, 255, 0.05)',
-                border: msg.sender === 'Pilot' ? '1px solid rgba(56, 189, 248, 0.2)' : '1px solid rgba(148, 163, 184, 0.2)',
-                color: msg.sender === 'Pilot' ? '#bae6fd' : '#e2e8f0',
+                width: '100%',
+                padding: '1px 0',
+                color: msg.sender === 'Pilot' ? '#4ade80' : '#ffffff',
                 fontSize: '11px',
-                lineHeight: '1.4'
+                fontFamily: 'monospace',
+                lineHeight: '1.2',
+                textAlign: 'left'
               }
             },
-              React.createElement('div', { style: { fontSize: '9px', opacity: 0.7, marginBottom: '2px' } }, msg.sender),
+              React.createElement('span', { style: { fontWeight: 'bold', marginRight: '6px', opacity: 0.8 } }, 
+                msg.sender === 'Pilot' ? '>' : `${msg.sender}:`
+              ),
               msg.text
             )
-          ) : React.createElement('div', { style: { fontSize: '10px', color: '#475569', fontStyle: 'italic', textAlign: 'center', marginTop: '10px' } }, 'Radio silent')
+          ) : React.createElement('div', { style: { fontSize: '10px', color: '#475569', fontStyle: 'italic', textAlign: 'center', marginTop: '4px' } }, 'Radio silent')
         )
       )
     ),

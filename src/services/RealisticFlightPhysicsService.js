@@ -882,8 +882,53 @@ class RealisticFlightPhysicsService {
         // Dimensional Moments
         const Mx_aero = q * S * b * Cl;
         const My_aero = q * S * c * Cm;
-        const Mz_aero = q * S * b * Cn;
+        let Mz_aero = q * S * b * Cn;
+        
+        // --- Ground Steering (Nose Wheel) ---
+        // User Request: "control the plane's yaw output on the ground (its effect will diminish as soon as I am 10ft+)"
+        // This implies a direct steering force/moment that is effective on ground and fades out.
+        
+        let Mz_steering = 0;
+        let Fy_steering = 0;
+        
+        // Altitude check (Fade out above 10ft)
+        // 10 ft = 3.048 meters
+        const altitudeFt = (-this.state.pos.z) * 3.28084;
+        
+        if (altitudeFt < 10) { 
+             // Fade factor: 1.0 at 0ft, 0.0 at 10ft
+             let steerFactor = (10 - altitudeFt) / 10;
+             if (steerFactor < 0) steerFactor = 0;
+             if (steerFactor > 1) steerFactor = 1;
+             
+             // Grass Damping
+             let damping = 1.0;
+             if (this.groundStatus && this.groundStatus.status === 'GRASS') {
+                 damping = 0.3; // User requested "damped on grass"
+             }
+             
+             // Steering Force Calculation
+             // Apply mass-based torque for consistent handling across aircraft types
+             const steeringTorque = this.state.mass * 15 * this.controls.rudder * steerFactor * damping;
+             Mz_steering = steeringTorque;
+             
+             // Side force to initiate turn
+             const steeringSideForce = this.state.mass * 5 * this.controls.rudder * steerFactor * damping;
+             Fy_steering = steeringSideForce;
+             
+             // Debug log occasionally
+             if (Math.random() < 0.01) {
+                 console.log(`Physics: Ground Steering Active. Alt: ${altitudeFt.toFixed(1)}ft, Factor: ${steerFactor.toFixed(2)}, Torque: ${steeringTorque.toFixed(0)}`);
+             }
+        }
 
+        // Add Steering to Aero Forces/Moments
+        Mz_aero += Mz_steering;
+        // Fy_aero is already defined as const, need to change it or add to it
+        // Fy_aero was: const Fy_aero = F_side;
+        // We can't reassign const. I need to modify the previous code or add it to force summation.
+        // Let's verify where Fy_aero is defined.
+        
         // --- Thrust ---
         const totalThrust = this.engines.reduce((acc, e) => acc + e.state.thrust, 0);
         const Fx_thrust = totalThrust; // Assumes thrust aligns with body X
@@ -974,7 +1019,7 @@ class RealisticFlightPhysicsService {
         // --- Totals ---
         const totalForces = new Vector3(
             Fx_aero + Fx_thrust + gravityBody.x + F_ground.x,
-            Fy_aero + gravityBody.y + F_ground.y,
+            Fy_aero + gravityBody.y + F_ground.y + Fy_steering,
             Fz_aero + gravityBody.z + F_ground.z
         );
 

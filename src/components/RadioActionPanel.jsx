@@ -82,12 +82,12 @@ const RadioActionPanel = ({ onTransmit, currentStation = 'Unicom', callsign = 'C
             onClick={() => handleTabChange(tab)}
             style={{
               flex: 1,
-              padding: '8px 4px',
+              padding: '4px 2px',
               background: activeTab === tab ? '#1e293b' : 'transparent',
               border: 'none',
               borderBottom: activeTab === tab ? '2px solid #38bdf8' : 'none',
               color: activeTab === tab ? '#38bdf8' : '#94a3b8',
-              fontSize: '11px',
+              fontSize: '10px',
               fontWeight: 'bold',
               cursor: 'pointer'
             }}
@@ -98,40 +98,41 @@ const RadioActionPanel = ({ onTransmit, currentStation = 'Unicom', callsign = 'C
       </div>
 
       {/* Content Area */}
-      <div style={{ flex: 1, padding: '8px', overflowY: 'auto' }}>
+      <div style={{ flex: 1, padding: '4px', overflowY: 'auto' }}>
         {!selectedTemplate ? (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
             {RADIO_TEMPLATES[activeTab].map(template => (
               <button
                 key={template.id}
                 onClick={() => handleTemplateSelect(template)}
                 style={{
                   textAlign: 'left',
-                  padding: '8px',
+                  padding: '4px 6px',
                   background: '#1e293b',
                   border: '1px solid #334155',
                   borderRadius: '4px',
                   color: '#e2e8f0',
-                  fontSize: '12px',
+                  fontSize: '11px',
                   cursor: 'pointer',
-                  transition: 'background 0.2s'
+                  transition: 'background 0.2s',
+                  lineHeight: '1.2'
                 }}
               >
-                <div style={{ fontWeight: 'bold', marginBottom: '2px' }}>{template.label}</div>
-                <div style={{ fontSize: '10px', color: '#94a3b8', fontStyle: 'italic' }}>
+                <div style={{ fontWeight: 'bold', fontSize: '10px' }}>{template.label}</div>
+                <div style={{ fontSize: '9px', color: '#94a3b8', fontStyle: 'italic', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                   {template.template}
                 </div>
               </button>
             ))}
           </div>
         ) : (
-          <form onSubmit={handleSend} style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+          <form onSubmit={handleSend} style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <span style={{ fontSize: '12px', fontWeight: 'bold', color: '#38bdf8' }}>{selectedTemplate.label}</span>
+              <span style={{ fontSize: '11px', fontWeight: 'bold', color: '#38bdf8' }}>{selectedTemplate.label}</span>
               <button 
                 type="button" 
                 onClick={() => setSelectedTemplate(null)}
-                style={{ background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer', fontSize: '10px' }}
+                style={{ background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer', fontSize: '9px' }}
               >
                 Cancel
               </button>
@@ -139,8 +140,8 @@ const RadioActionPanel = ({ onTransmit, currentStation = 'Unicom', callsign = 'C
 
             {/* Params Inputs */}
             {selectedTemplate.params && selectedTemplate.params.map(param => (
-              <div key={param} style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                <label style={{ fontSize: '10px', textTransform: 'uppercase', color: '#94a3b8' }}>{param}</label>
+              <div key={param} style={{ display: 'flex', flexDirection: 'column', gap: '1px' }}>
+                <label style={{ fontSize: '9px', textTransform: 'uppercase', color: '#94a3b8' }}>{param}</label>
                 {param === 'waypoint' && validWaypoints.length > 0 ? (
                   <select
                     value={paramValues[param] || ''}
@@ -149,13 +150,13 @@ const RadioActionPanel = ({ onTransmit, currentStation = 'Unicom', callsign = 'C
                       background: '#0f172a',
                       border: '1px solid #334155',
                       borderRadius: '4px',
-                      padding: '6px',
+                      padding: '4px',
                       color: 'white',
-                      fontSize: '12px',
+                      fontSize: '11px',
                       cursor: 'pointer'
                     }}
                   >
-                    <option value="">Select Waypoint...</option>
+                    <option value="">Select...</option>
                     {validWaypoints.map(wp => (
                       <option key={wp} value={wp}>{wp}</option>
                     ))}
@@ -170,9 +171,9 @@ const RadioActionPanel = ({ onTransmit, currentStation = 'Unicom', callsign = 'C
                       background: '#0f172a',
                       border: '1px solid #334155',
                       borderRadius: '4px',
-                      padding: '6px',
+                      padding: '4px',
                       color: 'white',
-                      fontSize: '12px'
+                      fontSize: '11px'
                     }}
                     autoFocus={param === selectedTemplate.params[0]}
                   />
@@ -182,15 +183,16 @@ const RadioActionPanel = ({ onTransmit, currentStation = 'Unicom', callsign = 'C
 
             {/* Preview */}
             <div style={{ 
-              fontSize: '11px', 
+              fontSize: '10px', 
               color: '#94a3b8', 
               background: '#0f172a', 
-              padding: '6px', 
+              padding: '4px', 
               borderRadius: '4px',
               border: '1px dashed #334155',
-              marginTop: '4px'
+              marginTop: '2px',
+              lineHeight: '1.2'
             }}>
-              Preview: "
+              "
               {selectedTemplate.template
                 .replace('{station}', currentStation)
                 .replace('{callsign}', callsign)
@@ -201,14 +203,14 @@ const RadioActionPanel = ({ onTransmit, currentStation = 'Unicom', callsign = 'C
             <button
               type="submit"
               style={{
-                marginTop: '4px',
-                padding: '8px',
+                marginTop: '2px',
+                padding: '6px',
                 background: '#38bdf8',
                 color: '#0f172a',
                 border: 'none',
                 borderRadius: '4px',
                 fontWeight: 'bold',
-                fontSize: '12px',
+                fontSize: '11px',
                 cursor: 'pointer'
               }}
             >

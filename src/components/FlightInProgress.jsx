@@ -74,6 +74,10 @@ const FlightInProgress = ({
     initialHeading: runwayHeadingDeg,
     airportElevation: initialDeparture?.elevation || 0,
     flightPlan: (routeDetails?.waypoints || flightPlan?.waypoints || []),
+    departure: selectedDeparture,
+    arrival: selectedArrival,
+    departureRunway: (routeDetails?.departureRunway) || (flightPlan?.departure?.runways?.[0]?.name),
+    arrivalRunway: (routeDetails?.landingRunway) || (flightPlan?.arrival?.runways?.[0]?.name),
     difficulty: difficulty,
     failureType: failureType
   };
