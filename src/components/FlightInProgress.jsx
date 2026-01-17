@@ -538,7 +538,7 @@ const FlightInProgress = ({
             </div>
           )}
         </div>
-        <div style={{ flex: 1.3, minWidth: '260px', height: '180px' }}>
+        <div style={{ flex: 1.3, minWidth: '260px', height: '120px' }}>
           <RadioActionPanel 
             onTransmit={handleRadioTransmit}
             currentStation={currentFreq.toFixed(3)}

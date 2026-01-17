@@ -98,7 +98,7 @@ const RadioActionPanel = ({ onTransmit, currentStation = 'Unicom', callsign = 'C
       </div>
 
       {/* Content Area */}
-      <div style={{ flex: 1, padding: '4px', overflowY: 'auto' }}>
+      <div style={{ flex: 'none', height: '80px', padding: '4px', overflowY: 'auto' }}>
         {!selectedTemplate ? (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
             {RADIO_TEMPLATES[activeTab].map(template => (

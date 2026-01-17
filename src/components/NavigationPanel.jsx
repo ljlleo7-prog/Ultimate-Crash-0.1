@@ -249,15 +249,15 @@ const NavigationPanel = ({ flightState, selectedArrival, flightPlan }) => {
     React.createElement('div', {
       style: {
         marginTop: '15px',
-        padding: '10px',
+        padding: '5px',
         background: 'rgba(0, 0, 0, 0.4)',
         borderRadius: '8px',
-        maxHeight: '200px',
+        maxHeight: '80px',
         overflowY: 'auto',
         border: '1px solid #00aa00'
       }
     },
-      React.createElement('h4', { style: { color: '#00ff00', marginBottom: '10px', textAlign: 'center' } }, 'Flight Plan Waypoints'),
+      React.createElement('h4', { style: { color: '#00ff00', marginBottom: '5px', textAlign: 'center', fontSize: '12px' } }, 'Flight Plan Waypoints'),
       waypoints.length > 0 ? (
         React.createElement('ul', { style: { listStyleType: 'none', padding: 0, margin: 0 } },
           waypoints.map((wp, index) =>

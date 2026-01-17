@@ -29,9 +29,9 @@
   background-image: 
     linear-gradient(#eee .1rem, transparent .1rem),
     radial-gradient(#ddd 1px, transparent 1px);
-  background-size: 100% 3rem, 15px 15px; /* Adjusted for extremely large text */
-  font-size: 1.5rem; /* Even more significantly increased font size */
-  line-height: 2.0; /* Very generous line height */
+  background-size: 100% 4rem, 25px 25px; /* Increased grid size significantly */
+  font-size: 1.8rem; /* Large but readable font size */
+  line-height: 2.0; /* Generous line height */
   overflow-y: auto; /* Ensure scroll bar appears when content exceeds */
 }
 

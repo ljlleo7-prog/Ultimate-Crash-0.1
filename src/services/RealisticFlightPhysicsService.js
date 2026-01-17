@@ -289,6 +289,43 @@ class RealisticFlightPhysicsService {
             wingSpan: data.wingSpan || 35,
             chord: (data.wingArea || 125) / (data.wingSpan || 35),
             maxThrust: data.maxThrustPerEngine || 120000,
+            engineCount: data.engineCount || 2,
+            enginePositions: data.enginePositions || (function() {
+                const count = data.engineCount || 2;
+                const span = data.wingSpan || 35;
+                const positions = [];
+                
+                // Defaults based on engine count
+                // Body Frame: X (Forward), Y (Right), Z (Down)
+                // CG is at 0,0,0
+                
+                if (count === 1) {
+                    positions.push(new Vector3(2.0, 0, 0)); // Nose/Center
+                } else if (count === 2) {
+                    // Under-wing engines (approx 25% span)
+                    // Z = 1.0 (Underslung)
+                    positions.push(new Vector3(0, -span * 0.25, 1.0)); // Left
+                    positions.push(new Vector3(0, span * 0.25, 1.0));  // Right
+                } else if (count === 3) {
+                     // MD-11/DC-10 style
+                     positions.push(new Vector3(0, -span * 0.25, 1.0)); // Left
+                     positions.push(new Vector3(0, span * 0.25, 1.0));  // Right
+                     positions.push(new Vector3(-15, 0, -3.0)); // Tail (High, Aft)
+                } else if (count === 4) {
+                     // 747/A380 style
+                     positions.push(new Vector3(2.0, -span * 0.35, 1.0)); // Out L
+                     positions.push(new Vector3(4.0, -span * 0.18, 1.5)); // In L
+                     positions.push(new Vector3(4.0, span * 0.18, 1.5));  // In R
+                     positions.push(new Vector3(2.0, span * 0.35, 1.0)); // Out R
+                } else {
+                    // Fallback for others (distribute along span)
+                    for (let i=0; i<count; i++) {
+                        const y = (i - (count-1)/2) * (span * 0.5 / count);
+                        positions.push(new Vector3(0, y, 1.0));
+                    }
+                }
+                return positions;
+            })(),
             
             // Inertia Tensor Approximation (if not provided)
             // Ixx, Iyy, Izz
@@ -891,9 +928,9 @@ class RealisticFlightPhysicsService {
         let Mz_steering = 0;
         let Fy_steering = 0;
         
-        // Altitude check (Fade out above 10ft)
-        // 10 ft = 3.048 meters
-        const altitudeFt = (-this.state.pos.z) * 3.28084;
+        // Altitude check (Fade out above 10ft AGL)
+        // Use AGL (Above Ground Level), not absolute altitude
+        const altitudeFt = (this.currentGroundZ - this.state.pos.z) * 3.28084;
         
         if (altitudeFt < 10) { 
              // Fade factor: 1.0 at 0ft, 0.0 at 10ft
@@ -909,11 +946,12 @@ class RealisticFlightPhysicsService {
              
              // Steering Force Calculation
              // Apply mass-based torque for consistent handling across aircraft types
-             const steeringTorque = this.state.mass * 15 * this.controls.rudder * steerFactor * damping;
+             // INCREASED: from 15 to 60 for torque, 5 to 25 for side force
+             const steeringTorque = this.state.mass * 60 * this.controls.rudder * steerFactor * damping;
              Mz_steering = steeringTorque;
              
              // Side force to initiate turn
-             const steeringSideForce = this.state.mass * 5 * this.controls.rudder * steerFactor * damping;
+             const steeringSideForce = this.state.mass * 25 * this.controls.rudder * steerFactor * damping;
              Fy_steering = steeringSideForce;
              
              // Debug log occasionally
@@ -930,8 +968,28 @@ class RealisticFlightPhysicsService {
         // Let's verify where Fy_aero is defined.
         
         // --- Thrust ---
-        const totalThrust = this.engines.reduce((acc, e) => acc + e.state.thrust, 0);
-        const Fx_thrust = totalThrust; // Assumes thrust aligns with body X
+        let F_thrust_body = new Vector3(0, 0, 0);
+        let M_thrust_body = new Vector3(0, 0, 0);
+
+        this.engines.forEach((engine, index) => {
+            const thrustMag = engine.state.thrust;
+            // Assume thrust vector is along X axis (Forward)
+            // Ideally, we could have a thrust vector direction per engine, but X is standard.
+            const F_eng = new Vector3(thrustMag, 0, 0);
+            
+            // Position
+            const pos = this.aircraft.enginePositions[index] || new Vector3(0, 0, 0);
+            
+            // Moment = r x F (Position x Force)
+            const M_eng = pos.cross(F_eng);
+            
+            F_thrust_body = F_thrust_body.add(F_eng);
+            M_thrust_body = M_thrust_body.add(M_eng);
+        });
+
+        const Fx_thrust = F_thrust_body.x;
+        // Fy and Fz from thrust are usually negligible unless vectoring or significant tilt, 
+        // but we can include them if we want to be precise (here they are 0)
         
         // --- Gravity ---
         // Gravity in Earth Frame is (0, 0, mg)
@@ -1024,9 +1082,9 @@ class RealisticFlightPhysicsService {
         );
 
         const totalMoments = new Vector3(
-            Mx_aero + M_ground.x,
-            My_aero + M_ground.y,
-            Mz_aero + M_ground.z
+            Mx_aero + M_ground.x + M_thrust_body.x,
+            My_aero + M_ground.y + M_thrust_body.y,
+            Mz_aero + M_ground.z + M_thrust_body.z
         );
 
         return { 
@@ -1041,7 +1099,11 @@ class RealisticFlightPhysicsService {
                 CL, CD, Cm, Cl, Cn,
                 lift: F_lift, drag: F_drag, side: F_side,
                 pitchMoment: My_aero,
-                groundMomentY: M_ground.y
+                groundMomentY: M_ground.y,
+                yawMoment: Mz_aero,
+                steeringMoment: Mz_steering,
+                thrustMomentYaw: M_thrust_body.z,
+                thrustMomentPitch: M_thrust_body.y
             }
         };
     }
@@ -1142,6 +1204,8 @@ class RealisticFlightPhysicsService {
         const v_earth = this.state.quat.rotate(this.state.vel);
         const vs = -v_earth.z;
 
+        const airspeeds = this.calculateAirspeeds();
+
         const autopilotStatus = this.getAutopilotStatus ? this.getAutopilotStatus() : { engaged: false, targets: {} };
         return {
             position: {
@@ -1198,7 +1262,8 @@ class RealisticFlightPhysicsService {
                 altitude_agl_ft: altitudeAGL * 3.28084,
                 terrain_elevation_ft: (this.terrainElevation || 0) * 3.28084,
                 airport_elevation_ft: (this.airportElevation || 0) * 3.28084,
-                airspeed: this.state.vel.magnitude() * 1.94384,
+                airspeed: airspeeds.trueAirspeed,
+                groundSpeed: airspeeds.groundSpeed,
                 heading: (euler.psi * 180 / Math.PI + 360) % 360
             },
             
@@ -1214,6 +1279,8 @@ class RealisticFlightPhysicsService {
                 isOnGround: this.onGround,
                 lift: this.debugData?.lift || 0,
                 pitchTorque: this.debugData?.pitchMoment || 0,
+                yawMoment_n: this.debugData?.yawMoment || 0,
+                steeringMoment_n: this.debugData?.steeringMoment || 0,
                 
                 // Extended Debugging
                 alpha: this.debugData?.alpha || 0,
