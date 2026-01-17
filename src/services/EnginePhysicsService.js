@@ -16,6 +16,7 @@ class EnginePhysicsService {
             maxN1: 102, // %
             spoolUpRate: 15, // % per second
             spoolDownRate: 20, // % per second
+            responsiveness: config.responsiveness || 1.0, // Multiplier for spool rate (0.95-1.05)
             ...config
         };
         
@@ -79,7 +80,8 @@ class EnginePhysicsService {
         // Acceleration decays near max N1 (inertia)
         // And acceleration is slower at low N1 (inertia)
         // Simplified exponential approach
-        this.state.n1 += n1Diff * rate * dt * 0.05; // 0.05 is a tuning factor for response time
+        // Apply responsiveness factor (uncertainty)
+        this.state.n1 += n1Diff * rate * dt * 0.05 * this.config.responsiveness; 
 
         // Clamp N1
         if (this.state.n1 < 0) this.state.n1 = 0;

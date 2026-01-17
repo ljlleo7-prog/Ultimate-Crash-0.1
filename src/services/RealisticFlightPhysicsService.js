@@ -159,10 +159,17 @@ class RealisticFlightPhysicsService {
         };
 
         // Engine State
-        this.engines = Array(this.aircraft.engineCount).fill(0).map(() => new EnginePhysicsService({
-            maxThrust: this.aircraft.maxThrust,
-            specificFuelConsumption: this.aircraft.specificFuelConsumption
-        }));
+        this.engines = Array(this.aircraft.engineCount).fill(0).map(() => {
+            // Introduce ~5% uncertainty in engine responsiveness
+            // Range: 0.95 to 1.05
+            const uncertainty = 0.95 + Math.random() * 0.10;
+            
+            return new EnginePhysicsService({
+                maxThrust: this.aircraft.maxThrust,
+                specificFuelConsumption: this.aircraft.specificFuelConsumption,
+                responsiveness: uncertainty
+            });
+        });
 
         // Simulation Metadata
         this.crashed = false;
@@ -775,15 +782,26 @@ class RealisticFlightPhysicsService {
         const mach = V_airspeed / speedOfSound;
         const airDensityRatio = env.density / this.CONSTANTS.SEA_LEVEL_DENSITY;
 
-        this.engines.forEach((engine) => {
-             // We can allow differential throttle if input structure supports it, 
-             // for now use global throttle for all
-             engine.update(dt, this.controls.throttle, mach, -this.state.pos.z, airDensityRatio, env.temp);
+        this.engines.forEach((engine, index) => {
+             // Determine throttle for this engine
+             let engineThrottle = this.controls.throttle; // Default to master
+             
+             // Check for specific engine throttle inputs
+             // Support controls.throttles array
+             if (Array.isArray(this.controls.throttles) && typeof this.controls.throttles[index] === 'number') {
+                 engineThrottle = this.controls.throttles[index];
+             }
+             // Support controls.throttle1, controls.throttle2, etc.
+             else if (typeof this.controls[`throttle${index + 1}`] === 'number') {
+                 engineThrottle = this.controls[`throttle${index + 1}`];
+             }
+
+             engine.update(dt, engineThrottle, mach, -this.state.pos.z, airDensityRatio, env.temp);
              
              // Consume Fuel
-        // fuelFlow is kg/s
-        const fuelBurned = engine.state.fuelFlow * dt;
-        this.state.fuel -= fuelBurned;
+             // fuelFlow is kg/s
+             const fuelBurned = engine.state.fuelFlow * dt;
+             this.state.fuel -= fuelBurned;
         });
         
         if (this.state.fuel < 0) {
@@ -819,7 +837,9 @@ class RealisticFlightPhysicsService {
         // beta = asin(v / V)
         let alpha = 0;
         let beta = 0;
-        if (V_airspeed > 0.1) {
+        // Fix for low speed instability: only calculate alpha/beta if airspeed > 3 knots (~1.5 m/s)
+        // Below this speed, alpha/beta are undefined/unstable due to noise.
+        if (V_airspeed > 1.5) {
             alpha = Math.atan2(V_air_body.z, V_air_body.x);
             beta = Math.asin(Math.max(-1, Math.min(1, V_air_body.y / V_airspeed)));
         }
