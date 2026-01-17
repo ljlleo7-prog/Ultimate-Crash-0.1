@@ -570,6 +570,11 @@ export function useAircraftPhysics(config = {}, autoStart = true, model = 'reali
     setGear,
     setTrim,
     performSystemAction,
+    setEnvironment: useCallback((envData) => {
+      if (physicsServiceRef.current && typeof physicsServiceRef.current.setEnvironment === 'function') {
+        physicsServiceRef.current.setEnvironment(envData);
+      }
+    }, []),
     updatePhysics,
     resetAircraft
   };

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAircraftPhysics } from '../hooks/useAircraftPhysics';
 import { updateWeather } from '../services/weatherService';
+import { realWeatherService } from '../services/RealWeatherService';
 import weatherConfig from '../config/weatherConfig.json';
 import FlightPanelModular from './FlightPanelModular';
 import DebugPhysicsPanel from './DebugPhysicsPanel';
@@ -92,6 +93,7 @@ const FlightInProgress = ({
     setGear,
     setTrim,
     performSystemAction,
+    setEnvironment,
     physicsService
   } = useAircraftPhysics(aircraftConfig, false, physicsModel);
 
@@ -100,23 +102,37 @@ const FlightInProgress = ({
   const [commandInput, setCommandInput] = useState('');
   const [radioMessages, setRadioMessages] = useState([]);
   const [currentFreq, setCurrentFreq] = useState(121.500);
+  const [useRealWeather, setUseRealWeather] = useState(true); // Enable Real Weather by default
   const [sceneState, setSceneState] = useState(sceneManager.getState());
   const [narrative, setNarrative] = useState(null);
 
-  const handleRadioTransmit = (message) => {
-    setRadioMessages(prev => [...prev, message]);
-    
-    // Trigger ATC Logic
-    const context = {
-      callsign: callsign || 'N12345',
-      altitude: Math.round(flightData.altitude),
-      heading: Math.round(flightData.heading),
-      airspeed: Math.round(flightData.indicatedAirspeed || flightData.airspeed)
+  // Radio Message Handler
+  const handleRadioTransmit = (text, type, templateId, params) => {
+    // Add pilot message
+    const newMessage = {
+      sender: callsign,
+      text: text,
+      timestamp: Date.now(),
+      type: type || 'transmission'
     };
     
-    atcManager.processMessage(message, context, (response) => {
-      setRadioMessages(prev => [...prev, response]);
-    });
+    setRadioMessages(prev => [...prev, newMessage]);
+    
+    // Process with ATC Logic
+    const context = {
+        callsign: callsign,
+        altitude: Math.round(flightData.altitude),
+        heading: Math.round(flightData.heading),
+        weather: weatherData // Pass weather data to ATC context
+    };
+
+    atcManager.processMessage(
+        { type, templateId, params, text },
+        context,
+        (response) => {
+            setRadioMessages(prev => [...prev, response]);
+        }
+    );
   };
   const [activeFailures, setActiveFailures] = useState([]);
   const [phaseName, setPhaseName] = useState('');
@@ -191,7 +207,25 @@ const FlightInProgress = ({
 
   // Weather update effect
   useEffect(() => {
-    if (!weatherData || !setWeatherData) return;
+    if (useRealWeather) {
+       const fetchRealWeather = async () => {
+         const lat = physicsService?.state?.geo?.lat || initialDeparture?.latitude || 37.6188;
+         const lon = physicsService?.state?.geo?.lon || initialDeparture?.longitude || -122.3750;
+         
+         try {
+             const data = await realWeatherService.getWeather(lat, lon);
+             setWeatherData(data);
+             if (setEnvironment) setEnvironment(data);
+             console.log("🌦️ Real Weather Updated:", data);
+         } catch (e) {
+             console.error("❌ Real Weather Fetch Failed", e);
+         }
+       };
+       
+       fetchRealWeather();
+       const interval = setInterval(fetchRealWeather, 5 * 60 * 1000); // Update every 5 minutes
+       return () => clearInterval(interval);
+    }
 
     const interval = setInterval(() => {
       setWeatherData(prevWeatherData => {
@@ -203,7 +237,7 @@ const FlightInProgress = ({
     }, weatherConfig.atisUpdateIntervalMinutes * 60 * 1000); // Convert minutes to milliseconds
 
     return () => clearInterval(interval);
-  }, [weatherData, setWeatherData]);
+  }, [weatherData, setWeatherData, useRealWeather, setEnvironment, physicsService]);
 
   // Update scene manager with selected flight parameters
   useEffect(() => {
@@ -635,7 +669,10 @@ const FlightInProgress = ({
             <span style={{ color: '#9ca3af' }}>Alt:</span>
             <span>{flightData.derived?.altitude_ft?.toFixed(0)} ft</span>
             
-            <span style={{ color: '#9ca3af' }}>Spd:</span>
+            <span style={{ color: '#9ca3af' }}>IAS:</span>
+            <span>{flightData.indicatedAirspeed?.toFixed(0)} kts</span>
+
+            <span style={{ color: '#9ca3af' }}>GS:</span>
             <span>{flightData.derived?.airspeed?.toFixed(0)} kts</span>
           </div>
 

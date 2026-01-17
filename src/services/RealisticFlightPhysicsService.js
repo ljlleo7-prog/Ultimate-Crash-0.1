@@ -665,13 +665,61 @@ class RealisticFlightPhysicsService {
         const density = pressure / (this.CONSTANTS.R_GAS * temp);
         const speedOfSound = Math.sqrt(this.CONSTANTS.GAMMA * this.CONSTANTS.R_GAS * temp);
 
-        return { density, pressure, temp, speedOfSound };
+        // Wind & Turbulence (injected via update or stored state)
+        // Default to zero if not set
+        const wind = this.environment?.wind || new Vector3(0, 0, 0);
+        const turbulence = this.environment?.turbulence || 0;
+
+        return { density, pressure, temp, speedOfSound, wind, turbulence };
+    }
+
+    /**
+     * Set environmental conditions (called from external service)
+     * @param {Object} envData { windSpeed, windDirection, turbulence, precipitation }
+     */
+    setEnvironment(envData) {
+        if (!envData) return;
+        
+        // Convert Wind (Speed in Knots, Direction in Degrees From) to Earth Velocity Vector (m/s)
+        // Direction is "From", so vector is opposite.
+        // 0 deg = From North (Moving South). Vector X = -Speed.
+        // 90 deg = From East (Moving West). Vector Y = -Speed.
+        // Wind Vector (Earth NED):
+        // X (North) = -Speed * cos(dir)
+        // Y (East) = -Speed * sin(dir)
+        // Z (Down) = 0 (usually)
+        
+        const speedMs = (envData.windSpeed || 0) * 0.514444; // knots -> m/s
+        const dirRad = (envData.windDirection || 0) * Math.PI / 180;
+        
+        // North is X, East is Y.
+        // Wind 360 (From North) -> Flowing South -> -X
+        // Wind 090 (From East) -> Flowing West -> -Y
+        const windX = -speedMs * Math.cos(dirRad);
+        const windY = -speedMs * Math.sin(dirRad);
+        
+        this.environment = {
+            wind: new Vector3(windX, windY, 0),
+            turbulence: envData.turbulence || 0,
+            precipitation: envData.precipitation || 0
+        };
     }
 
     updateEngines(env, dt) {
         // Mach number approx
         const speedOfSound = env.speedOfSound || 340;
-        const mach = this.state.vel.magnitude() / speedOfSound;
+        // Mach should be based on Airspeed, not Ground Speed
+        // We need V_air_body magnitude.
+        // Re-calculate local airspeed if needed, or pass it in.
+        // For simplicity, we'll re-calculate V_air here or approximate.
+        
+        // Transform Wind to Body Frame for Airspeed Calculation
+        const q_inv = new Quaternion(this.state.quat.w, -this.state.quat.x, -this.state.quat.y, -this.state.quat.z);
+        const V_wind_body = q_inv.rotate(env.wind || new Vector3(0,0,0));
+        const V_air_body = this.state.vel.sub(V_wind_body);
+        const V_airspeed = V_air_body.magnitude();
+
+        const mach = V_airspeed / speedOfSound;
         const airDensityRatio = env.density / this.CONSTANTS.SEA_LEVEL_DENSITY;
 
         this.engines.forEach((engine) => {
@@ -692,9 +740,23 @@ class RealisticFlightPhysicsService {
     }
 
     calculateAerodynamicsAndGround(env) {
-        // --- Velocity ---
-        const V_body = this.state.vel; // u, v, w
-        const V_airspeed = V_body.magnitude();
+        // --- Velocity (Airspeed vs Ground Speed) ---
+        // this.state.vel is V_ground_body (Ground Velocity in Body Frame)
+        
+        // Wind (Earth) -> Wind (Body)
+        const q_inv = new Quaternion(this.state.quat.w, -this.state.quat.x, -this.state.quat.y, -this.state.quat.z);
+        const V_wind_body = q_inv.rotate(env.wind || new Vector3(0,0,0));
+        
+        // Turbulence: Add random noise to wind body vector
+        if (env.turbulence > 0) {
+            const turbScale = env.turbulence * 5.0; // up to 5 m/s variation
+            V_wind_body.x += (Math.random() - 0.5) * turbScale;
+            V_wind_body.y += (Math.random() - 0.5) * turbScale;
+            V_wind_body.z += (Math.random() - 0.5) * turbScale;
+        }
+
+        const V_air_body = this.state.vel.sub(V_wind_body); // V_air = V_ground - V_wind
+        const V_airspeed = V_air_body.magnitude();
         
         // Dynamic Pressure (q)
         const q = 0.5 * env.density * V_airspeed * V_airspeed;
@@ -705,8 +767,8 @@ class RealisticFlightPhysicsService {
         let alpha = 0;
         let beta = 0;
         if (V_airspeed > 0.1) {
-            alpha = Math.atan2(V_body.z, V_body.x);
-            beta = Math.asin(Math.max(-1, Math.min(1, V_body.y / V_airspeed)));
+            alpha = Math.atan2(V_air_body.z, V_air_body.x);
+            beta = Math.asin(Math.max(-1, Math.min(1, V_air_body.y / V_airspeed)));
         }
 
         // --- Aerodynamic Coefficients ---
@@ -820,7 +882,7 @@ class RealisticFlightPhysicsService {
         // To rotate frame A to B, we use q_AB. To rotate vector in A to B, we use q_AB*.
         // this.state.quat represents Body -> Earth rotation.
         // So we need inverse to take Gravity (Earth) -> Body.
-        const q_inv = new Quaternion(this.state.quat.w, -this.state.quat.x, -this.state.quat.y, -this.state.quat.z);
+        // q_inv is already calculated above
         const gravityBody = q_inv.rotate(gravityEarth);
 
         // --- Ground Interaction (Multi-Point Gear) ---
@@ -864,7 +926,14 @@ class RealisticFlightPhysicsService {
                 
                 if (speed_h > 0.01) {
                     const isBraking = this.controls.brakes > 0.1 && gear.name.includes('main');
-                    const mu = isBraking ? 0.8 : 0.02;
+                    let mu = isBraking ? 0.8 : 0.02;
+                    
+                    // Rain reduction (Braking Effect)
+                    if (this.environment && this.environment.precipitation > 0) {
+                        const rainFactor = Math.min(this.environment.precipitation, 10) / 10; // 0 to 1
+                        mu = mu * (1 - 0.4 * rainFactor); // Up to 40% friction loss
+                    }
+
                     const frictionMag = Math.abs(F_n) * mu;
                     F_f_earth = vel_h.normalize().scale(-frictionMag);
                     
@@ -1419,11 +1488,24 @@ class RealisticFlightPhysicsService {
         this.engines.forEach(e => { e.n1 = 0; e.thrust = 0; });
     }
     calculateAirspeeds() {
-        const tas = this.state.vel.magnitude() * 1.94384; // knots
+        const wind = this.environment?.wind || new Vector3(0, 0, 0);
+        
+        // Transform Wind to Body Frame
+        const q_inv = new Quaternion(this.state.quat.w, -this.state.quat.x, -this.state.quat.y, -this.state.quat.z);
+        const V_wind_body = q_inv.rotate(wind);
+        
+        // V_air = V_ground - V_wind
+        const V_air_body = this.state.vel.sub(V_wind_body);
+        
+        const tas = V_air_body.magnitude() * 1.94384; // knots
+        
         // Simple IAS approx
         const rho = this.calculateEnvironment(this.state.pos.z).density;
         const ias = tas * Math.sqrt(rho / 1.225);
-        return { trueAirspeed: tas, indicatedAirspeed: ias };
+        
+        const gs = this.state.vel.magnitude() * 1.94384; // Ground Speed in knots
+
+        return { trueAirspeed: tas, indicatedAirspeed: ias, groundSpeed: gs };
     }
 }
 

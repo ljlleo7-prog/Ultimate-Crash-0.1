@@ -74,6 +74,12 @@ export const RADIO_TEMPLATES = {
       template: '{station}, {callsign} ready for takeoff, runway {runway}.',
       params: ['runway'],
       type: 'request'
+    },
+    {
+      id: 'req_atis',
+      label: 'Request ATIS',
+      template: '{station}, {callsign} requesting current weather / ATIS.',
+      type: 'request'
     }
   ],
   INFORM: [
