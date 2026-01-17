@@ -11,10 +11,12 @@ import FlightPosePanel from './FlightPosePanel';
 import NavigationPanel from './NavigationPanel';
 import CentralPanel from './CentralPanel';
 import ControlSurfacePanel from './ControlSurfacePanel';
+import OverheadPanel from './OverheadPanel';
 import './FlightPanel.css';
 
 const FlightPanelModular = ({ flightData, onActionRequest, aircraftModel, selectedArrival, flightPlan }) => {
   // Use flightData from parent component instead of creating own physics service
+  const [showOverhead, setShowOverhead] = useState(false);
   const [flightState, setFlightState] = useState({
     // Navigation
     heading: flightData?.heading || 270,
@@ -124,7 +126,8 @@ const FlightPanelModular = ({ flightData, onActionRequest, aircraftModel, select
         altitudeHold: prevState.altitudeHold,
         headingHold: prevState.headingHold,
         autopilotTargets: flightData.autopilotTargets || prevState.autopilotTargets,
-        frame: typeof flightData.frame === 'number' ? flightData.frame : prevState.frame
+        frame: typeof flightData.frame === 'number' ? flightData.frame : prevState.frame,
+        systems: flightData.systems || prevState.systems || {}
       }));
     }
   }, [flightData]);
@@ -231,8 +234,21 @@ const FlightPanelModular = ({ flightData, onActionRequest, aircraftModel, select
     }
   };
 
+  const handleSystemAction = (system, action, value) => {
+    if (onActionRequest) {
+      onActionRequest('system-action', { system, action, value });
+    }
+  };
+
   // Main render function
   return React.createElement('div', { className: 'modern-flight-panel', style: { userSelect: 'none' } },
+    // Overhead Panel Overlay
+    showOverhead && React.createElement(OverheadPanel, {
+      onClose: () => setShowOverhead(false),
+      flightState,
+      onSystemAction: handleSystemAction
+    }),
+
     // Crash warning flash
     React.createElement(CrashWarningFlash, { flashActive, flashText, onAlertComplete: handleAlertComplete }),
     
@@ -288,7 +304,10 @@ const FlightPanelModular = ({ flightData, onActionRequest, aircraftModel, select
         React.createElement(NavigationPanel, { flightState, selectedArrival, flightPlan }),
         
         // Central Panel (Right)
-        React.createElement(CentralPanel, { flightState })
+        React.createElement(CentralPanel, { 
+          flightState,
+          onToggleSystems: () => setShowOverhead(prev => !prev)
+        })
       ),
       
       // Manual controls at bottom

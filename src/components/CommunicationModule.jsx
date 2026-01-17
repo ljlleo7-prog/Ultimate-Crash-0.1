@@ -119,63 +119,155 @@ const FrequencyKnob = ({ label, size, innerSize, onChange, sensitivity = 1, colo
 const CommunicationModule = ({ flightState, setRadioFreq, flightPlan }) => {
   const currentFreq = flightState?.radioFreq || 121.500;
   const [connectionStatus, setConnectionStatus] = useState({ name: 'No Signal', type: '', connected: false });
+  const [availableStations, setAvailableStations] = useState([]);
+  const [nearbyAirports, setNearbyAirports] = useState([]);
+  const [referencePos, setReferencePos] = useState(null);
+  const lastCheckPos = useRef({ lat: null, lon: null });
 
-  // Update connection status
+  // 1. Optimize: Update nearby airports only when position changes significantly
   useEffect(() => {
     const lat = flightState?.latitude;
     const lon = flightState?.longitude;
     
     if (lat === undefined || lon === undefined) return;
 
-    // 1000km is approximately 540 nautical miles
-    const detectionRadiusNm = 540;
+    // Initialize or check distance
+    if (lastCheckPos.current.lat !== null) {
+      const dist = Math.sqrt(
+        Math.pow(lat - lastCheckPos.current.lat, 2) + 
+        Math.pow(lon - lastCheckPos.current.lon, 2)
+      );
+      // 0.1 degrees is roughly 11km. Update if moved more than that.
+      if (dist < 0.1) return;
+    }
+
+    lastCheckPos.current = { lat, lon };
     
-    // Check nearby airports
-    const nearbyAirports = airportService.getAirportsWithinRadius(lat, lon, detectionRadiusNm);
+    // 500nm detection radius as requested
+    const detectionRadiusNm = 500;
+    const airports = airportService.getAirportsWithinRadius(lat, lon, detectionRadiusNm);
     
-    let found = null;
+    // Calculate distance for airports immediately
+    const airportsWithDist = airports.map(ap => ({
+      ...ap,
+      distance: airportService.calculateDistance(
+        { latitude: lat, longitude: lon },
+        { latitude: ap.latitude, longitude: ap.longitude }
+      )
+    }));
+
+    setNearbyAirports(airportsWithDist);
+    setReferencePos({ lat, lon });
     
-    // 1. Check Airports
+  }, [flightState?.latitude, flightState?.longitude]);
+
+  // 2. Build available stations list when airports or flight plan changes
+  useEffect(() => {
+    const stations = [];
+    const currentPos = referencePos || { lat: flightState?.latitude, lon: flightState?.longitude };
+
+    // Add Airports
     for (const airport of nearbyAirports) {
       if (airport.frequencies) {
-        // Use a small epsilon for float comparison
-        const match = airport.frequencies.find(f => Math.abs(f.frequency - currentFreq) < 0.01);
-        if (match) {
-          found = { 
-            name: airport.name, 
-            type: `${match.type} (${airport.iata})`, 
-            connected: true 
-          };
-          break;
-        }
+        airport.frequencies.forEach(f => {
+          stations.push({
+            name: airport.iata,
+            type: f.type,
+            frequency: f.frequency,
+            desc: `${airport.iata} ${f.type}`,
+            distance: airport.distance // Use pre-calculated distance
+          });
+        });
       }
     }
     
-    // 2. Check Waypoints
-    if (!found && flightPlan) {
-      // Check Departure
+    // Add Waypoints
+    if (flightPlan && currentPos.lat !== undefined) {
+      const getDist = (target) => {
+        if (target.latitude && target.longitude) {
+          return airportService.calculateDistance(
+            { latitude: currentPos.lat, longitude: currentPos.lon },
+            { latitude: target.latitude, longitude: target.longitude }
+          );
+        }
+        return 99999; // Far away if no coords
+      };
+
+      // Departure
       if (flightPlan.departure && flightPlan.departure.frequency) {
-         if (Math.abs(flightPlan.departure.frequency - currentFreq) < 0.01) {
-             found = { name: flightPlan.departure.name, type: 'Departure', connected: true };
-         }
+         stations.push({
+           name: flightPlan.departure.name,
+           type: 'Departure',
+           frequency: flightPlan.departure.frequency,
+           desc: `DEP ${flightPlan.departure.name}`,
+           distance: getDist(flightPlan.departure)
+         });
       }
       
-      // Check Arrival
-      if (!found && flightPlan.arrival && flightPlan.arrival.frequency) {
-         if (Math.abs(flightPlan.arrival.frequency - currentFreq) < 0.01) {
-             found = { name: flightPlan.arrival.name, type: 'Arrival', connected: true };
-         }
+      // Arrival
+      if (flightPlan.arrival && flightPlan.arrival.frequency) {
+         stations.push({
+           name: flightPlan.arrival.name,
+           type: 'Arrival',
+           frequency: flightPlan.arrival.frequency,
+           desc: `ARR ${flightPlan.arrival.name}`,
+           distance: getDist(flightPlan.arrival)
+         });
       }
 
-      // Check standard waypoints
-      if (!found && flightPlan.waypoints) {
+      // Waypoints
+      if (flightPlan.waypoints) {
         for (const wp of flightPlan.waypoints) {
-          if (wp.frequency && Math.abs(wp.frequency - currentFreq) < 0.01) {
-             found = { name: wp.name, type: 'Waypoint ATC', connected: true };
-             break;
+          if (wp.frequency) {
+            stations.push({
+              name: wp.name,
+              type: 'Waypoint ATC',
+              frequency: wp.frequency,
+              desc: `${wp.name}`,
+              distance: getDist(wp)
+            });
           }
         }
       }
+    }
+
+    // Sort and deduplicate
+    const uniqueStations = [];
+    const seen = new Set();
+    
+    // Sort by distance first
+    stations.sort((a, b) => (a.distance || 99999) - (b.distance || 99999));
+
+    stations.forEach(s => {
+      const key = `${s.desc}-${s.frequency}`;
+      if (!seen.has(key)) {
+        seen.add(key);
+        uniqueStations.push(s);
+      }
+    });
+    
+    // Take nearest 3
+    const nearest3 = uniqueStations.slice(0, 3);
+    
+    // Sort by frequency for display? Or keep by distance?
+    // User said "only display the nearest 3". Usually implies seeing them in order of distance or just the subset.
+    // I'll keep them sorted by distance as that's most useful.
+    setAvailableStations(nearest3);
+  }, [nearbyAirports, flightPlan, referencePos]);
+
+  // 3. Check connection status (fast, runs on freq change)
+  useEffect(() => {
+    let found = null;
+    
+    // Use a small epsilon for float comparison
+    const match = availableStations.find(s => Math.abs(s.frequency - currentFreq) < 0.01);
+    
+    if (match) {
+      found = { 
+        name: match.name, 
+        type: match.type, 
+        connected: true 
+      };
     }
 
     if (found) {
@@ -184,7 +276,7 @@ const CommunicationModule = ({ flightState, setRadioFreq, flightPlan }) => {
       setConnectionStatus({ name: 'No Signal', type: '', connected: false });
     }
     
-  }, [currentFreq, flightState?.latitude, flightState?.longitude, flightPlan]);
+  }, [currentFreq, availableStations]);
 
   // Handlers for frequency change
   const handleCoarseChange = (steps) => {
@@ -232,7 +324,8 @@ const CommunicationModule = ({ flightState, setRadioFreq, flightPlan }) => {
     // Left: Communication Details
     React.createElement('div', {
       style: {
-        flex: 1,
+        width: '140px',
+        flexShrink: 0,
         display: 'flex',
         flexDirection: 'column',
         justifyContent: 'center',
@@ -250,7 +343,7 @@ const CommunicationModule = ({ flightState, setRadioFreq, flightPlan }) => {
           whiteSpace: 'nowrap',
           overflow: 'hidden',
           textOverflow: 'ellipsis',
-          maxWidth: '180px'
+          maxWidth: '100%'
         } 
       }, connectionStatus.name),
       React.createElement('div', { 
@@ -260,6 +353,58 @@ const CommunicationModule = ({ flightState, setRadioFreq, flightPlan }) => {
           color: connectionStatus.connected ? '#4ade80' : '#64748b'
         } 
       }, connectionStatus.connected ? `${connectionStatus.type} - Connected` : 'Searching...')
+    ),
+
+    // Middle: Nearby Frequencies
+    React.createElement('div', {
+      style: {
+        flex: 1,
+        display: 'flex',
+        flexDirection: 'column',
+        borderRight: '1px solid #334155',
+        height: '100%',
+        padding: '0 8px',
+        overflow: 'hidden'
+      }
+    },
+      React.createElement('div', { style: { fontSize: '10px', fontWeight: 'bold', color: '#94a3b8', marginBottom: '4px' } }, 'NEARBY SIGNALS'),
+      React.createElement('div', {
+        className: 'no-scrollbar',
+        style: {
+          flex: 1,
+          overflowY: 'auto',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '2px'
+        }
+      },
+        availableStations.length > 0 ? availableStations.map((station, idx) => 
+          React.createElement('div', {
+            key: idx,
+            onClick: () => setRadioFreq(station.frequency),
+            style: {
+              fontSize: '10px',
+              color: Math.abs(station.frequency - currentFreq) < 0.01 ? '#4ade80' : '#64748b',
+              cursor: 'pointer',
+              display: 'flex',
+              justifyContent: 'space-between',
+              padding: '2px 4px',
+              borderRadius: '2px',
+              backgroundColor: Math.abs(station.frequency - currentFreq) < 0.01 ? 'rgba(74, 222, 128, 0.1)' : 'transparent',
+              transition: 'background-color 0.2s'
+            },
+            onMouseEnter: (e) => {
+               if (Math.abs(station.frequency - currentFreq) >= 0.01) e.currentTarget.style.backgroundColor = 'rgba(148, 163, 184, 0.1)';
+            },
+            onMouseLeave: (e) => {
+               if (Math.abs(station.frequency - currentFreq) >= 0.01) e.currentTarget.style.backgroundColor = 'transparent';
+            }
+          },
+            React.createElement('span', { style: { whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', marginRight: '8px' } }, station.desc),
+            React.createElement('span', { style: { fontFamily: 'monospace' } }, station.frequency.toFixed(3))
+          )
+        ) : React.createElement('div', { style: { fontSize: '10px', color: '#475569', fontStyle: 'italic' } }, 'No signals detected')
+      )
     ),
 
     // Right: Frequency Controls

@@ -68,7 +68,9 @@ const FlightInProgress = ({
     initialLongitude: initialDeparture?.longitude || -122.3750,
     // Pass heading in degrees, as useAircraftPhysics converts it to radians
     initialHeading: runwayHeadingDeg,
-    flightPlan: (routeDetails?.waypoints || flightPlan?.waypoints || [])
+    flightPlan: (routeDetails?.waypoints || flightPlan?.waypoints || []),
+    difficulty: difficulty,
+    failureType: failureType
   };
 
   const {
@@ -87,6 +89,7 @@ const FlightInProgress = ({
     setAirBrakes,
     setGear,
     setTrim,
+    performSystemAction,
     physicsService
   } = useAircraftPhysics(aircraftConfig, false, physicsModel);
 
@@ -217,10 +220,16 @@ const FlightInProgress = ({
     const loop = now => {
       const dt = (now - lastTime) / 1000;
       lastTime = now;
+      
+      // Safety clamp to prevent physics explosion on lag spikes (max 0.1s)
+      const safeDt = Math.min(dt, 0.1);
+
       const lastSceneState = sceneManager.getState();
       let physicsState = null;
       if (lastSceneState.physicsActive && isInitialized) {
-        physicsState = updatePhysics(1 / 60, now);
+        // Use real elapsed time (safeDt) instead of hardcoded 1/60
+        // This fixes the "doubled update speed" on high refresh rate monitors (e.g. 120Hz)
+        physicsState = updatePhysics(safeDt, now);
       }
       sceneManager.update(dt, physicsState);
       const state = sceneManager.getState();
@@ -646,6 +655,13 @@ const FlightInProgress = ({
                     };
                     
                     physicsService.updateAutopilotTargets(targets);
+                  }
+                  console.log(`📡 FlightPanel Action: ${action} = ${JSON.stringify(payload)}`);
+                  break;
+                }
+                case 'system-action': {
+                  if (performSystemAction && payload) {
+                    performSystemAction(payload.system, payload.action, payload.value);
                   }
                   console.log(`📡 FlightPanel Action: ${action} = ${JSON.stringify(payload)}`);
                   break;

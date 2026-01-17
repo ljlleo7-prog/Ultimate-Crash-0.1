@@ -13,6 +13,7 @@
 
 import EnginePhysicsService from './EnginePhysicsService.js';
 import RealisticAutopilotService from './RealisticAutopilotService.js';
+import FailureSystem from './FailureSystem.js';
 
 // ==========================================
 // Math Utilities
@@ -171,6 +172,83 @@ class RealisticFlightPhysicsService {
 
         // Autopilot
         this.autopilot = new RealisticAutopilotService();
+        
+        // Failure System
+        this.failureSystem = new FailureSystem();
+        this.sensors = { pitotBlocked: false };
+
+        // Aircraft Systems State
+        this.systems = {
+            electrical: {
+                battery: true,
+                stbyPower: true,
+                gen1: true,
+                gen2: true,
+                apuGen: false,
+                dcVolts: 28.4,
+                acAmps: 140
+            },
+            fuel: {
+                leftPumps: true,
+                rightPumps: true,
+                centerPumps: false,
+                crossfeed: false
+            },
+            apu: {
+                master: false,
+                start: false,
+                running: false,
+                bleed: false,
+                egt: 0
+            },
+            hydraulics: {
+                sysA: { pressure: 3000, engPump: true, elecPump: false },
+                sysB: { pressure: 3000, engPump: true, elecPump: false }
+            },
+            pressurization: {
+                packL: true,
+                packR: true,
+                bleed1: true,
+                bleed2: true,
+                cabinAlt: 0,
+                diffPressure: 0,
+                targetAlt: 35000,
+                mode: 'AUTO'
+            },
+            oxygen: {
+                masks: false,
+                crewPressure: 1800,
+                paxPressure: 1500
+            },
+            lighting: {
+                landing: false,
+                taxi: false,
+                nav: true,
+                beacon: true,
+                strobe: true,
+                logo: false,
+                wing: false
+            },
+            transponder: {
+                code: '2000',
+                mode: 'TA/RA',
+                altRpt: true
+            },
+            nav: {
+                irsL: true,
+                irsR: true
+            },
+            fire: {
+                eng1: false,
+                eng2: false,
+                apu: false,
+                cargo: false
+            },
+            starters: {
+                engine1: false,
+                engine2: false
+            }
+        };
     }
 
     validateAndParseAircraft(data) {
@@ -403,6 +481,173 @@ class RealisticFlightPhysicsService {
         }
     }
 
+    updateSystems(dt) {
+        // --- APU Logic ---
+        const apu = this.systems.apu;
+        if (apu.start) {
+            // Momentary start switch logic could be handled here or UI
+            // Assuming start initiates sequence
+            if (!apu.running) {
+                apu.egt += 50 * dt; // Spool up
+                if (apu.egt > 400) {
+                    apu.running = true;
+                    apu.start = false; // Reset start switch
+                }
+            }
+        } else if (apu.master) {
+             if (apu.running) {
+                 // Stabilize
+                 apu.egt = 420;
+             }
+        } else {
+            // Shutdown
+            if (apu.running) {
+                apu.running = false;
+            }
+            if (apu.egt > 0) apu.egt -= 10 * dt;
+        }
+
+        // --- Hydraulics ---
+        const hyd = this.systems.hydraulics;
+        const eng1Running = this.engines[0]?.state.n2 > 50;
+        const eng2Running = this.engines[1]?.state.n2 > 50;
+        
+        // System A
+        if ((hyd.sysA.engPump && eng1Running) || hyd.sysA.elecPump) {
+            if (hyd.sysA.pressure < 3000) hyd.sysA.pressure += 1000 * dt;
+            if (hyd.sysA.pressure > 3000) hyd.sysA.pressure = 3000;
+        } else {
+            if (hyd.sysA.pressure > 0) hyd.sysA.pressure -= 100 * dt;
+        }
+
+        // System B
+        if ((hyd.sysB.engPump && eng2Running) || hyd.sysB.elecPump) {
+            if (hyd.sysB.pressure < 3000) hyd.sysB.pressure += 1000 * dt;
+            if (hyd.sysB.pressure > 3000) hyd.sysB.pressure = 3000;
+        } else {
+             if (hyd.sysB.pressure > 0) hyd.sysB.pressure -= 100 * dt;
+        }
+
+        // --- Pressurization ---
+        const press = this.systems.pressurization;
+        const aircraftAlt = -this.state.pos.z * 3.28084;
+        
+        if (press.mode === 'AUTO') {
+            // Simple logic: maintain cabin alt schedule
+            let targetCabinAlt = 0;
+            if (aircraftAlt > 8000) {
+                // E.g. 8000ft cabin at 40000ft
+                targetCabinAlt = Math.min(8000, aircraftAlt);
+                // Actually usually a ratio
+                targetCabinAlt = (aircraftAlt / 40000) * 8000; 
+                if (targetCabinAlt > 8000) targetCabinAlt = 8000;
+            } else {
+                targetCabinAlt = aircraftAlt;
+            }
+            
+            // Rate of change
+            const rate = 500 * dt; // 500 fpm
+            if (press.cabinAlt < targetCabinAlt) press.cabinAlt += rate * (dt/60);
+            else if (press.cabinAlt > targetCabinAlt) press.cabinAlt -= rate * (dt/60);
+            
+            // Diff pressure (PSI)
+            // 1 PSI approx 2000ft roughly at altitude? No, calculate from pressure
+            // Simple approx for display
+            press.diffPressure = ((aircraftAlt - press.cabinAlt) / 1000) * 0.2; 
+            if (press.diffPressure < 0) press.diffPressure = 0;
+        }
+
+        // --- Electrical ---
+        const elec = this.systems.electrical;
+        const gen1Ok = eng1Running && elec.gen1;
+        const gen2Ok = eng2Running && elec.gen2;
+        const apuOk = apu.running && elec.apuGen;
+        
+        if (gen1Ok || gen2Ok || apuOk) {
+            elec.dcVolts = 28.4;
+            elec.acAmps = 140; // Dummy load
+        } else if (elec.battery) {
+            elec.dcVolts = 24.0;
+            elec.acAmps = 0;
+        } else {
+            elec.dcVolts = 0;
+            elec.acAmps = 0;
+        }
+    }
+
+    performSystemAction(system, action, value) {
+        console.log(`System Action: ${system} -> ${action}`);
+        
+        if (!this.systems[system]) return;
+        
+        // Handle nested properties if action is like 'sysA.engPump' or direct 'battery'
+        // For simplicity, we assume action maps to property or we use custom logic
+        
+        if (system === 'electrical') {
+            if (this.systems.electrical.hasOwnProperty(action)) {
+                this.systems.electrical[action] = !this.systems.electrical[action];
+            }
+        }
+        else if (system === 'fuel') {
+            if (this.systems.fuel.hasOwnProperty(action)) {
+                this.systems.fuel[action] = !this.systems.fuel[action];
+            }
+        }
+        else if (system === 'apu') {
+            if (action === 'master') this.systems.apu.master = !this.systems.apu.master;
+            if (action === 'start') {
+                 if (this.systems.apu.master && !this.systems.apu.running) {
+                     this.systems.apu.start = true;
+                 }
+            }
+            if (action === 'bleed') this.systems.apu.bleed = !this.systems.apu.bleed;
+        }
+        else if (system === 'hydraulics') {
+            // action might be 'eng1Pump'
+            if (action === 'eng1Pump') this.systems.hydraulics.sysA.engPump = !this.systems.hydraulics.sysA.engPump;
+            if (action === 'elec1Pump') this.systems.hydraulics.sysA.elecPump = !this.systems.hydraulics.sysA.elecPump;
+            if (action === 'eng2Pump') this.systems.hydraulics.sysB.engPump = !this.systems.hydraulics.sysB.engPump;
+            if (action === 'elec2Pump') this.systems.hydraulics.sysB.elecPump = !this.systems.hydraulics.sysB.elecPump;
+        }
+        else if (system === 'lighting') {
+            if (this.systems.lighting.hasOwnProperty(action)) {
+                this.systems.lighting[action] = !this.systems.lighting[action];
+            }
+        }
+        else if (system === 'pressurization') {
+             if (this.systems.pressurization.hasOwnProperty(action)) {
+                 if (typeof this.systems.pressurization[action] === 'boolean') {
+                    this.systems.pressurization[action] = !this.systems.pressurization[action];
+                 }
+            }
+        }
+        else if (system === 'oxygen') {
+            if (action === 'masks') this.systems.oxygen.masks = !this.systems.oxygen.masks;
+        }
+        else if (system === 'transponder') {
+            // Specialized actions
+            if (action === 'mode_tara') {
+                this.systems.transponder.mode = (this.systems.transponder.mode === 'TA/RA') ? 'STBY' : 'TA/RA';
+            }
+            if (action === 'altRpt') this.systems.transponder.altRpt = !this.systems.transponder.altRpt;
+        }
+        else if (system === 'nav') {
+             if (this.systems.nav.hasOwnProperty(action)) {
+                this.systems.nav[action] = !this.systems.nav[action];
+            }
+        }
+        else if (system === 'fire') {
+             if (this.systems.fire.hasOwnProperty(action)) {
+                this.systems.fire[action] = !this.systems.fire[action];
+            }
+        }
+        else if (system === 'starters') {
+             if (this.systems.starters.hasOwnProperty(action)) {
+                this.systems.starters[action] = !this.systems.starters[action];
+            }
+        }
+    }
+
     calculateEnvironment(z_down) {
         // Altitude = -z_down
         const h = -z_down; 
@@ -430,11 +675,9 @@ class RealisticFlightPhysicsService {
              engine.update(dt, this.controls.throttle, mach, -this.state.pos.z, airDensityRatio, env.temp);
              
              // Consume Fuel
-             // fuelFlow is kg/s
-             // Apply a consumption coefficient to balance fuel cost (User reported ~2x over-consumption)
-             const FUEL_CONSUMPTION_COEFFICIENT = 0.6;
-             const fuelBurned = engine.state.fuelFlow * dt * FUEL_CONSUMPTION_COEFFICIENT;
-             this.state.fuel -= fuelBurned;
+        // fuelFlow is kg/s
+        const fuelBurned = engine.state.fuelFlow * dt;
+        this.state.fuel -= fuelBurned;
         });
         
         if (this.state.fuel < 0) {
@@ -793,6 +1036,7 @@ class RealisticFlightPhysicsService {
                 egt: this.engines.map(e => e.state.egt),
                 fuelFlow: this.engines.map(e => e.state.fuelFlow)
             },
+            systems: this.systems,
             fuel: this.state.fuel,
             currentWaypointIndex: this.currentWaypointIndex || 0,
             
@@ -852,6 +1096,51 @@ class RealisticFlightPhysicsService {
         }
     }
 
+    performSystemAction(system, action, value) {
+        if (!this.systems[system]) {
+            console.warn(`System ${system} not found`);
+            return;
+        }
+
+        // Handle nested properties or direct assignment
+        // For now, we assume direct assignment to the system state
+        // Special logic for specific systems can be added here
+        
+        console.log(`Physics Service: System Action ${system}.${action} = ${value}`);
+
+        // Update the state
+        if (this.systems[system][action] !== undefined) {
+             this.systems[system][action] = value;
+        } else {
+             // If action is not a direct property, it might be a method or complex logic
+             // For toggle switches, it's usually a direct property
+             console.warn(`Action ${action} not found on system ${system}`);
+        }
+
+        // Side effects
+        this.updateSystemLogic(system, action, value);
+    }
+
+    updateSystemLogic(system, action, value) {
+        // APU Logic
+        if (system === 'apu') {
+            if (action === 'start' && value === true) {
+                // Start sequence simulation (simplified)
+                if (this.systems.apu.master) {
+                    setTimeout(() => {
+                        this.systems.apu.running = true;
+                        this.systems.apu.egt = 400; // Normal EGT
+                        this.systems.apu.start = false; // Reset start switch
+                    }, 5000); // 5 seconds start time
+                }
+            }
+            if (action === 'master' && value === false) {
+                this.systems.apu.running = false;
+                this.systems.apu.egt = 0;
+            }
+        }
+    }
+
     /**
      * Set initial flight conditions
      */
@@ -886,6 +1175,21 @@ class RealisticFlightPhysicsService {
         if (conditions.orientation && conditions.orientation.psi !== undefined) {
             const headingDeg = (conditions.orientation.psi * 180 / Math.PI + 360) % 360;
             this.autopilot.setTargets({ heading: headingDeg === 0 ? 360 : headingDeg });
+        }
+        
+        // Failure System Config
+        if (this.failureSystem) {
+            // Re-initialize failure system with new config if provided
+            const failureConfig = {};
+            if (conditions.difficulty) failureConfig.difficulty = conditions.difficulty;
+            if (conditions.failureType) failureConfig.failureType = conditions.failureType;
+            
+            // Only re-create if we have new config, otherwise just reset
+            if (conditions.difficulty || conditions.failureType) {
+                this.failureSystem = new FailureSystem(failureConfig);
+            } else {
+                this.failureSystem.reset();
+            }
         }
     }
     

@@ -32,7 +32,8 @@ export function useAircraftPhysics(config = {}, autoStart = true, model = 'reali
     flapsValue: 0,
     airBrakesValue: 0,
     gearValue: true,
-    frame: 0
+    frame: 0,
+    systems: {}
   });
 
   const [physicsState, setPhysicsState] = useState({
@@ -152,7 +153,9 @@ export function useAircraftPhysics(config = {}, autoStart = true, model = 'reali
                    theta: 0,
                    phi: 0
                },
-               flightPlan: config.flightPlan
+               flightPlan: config.flightPlan,
+               difficulty: config.difficulty,
+               failureType: config.failureType
            });
         }
         
@@ -353,7 +356,8 @@ export function useAircraftPhysics(config = {}, autoStart = true, model = 'reali
         autopilotEngaged,
         autopilotMode,
         autopilotTargets,
-        debugPhysics: newState.debugPhysics
+        debugPhysics: newState.debugPhysics,
+        systems: newState.systems || {}
       };
 
       setFlightData(newFlightData);
@@ -456,6 +460,12 @@ export function useAircraftPhysics(config = {}, autoStart = true, model = 'reali
     currentControlsRef.current = { ...currentControlsRef.current, trim: scaledTrim };
   }, []);
 
+  const performSystemAction = useCallback((system, action, value) => {
+    if (physicsServiceRef.current && typeof physicsServiceRef.current.performSystemAction === 'function') {
+      physicsServiceRef.current.performSystemAction(system, action, value);
+    }
+  }, []);
+
   const resetAircraft = useCallback(() => {
     if (physicsServiceRef.current) {
       physicsServiceRef.current.reset();
@@ -523,6 +533,7 @@ export function useAircraftPhysics(config = {}, autoStart = true, model = 'reali
     setAirBrakes,
     setGear,
     setTrim,
+    performSystemAction,
     updatePhysics,
     resetAircraft
   };

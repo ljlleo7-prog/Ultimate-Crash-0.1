@@ -1,7 +1,7 @@
 import React from 'react';
 
 // Central Panel Component - Compact design for variable engine counts
-const CentralPanel = ({ flightState }) => {
+const CentralPanel = ({ flightState, onToggleSystems }) => {
   // FIXED: Add safety checks for all properties
   const alarms = flightState.alarms || [];
   const crashWarning = flightState.crashWarning || '';
@@ -35,12 +35,34 @@ const CentralPanel = ({ flightState }) => {
   
   return React.createElement('div', { className: 'central-panel', style: { padding: '10px' } },
     // Compact header
-    React.createElement('h3', { style: { 
-      textAlign: 'center', 
-      marginBottom: '15px',
-      fontSize: '16px',
-      color: '#fff'
-    } }, 'ENGINE & SYSTEMS'),
+    React.createElement('div', { style: { 
+      display: 'flex', 
+      justifyContent: 'space-between', 
+      alignItems: 'center', 
+      marginBottom: '15px' 
+    }},
+      React.createElement('h3', { style: { 
+        margin: 0,
+        fontSize: '16px',
+        color: '#fff',
+        flex: 1,
+        textAlign: 'center'
+      } }, 'ENGINE & SYSTEMS'),
+      React.createElement('button', {
+        onClick: onToggleSystems,
+        style: {
+          background: '#4a90e2',
+          border: 'none',
+          borderRadius: '4px',
+          color: 'white',
+          padding: '4px 8px',
+          fontSize: '10px',
+          fontWeight: 'bold',
+          cursor: 'pointer',
+          boxShadow: '0 2px 4px rgba(0,0,0,0.3)'
+        }
+      }, 'OH PNL')
+    ),
     
     // Compact Engine Parameters with variable engine support
     React.createElement('div', { 
