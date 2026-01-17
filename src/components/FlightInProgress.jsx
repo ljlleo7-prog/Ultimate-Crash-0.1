@@ -462,6 +462,7 @@ const FlightInProgress = ({
             onTransmit={handleRadioTransmit}
             currentStation={currentFreq.toFixed(3)}
             callsign={callsign || 'N12345'}
+            flightPlan={flightPlan}
           />
         </div>
       </div>

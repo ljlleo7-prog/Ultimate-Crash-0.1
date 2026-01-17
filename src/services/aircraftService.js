@@ -83,21 +83,8 @@ class AircraftService {
   async getPopularAircraft() {
     const db = await this.initialize();
     
-    // Return a curated list of popular aircraft models for user suggestions
-    const popularModels = [
-      'Boeing 737-800',
-      'Airbus A320-200',
-      'Boeing 777-300ER',
-      'Airbus A350-900',
-      'Embraer E190'
-    ];
-    
-    return this.aircraftDatabase.filter(aircraft => 
-      popularModels.some(model => 
-        aircraft.model.toLowerCase().includes(model.toLowerCase()) ||
-        model.toLowerCase().includes(aircraft.model.toLowerCase())
-      )
-    ).map(aircraft => ({
+    // Return all available aircraft models for user selection
+    return this.aircraftDatabase.map(aircraft => ({
       model: aircraft.model,
       manufacturer: aircraft.manufacturer,
       iata: aircraft.iata,

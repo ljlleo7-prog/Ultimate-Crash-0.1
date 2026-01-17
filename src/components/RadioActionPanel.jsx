@@ -138,21 +138,42 @@ const RadioActionPanel = ({ onTransmit, currentStation = 'Unicom', callsign = 'C
             {selectedTemplate.params && selectedTemplate.params.map(param => (
               <div key={param} style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
                 <label style={{ fontSize: '10px', textTransform: 'uppercase', color: '#94a3b8' }}>{param}</label>
-                <input
-                  type="text"
-                  value={paramValues[param]}
-                  onChange={(e) => handleParamChange(param, e.target.value)}
-                  placeholder={`Enter ${param}...`}
-                  style={{
-                    background: '#0f172a',
-                    border: '1px solid #334155',
-                    borderRadius: '4px',
-                    padding: '6px',
-                    color: 'white',
-                    fontSize: '12px'
-                  }}
-                  autoFocus={param === selectedTemplate.params[0]}
-                />
+                {param === 'waypoint' && validWaypoints.length > 0 ? (
+                  <select
+                    value={paramValues[param] || ''}
+                    onChange={(e) => handleParamChange(param, e.target.value)}
+                    style={{
+                      background: '#0f172a',
+                      border: '1px solid #334155',
+                      borderRadius: '4px',
+                      padding: '6px',
+                      color: 'white',
+                      fontSize: '12px',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    <option value="">Select Waypoint...</option>
+                    {validWaypoints.map(wp => (
+                      <option key={wp} value={wp}>{wp}</option>
+                    ))}
+                  </select>
+                ) : (
+                  <input
+                    type="text"
+                    value={paramValues[param]}
+                    onChange={(e) => handleParamChange(param, e.target.value)}
+                    placeholder={`Enter ${param}...`}
+                    style={{
+                      background: '#0f172a',
+                      border: '1px solid #334155',
+                      borderRadius: '4px',
+                      padding: '6px',
+                      color: 'white',
+                      fontSize: '12px'
+                    }}
+                    autoFocus={param === selectedTemplate.params[0]}
+                  />
+                )}
               </div>
             ))}
 

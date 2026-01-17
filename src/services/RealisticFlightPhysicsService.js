@@ -169,6 +169,8 @@ class RealisticFlightPhysicsService {
         this.onGround = true;
         this.crashReason = "";
         this.time = 0;
+        this.runwayGeometry = null;
+        this.groundStatus = { status: 'UNKNOWN', remainingLength: 0 };
 
         // Autopilot
         this.autopilot = new RealisticAutopilotService();
@@ -346,6 +348,9 @@ class RealisticFlightPhysicsService {
 
     update(input, dt) {
         if (this.crashed) return this.getOutputState();
+
+        // Update ground status based on current position
+        this.updateGroundStatus();
 
         // Sub-stepping for stability (High stiffness springs need small dt)
         const subSteps = 5;
@@ -967,6 +972,9 @@ class RealisticFlightPhysicsService {
 
     checkConstraints() {
         // Crash Detection
+        const altitude = -this.state.pos.z; // Meters above ground (approx)
+        
+        // 1. Underground Check (Standard)
         if (this.state.pos.z > 0 && !this.onGround) {
             // Underground?
             // If we hit ground hard
@@ -976,6 +984,16 @@ class RealisticFlightPhysicsService {
             } else {
                 // Reset to surface if just minor penetration (handled by ground spring mostly)
                 if (this.state.pos.z > 0) this.state.pos.z = 0;
+            }
+        }
+
+        // 2. Obstacle Collision Check (New Safety Rules)
+        // Rule: Safe at 0ft only on RUNWAY or GRASS. Unsafe (< 10ft) elsewhere.
+        if (!this.crashed && altitude < 3.05) { // < 10 ft
+            if (this.groundStatus.status === 'OBJECTS') {
+                this.crashed = true;
+                this.crashReason = "Collision with Ground Objects";
+                console.log("CRASH: Collision with objects at altitude " + altitude.toFixed(2) + "m");
             }
         }
     }
@@ -1139,6 +1157,75 @@ class RealisticFlightPhysicsService {
                 this.systems.apu.egt = 0;
             }
         }
+    }
+
+    setRunwayGeometry(geometry) {
+        this.runwayGeometry = geometry;
+        console.log("Physics Service: Runway Geometry Set", geometry);
+    }
+
+    updateGroundStatus() {
+        if (!this.runwayGeometry) {
+            this.groundStatus = { status: 'UNKNOWN', remainingLength: 0 };
+            return;
+        }
+
+        const { thresholdStart, heading, length, width } = this.runwayGeometry;
+        const currentLat = this.state.geo.lat;
+        const currentLon = this.state.geo.lon;
+
+        // Convert Geo difference to Meters (NED approx)
+        const latRad = currentLat * Math.PI / 180;
+        const metersPerLat = 111132.92; // Approx
+        const metersPerLon = 111412.84 * Math.cos(latRad);
+
+        const dLat = currentLat - thresholdStart.latitude;
+        const dLon = currentLon - thresholdStart.longitude;
+
+        const x_north = dLat * metersPerLat;
+        const y_east = dLon * metersPerLon;
+
+        // Rotate into Runway Frame
+        // Heading is degrees CW from North
+        // We want X_runway along the runway heading
+        const hRad = heading * Math.PI / 180;
+        const cosH = Math.cos(hRad);
+        const sinH = Math.sin(hRad);
+
+        // Dot product with Runway Vector (cosH, sinH)
+        const distAlong = x_north * cosH + y_east * sinH;
+        
+        // Cross product (distance from centerline)
+        // Vector R = (cosH, sinH). Vector P = (x, y).
+        // Cross = x*sinH - y*cosH (This gives distance to the right? or left?)
+        // Let's take abs value for width check
+        const distCross = Math.abs(x_north * sinH - y_east * cosH);
+
+        // Check Zones
+        let status = 'OBJECTS';
+        
+        // Runway Zone
+        // Buffer of 0m? User said "0ft is safe for runway/grass".
+        if (distAlong >= 0 && distAlong <= length && distCross <= width / 2) {
+            status = 'RUNWAY';
+        }
+        // Grass Zone (Safe Area)
+        // Arbitrary: -500m to Length+500m, Width * 4
+        else if (distAlong >= -500 && distAlong <= length + 500 && distCross <= width * 2) {
+            status = 'GRASS';
+        }
+
+        // Remaining Length
+        // If before start, full length. If past end, 0.
+        let remaining = 0;
+        if (distAlong < 0) remaining = length;
+        else if (distAlong > length) remaining = 0;
+        else remaining = length - distAlong;
+
+        this.groundStatus = {
+            status: status,
+            remainingLength: remaining
+        };
     }
 
     /**

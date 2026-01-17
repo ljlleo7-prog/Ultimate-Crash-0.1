@@ -81,6 +81,10 @@ const DebugPhysicsPanel = ({ debugPhysicsData, thrust, drag, waypoints = [], fli
       <div>Altitude (Z): {typeof altitude_z === 'number' ? altitude_z.toFixed(2) : 'N/A'} m</div>
       <div>On Ground: {isOnGround ? 'YES' : 'NO'}</div>
       
+      <div style={{ fontWeight: 'bold', marginTop: '8px', marginBottom: '5px', borderBottom: '1px solid #444', paddingBottom: '3px' }}>GROUND STATUS</div>
+      <div>Status: <span style={{ color: groundStatus === 'RUNWAY' ? '#0f0' : (groundStatus === 'GRASS' ? '#ff0' : '#f00'), fontWeight: 'bold' }}>{groundStatus}</span></div>
+      <div>Remaining Runway: {remainingRunwayLength.toFixed(0)} m</div>
+
       <div style={{ fontWeight: 'bold', marginTop: '8px', marginBottom: '5px', borderBottom: '1px solid #444', paddingBottom: '3px' }}>FORCES</div>
       <div>Thrust: {typeof thrust === 'number' ? (thrust / 1000).toFixed(1) : '0.0'} kN</div>
       <div>Drag: {typeof drag === 'number' ? (drag / 1000).toFixed(1) : '0.0'} kN</div>

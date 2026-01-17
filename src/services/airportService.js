@@ -188,6 +188,84 @@ class AirportService {
     return enhancedData;
   }
 
+  getRunwayGeometry(airportCode, runwayName) {
+    const airport = this.getAirportByCode(airportCode);
+    if (!airport) return null;
+
+    let runway = null;
+    if (runwayName && airport.runways) {
+      runway = airport.runways.find(r => r.name === runwayName);
+    }
+    
+    // Fallback to first runway or a mock if not found
+    if (!runway) {
+      if (airport.runways && Array.isArray(airport.runways) && airport.runways.length > 0) {
+        runway = airport.runways[0];
+      } else if (airport.runway) {
+        runway = { name: airport.runway, length: airport.runwayLength || 8000 };
+      } else {
+        runway = { name: "09/27", length: 8000 };
+      }
+    }
+
+    // Parse heading
+    // Name format: "09", "09L", "09R", "09C"
+    // Extract first 2 digits
+    const headingMatch = runway.name.match(/^(\d{2})/);
+    let headingDeg = 0;
+    if (headingMatch) {
+      headingDeg = parseInt(headingMatch[1]) * 10;
+    }
+
+    // Dimensions
+    // Assuming length is in feet (standard in aviation databases here), convert to meters
+    const lengthM = (runway.length || 8000) * 0.3048; 
+    const widthM = 45; // Standard width in meters
+
+    // Calculate endpoints
+    // Midpoint is airport lat/lon
+    // We need to convert meters to lat/lon degrees
+    const R = 6371000; // Earth radius in meters
+    const toRad = Math.PI / 180;
+    const toDeg = 180 / Math.PI;
+
+    // Calculate offsets from midpoint to ends (half length)
+    // We assume the runway is centered at the airport coordinates
+    const halfLength = lengthM / 2;
+    
+    // Heading is direction OF the runway. 
+    // Start point is "behind" the midpoint, End point is "ahead".
+    // But which end is which depends on the runway name used (e.g. 09 vs 27).
+    // The headingDeg derived from "09" is 90 degrees.
+    // So the vector points East.
+    // The "Start" (Threshold 09) is at the West end.
+    // So we subtract the vector from midpoint to get start.
+    
+    const dLat = (halfLength * Math.cos(headingDeg * toRad)) / R * toDeg;
+    const dLon = (halfLength * Math.sin(headingDeg * toRad)) / (R * Math.cos(airport.latitude * toRad)) * toDeg;
+
+    const start = {
+      latitude: airport.latitude - dLat,
+      longitude: airport.longitude - dLon
+    };
+    
+    const end = {
+      latitude: airport.latitude + dLat,
+      longitude: airport.longitude + dLon
+    };
+
+    return {
+      airportLat: airport.latitude,
+      airportLon: airport.longitude,
+      heading: headingDeg,
+      length: lengthM,
+      width: widthM,
+      thresholdStart: start,
+      thresholdEnd: end,
+      runwayName: runway.name
+    };
+  }
+
   getDatabaseStats() {
     return airportDatabase.metadata.statistics;
   }

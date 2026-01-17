@@ -157,6 +157,42 @@ export function useAircraftPhysics(config = {}, autoStart = true, model = 'reali
                difficulty: config.difficulty,
                failureType: config.failureType
            });
+           
+           // Set Runway Geometry for Ground Status
+           if (config.flightPlan) {
+               // Determine relevant airport (Departure or Arrival)
+               // Simple heuristic: If initial altitude is low (< 5000ft) and we are near one of them.
+               // For now, check distance to Departure and Arrival if coordinates available
+               const depCode = config.flightPlan.departure?.iata || config.flightPlan.departure;
+               const arrCode = config.flightPlan.arrival?.iata || config.flightPlan.arrival;
+               
+               let targetAirport = depCode;
+               
+               // If we have coordinates, check which one is closer
+               if (initialLatitude && initialLongitude && depCode && arrCode) {
+                    const dep = airportService.getAirportByCode(depCode);
+                    const arr = airportService.getAirportByCode(arrCode);
+                    
+                    if (dep && arr) {
+                        const distToDep = Math.sqrt(Math.pow(dep.latitude - initialLatitude, 2) + Math.pow(dep.longitude - initialLongitude, 2));
+                        const distToArr = Math.sqrt(Math.pow(arr.latitude - initialLatitude, 2) + Math.pow(arr.longitude - initialLongitude, 2));
+                        
+                        if (distToArr < distToDep) {
+                            targetAirport = arrCode;
+                        }
+                    }
+               }
+               
+               if (targetAirport) {
+                   // Try to get runway name from flight plan if available, else let service pick default
+                   // Flight plan might store selected runway?
+                   const runwayName = (targetAirport === depCode) ? config.flightPlan.departureRunway : config.flightPlan.arrivalRunway;
+                   const geometry = airportService.getRunwayGeometry(targetAirport, runwayName);
+                   if (geometry) {
+                       service.setRunwayGeometry(geometry);
+                   }
+               }
+           }
         }
         
         if (config && service && service.aircraft) {
