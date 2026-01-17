@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 
-const ModernAutopilotModule = ({ flightState, setAutopilotTargets, toggleAutopilot, setAutopilotMode }) => {
+const ModernAutopilotModule = ({ flightState, setAutopilotTargets, toggleAutopilot, setAutopilotMode, setAltimeter }) => {
   const initialTargets = flightState?.autopilotTargets
     ? {
         ias: Number(flightState.autopilotTargets.ias) || Number(flightState.indicatedAirspeed) || 0,
@@ -271,6 +271,42 @@ const ModernAutopilotModule = ({ flightState, setAutopilotTargets, toggleAutopil
           React.createElement('button', {
             style: { background: 'none', border: 'none', color: '#64748b', cursor: 'pointer', padding: '0 4px', fontSize: '14px' },
             onClick: () => updateTarget('altitude', Math.min(45000, targets.altitude + 100)),
+            disabled: flightState.hasCrashed
+          }, '+')
+        )
+      ),
+
+      // QNH Group
+      React.createElement('div', { style: { display: 'flex', flexDirection: 'column', gap: '2px', width: '70px' } },
+        React.createElement('label', { style: { fontSize: '9px', color: '#94a3b8', fontWeight: 'bold' } }, 'BARO (IN)'),
+        React.createElement('div', { 
+          style: { 
+            display: 'flex', 
+            alignItems: 'center', 
+            background: '#0f172a',
+            borderRadius: '4px',
+            padding: '2px',
+            border: '1px solid #1e293b'
+          } 
+        },
+          React.createElement('button', {
+            style: { background: 'none', border: 'none', color: '#64748b', cursor: 'pointer', padding: '0 4px', fontSize: '14px' },
+            onClick: () => setAltimeter && setAltimeter(Math.max(28.00, (flightState.altimeter || 29.92) - 0.01)),
+            disabled: flightState.hasCrashed
+          }, '-'),
+          React.createElement('span', { 
+            style: { 
+              flex: 1, 
+              textAlign: 'center', 
+              fontSize: '13px', 
+              color: '#38bdf8', 
+              fontFamily: 'monospace',
+              fontWeight: 'bold'
+            } 
+          }, `${(flightState.altimeter || 29.92).toFixed(2)}`),
+          React.createElement('button', {
+            style: { background: 'none', border: 'none', color: '#64748b', cursor: 'pointer', padding: '0 4px', fontSize: '14px' },
+            onClick: () => setAltimeter && setAltimeter(Math.min(31.00, (flightState.altimeter || 29.92) + 0.01)),
             disabled: flightState.hasCrashed
           }, '+')
         )

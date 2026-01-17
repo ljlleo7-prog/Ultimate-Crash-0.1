@@ -14,7 +14,7 @@ import ControlSurfacePanel from './ControlSurfacePanel';
 import OverheadPanel from './OverheadPanel';
 import './FlightPanel.css';
 
-const FlightPanelModular = ({ flightData, onActionRequest, aircraftModel, selectedArrival, flightPlan, radioMessages, onRadioFreqChange }) => {
+const FlightPanelModular = ({ flightData, weatherData, onActionRequest, aircraftModel, selectedArrival, flightPlan, radioMessages, onRadioFreqChange }) => {
   // Use flightData from parent component instead of creating own physics service
   const [showOverhead, setShowOverhead] = useState(false);
   const [flightState, setFlightState] = useState({
@@ -33,6 +33,7 @@ const FlightPanelModular = ({ flightData, onActionRequest, aircraftModel, select
     verticalSpeed: flightData?.verticalSpeed || 1200,
     altitude: flightData?.altitude || 35000,
     altimeter: 29.92,
+    localQNH: weatherData?.pressureInHg || 29.92,
     
     // Engine
     engineN1: [85.2, 85.1],
@@ -101,6 +102,9 @@ const FlightPanelModular = ({ flightData, onActionRequest, aircraftModel, select
         verticalSpeed: flightData.verticalSpeed || 0, // FIXED: Ensure vertical speed is always a number
         altitude: flightData.altitude || 0, // FIXED: Ensure altitude is always a number
         altimeter: prevState.altimeter,
+        localQNH: (weatherData && typeof weatherData.pressureInHg === 'number') ? weatherData.pressureInHg : (prevState.localQNH || 29.92),
+        terrainElevation: (flightData.derived && typeof flightData.derived.terrain_elevation_ft === 'number') ? flightData.derived.terrain_elevation_ft : (prevState.terrainElevation || 0),
+        visibility: weatherData?.visibility, // Update visibility
         
         // Engine
         engineN1: flightData.engineN1 || prevState.engineN1,
@@ -130,7 +134,7 @@ const FlightPanelModular = ({ flightData, onActionRequest, aircraftModel, select
         systems: flightData.systems || prevState.systems || {}
       }));
     }
-  }, [flightData]);
+  }, [flightData, weatherData]);
   
   const [flashActive, setFlashActive] = useState(false);
   const [flashText, setFlashText] = useState('');
@@ -286,7 +290,8 @@ const FlightPanelModular = ({ flightData, onActionRequest, aircraftModel, select
           flightState, 
           setAutopilotTargets, 
           toggleAutopilot,
-          setAutopilotMode 
+          setAutopilotMode,
+          setAltimeter: (val) => setFlightState(prev => ({ ...prev, altimeter: val }))
         }),
         React.createElement(CommunicationModule, {
           flightState,

@@ -26,7 +26,7 @@ export const ATC_RESPONSES = {
     return `Cleared to land runway ${runway}, ${windStr}, {callsign}.`;
   },
   'req_startup': () => {
-    return `Startup and pushback approved, face East, QNH 1013, {callsign}.`;
+    return `Startup and pushback approved, face East, Altimeter 29.92, {callsign}.`;
   },
   'req_taxi': () => {
     const taxiways = ['Alpha', 'Bravo', 'Charlie'];

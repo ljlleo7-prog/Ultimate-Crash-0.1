@@ -171,6 +171,22 @@ class RealisticFlightPhysicsService {
         this.time = 0;
         this.runwayGeometry = null;
         this.groundStatus = { status: 'UNKNOWN', remainingLength: 0 };
+        // Initialize airport elevation from config (converted from feet to meters if provided)
+        this.airportElevation = (aircraftData.airportElevation || 0) * 0.3048; 
+        this.terrainElevation = null; // AMSL in meters
+        this.currentGroundZ = 0; // NED Z coordinate of ground (usually negative or zero)
+
+        // If starting on ground, set initial Z based on airport elevation
+        if (this.onGround && this.airportElevation > 0) {
+             // We want AMSL = airportElevation.
+             // AMSL = -pos.z + airportElevation.
+             // So -pos.z should be 0 (relative to airport).
+             // But gear height?
+             // pos.z = -gearHeight.
+             // AMSL = gearHeight + airportElevation.
+             // This seems correct for "On Runway".
+             // currentGroundZ should be 0 (relative to airport).
+        }
 
         // Autopilot
         this.autopilot = new RealisticAutopilotService();
@@ -906,9 +922,10 @@ class RealisticFlightPhysicsService {
             const P_offset_earth = this.state.quat.rotate(P_body);
             const P_world_z = this.state.pos.z + P_offset_earth.z;
             
-            if (P_world_z > 0) {
+            // Check against current ground height (NED Z)
+            if (P_world_z > this.currentGroundZ) {
                 onGroundAny = true;
-                const depth = P_world_z;
+                const depth = P_world_z - this.currentGroundZ;
                 
                 // 2. Velocity at Contact Point (Body Frame -> Earth Frame Z)
                 const V_point_body = this.state.vel.add(this.state.rates.cross(P_body));
@@ -1041,10 +1058,11 @@ class RealisticFlightPhysicsService {
 
     checkConstraints() {
         // Crash Detection
-        const altitude = -this.state.pos.z; // Meters above ground (approx)
+        // Altitude AGL (Above Ground Level)
+        const altitude = this.currentGroundZ - this.state.pos.z; 
         
         // 1. Underground Check (Standard)
-        if (this.state.pos.z > 0 && !this.onGround) {
+        if (this.state.pos.z > this.currentGroundZ && !this.onGround) {
             // Underground?
             // If we hit ground hard
             if (this.state.vel.z > 10) { // > 10 m/s sink rate
@@ -1052,7 +1070,7 @@ class RealisticFlightPhysicsService {
                  this.crashReason = "Hard Landing / Crash";
             } else {
                 // Reset to surface if just minor penetration (handled by ground spring mostly)
-                if (this.state.pos.z > 0) this.state.pos.z = 0;
+                if (this.state.pos.z > this.currentGroundZ) this.state.pos.z = this.currentGroundZ;
             }
         }
 
@@ -1070,7 +1088,9 @@ class RealisticFlightPhysicsService {
     getOutputState() {
         // Convert internal physics state to the App's expected format
         const euler = this.state.quat.toEuler(); // Rads
-        const altitude = -this.state.pos.z; // Altitude is -z
+        const altitude = -this.state.pos.z; // Altitude relative to Origin (usually Runway)
+        const altitudeAMSL = altitude + (this.airportElevation || 0);
+        const altitudeAGL = this.currentGroundZ - this.state.pos.z;
         
         // Vertical Speed (Earth Z dot, inverted)
         // v_earth = q * v_body * q_inv
@@ -1082,7 +1102,7 @@ class RealisticFlightPhysicsService {
             position: {
                 x: this.state.pos.x, // North
                 y: this.state.pos.y, // East
-                z: altitude,         // Altitude (Up)
+                z: altitude,         // Altitude (Relative Up)
                 latitude: this.state.geo.lat,
                 longitude: this.state.geo.lon
             },
@@ -1129,7 +1149,10 @@ class RealisticFlightPhysicsService {
             
             // Debug / Derived
             derived: {
-                altitude_ft: altitude * 3.28084,
+                altitude_ft: altitudeAMSL * 3.28084, // Display AMSL
+                altitude_agl_ft: altitudeAGL * 3.28084,
+                terrain_elevation_ft: (this.terrainElevation || 0) * 3.28084,
+                airport_elevation_ft: (this.airportElevation || 0) * 3.28084,
                 airspeed: this.state.vel.magnitude() * 1.94384,
                 heading: (euler.psi * 180 / Math.PI + 360) % 360
             },
@@ -1140,6 +1163,9 @@ class RealisticFlightPhysicsService {
                 pitchMoment_y: this.debugData?.pitchMoment || 0,
                 pitchRate_q: this.state.rates.y,
                 altitude_z: altitude,
+                altitude_amsl: altitudeAMSL,
+                altitude_agl: altitudeAGL,
+                ground_z_ned: this.currentGroundZ,
                 isOnGround: this.onGround,
                 lift: this.debugData?.lift || 0,
                 pitchTorque: this.debugData?.pitchMoment || 0,
@@ -1236,6 +1262,7 @@ class RealisticFlightPhysicsService {
     updateGroundStatus() {
         if (!this.runwayGeometry) {
             this.groundStatus = { status: 'UNKNOWN', remainingLength: 0 };
+            this.currentGroundZ = 0;
             return;
         }
 
@@ -1295,6 +1322,23 @@ class RealisticFlightPhysicsService {
             status: status,
             remainingLength: remaining
         };
+
+        // Update Ground Height (NED Z)
+        // If on Runway, assume Airport Level (0 relative Z)
+        // If Off Runway, use Terrain Elevation
+        let groundHeightAMSL = this.airportElevation;
+        if (status !== 'RUNWAY') {
+             // Use terrain if available (non-null), otherwise stick to airport elevation (safety fallback)
+             if (this.terrainElevation !== null) {
+                 groundHeightAMSL = this.terrainElevation;
+             }
+        }
+        
+        // Calculate Relative Ground Z (NED)
+        // Z is Down. Positive Height = Negative Z.
+        // Origin is at Airport Elevation.
+        // Ground Z = -(GroundAMSL - AirportAMSL)
+        this.currentGroundZ = -(groundHeightAMSL - this.airportElevation);
     }
 
     /**

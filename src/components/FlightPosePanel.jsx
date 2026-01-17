@@ -4,7 +4,7 @@ import React from 'react';
 const FlightPosePanel = ({ flightState }) => {
   // FIXED: Add safety checks for all properties
   const indicatedAirspeed = flightState.indicatedAirspeed || 0;
-  const altitude = flightState.altitude || 0;
+  const trueAltitude = flightState.altitude || 0; // AMSL from physics
   const verticalSpeed = flightState.verticalSpeed || 0;
   const heading = flightState.heading || 0;
   const groundSpeed = flightState.groundSpeed || 0;
@@ -12,8 +12,35 @@ const FlightPosePanel = ({ flightState }) => {
   const pitch = flightState.pitch || 0;
   const roll = flightState.roll || 0;
   
-  // Calculate altitude in 20-foot increments
-  const altitude20ft = Math.round(altitude / 20) * 20;
+  // Altimeter Logic
+  const altimeterSetting = flightState.altimeter || 29.92;
+  const localQNH = flightState.localQNH || 29.92;
+  const terrainElevation = flightState.terrainElevation || 0;
+
+  // Calculate Indicated Altitude
+  // Formula: Indicated = True + (Setting - QNH) * 1000
+  const indicatedAltitude = trueAltitude + (altimeterSetting - localQNH) * 1000;
+  
+  // Calculate Indicated Terrain Elevation (where it appears on the tape relative to indicated altitude)
+  // The tape shows Indicated Altitude.
+  // The Terrain Mark should be at the Indicated Altitude corresponding to the Terrain Level.
+  // Indicated Terrain Level = True Terrain + (Setting - QNH) * 1000
+  const indicatedTerrainElevation = terrainElevation + (altimeterSetting - localQNH) * 1000;
+  
+  // AGL (Above Ground Level)
+  const agl = trueAltitude - terrainElevation;
+
+  // Visibility Logic
+  const visibility = flightState.visibility;
+  let fogOpacity = 0;
+  if (visibility !== undefined && visibility !== null) {
+      if (visibility < 500) fogOpacity = 0.95 - (visibility / 500) * 0.15;
+      else if (visibility < 2000) fogOpacity = 0.8 - ((visibility - 500) / 1500) * 0.4;
+      else if (visibility < 8000) fogOpacity = 0.4 - ((visibility - 2000) / 6000) * 0.4;
+  }
+
+  // Calculate altitude in 20-foot increments for display text
+  const altitude20ft = Math.round(indicatedAltitude / 20) * 20;
   
   return React.createElement('div', { className: 'civil-aviation-pose-panel' },
     React.createElement('h3', null, 'Primary Flight Display'),
@@ -78,6 +105,22 @@ const FlightPosePanel = ({ flightState }) => {
             } 
           }),
           
+          // Fog Overlay
+          fogOpacity > 0 && React.createElement('div', {
+            className: 'fog-overlay',
+            style: {
+              position: 'absolute',
+              top: '-250%',
+              left: '-50%',
+              width: '200%',
+              height: '300%',
+              backgroundColor: '#e2e8f0',
+              opacity: fogOpacity,
+              pointerEvents: 'none',
+              zIndex: 2 // Above sky/ground, below ladder
+            }
+          }),
+
           // Pitch ladder
           React.createElement('div', { className: 'pitch-ladder' },
             Array.from({ length: 13 }, (_, i) => {
@@ -137,14 +180,43 @@ const FlightPosePanel = ({ flightState }) => {
               );
             })
           ),
+          
+          // Terrain Warning Mark (Red Line)
+          React.createElement('div', {
+            className: 'terrain-mark',
+            style: { 
+              position: 'absolute',
+              bottom: `${Math.min(100, Math.max(0, (indicatedTerrainElevation / 45000) * 100))}%`,
+              left: 0,
+              width: '100%',
+              height: '2px',
+              backgroundColor: 'red',
+              zIndex: 5
+            }
+          }),
+          
           // Current ALT indicator with 20ft accuracy
           React.createElement('div', {
             className: 'current-indicator alt-indicator',
-            style: { bottom: `${Math.min(100, (altitude / 45000) * 100)}%` }
+            style: { bottom: `${Math.min(100, (indicatedAltitude / 45000) * 100)}%` }
           },
             React.createElement('div', { className: 'indicator-line' }),
             React.createElement('span', { className: 'current-value' }, `${altitude20ft}`)
-          )
+          ),
+          
+          // Terrain Text (AGL)
+          React.createElement('div', {
+            style: {
+              position: 'absolute',
+              bottom: '5px',
+              right: '5px',
+              color: agl < 1000 ? 'red' : '#fbbf24', // Red if low, amber otherwise
+              fontSize: '10px',
+              fontWeight: 'bold',
+              textAlign: 'right',
+              zIndex: 10
+            }
+          }, `${Math.max(0, agl).toFixed(0)}ft above terrain`)
         )
       )
     ),

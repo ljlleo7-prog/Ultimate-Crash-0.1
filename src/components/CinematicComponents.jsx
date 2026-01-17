@@ -81,7 +81,7 @@ const CinematicReview = ({ callsign, selectedDeparture, selectedArrival, aircraf
               <div className="fax-row" style={{ marginTop: '1rem', borderBottom: 'none' }}>
                 <span className="fax-label">WAYPOINTS:</span>
                 <span className="fax-value" style={{ textAlign: 'right', fontSize: '0.8rem' }}>
-                  {routeDetails.waypoints.join(' > ')}
+                  {routeDetails.waypoints.map(wp => typeof wp === 'string' ? wp : (wp.name || 'WPT')).join(' > ')}
                 </span>
               </div>
             )}

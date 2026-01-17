@@ -127,6 +127,9 @@ export function useAircraftPhysics(config = {}, autoStart = true, model = 'reali
           if (typeof config.maxThrustPerEngine === 'number' && !isNaN(config.maxThrustPerEngine) && config.maxThrustPerEngine > 0) {
             finalAircraft.maxThrustPerEngine = config.maxThrustPerEngine;
           }
+          if (typeof config.airportElevation === 'number' && !isNaN(config.airportElevation)) {
+            finalAircraft.airportElevation = config.airportElevation;
+          }
         }
 
         console.log('🎮 useAircraftPhysics: DEFAULT AIRCRAFT DATA:', {

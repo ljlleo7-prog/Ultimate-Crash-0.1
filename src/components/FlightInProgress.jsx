@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useAircraftPhysics } from '../hooks/useAircraftPhysics';
 import { updateWeather } from '../services/weatherService';
 import { realWeatherService } from '../services/RealWeatherService';
+import { terrainService } from '../services/TerrainService';
 import weatherConfig from '../config/weatherConfig.json';
 import FlightPanelModular from './FlightPanelModular';
 import DebugPhysicsPanel from './DebugPhysicsPanel';
@@ -71,6 +72,7 @@ const FlightInProgress = ({
     initialLongitude: initialDeparture?.longitude || -122.3750,
     // Pass heading in degrees, as useAircraftPhysics converts it to radians
     initialHeading: runwayHeadingDeg,
+    airportElevation: initialDeparture?.elevation || 0,
     flightPlan: (routeDetails?.waypoints || flightPlan?.waypoints || []),
     difficulty: difficulty,
     failureType: failureType
@@ -107,13 +109,28 @@ const FlightInProgress = ({
   const [narrative, setNarrative] = useState(null);
 
   // Radio Message Handler
-  const handleRadioTransmit = (text, type, templateId, params) => {
+  const handleRadioTransmit = (messageDataOrText, type, templateId, params) => {
+    let messageText, messageType, messageTemplateId, messageParams;
+
+    // Handle both object (from RadioActionPanel) and legacy string arguments
+    if (typeof messageDataOrText === 'object' && messageDataOrText !== null) {
+        messageText = messageDataOrText.text;
+        messageType = messageDataOrText.type;
+        messageTemplateId = messageDataOrText.templateId;
+        messageParams = messageDataOrText.params;
+    } else {
+        messageText = messageDataOrText;
+        messageType = type;
+        messageTemplateId = templateId;
+        messageParams = params;
+    }
+
     // Add pilot message
     const newMessage = {
       sender: callsign,
-      text: text,
+      text: messageText,
       timestamp: Date.now(),
-      type: type || 'transmission'
+      type: messageType || 'transmission'
     };
     
     setRadioMessages(prev => [...prev, newMessage]);
@@ -127,7 +144,7 @@ const FlightInProgress = ({
     };
 
     atcManager.processMessage(
-        { type, templateId, params, text },
+        { type: messageType, templateId: messageTemplateId, params: messageParams, text: messageText },
         context,
         (response) => {
             setRadioMessages(prev => [...prev, response]);
@@ -238,6 +255,32 @@ const FlightInProgress = ({
 
     return () => clearInterval(interval);
   }, [weatherData, setWeatherData, useRealWeather, setEnvironment, physicsService]);
+
+  // Terrain update effect
+  useEffect(() => {
+    const fetchTerrain = async () => {
+       if (!physicsService || !physicsService.state || !physicsService.state.geo) return;
+       
+       const { lat, lon } = physicsService.state.geo;
+       
+       try {
+           const ele = await terrainService.getElevation(lat, lon);
+           if (ele !== null && typeof ele === 'number') {
+               // Update physics service directly
+               physicsService.terrainElevation = ele;
+           }
+       } catch (e) {
+           console.warn("Terrain fetch failed", e);
+       }
+    };
+
+    // Initial fetch
+    fetchTerrain();
+
+    // Loop every 1 second
+    const interval = setInterval(fetchTerrain, 1000);
+    return () => clearInterval(interval);
+  }, [physicsService]);
 
   // Update scene manager with selected flight parameters
   useEffect(() => {
@@ -510,6 +553,8 @@ const FlightInProgress = ({
             drag={flightData?.drag}
             waypoints={aircraftConfig.flightPlan}
             flightData={flightData}
+            groundStatus={physicsService?.groundStatus?.status}
+            remainingRunwayLength={physicsService?.groundStatus?.remainingLength ?? 0}
           />
         )}
 
@@ -534,9 +579,10 @@ const FlightInProgress = ({
           {showDebugPhysics ? 'HIDE DEBUG' : 'SHOW DEBUG'}
         </button>
 
-        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', zIndex: 10 }}>
           <FlightPanelModular
             flightData={flightData}
+            weatherData={weatherData}
             aircraftModel={aircraftModel}
             selectedArrival={selectedArrival}
             flightPlan={flightPlan}

@@ -2,10 +2,13 @@
 import React, { useState, useEffect } from 'react';
 import { RADIO_TEMPLATES } from '../data/radioTemplates';
 
-const RadioActionPanel = ({ onTransmit, currentStation = 'Unicom', callsign = 'Cessna 172' }) => {
+const RadioActionPanel = ({ onTransmit, currentStation = 'Unicom', callsign = 'Cessna 172', flightPlan }) => {
   const [activeTab, setActiveTab] = useState('REQUEST');
   const [selectedTemplate, setSelectedTemplate] = useState(null);
   const [paramValues, setParamValues] = useState({});
+
+  // Derive valid waypoints from flight plan
+  const validWaypoints = flightPlan?.waypoints?.map(wp => wp.name || wp.id).filter(Boolean) || [];
 
   const handleTabChange = (tab) => {
     setActiveTab(tab);

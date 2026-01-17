@@ -64,6 +64,7 @@ class RealWeatherService {
         temperature: current.temperature_2m, // Celsius
         humidity: current.relative_humidity_2m, // %
         pressure: current.pressure_msl, // hPa
+        pressureInHg: current.pressure_msl * 0.02953, // inHg
         windSpeed: current.wind_speed_10m, // knots
         windDirection: current.wind_direction_10m, // degrees
         windGust: current.wind_gusts_10m, // knots

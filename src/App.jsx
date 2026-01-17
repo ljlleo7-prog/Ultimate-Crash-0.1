@@ -93,6 +93,8 @@ function App() {
   const [showRouteSelection, setShowRouteSelection] = useState(false);
   const [detailedRoute, setDetailedRoute] = useState(null);
 
+
+
   // Load popular aircraft models
   useEffect(() => {
     const loadAircraft = async () => {
