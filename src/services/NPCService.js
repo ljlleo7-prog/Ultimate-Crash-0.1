@@ -1,6 +1,7 @@
 
-import { NPCFlightModel } from './NPCFlightModel';
+import { NPCFlightModel, NPC_STAGE } from './NPCFlightModel';
 import airlineData from '../data/airlinesDatabase.json';
+import { airportService } from './airportService';
 
 class NPCManagerService {
   constructor() {
@@ -9,7 +10,7 @@ class NPCManagerService {
     this.nextId = 1;
     this.spawnRadius = 80; // nm
     this.despawnRadius = 320; // nm
-    this.maxNPCs = 20;
+    this.maxNPCs = 15;
     this.minNPCs = 1;
   }
 
@@ -98,11 +99,86 @@ class NPCManagerService {
   }
 
   spawnNPC(centerPos) {
-    const pos = this.generateRandomPos(centerPos, this.spawnRadius);
+    const roll = Math.random();
+    let pos = null;
+    let targetAirport = null;
     const callsign = this.generateCallsign();
-    const npc = new NPCFlightModel(this.nextId++, callsign, pos, null);
+
+    // 40% Cruise, 30% Climb (Takeoff), 30% Approach
+    if (roll < 0.4) {
+      // Cruise
+      pos = this.generateRandomPos(centerPos, this.spawnRadius);
+      pos.stage = NPC_STAGE.CRUISE;
+    } else {
+      // Try to find airport for Takeoff/Landing
+      // Search slightly larger radius to find suitable airports
+      const airports = airportService.getAirportsWithinRadius(centerPos.latitude, centerPos.longitude, this.spawnRadius);
+      
+      // Filter out airports too close to player (likely user's current airport)
+      // Assume user is on runway if < 3nm
+      const validAirports = airports.filter(ap => {
+        const dist = this.calculateDistance(centerPos, {latitude: ap.latitude, longitude: ap.longitude});
+        return dist > 5; // Keep airports > 5nm away to avoid user's runway
+      });
+
+      if (validAirports.length === 0) {
+        // Fallback to Cruise if no other airports nearby
+        pos = this.generateRandomPos(centerPos, this.spawnRadius);
+        pos.stage = NPC_STAGE.CRUISE;
+      } else {
+        // Pick random airport
+        const airport = validAirports[Math.floor(Math.random() * validAirports.length)];
+        targetAirport = airport.iata;
+
+        if (roll < 0.7) {
+          // CLIMB (Takeoff)
+          // Spawn just after takeoff, climbing out
+          const heading = Math.random() * 360; // Random heading (simulating random runway)
+          // 1-2nm out
+          const distOut = 1 + Math.random(); 
+          const dDeg = distOut / 60;
+
+          pos = {
+            latitude: airport.latitude + dDeg * Math.cos(heading * Math.PI / 180),
+            longitude: airport.longitude + dDeg * Math.sin(heading * Math.PI / 180),
+            altitude: 500 + Math.random() * 1000, // 500-1500ft AGL
+            heading: heading,
+            speed: 160 + Math.random() * 40,
+            stage: NPC_STAGE.CLIMB
+          };
+
+        } else {
+          // APPROACH
+          // Spawn on approach vector
+          const distOut = 10 + Math.random() * 10; // 10-20nm out
+          const approachAngle = Math.random() * 2 * Math.PI;
+          const dDeg = distOut / 60;
+          
+          // Position relative to airport
+          const lat = airport.latitude + dDeg * Math.cos(approachAngle);
+          const lon = airport.longitude + dDeg * Math.sin(approachAngle);
+          
+          // Heading pointing towards airport
+          // atan2(dy, dx) gives angle from pos to airport
+          const dy = airport.latitude - lat;
+          const dx = (airport.longitude - lon) * Math.cos(lat * Math.PI / 180); // Adjust for longitude
+          const bearing = Math.atan2(dx, dy) * 180 / Math.PI; // Simple bearing calculation
+          
+          pos = {
+            latitude: lat,
+            longitude: lon,
+            altitude: 3000 + Math.random() * 2000, // 3000-5000ft
+            heading: (bearing + 360) % 360,
+            speed: 200 + Math.random() * 30,
+            stage: NPC_STAGE.APPROACH
+          };
+        }
+      }
+    }
+
+    const npc = new NPCFlightModel(this.nextId++, callsign, pos, targetAirport);
     this.npcs.push(npc);
-    // console.log(`Spawned NPC ${callsign} at ${pos.latitude.toFixed(2)}, ${pos.longitude.toFixed(2)}`);
+    // console.log(`Spawned NPC ${callsign} (${pos.stage}) at ${pos.latitude.toFixed(2)}, ${pos.longitude.toFixed(2)}`);
   }
 
   getNPCs() {

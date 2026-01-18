@@ -5,15 +5,19 @@ export class ATCLogic {
   constructor() {
     this.pendingResponse = null;
     this.responseTimeout = null;
-    this.busyUntil = 0;
+    this.frequencyLocks = new Map(); // frequency -> busyUntil timestamp
   }
 
-  isBusy() {
-    return Date.now() < this.busyUntil;
+  isBusy(frequency) {
+    if (!frequency) return false;
+    const busyUntil = this.frequencyLocks.get(frequency) || 0;
+    return Date.now() < busyUntil;
   }
 
-  blockChannel(durationMs) {
-    this.busyUntil = Math.max(this.busyUntil, Date.now() + durationMs);
+  blockChannel(frequency, durationMs) {
+    if (!frequency) return;
+    const currentLock = this.frequencyLocks.get(frequency) || 0;
+    this.frequencyLocks.set(frequency, Math.max(currentLock, Date.now() + durationMs));
   }
 
   /**
@@ -23,6 +27,11 @@ export class ATCLogic {
    * @param {Function} onResponse - Callback when ATC responds (text) => void
    */
   processMessage(message, context, onResponse) {
+    // Filter out frequencies where ATC doesn't respond (e.g. UNICOM or disabled frequencies)
+    if (context && context.frequencyType === 'UNICOM') {
+        return;
+    }
+
     // Cancel any existing pending response
     if (this.responseTimeout) {
       clearTimeout(this.responseTimeout);

@@ -116,7 +116,7 @@ const FrequencyKnob = ({ label, size, innerSize, onChange, sensitivity = 1, colo
   );
 };
 
-const CommunicationModule = ({ flightState, setRadioFreq, flightPlan, radioMessages = [], frequencyContext }) => {
+const CommunicationModule = ({ flightState, setRadioFreq, flightPlan, radioMessages = [], frequencyContext, currentRegion }) => {
   const currentFreq = flightState?.radioFreq || 121.500;
   const [connectionStatus, setConnectionStatus] = useState({ name: 'No Signal', type: '', connected: false });
   const [availableStations, setAvailableStations] = useState([]);
@@ -173,73 +173,44 @@ const CommunicationModule = ({ flightState, setRadioFreq, flightPlan, radioMessa
 
   // 2. Build available stations list when airports or flight plan changes
   useEffect(() => {
+    // Debug log
+    if (currentRegion) console.log('CommunicationModule: currentRegion available:', currentRegion);
+    
     const stations = [];
     const currentPos = referencePos || { lat: flightState?.latitude, lon: flightState?.longitude };
+    const altitude = flightState?.altitude || 0;
+    const isHighAltitude = altitude > 5000;
 
-    // Add Airports
-    for (const airport of nearbyAirports) {
-      if (airport.frequencies) {
-        airport.frequencies.forEach(f => {
-          stations.push({
-            name: airport.iata,
-            type: f.type,
-            frequency: f.frequency,
-            desc: `${airport.iata} ${f.type}`,
-            distance: airport.distance // Use pre-calculated distance
-          });
-        });
-      }
+    // Add Region Control (Always available, priority at high altitude)
+    if (currentRegion) {
+      stations.push({
+        name: currentRegion.name,
+        type: 'Center',
+        frequency: parseFloat(currentRegion.frequency),
+        desc: currentRegion.name,
+        distance: 0 // Always available in region
+      });
     }
-    
-    // Add Waypoints
-    if (flightPlan && currentPos.lat !== undefined) {
-      const getDist = (target) => {
-        if (target.latitude && target.longitude) {
-          return airportService.calculateDistance(
-            { latitude: currentPos.lat, longitude: currentPos.lon },
-            { latitude: target.latitude, longitude: target.longitude }
-          );
-        }
-        return 99999; // Far away if no coords
-      };
 
-      // Departure
-      if (flightPlan.departure && flightPlan.departure.frequency) {
-         stations.push({
-           name: flightPlan.departure.name,
-           type: 'Departure',
-           frequency: flightPlan.departure.frequency,
-           desc: `DEP ${flightPlan.departure.name}`,
-           distance: getDist(flightPlan.departure)
-         });
-      }
-      
-      // Arrival
-      if (flightPlan.arrival && flightPlan.arrival.frequency) {
-         stations.push({
-           name: flightPlan.arrival.name,
-           type: 'Arrival',
-           frequency: flightPlan.arrival.frequency,
-           desc: `ARR ${flightPlan.arrival.name}`,
-           distance: getDist(flightPlan.arrival)
-         });
-      }
-
-      // Waypoints
-      if (flightPlan.waypoints) {
-        for (const wp of flightPlan.waypoints) {
-          if (wp.frequency) {
+    // Add Airports (Only if low altitude or within very close range)
+    if (!isHighAltitude) {
+      for (const airport of nearbyAirports) {
+        if (airport.frequencies) {
+          airport.frequencies.forEach(f => {
             stations.push({
-              name: wp.name,
-              type: 'Waypoint ATC',
-              frequency: wp.frequency,
-              desc: `${wp.name}`,
-              distance: getDist(wp)
+              name: airport.iata,
+              type: f.type,
+              frequency: f.frequency,
+              desc: `${airport.iata} ${f.type}`,
+              distance: airport.distance // Use pre-calculated distance
             });
-          }
+          });
         }
       }
     }
+
+    // Add Flight Plan Waypoints (as simulated stations or just for nav reference in future)
+    // For now, we only add actual radio stations.
 
     // Sort and deduplicate
     const uniqueStations = [];
@@ -258,12 +229,8 @@ const CommunicationModule = ({ flightState, setRadioFreq, flightPlan, radioMessa
     
     // Take nearest 3
     const nearest3 = uniqueStations.slice(0, 3);
-    
-    // Sort by frequency for display? Or keep by distance?
-    // User said "only display the nearest 3". Usually implies seeing them in order of distance or just the subset.
-    // I'll keep them sorted by distance as that's most useful.
     setAvailableStations(nearest3);
-  }, [nearbyAirports, flightPlan, referencePos]);
+  }, [nearbyAirports, flightPlan, referencePos, currentRegion, flightState?.altitude]);
 
   // 3. Check connection status (fast, runs on freq change)
   useEffect(() => {
@@ -426,7 +393,7 @@ const CommunicationModule = ({ flightState, setRadioFreq, flightPlan, radioMessa
               onClick: () => setRadioFreq(station.frequency),
               style: {
                 fontSize: '10px',
-                color: Math.abs(station.frequency - currentFreq) < 0.01 ? '#4ade80' : '#64748b',
+                color: Math.abs(station.frequency - currentFreq) < 0.01 ? '#4ade80' : (station.type === 'Center' ? '#38bdf8' : '#64748b'),
                 cursor: 'pointer',
                 display: 'flex',
                 justifyContent: 'space-between',
@@ -466,6 +433,12 @@ const CommunicationModule = ({ flightState, setRadioFreq, flightPlan, radioMessa
             if (!frequencyContext) return true;
             if (msg.type === 'system') return true;
             if (!msg.frequency) return true;
+            
+            // Support numeric frequency matching
+            if (typeof msg.frequency === 'number') {
+               return Math.abs(msg.frequency - currentFreq) < 0.005;
+            }
+            
             return msg.frequency === frequencyContext;
           }).map((msg, idx) => 
             React.createElement('div', {
@@ -473,7 +446,7 @@ const CommunicationModule = ({ flightState, setRadioFreq, flightPlan, radioMessa
               style: {
                 width: '100%',
                 padding: '1px 0',
-                color: msg.sender === 'ATC' ? '#ffffff' : '#4ade80',
+                color: msg.sender === 'ATC' ? '#ffffff' : (msg.type === 'traffic' ? '#facc15' : '#4ade80'),
                 fontSize: '11px',
                 fontFamily: 'monospace',
                 lineHeight: '1.2',
@@ -481,7 +454,7 @@ const CommunicationModule = ({ flightState, setRadioFreq, flightPlan, radioMessa
               }
             },
               React.createElement('span', { style: { fontWeight: 'bold', marginRight: '6px', opacity: 0.8 } }, 
-                msg.sender === 'ATC' ? 'ATC:' : '>'
+                msg.sender === 'ATC' ? 'ATC:' : (msg.type === 'traffic' ? `${msg.sender}:` : '>')
               ),
               msg.text
             )

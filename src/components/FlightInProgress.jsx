@@ -14,6 +14,7 @@ import { getRunwayHeading } from '../utils/routeGenerator';
 import RadioActionPanel from './RadioActionPanel';
 import { atcManager } from '../services/ATCLogic';
 import { npcService } from '../services/NPCService';
+import { regionControlService } from '../services/RegionControlService';
 
 const FlightInProgress = ({ 
   callsign, 
@@ -177,7 +178,8 @@ const FlightInProgress = ({
         callsign: callsign,
         altitude: Math.round(flightData.altitude),
         heading: Math.round(flightData.heading),
-        weather: weatherData // Pass weather data to ATC context
+        weather: weatherData, // Pass weather data to ATC context
+        frequencyType: freqType
     };
 
     atcManager.processMessage(
@@ -193,11 +195,28 @@ const FlightInProgress = ({
   const [showDebugPhysics, setShowDebugPhysics] = useState(false);
   const [isChannelBusy, setIsChannelBusy] = useState(false);
   const [npcs, setNpcs] = useState([]);
+  const [currentRegion, setCurrentRegion] = useState(null);
   
   const lastNpcUpdateRef = React.useRef(Date.now());
+  const lastRegionUpdateRef = React.useRef(0);
 
   const getFrequencyType = (freq) => {
     const f = parseFloat(freq);
+    const alt = flightData?.altitude || 0;
+
+    // Check Region Control Frequency first
+    if (currentRegion && Math.abs(f - parseFloat(currentRegion.frequency)) < 0.005) {
+        return 'CENTER';
+    }
+
+    // High Altitude Logic (> 5000ft)
+    // "Disable airport frequency if altitude is 5000ft higher"
+    if (alt > 5000) {
+        if (Math.abs(f - 121.5) < 0.1) return 'GUARD';
+        return 'UNICOM'; // Effectively disables TOWER/GROUND responses
+    }
+
+    // Low Altitude Logic (Standard)
     if (Math.abs(f - 118.0) < 0.1) return 'TOWER';
     if (Math.abs(f - 121.9) < 0.1) return 'GROUND';
     if (Math.abs(f - 121.5) < 0.1) return 'GUARD';
@@ -220,6 +239,16 @@ const FlightInProgress = ({
     const busy = atcManager.isBusy();
     if (busy !== isChannelBusy) {
         setIsChannelBusy(busy);
+    }
+
+    // Update Region Info (every 5 seconds or if not set)
+    if (!currentRegion || now - lastRegionUpdateRef.current > 5000) {
+        if (flightData.position) {
+             const region = regionControlService.getRegionInfo(flightData.position.latitude, flightData.position.longitude);
+             console.log('Region Update:', region);
+             setCurrentRegion(region);
+             lastRegionUpdateRef.current = now;
+        }
     }
 
     // Update NPCs
@@ -680,6 +709,7 @@ const FlightInProgress = ({
             onRadioFreqChange={setCurrentFreq}
             npcs={npcs}
             frequencyContext={getFrequencyType(currentFreq)}
+            currentRegion={currentRegion}
             onActionRequest={(action, payload) => {
               const payloadStr = typeof payload === 'number' ? payload.toFixed(5) : JSON.stringify(payload);
               console.log(`📡 UI Action: ${action} = ${payloadStr}`);

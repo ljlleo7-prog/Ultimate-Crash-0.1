@@ -15,7 +15,7 @@ import OverheadPanel from './OverheadPanel';
 import RudderPedal from './RudderPedal';
 import './FlightPanel.css';
 
-const FlightPanelModular = ({ flightData, weatherData, onActionRequest, aircraftModel, selectedArrival, flightPlan, radioMessages, onRadioFreqChange, npcs, frequencyContext }) => {
+const FlightPanelModular = ({ flightData, weatherData, onActionRequest, aircraftModel, selectedArrival, flightPlan, radioMessages, onRadioFreqChange, npcs, frequencyContext, currentRegion }) => {
   // Use flightData from parent component instead of creating own physics service
   const [showOverhead, setShowOverhead] = useState(false);
   const [flightState, setFlightState] = useState({
@@ -324,7 +324,8 @@ const FlightPanelModular = ({ flightData, weatherData, onActionRequest, aircraft
           },
           flightPlan,
           radioMessages,
-          frequencyContext
+          frequencyContext,
+          currentRegion
         })
       ),
       
