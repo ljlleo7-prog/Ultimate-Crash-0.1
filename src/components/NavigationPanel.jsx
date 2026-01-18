@@ -1,10 +1,12 @@
 import React, { useRef, useEffect, useState } from 'react';
 import { calculateDistance } from '../utils/distanceCalculator';
 import { airportService } from '../services/airportService';
+import { terrainRadarService } from '../services/TerrainRadarService';
 
 // Navigation Panel Component
 const NavigationPanel = ({ flightState, selectedArrival, flightPlan }) => {
   const radarCanvasRef = useRef(null);
+  const lastTerrainUpdateRef = useRef(0);
   const [distanceToWaypoint, setDistanceToWaypoint] = useState(0);
   const [mapRange, setMapRange] = useState(40); // Default 40nm
   const [nearbyRunways, setNearbyRunways] = useState([]);
@@ -12,6 +14,7 @@ const NavigationPanel = ({ flightState, selectedArrival, flightPlan }) => {
   const groundSpeed = flightState?.groundSpeed || 0;
   const trueAirspeed = flightState?.trueAirspeed || 0;
   const heading = flightState?.heading || 0;
+  const altitude = flightState?.altitude || 0;
 
   const waypoints = flightPlan?.waypoints || [];
   const [currentNextWaypointName, setCurrentNextWaypointName] = useState('N/A');
@@ -67,6 +70,23 @@ const NavigationPanel = ({ flightState, selectedArrival, flightPlan }) => {
     setNearbyRunways(runways);
 
   }, [flightState?.latitude, flightState?.longitude]); // Depends on position
+
+  // Effect to update Terrain Radar
+  useEffect(() => {
+    if (!flightState?.latitude || !flightState?.longitude) return;
+    
+    // Throttle updates to avoid heavy calculation every frame
+    const now = Date.now();
+    if (now - lastTerrainUpdateRef.current > 1000) {
+        // Update terrain radar service with current position and range
+        // Clamp range to 80nm to prevent massive queue buildup and lag
+        // The user can zoom out to 640nm, but we only fetch detailed terrain within 80nm
+        const fetchRange = Math.min(mapRange, 80);
+        terrainRadarService.update(flightState.latitude, flightState.longitude, fetchRange);
+        lastTerrainUpdateRef.current = now;
+    }
+    
+  }, [flightState?.latitude, flightState?.longitude, mapRange]);
 
 
   useEffect(() => {
@@ -131,6 +151,35 @@ const NavigationPanel = ({ flightState, selectedArrival, flightPlan }) => {
     const center = size / 2;
     const radius = size / 2 - 10;
 
+    const toRad = (d) => d * Math.PI / 180;
+    const toDeg = (r) => r * 180 / Math.PI;
+    const bearingTo = (lat1, lon1, lat2, lon2) => {
+        const φ1 = toRad(lat1);
+        const φ2 = toRad(lat2);
+        const Δλ = toRad(lon2 - lon1);
+        const y = Math.sin(Δλ) * Math.cos(φ2);
+        const x = Math.cos(φ1) * Math.sin(φ2) - Math.sin(φ1) * Math.cos(φ2) * Math.cos(Δλ);
+        return (toDeg(Math.atan2(y, x)) + 360) % 360;
+    };
+    
+    // Terrain Gradient Color Helper
+    const getTerrainColor = (height) => {
+      const relativeAlt = altitude - height;
+      
+      // If we are high above terrain (> 5000ft), don't show or show very faint
+      if (relativeAlt > 5000) return null;
+      
+      // Safety coloring
+      if (height > altitude) return 'rgba(255, 0, 0, 0.8)'; // Terrain ABOVE us (Red)
+      if (relativeAlt < 500) return 'rgba(255, 0, 0, 0.6)'; // < 500ft clearance (Red)
+      if (relativeAlt < 1000) return 'rgba(255, 255, 0, 0.6)'; // < 1000ft clearance (Yellow)
+      if (relativeAlt < 2000) return 'rgba(0, 255, 0, 0.4)'; // < 2000ft clearance (Green)
+      
+      // 2000ft to 5000ft: Fade out green
+      const alpha = 0.4 * (1 - (relativeAlt - 2000) / 3000);
+      return `rgba(0, 100, 0, ${alpha})`;
+    };
+
     const drawRadar = () => {
       ctx.clearRect(0, 0, size, size);
 
@@ -138,9 +187,71 @@ const NavigationPanel = ({ flightState, selectedArrival, flightPlan }) => {
       ctx.translate(center, center);
       ctx.rotate((-heading * Math.PI / 180));
 
+      // --- Draw Terrain ---
+      if (flightState?.latitude && flightState?.longitude) {
+        // Map range is radius in NM.
+        // Canvas radius is pixels.
+        const pxPerNm = radius / mapRange;
+        const degPerNm = 1/60; 
+        
+        const gridSizeDeg = terrainRadarService.GRID_SIZE;
+        const gridSizeNm = gridSizeDeg * 60;
+        const gridSizePx = Math.ceil(gridSizeNm * pxPerNm);
+        
+        // Optimization: Limit render range to prevent lag on large maps
+        // We only fetch up to 80nm, so rendering beyond that is useless anyway
+        // Also implement LOD (Level of Detail) stepping for large ranges
+        const renderRange = Math.min(mapRange, 160); 
+        const step = mapRange > 40 ? Math.ceil(mapRange / 40) : 1;
+        
+        const rangeDeg = renderRange / 60;
+        const startLat = flightState.latitude - rangeDeg;
+        const endLat = flightState.latitude + rangeDeg;
+        const startLon = flightState.longitude - rangeDeg;
+        const endLon = flightState.longitude + rangeDeg;
+        
+        const startIdx = terrainRadarService.getGridIndices(startLat, startLon);
+        const endIdx = terrainRadarService.getGridIndices(endLat, endLon);
+        
+        // Iterate grid indices with stepping
+        for (let i = startIdx.latIdx; i <= endIdx.latIdx; i += step) {
+          for (let j = startIdx.lonIdx; j <= endIdx.lonIdx; j += step) {
+            const tileLat = (i + 0.5) * gridSizeDeg;
+            const tileLon = (j + 0.5) * gridSizeDeg;
+            
+            const height = terrainRadarService.getTerrainHeight(tileLat, tileLon);
+            if (height !== null) {
+              const color = getTerrainColor(height);
+              if (color) {
+                // Calculate position relative to aircraft
+                const dLatNm = (tileLat - flightState.latitude) * 60;
+                // Longitude correction for latitude
+                const dLonNm = (tileLon - flightState.longitude) * 60 * Math.cos(flightState.latitude * Math.PI / 180);
+                
+                // Convert NM to Pixels (x is East/Lon, y is North/Lat)
+                // Canvas coordinates: y is down (North is -y), x is right (East is +x)
+                const x = dLonNm * pxPerNm;
+                const y = -dLatNm * pxPerNm; // Inverted because canvas Y is down
+                
+                // Only draw if within circle
+                if (x*x + y*y < radius*radius) {
+                   ctx.fillStyle = color;
+                   // Draw rectangle centered at x, y
+                   // Scale rectangle size by step
+                   const size = (gridSizePx * step) + (step > 1 ? 0.5 : 0); // Slight overlap to avoid gaps
+                   ctx.fillRect(x - size/2, y - size/2, size, size);
+                }
+              }
+            }
+          }
+        }
+      }
+      // --- End Draw Terrain ---
+
       ctx.beginPath();
       ctx.arc(0, 0, radius, 0, Math.PI * 2);
-      ctx.fillStyle = 'rgba(0, 50, 0, 0.5)';
+      // ctx.fillStyle = 'rgba(0, 50, 0, 0.5)'; // Old background
+      ctx.fillStyle = 'rgba(0, 20, 0, 0.2)'; // More transparent to see terrain
       ctx.fill();
       ctx.strokeStyle = '#00ff00';
       ctx.lineWidth = 2;
@@ -183,6 +294,7 @@ const NavigationPanel = ({ flightState, selectedArrival, flightPlan }) => {
           ctx.save();
           ctx.translate(x, y);
           ctx.rotate(-angle);
+          ctx.rotate(heading * Math.PI / 180); // Counter-rotate to keep text upright
           ctx.fillText(label, 0, 0);
           ctx.restore();
         } else if (i % 30 === 0) {
@@ -190,21 +302,11 @@ const NavigationPanel = ({ flightState, selectedArrival, flightPlan }) => {
           ctx.save();
           ctx.translate(x, y);
           ctx.rotate(-angle);
+          ctx.rotate(heading * Math.PI / 180); // Counter-rotate
           ctx.fillText(numLabel, 0, 0);
           ctx.restore();
         }
       }
-
-      const toRad = (d) => d * Math.PI / 180;
-      const toDeg = (r) => r * 180 / Math.PI;
-      const bearingTo = (lat1, lon1, lat2, lon2) => {
-          const φ1 = toRad(lat1);
-          const φ2 = toRad(lat2);
-          const Δλ = toRad(lon2 - lon1);
-          const y = Math.sin(Δλ) * Math.cos(φ2);
-          const x = Math.cos(φ1) * Math.sin(φ2) - Math.sin(φ1) * Math.cos(φ2) * Math.cos(Δλ);
-          return (toDeg(Math.atan2(y, x)) + 360) % 360;
-      };
 
       let alignmentBarData = null;
 
@@ -241,17 +343,16 @@ const NavigationPanel = ({ flightState, selectedArrival, flightPlan }) => {
             // Check distance to runway start
             const distNm = calculateDistance(flightState.latitude, flightState.longitude, rw.thresholdStart.latitude, rw.thresholdStart.longitude);
             
-            if (distNm < 10) { // Only show if within 10nm
+            if (distNm < mapRange * 1.2) { // Show if roughly within range
                  // Calculate Start Point
                  const brgStart = bearingTo(flightState.latitude, flightState.longitude, rw.thresholdStart.latitude, rw.thresholdStart.longitude) * Math.PI / 180;
-                 const rStart = Math.min(1, distNm / mapRange) * radius;
+                 const rStart = Math.min(mapRange * 2, calculateDistance(flightState.latitude, flightState.longitude, rw.thresholdStart.latitude, rw.thresholdStart.longitude) / mapRange * radius); // Clamp for safety
                  const xStart = rStart * Math.sin(brgStart);
                  const yStart = -rStart * Math.cos(brgStart);
 
                  // Calculate End Point
-                 const distEnd = calculateDistance(flightState.latitude, flightState.longitude, rw.thresholdEnd.latitude, rw.thresholdEnd.longitude);
                  const brgEnd = bearingTo(flightState.latitude, flightState.longitude, rw.thresholdEnd.latitude, rw.thresholdEnd.longitude) * Math.PI / 180;
-                 const rEnd = Math.min(1, distEnd / mapRange) * radius;
+                 const rEnd = Math.min(mapRange * 2, calculateDistance(flightState.latitude, flightState.longitude, rw.thresholdEnd.latitude, rw.thresholdEnd.longitude) / mapRange * radius);
                  const xEnd = rEnd * Math.sin(brgEnd);
                  const yEnd = -rEnd * Math.cos(brgEnd);
 
@@ -300,10 +401,6 @@ const NavigationPanel = ({ flightState, selectedArrival, flightPlan }) => {
             ctx.textAlign = 'center';
             ctx.textBaseline = 'bottom';
             ctx.fillText(points[i].name, 0, -8);
-            // Optional: Show distance for waypoints
-            // ctx.font = '9px Arial';
-            // ctx.fillStyle = '#aaaaaa';
-            // ctx.fillText(`${points[i].distNm.toFixed(0)}nm`, 0, 5);
             ctx.restore();
           }
         }
@@ -385,7 +482,7 @@ const NavigationPanel = ({ flightState, selectedArrival, flightPlan }) => {
     };
 
     drawRadar();
-  }, [flightState, heading, waypoints, currentNextWaypointName, mapRange, nearbyRunways]);
+  }, [flightState, heading, altitude, waypoints, currentNextWaypointName, mapRange, nearbyRunways]);
   
   return React.createElement('div', { className: 'navigation-panel' },
     React.createElement('div', { className: 'radar-display-container' },
