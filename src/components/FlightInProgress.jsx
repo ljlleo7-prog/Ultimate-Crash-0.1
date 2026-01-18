@@ -13,6 +13,7 @@ import eventBus from '../services/eventBus.js';
 import { getRunwayHeading } from '../utils/routeGenerator';
 import RadioActionPanel from './RadioActionPanel';
 import { atcManager } from '../services/ATCLogic';
+import { npcService } from '../services/NPCService';
 
 const FlightInProgress = ({ 
   callsign, 
@@ -133,6 +134,17 @@ const FlightInProgress = ({
 
   // Radio Message Handler
   const handleRadioTransmit = (messageDataOrText, type, templateId, params) => {
+    // Check if channel is busy
+    if (atcManager.isBusy()) {
+        setRadioMessages(prev => [...prev, {
+            sender: 'System',
+            text: '[FREQUENCY BUSY]',
+            timestamp: Date.now(),
+            type: 'system'
+        }]);
+        return;
+    }
+
     let messageText, messageType, messageTemplateId, messageParams;
 
     // Handle both object (from RadioActionPanel) and legacy string arguments
@@ -149,11 +161,13 @@ const FlightInProgress = ({
     }
 
     // Add pilot message
+    const freqType = getFrequencyType(currentFreq);
     const newMessage = {
       sender: callsign,
       text: messageText,
       timestamp: Date.now(),
-      type: messageType || 'transmission'
+      type: messageType || 'transmission',
+      frequency: freqType
     };
     
     setRadioMessages(prev => [...prev, newMessage]);
@@ -170,13 +184,57 @@ const FlightInProgress = ({
         { type: messageType, templateId: messageTemplateId, params: messageParams, text: messageText },
         context,
         (response) => {
-            setRadioMessages(prev => [...prev, response]);
+            setRadioMessages(prev => [...prev, { ...response, frequency: freqType }]);
         }
     );
   };
   const [activeFailures, setActiveFailures] = useState([]);
   const [phaseName, setPhaseName] = useState('');
   const [showDebugPhysics, setShowDebugPhysics] = useState(false);
+  const [isChannelBusy, setIsChannelBusy] = useState(false);
+  const [npcs, setNpcs] = useState([]);
+  
+  const lastNpcUpdateRef = React.useRef(Date.now());
+
+  const getFrequencyType = (freq) => {
+    const f = parseFloat(freq);
+    if (Math.abs(f - 118.0) < 0.1) return 'TOWER';
+    if (Math.abs(f - 121.9) < 0.1) return 'GROUND';
+    if (Math.abs(f - 121.5) < 0.1) return 'GUARD';
+    if (Math.abs(f - 119.0) < 0.1) return 'CENTER';
+    return 'UNICOM';
+  };
+
+  // NPC Update Loop
+  useEffect(() => {
+    if (!flightData || !flightData.position) return;
+    
+    const now = Date.now();
+    let dt = (now - lastNpcUpdateRef.current) / 1000;
+    lastNpcUpdateRef.current = now;
+
+    // Cap dt to prevent huge jumps after pause/lag
+    if (dt > 1.0) dt = 0.016;
+    
+    // Sync busy state
+    const busy = atcManager.isBusy();
+    if (busy !== isChannelBusy) {
+        setIsChannelBusy(busy);
+    }
+
+    // Update NPCs
+    const messages = npcService.update(dt, flightData.position);
+    setNpcs([...npcService.npcs]); // Update state for radar
+
+    if (messages.length > 0) {
+        // Handle incoming NPC messages
+        messages.forEach(msg => {
+            // Block channel for 3 seconds per message
+            atcManager.blockChannel(3000);
+            setRadioMessages(prev => [...prev, msg]);
+        });
+    }
+  }, [flightData.frame, flightData.position]);
 
   // Set up event listeners for narrative and failure updates
   useEffect(() => {
@@ -571,6 +629,7 @@ const FlightInProgress = ({
             currentStation={currentFreq.toFixed(3)}
             callsign={callsign || 'N12345'}
             flightPlan={flightPlan}
+            isChannelBusy={isChannelBusy}
           />
         </div>
       </div>
@@ -619,6 +678,8 @@ const FlightInProgress = ({
             flightPlan={flightPlan}
             radioMessages={radioMessages}
             onRadioFreqChange={setCurrentFreq}
+            npcs={npcs}
+            frequencyContext={getFrequencyType(currentFreq)}
             onActionRequest={(action, payload) => {
               const payloadStr = typeof payload === 'number' ? payload.toFixed(5) : JSON.stringify(payload);
               console.log(`📡 UI Action: ${action} = ${payloadStr}`);

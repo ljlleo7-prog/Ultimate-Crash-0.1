@@ -5,6 +5,15 @@ export class ATCLogic {
   constructor() {
     this.pendingResponse = null;
     this.responseTimeout = null;
+    this.busyUntil = 0;
+  }
+
+  isBusy() {
+    return Date.now() < this.busyUntil;
+  }
+
+  blockChannel(durationMs) {
+    this.busyUntil = Math.max(this.busyUntil, Date.now() + durationMs);
   }
 
   /**

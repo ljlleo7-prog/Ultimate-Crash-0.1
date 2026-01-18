@@ -4,7 +4,7 @@ import { airportService } from '../services/airportService';
 import { terrainRadarService } from '../services/TerrainRadarService';
 
 // Navigation Panel Component
-const NavigationPanel = ({ flightState, selectedArrival, flightPlan }) => {
+const NavigationPanel = ({ flightState, selectedArrival, flightPlan, npcs = [] }) => {
   const radarCanvasRef = useRef(null);
   const lastTerrainUpdateRef = useRef(0);
   const [distanceToWaypoint, setDistanceToWaypoint] = useState(0);
@@ -247,6 +247,80 @@ const NavigationPanel = ({ flightState, selectedArrival, flightPlan }) => {
         }
       }
       // --- End Draw Terrain ---
+
+      // --- Draw Traffic (TCAS) ---
+      if (npcs && npcs.length > 0) {
+          npcs.forEach(npc => {
+            // Calculate relative position
+            const dLat = npc.latitude - flightState.latitude;
+            const dLon = npc.longitude - flightState.longitude;
+            
+            // Convert to NM
+            const dLatNm = dLat * 60;
+            const dLonNm = dLon * 60 * Math.cos(flightState.latitude * Math.PI / 180);
+            
+            // Convert to Pixels (x is East, y is North-ish)
+            // Canvas: y is down. North is -y.
+            const pxPerNm = radius / mapRange;
+            const x = dLonNm * pxPerNm;
+            const y = -dLatNm * pxPerNm;
+            
+            // Distance
+            const distNm = Math.sqrt(dLatNm*dLatNm + dLonNm*dLonNm);
+            const dAlt = Math.abs(npc.altitude - altitude);
+            
+            // Skip if out of range (plus margin)
+            if (distNm > mapRange * 1.2) return;
+            
+            // Check Critical
+            const closingSpeed = (flightState.trueAirspeed || 0) + (npc.speed || 0);
+            const timeToReach = closingSpeed > 0 ? distNm / (closingSpeed / 3600) : 999; 
+            const isCritical = (
+                altitude > 3000 && 
+                dAlt < 1000 && 
+                timeToReach * 3600 < 20
+            );
+            
+            // Color
+            let color = '#38bdf8'; // Default Cyan
+            if (isCritical) {
+                color = '#ff0000'; // Red
+            } else {
+                if (dAlt < 1000) {
+                    color = '#fbbf24'; // Amber/Orange
+                } else if (distNm < 10) {
+                     color = '#facc15'; // Yellow
+                }
+            }
+            
+            // Draw
+            ctx.save();
+            ctx.translate(x, y);
+            
+            // Rotate to NPC heading
+            ctx.rotate(npc.heading * Math.PI / 180);
+            
+            // Draw Triangle
+            ctx.beginPath();
+            ctx.moveTo(0, -6);
+            ctx.lineTo(4, 4);
+            ctx.lineTo(-4, 4);
+            ctx.closePath();
+            ctx.fillStyle = color;
+            ctx.fill();
+            
+            // Text "FL XXX"
+            // Reset rotation for text to be upright on screen
+            ctx.rotate(-npc.heading * Math.PI / 180); // Back to North-Up
+            ctx.rotate(heading * Math.PI / 180); // Back to Screen-Up
+            
+            ctx.fillStyle = color;
+            ctx.font = '10px monospace';
+            ctx.fillText(`FL ${Math.round(npc.altitude/100)}`, 8, 3);
+            
+            ctx.restore();
+          });
+      }
 
       ctx.beginPath();
       ctx.arc(0, 0, radius, 0, Math.PI * 2);

@@ -33,6 +33,13 @@ export const RADIO_TEMPLATES = {
       template: 'Contact {station} on {frequency}, {callsign}.',
       params: ['station', 'frequency'],
       type: 'readback'
+    },
+    {
+      id: 'rb_taxi',
+      label: 'Readback Taxi',
+      template: 'Taxi via {route} and hold short of RW {runway}, {callsign}.',
+      params: ['route', 'runway'],
+      type: 'readback'
     }
   ],
   REQUEST: [

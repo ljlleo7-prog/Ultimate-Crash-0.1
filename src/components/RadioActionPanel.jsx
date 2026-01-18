@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { RADIO_TEMPLATES } from '../data/radioTemplates';
 
-const RadioActionPanel = ({ onTransmit, currentStation = 'Unicom', callsign = 'Cessna 172', flightPlan }) => {
+const RadioActionPanel = ({ onTransmit, currentStation = 'Unicom', callsign = 'Cessna 172', flightPlan, isChannelBusy }) => {
   const [activeTab, setActiveTab] = useState('REQUEST');
   const [selectedTemplate, setSelectedTemplate] = useState(null);
   const [paramValues, setParamValues] = useState({});
@@ -202,19 +202,20 @@ const RadioActionPanel = ({ onTransmit, currentStation = 'Unicom', callsign = 'C
 
             <button
               type="submit"
+              disabled={isChannelBusy}
               style={{
                 marginTop: '2px',
                 padding: '6px',
-                background: '#38bdf8',
-                color: '#0f172a',
+                background: isChannelBusy ? '#475569' : '#38bdf8',
+                color: isChannelBusy ? '#94a3b8' : '#0f172a',
                 border: 'none',
                 borderRadius: '4px',
                 fontWeight: 'bold',
                 fontSize: '11px',
-                cursor: 'pointer'
+                cursor: isChannelBusy ? 'not-allowed' : 'pointer'
               }}
             >
-              TRANSMIT
+              {isChannelBusy ? 'FREQ BUSY' : 'TRANSMIT'}
             </button>
           </form>
         )}

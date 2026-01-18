@@ -116,7 +116,7 @@ const FrequencyKnob = ({ label, size, innerSize, onChange, sensitivity = 1, colo
   );
 };
 
-const CommunicationModule = ({ flightState, setRadioFreq, flightPlan, radioMessages = [] }) => {
+const CommunicationModule = ({ flightState, setRadioFreq, flightPlan, radioMessages = [], frequencyContext }) => {
   const currentFreq = flightState?.radioFreq || 121.500;
   const [connectionStatus, setConnectionStatus] = useState({ name: 'No Signal', type: '', connected: false });
   const [availableStations, setAvailableStations] = useState([]);
@@ -327,7 +327,7 @@ const CommunicationModule = ({ flightState, setRadioFreq, flightPlan, radioMessa
       gap: '12px',
       alignItems: 'center',
       // height: 'fit-content', // Allow stretching
-      minHeight: '60px', // Compact height (approx 1 message + header)
+      height: '140px', // Fixed height to prevent infinite growth
       flex: 1 // Take remaining space
     }
   },
@@ -462,13 +462,18 @@ const CommunicationModule = ({ flightState, setRadioFreq, flightPlan, radioMessa
             background: 'rgba(0,0,0,0.2)'
           }
         },
-          radioMessages.length > 0 ? radioMessages.map((msg, idx) => 
+          radioMessages.length > 0 ? radioMessages.filter(msg => {
+            if (!frequencyContext) return true;
+            if (msg.type === 'system') return true;
+            if (!msg.frequency) return true;
+            return msg.frequency === frequencyContext;
+          }).map((msg, idx) => 
             React.createElement('div', {
               key: idx,
               style: {
                 width: '100%',
                 padding: '1px 0',
-                color: msg.sender === 'Pilot' ? '#4ade80' : '#ffffff',
+                color: msg.sender === 'ATC' ? '#ffffff' : '#4ade80',
                 fontSize: '11px',
                 fontFamily: 'monospace',
                 lineHeight: '1.2',
@@ -476,7 +481,7 @@ const CommunicationModule = ({ flightState, setRadioFreq, flightPlan, radioMessa
               }
             },
               React.createElement('span', { style: { fontWeight: 'bold', marginRight: '6px', opacity: 0.8 } }, 
-                msg.sender === 'Pilot' ? '>' : `${msg.sender}:`
+                msg.sender === 'ATC' ? 'ATC:' : '>'
               ),
               msg.text
             )
