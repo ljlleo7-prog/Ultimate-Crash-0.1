@@ -3,6 +3,7 @@ import { useAircraftPhysics } from '../hooks/useAircraftPhysics';
 import { updateWeather } from '../services/weatherService';
 import { realWeatherService } from '../services/RealWeatherService';
 import { terrainService } from '../services/TerrainService';
+import { airportService } from '../services/airportService';
 import weatherConfig from '../config/weatherConfig.json';
 import FlightPanelModular from './FlightPanelModular';
 import DebugPhysicsPanel from './DebugPhysicsPanel';
@@ -59,6 +60,24 @@ const FlightInProgress = ({
   const runwayHeadingDeg = getRunwayHeading(runwayName, isEastward);
   const runwayHeadingRad = runwayHeadingDeg * Math.PI / 180;
 
+  // Calculate Spawn Position (Runway Threshold)
+  let initialLat = initialDeparture?.latitude || 37.6188;
+  let initialLon = initialDeparture?.longitude || -122.3750;
+
+  if (initialDeparture && runwayName) {
+      // Try to get runway geometry to spawn at the threshold
+      // Pass the airport code (IATA or ICAO)
+      const airportCode = initialDeparture.iata || initialDeparture.icao;
+      if (airportCode) {
+          const geom = airportService.getRunwayGeometry(airportCode, runwayName);
+          if (geom && geom.thresholdStart) {
+              console.log(`Spawn Point Adjusted to Runway ${runwayName} Threshold:`, geom.thresholdStart);
+              initialLat = geom.thresholdStart.latitude;
+              initialLon = geom.thresholdStart.longitude;
+          }
+      }
+  }
+
   const aircraftConfig = {
     aircraftModel,
     payloadWeight: totalPayloadWeight,
@@ -68,8 +87,8 @@ const FlightInProgress = ({
       ? weatherData.windSpeed
       : 0,
     // Fallback to KSFO if latitude/longitude are missing (prevents 0,0 initialization)
-    initialLatitude: initialDeparture?.latitude || 37.6188,
-    initialLongitude: initialDeparture?.longitude || -122.3750,
+    initialLatitude: initialLat,
+    initialLongitude: initialLon,
     // Pass heading in degrees, as useAircraftPhysics converts it to radians
     initialHeading: runwayHeadingDeg,
     airportElevation: initialDeparture?.elevation || 0,

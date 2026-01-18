@@ -179,6 +179,7 @@ class RealisticFlightPhysicsService {
         this.time = 0;
         this.runwayGeometry = null;
         this.groundStatus = { status: 'UNKNOWN', remainingLength: 0 };
+        this.difficulty = 'rookie'; // Default
         // Initialize airport elevation from config (converted from feet to meters if provided)
         this.airportElevation = (aircraftData.airportElevation || 0) * 0.3048; 
         this.terrainElevation = null; // AMSL in meters
@@ -279,7 +280,16 @@ class RealisticFlightPhysicsService {
     }
 
     validateAndParseAircraft(data) {
-        // Ensure defaults for critical physics parameters
+        const wingArea = data.wingArea || 125;
+        const wingSpan = data.wingSpan || 35;
+        const chord = wingArea / wingSpan;
+        const cgPos = typeof data.centerOfGravityPosition === 'number' ? data.centerOfGravityPosition : 0.15;
+        const acPos = typeof data.aerodynamicCenterPosition === 'number' ? data.aerodynamicCenterPosition : 0.25;
+        const groundGravityArm = typeof data.groundGravityArm === 'number' ? data.groundGravityArm : chord * cgPos;
+        const defaultLiftArmFrac = acPos - cgPos;
+        const groundLiftArm = typeof data.groundLiftArm === 'number'
+            ? data.groundLiftArm
+            : chord * (defaultLiftArmFrac !== 0 ? defaultLiftArmFrac : 0.1);
         return {
             ...data,
             specificFuelConsumption: (function() {
@@ -294,9 +304,11 @@ class RealisticFlightPhysicsService {
                 return sfc;
             })(),
             mass: (data.emptyWeight || 40000) + (data.fuelWeight || 10000) + (data.payloadWeight || 0),
-            wingArea: data.wingArea || 125,
-            wingSpan: data.wingSpan || 35,
-            chord: (data.wingArea || 125) / (data.wingSpan || 35),
+            wingArea,
+            wingSpan,
+            chord,
+            groundGravityArm,
+            groundLiftArm,
             maxThrust: data.maxThrustPerEngine || 120000,
             engineCount: data.engineCount || 2,
             enginePositions: data.enginePositions || (function() {
@@ -935,30 +947,35 @@ class RealisticFlightPhysicsService {
         const sinA = Math.sin(alpha);
         
         const Fx_aero = -F_drag * cosA + F_lift * sinA;
-        const Fy_aero = F_side;
+        let Fy_aero = F_side;
         const Fz_aero = -F_drag * sinA - F_lift * cosA;
 
         // Dimensional Moments
         let Mx_aero = q * S * b * Cl;
         let My_aero = q * S * c * Cm;
         let Mz_aero = q * S * b * Cn;
+
+        // --- Runway Stabilizer (User Request) ---
+        // Rookie: Rail mode (Applied inside method via state override).
+        // Others: Gentle pull forces.
+        const stabilizer = this.applyRunwayStabilizer();
+        if (stabilizer) {
+            Fy_aero += stabilizer.Fy;
+            Mz_aero += stabilizer.Mz;
+        }
         
         // --- Ground Steering (Nose Wheel) ---
         // User Request: "control the plane's yaw output on the ground (its effect will diminish as soon as I am 10ft+)"
-        // This implies a direct steering force/moment that is effective on ground and fades out.
+        // Modified: Use onGround flag instead of CG altitude to prevent premature fade-out on large aircraft.
         
         let Mz_steering = 0;
         let Fy_steering = 0;
         
-        // Altitude check (Fade out above 10ft AGL)
-        // Use AGL (Above Ground Level), not absolute altitude
-        const altitudeFt = (this.currentGroundZ - this.state.pos.z) * 3.28084;
-        
-        if (altitudeFt < 10) { 
-             // Fade factor: 1.0 at 0ft, 0.0 at 10ft
-             let steerFactor = (10 - altitudeFt) / 10;
-             if (steerFactor < 0) steerFactor = 0;
-             if (steerFactor > 1) steerFactor = 1;
+        if (this.onGround) { 
+             // Fade factor: Based on weight on wheels or just 1.0 if on ground.
+             // User wants fade out as they lift off. onGround handles the binary state.
+             // We can add a transition if needed, but onGround is robust.
+             let steerFactor = 1.0;
              
              // Grass Damping
              let damping = 1.0;
@@ -968,17 +985,17 @@ class RealisticFlightPhysicsService {
              
              // Steering Force Calculation
              // Apply mass-based torque for consistent handling across aircraft types
-             // REDUCED: from 60 to 30 for torque, 25 to 15 for side force to prevent twitchiness
-             const steeringTorque = this.state.mass * 30 * this.controls.rudder * steerFactor * damping;
+             // INCREASED: Stronger nose wheel authority (Torque 30->80, Side 15->40)
+             const steeringTorque = this.state.mass * 80 * this.controls.rudder * steerFactor * damping;
              Mz_steering = steeringTorque;
              
              // Side force to initiate turn
-             const steeringSideForce = this.state.mass * 15 * this.controls.rudder * steerFactor * damping;
+             const steeringSideForce = this.state.mass * 40 * this.controls.rudder * steerFactor * damping;
              Fy_steering = steeringSideForce;
              
              // Debug log occasionally
-             if (Math.random() < 0.01) {
-                 console.log(`Physics: Ground Steering Active. Alt: ${altitudeFt.toFixed(1)}ft, Factor: ${steerFactor.toFixed(2)}, Torque: ${steeringTorque.toFixed(0)}`);
+             if (Math.random() < 0.001) {
+                 console.log(`Physics: Ground Steering Active. Torque: ${steeringTorque.toFixed(0)}`);
              }
         }
 
@@ -1103,18 +1120,11 @@ class RealisticFlightPhysicsService {
                     mu_slide *= (1 - 0.4 * rainFactor);
                 }
 
-                // Grass Friction Adjustment
                 if (this.groundStatus && this.groundStatus.status === 'GRASS') {
-                    // Increase rolling resistance significantly on grass (Soft ground)
-                    mu_roll = 0.08; // Was 0.02
-                    
-                    // Reduce sliding friction (Slippery grass)
-                    mu_slide = 0.5; // Was 0.9
-                    
-                    // Add "bumpiness" noise to normal force to simulate uneven terrain
-                    // Only if moving
-                    if (this.state.vel.length() > 1) {
-                        const noise = (Math.random() - 0.5) * 0.2; // +/- 10% variation
+                    mu_roll = 0.08;
+                    mu_slide = 0.5;
+                    if (this.state.vel.magnitude() > 1) {
+                        const noise = (Math.random() - 0.5) * 0.2;
                         F_n *= (1 + noise);
                     }
                 }
@@ -1178,6 +1188,15 @@ class RealisticFlightPhysicsService {
 
         this.onGround = onGroundAny;
 
+        if (this.onGround) {
+            const weightGround = this.state.mass * this.CONSTANTS.G;
+            const gravityArm = this.aircraft.groundGravityArm || (this.aircraft.chord || 5) * 0.15;
+            const liftArm = this.aircraft.groundLiftArm || (this.aircraft.chord || 5) * 0.2;
+            const My_gravity = -weightGround * gravityArm;
+            const My_lift_ground = F_lift * liftArm;
+            My_aero += My_gravity + My_lift_ground;
+        }
+
         // --- Main-Gear Pivot Logic (User Request) ---
         // Ensure rotation happens around main wheels, not CG.
         // Rotation Phase: Nose is light/off (Force ~ 0), Mains are heavy
@@ -1196,7 +1215,9 @@ class RealisticFlightPhysicsService {
              // Calculate Vertical Velocity at Pivot Point (Body Frame Z)
              // V_pivot_z = V_cg_z + (q * pivot_x) - (p * pivot_y is 0)
              // Positive Z is down.
-             const v_pivot_z = this.state.vel.z + (this.state.rates.y * pivotPos.x);
+             // w x r = (0, q, 0) x (x, 0, 0) = (0, 0, -qx)
+             // So v_z component from rotation is -q*x
+             const v_pivot_z = this.state.vel.z - (this.state.rates.y * pivotPos.x);
              
              // Apply constraint force to keep pivot attached to ground (V_z ~ 0)
              // High damping gain to kill vertical velocity at pivot
@@ -1249,16 +1270,18 @@ class RealisticFlightPhysicsService {
              const Iz = this.aircraft.Iz || 3000000;
              
              // Damping Factor (1/s) - Controls how fast rotation decays
-             // Reduced from 5.0 to 1.0 to prevent magnifying noise/vibration
-             const dampingFactor = 1.0; 
+             // INCREASED: 1.0 -> 5.0 for solid ground feel, prevents twitchiness at low speed
+             const dampingFactor = 5.0; 
 
              M_ground.x -= this.state.rates.x * (Ix * dampingFactor);
              M_ground.y -= this.state.rates.y * (Iy * dampingFactor);
              M_ground.z -= this.state.rates.z * (Iz * dampingFactor);
              
              // Vertical Damping (Mass-based)
-             if (Math.abs(this.state.vel.z) < 0.5) {
-                  F_ground.z -= this.state.vel.z * (this.state.mass * 5.0); 
+             // Global damper to stop bouncing/jitter at low speeds
+             // INCREASED: 5.0 -> 10.0
+             if (Math.abs(this.state.vel.z) < 1.0) {
+                  F_ground.z -= this.state.vel.z * (this.state.mass * 10.0); 
              }
         }
 
@@ -1641,7 +1664,8 @@ class RealisticFlightPhysicsService {
         // If on Runway, assume Airport Level (0 relative Z)
         // If Off Runway, use Terrain Elevation
         let groundHeightAMSL = this.airportElevation;
-        if (status !== 'RUNWAY') {
+        // User request: "for runway and airport-grass, lets first use the same height with the airport."
+        if (status !== 'RUNWAY' && status !== 'GRASS') {
              // Use terrain if available (non-null), otherwise stick to airport elevation (safety fallback)
              if (this.terrainElevation !== null) {
                  groundHeightAMSL = this.terrainElevation;
@@ -1653,6 +1677,84 @@ class RealisticFlightPhysicsService {
         // Origin is at Airport Elevation.
         // Ground Z = -(GroundAMSL - AirportAMSL)
         this.currentGroundZ = -(groundHeightAMSL - this.airportElevation);
+    }
+
+    applyRunwayStabilizer() {
+        if (this.difficulty === 'devil') return null;
+        if (!this.onGround || this.groundStatus.status !== 'RUNWAY') return null;
+        if (!this.runwayGeometry || !this.runwayGeometry.thresholdStart) return null;
+
+        const geom = this.runwayGeometry;
+        const lat = this.state.geo.lat;
+        const lon = this.state.geo.lon;
+        const lat0 = geom.thresholdStart.latitude;
+        const lon0 = geom.thresholdStart.longitude;
+        
+        const latRad = lat0 * Math.PI / 180;
+        const metersPerLat = 111132.92; 
+        const metersPerLon = 111412.84 * Math.cos(latRad);
+        
+        const dx = (lat - lat0) * metersPerLat; 
+        const dy = (lon - lon0) * metersPerLon; 
+        
+        const headingRad = geom.heading * Math.PI / 180;
+        const ux = Math.cos(headingRad);
+        const uy = Math.sin(headingRad);
+        
+        const distAlong = dx * ux + dy * uy;
+        
+        // XTE: Positive = Right of track
+        const XTE = dy * ux - dx * uy;
+
+        const euler = this.state.quat.toEuler();
+        const currentPsi = euler.psi; 
+        let headingDiff = currentPsi - headingRad;
+        while (headingDiff > Math.PI) headingDiff -= 2 * Math.PI;
+        while (headingDiff < -Math.PI) headingDiff += 2 * Math.PI;
+        
+        if (this.difficulty === 'rookie') {
+            // ROOKIE: Rail Mode - Force Centerline & Heading
+            const newDx = distAlong * ux;
+            const newDy = distAlong * uy;
+            
+            const newLat = lat0 + newDx / metersPerLat;
+            const newLon = lon0 + newDy / metersPerLon;
+            
+            this.state.geo.lat = newLat;
+            this.state.geo.lon = newLon;
+            
+            // Force Heading
+            this.state.quat = Quaternion.fromEuler(euler.phi, euler.theta, headingRad);
+            
+            // Kill lateral velocity & yaw rate
+            this.state.vel.y = 0; 
+            this.state.rates.z = 0;
+            
+            return null;
+        } else {
+            // OTHER: Gentle Pull
+            const sideVel = this.state.vel.y; 
+            const k_lat = 5000; 
+            const c_lat = 10000; 
+            
+            // Force in Body Y (Left if XTE > 0)
+            let F_y = -XTE * k_lat - sideVel * c_lat;
+            
+            const maxF = this.state.mass * 2.0; 
+            if (F_y > maxF) F_y = maxF;
+            if (F_y < -maxF) F_y = -maxF;
+            
+            const k_yaw = 500000; 
+            const c_yaw = 500000;
+            
+            let M_z = -headingDiff * k_yaw - this.state.rates.z * c_yaw;
+            
+            const maxM = 5000000;
+            if (M_z > maxM) M_z = maxM;
+            if (M_z < -maxM) M_z = -maxM;
+            
+            return { Fy: F_y, Mz: M_z };
+        }
     }
 
     /**
@@ -1668,6 +1770,13 @@ class RealisticFlightPhysicsService {
         // Orientation (psi = yaw in radians)
         if (conditions.orientation && conditions.orientation.psi !== undefined) {
             this.state.quat = Quaternion.fromEuler(0, 0, conditions.orientation.psi);
+        }
+
+        // Difficulty
+        if (conditions.difficulty) {
+            this.difficulty = conditions.difficulty;
+        } else {
+            this.difficulty = 'rookie'; // Default
         }
 
         // Flight Plan

@@ -1,7 +1,7 @@
 {
   "metadata": {
     "version": "1.0",
-    "lastUpdated": "2026-01-14",
+    "lastUpdated": "2026-01-18",
     "description": "Unified airport database combining normal and emergency airports",
     "usage": {
       "normal": "Available for flight planning and diversion selection",
@@ -63,7 +63,7 @@
       ],
       "city": "Atlanta",
       "country": "United States",
-      "elevation": 1026,
+      "elevation": 899,
       "frequencies": [
         {
           "type": "ATIS",
@@ -299,7 +299,7 @@
       ],
       "city": "Vancouver",
       "country": "Canada",
-      "elevation": 13,
+      "elevation": 30,
       "frequencies": [
         {
           "type": "ATIS",
@@ -399,7 +399,7 @@
       ],
       "city": "Mexico City",
       "country": "Mexico",
-      "elevation": 7385,
+      "elevation": 7306,
       "frequencies": [
         {
           "type": "ATIS",
@@ -464,7 +464,7 @@
       ],
       "city": "Denver",
       "country": "United States",
-      "elevation": 5431,
+      "elevation": 5420,
       "frequencies": [
         {
           "type": "ATIS",
@@ -529,7 +529,7 @@
       ],
       "city": "New York",
       "country": "United States",
-      "elevation": 13,
+      "elevation": 30,
       "frequencies": [
         {
           "type": "ATIS",
@@ -647,7 +647,7 @@
       ],
       "city": "Seattle",
       "country": "United States",
-      "elevation": 433,
+      "elevation": 371,
       "frequencies": [
         {
           "type": "ATIS",
@@ -712,7 +712,7 @@
       ],
       "city": "Las Vegas",
       "country": "United States",
-      "elevation": 2181,
+      "elevation": 2096,
       "frequencies": [
         {
           "type": "ATIS",
@@ -765,7 +765,7 @@
       ],
       "city": "Miami",
       "country": "United States",
-      "elevation": 7,
+      "elevation": 33,
       "frequencies": [
         {
           "type": "ATIS",
@@ -830,7 +830,7 @@
       ],
       "city": "Houston",
       "country": "United States",
-      "elevation": 97,
+      "elevation": 112,
       "frequencies": [
         {
           "type": "ATIS",
@@ -883,7 +883,7 @@
       ],
       "city": "Phoenix",
       "country": "United States",
-      "elevation": 1117,
+      "elevation": 1079,
       "frequencies": [
         {
           "type": "ATIS",
@@ -936,7 +936,7 @@
       ],
       "city": "Charlotte",
       "country": "United States",
-      "elevation": 748,
+      "elevation": 702,
       "frequencies": [
         {
           "type": "ATIS",
@@ -1054,7 +1054,7 @@
       ],
       "city": "Newark",
       "country": "United States",
-      "elevation": 18,
+      "elevation": 79,
       "frequencies": [
         {
           "type": "ATIS",
@@ -1184,7 +1184,7 @@
       ],
       "city": "Minneapolis",
       "country": "United States",
-      "elevation": 831,
+      "elevation": 820,
       "frequencies": [
         {
           "type": "ATIS",
@@ -1290,7 +1290,7 @@
       ],
       "city": "Philadelphia",
       "country": "United States",
-      "elevation": 39,
+      "elevation": 75,
       "frequencies": [
         {
           "type": "ATIS",
@@ -1343,7 +1343,7 @@
       ],
       "city": "St. Louis",
       "country": "United States",
-      "elevation": 614,
+      "elevation": 564,
       "frequencies": [
         {
           "type": "ATIS",
@@ -1437,7 +1437,7 @@
       ],
       "city": "Washington",
       "country": "United States",
-      "elevation": 312,
+      "elevation": 262,
       "frequencies": [
         {
           "type": "ATIS",
@@ -1543,7 +1543,7 @@
       ],
       "city": "Salt Lake City",
       "country": "United States",
-      "elevation": 4226,
+      "elevation": 4239,
       "frequencies": [
         {
           "type": "ATIS",
@@ -1596,7 +1596,7 @@
       ],
       "city": "Cincinnati",
       "country": "United States",
-      "elevation": 893,
+      "elevation": 860,
       "frequencies": [
         {
           "type": "ATIS",
@@ -1649,7 +1649,7 @@
       ],
       "city": "Orlando",
       "country": "United States",
-      "elevation": 96,
+      "elevation": 118,
       "frequencies": [
         {
           "type": "ATIS",
@@ -1802,7 +1802,7 @@
       ],
       "city": "Paris",
       "country": "France",
-      "elevation": 394,
+      "elevation": 338,
       "frequencies": [
         {
           "type": "ATIS",
@@ -1861,7 +1861,7 @@
       ],
       "city": "Frankfurt",
       "country": "Germany",
-      "elevation": 364,
+      "elevation": 318,
       "frequencies": [
         {
           "type": "ATIS",
@@ -1908,7 +1908,7 @@
       ],
       "city": "Munich",
       "country": "Germany",
-      "elevation": 449,
+      "elevation": 1490,
       "frequencies": [
         {
           "type": "ATIS",
@@ -1949,7 +1949,7 @@
       ],
       "city": "Zurich",
       "country": "Switzerland",
-      "elevation": 1416,
+      "elevation": 1375,
       "frequencies": [
         {
           "type": "ATIS",
@@ -2002,7 +2002,7 @@
       ],
       "city": "Rome",
       "country": "Italy",
-      "elevation": 16,
+      "elevation": -3,
       "frequencies": [
         {
           "type": "ATIS",
@@ -2102,7 +2102,7 @@
       ],
       "city": "Madrid",
       "country": "Spain",
-      "elevation": 2195,
+      "elevation": 1949,
       "frequencies": [
         {
           "type": "ATIS",
@@ -2155,7 +2155,7 @@
       ],
       "city": "Istanbul",
       "country": "Turkiye",
-      "elevation": 100,
+      "elevation": 279,
       "frequencies": [
         {
           "type": "ATIS",
@@ -2196,7 +2196,7 @@
       ],
       "city": "Dublin",
       "country": "Ireland",
-      "elevation": 249,
+      "elevation": 220,
       "frequencies": [
         {
           "type": "ATIS",
@@ -2243,7 +2243,7 @@
       ],
       "city": "Copenhagen",
       "country": "Denmark",
-      "elevation": 23,
+      "elevation": 10,
       "frequencies": [
         {
           "type": "ATIS",
@@ -2331,7 +2331,7 @@
       ],
       "city": "Oslo",
       "country": "Norway",
-      "elevation": 200,
+      "elevation": 0,
       "frequencies": [
         {
           "type": "ATIS",
@@ -2425,7 +2425,7 @@
       ],
       "city": "Amsterdam",
       "country": "Netherlands",
-      "elevation": -11,
+      "elevation": 23,
       "frequencies": [
         {
           "type": "ATIS",
@@ -2472,7 +2472,7 @@
       ],
       "city": "Milan",
       "country": "Italy",
-      "elevation": 83,
+      "elevation": 755,
       "frequencies": [
         {
           "type": "ATIS",
@@ -2513,7 +2513,7 @@
       ],
       "city": "Lisbon",
       "country": "Portugal",
-      "elevation": 23,
+      "elevation": 328,
       "frequencies": [
         {
           "type": "ATIS",
@@ -2560,7 +2560,7 @@
       ],
       "city": "Beijing",
       "country": "China",
-      "elevation": 118,
+      "elevation": 177,
       "frequencies": [
         {
           "type": "ATIS",
@@ -2748,7 +2748,7 @@
       ],
       "city": "Guangzhou",
       "country": "China",
-      "elevation": 118,
+      "elevation": 30,
       "frequencies": [
         {
           "type": "ATIS",
@@ -2795,7 +2795,7 @@
       ],
       "city": "Singapore",
       "country": "Singapore",
-      "elevation": 22,
+      "elevation": 43,
       "frequencies": [
         {
           "type": "ATIS",
@@ -2942,7 +2942,7 @@
       ],
       "city": "Delhi",
       "country": "India",
-      "elevation": 706,
+      "elevation": 751,
       "frequencies": [
         {
           "type": "ATIS",
@@ -3071,7 +3071,7 @@
       ],
       "city": "Taipei",
       "country": "Taiwan",
-      "elevation": 200,
+      "elevation": 112,
       "frequencies": [
         {
           "type": "ATIS",
@@ -3206,7 +3206,7 @@
       ],
       "city": "Jakarta",
       "country": "Indonesia",
-      "elevation": 10,
+      "elevation": 62,
       "frequencies": [
         {
           "type": "ATIS",
@@ -3253,7 +3253,7 @@
       ],
       "city": "Tokyo",
       "country": "Japan",
-      "elevation": 63,
+      "elevation": 121,
       "frequencies": [
         {
           "type": "ATIS",
@@ -3300,7 +3300,7 @@
       ],
       "city": "Shenzhen",
       "country": "China",
-      "elevation": 16,
+      "elevation": 0,
       "frequencies": [
         {
           "type": "ATIS",
@@ -3341,7 +3341,7 @@
       ],
       "city": "Chengdu",
       "country": "China",
-      "elevation": 1887,
+      "elevation": 1608,
       "frequencies": [
         {
           "type": "ATIS",
@@ -3382,7 +3382,7 @@
       ],
       "city": "Wuhan",
       "country": "China",
-      "elevation": 118,
+      "elevation": 69,
       "frequencies": [
         {
           "type": "ATIS",
@@ -3429,7 +3429,7 @@
       ],
       "city": "Xi'an",
       "country": "China",
-      "elevation": 1024,
+      "elevation": 1240,
       "frequencies": [
         {
           "type": "ATIS",
@@ -3470,7 +3470,7 @@
       ],
       "city": "Zhengzhou",
       "country": "China",
-      "elevation": 496,
+      "elevation": 531,
       "frequencies": [
         {
           "type": "ATIS",
@@ -3605,7 +3605,7 @@
       ],
       "city": "Chongqing",
       "country": "China",
-      "elevation": 1200,
+      "elevation": 1348,
       "frequencies": [
         {
           "type": "ATIS",
@@ -3646,7 +3646,7 @@
       ],
       "city": "Nanjing",
       "country": "China",
-      "elevation": 300,
+      "elevation": 59,
       "frequencies": [
         {
           "type": "ATIS",
@@ -3693,7 +3693,7 @@
       ],
       "city": "Sydney",
       "country": "Australia",
-      "elevation": 39,
+      "elevation": 7,
       "frequencies": [
         {
           "type": "ATIS",
@@ -3740,7 +3740,7 @@
       ],
       "city": "Melbourne",
       "country": "Australia",
-      "elevation": 360,
+      "elevation": 371,
       "frequencies": [
         {
           "type": "ATIS",
@@ -3781,7 +3781,7 @@
       ],
       "city": "Auckland",
       "country": "New Zealand",
-      "elevation": 92,
+      "elevation": 23,
       "frequencies": [
         {
           "type": "ATIS",
@@ -3828,7 +3828,7 @@
       ],
       "city": "São Paulo",
       "country": "Brazil",
-      "elevation": 259,
+      "elevation": 2457,
       "frequencies": [
         {
           "type": "ATIS",
@@ -3869,7 +3869,7 @@
       ],
       "city": "Buenos Aires",
       "country": "Argentina",
-      "elevation": 20,
+      "elevation": 66,
       "frequencies": [
         {
           "type": "ATIS",
@@ -3910,7 +3910,7 @@
       ],
       "city": "Santiago",
       "country": "Chile",
-      "elevation": 1735,
+      "elevation": 1578,
       "frequencies": [
         {
           "type": "ATIS",

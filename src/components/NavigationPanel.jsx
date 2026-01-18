@@ -171,67 +171,7 @@ const NavigationPanel = ({ flightState, selectedArrival, flightPlan }) => {
         ctx.moveTo(0, -radius);
         ctx.lineTo(0, -radius - (i % 90 === 0 ? 10 : 5));
         ctx.stroke();
-        // Draw Runway Alignment Triangle
-      if (nearbyRunways.length > 0 && typeof flightState?.latitude === 'number') {
-          // Find the closest runway
-          let closestRw = null;
-          let minRwDist = Infinity;
-          
-          nearbyRunways.forEach(rw => {
-             // Calculate distance to runway center
-             const midLat = (rw.thresholdStart.latitude + rw.thresholdEnd.latitude) / 2;
-             const midLon = (rw.thresholdStart.longitude + rw.thresholdEnd.longitude) / 2;
-             const d = calculateDistance(flightState.latitude, flightState.longitude, midLat, midLon);
-             if (d < minRwDist) {
-                 minRwDist = d;
-                 closestRw = { ...rw, midLat, midLon };
-             }
-          });
-
-          if (closestRw && minRwDist < 10) { // Only show if within 10nm
-              // Calculate bearing to runway center
-              const bearingToCenter = bearingTo(flightState.latitude, flightState.longitude, closestRw.midLat, closestRw.midLon);
-              
-              // Calculate relative bearing (angle offset from aircraft heading)
-              let relBearing = (bearingToCenter - heading + 360) % 360;
-              if (relBearing > 180) relBearing -= 360; // Range -180 to 180
-
-              // Map to screen X position (Top of radar)
-              // Radar is +/- 90 degrees visible? No, radar rotates.
-              // The indicator should be relative to the "Top Center" (Heading)
-              
-              // If relBearing is 0, triangle is at center (0)
-              // If relBearing is +10 (Runway is right), triangle moves Right
-              // Limit movement to the width of the radar view (approx +/- 45 deg range on bar?)
-              const maxDeflection = 45; // degrees
-              const pxPerDeg = (size / 2) / maxDeflection; 
-              
-              let xOffset = relBearing * pxPerDeg;
-              
-              // Clamp to edges
-              if (xOffset > size/2 - 10) xOffset = size/2 - 10;
-              if (xOffset < -(size/2 - 10)) xOffset = -(size/2 - 10);
-              
-              // Color logic: Green if centered (<5 deg), Yellow (<15), Red (>15)
-              let triColor = '#00ff00';
-              if (Math.abs(relBearing) > 5) triColor = '#ffff00';
-              if (Math.abs(relBearing) > 15) triColor = '#ff0000';
-
-              // Draw Triangle
-              ctx.save();
-              ctx.translate(center + xOffset, 15); // Top of radar
-              ctx.beginPath();
-              ctx.moveTo(0, 0); // Bottom point
-              ctx.lineTo(6, -10); // Top Right
-              ctx.lineTo(-6, -10); // Top Left
-              ctx.closePath();
-              ctx.fillStyle = triColor;
-              ctx.fill();
-              ctx.restore();
-          }
-      }
-
-      ctx.restore();
+        ctx.restore();
 
         if (i % 90 === 0) {
           let label = '';
@@ -265,6 +205,32 @@ const NavigationPanel = ({ flightState, selectedArrival, flightPlan }) => {
           const x = Math.cos(φ1) * Math.sin(φ2) - Math.sin(φ1) * Math.cos(φ2) * Math.cos(Δλ);
           return (toDeg(Math.atan2(y, x)) + 360) % 360;
       };
+
+      let alignmentBarData = null;
+
+      if (nearbyRunways.length > 0 && typeof flightState?.latitude === 'number') {
+        let closestRw = null;
+        let minRwDist = Infinity;
+
+        nearbyRunways.forEach(rw => {
+          const midLat = (rw.thresholdStart.latitude + rw.thresholdEnd.latitude) / 2;
+          const midLon = (rw.thresholdStart.longitude + rw.thresholdEnd.longitude) / 2;
+          const d = calculateDistance(flightState.latitude, flightState.longitude, midLat, midLon);
+          if (d < minRwDist) {
+            minRwDist = d;
+            closestRw = { ...rw, midLat, midLon };
+          }
+        });
+
+        if (closestRw && minRwDist < 10) {
+          const bearingToCenter = bearingTo(flightState.latitude, flightState.longitude, closestRw.midLat, closestRw.midLon);
+          let relBearing = (bearingToCenter - heading + 360) % 360;
+          if (relBearing > 180) relBearing -= 360;
+
+          // Store for drawing outside rotation context
+          alignmentBarData = { relBearing };
+        }
+      }
 
       // Draw Runways (Purple Lines)
       if (nearbyRunways.length > 0 && typeof flightState?.latitude === 'number') {
@@ -344,6 +310,53 @@ const NavigationPanel = ({ flightState, selectedArrival, flightPlan }) => {
       }
 
       ctx.restore();
+
+      // Draw Runway Alignment Bar (Fixed on Screen)
+      if (alignmentBarData) {
+        const { relBearing } = alignmentBarData;
+        const barY = 20;
+        const barWidth = size * 0.8;
+        const barX = (size - barWidth) / 2;
+        
+        // Background Bar
+        ctx.beginPath();
+        ctx.rect(barX, barY - 2, barWidth, 4);
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
+        ctx.fill();
+        ctx.strokeStyle = '#aaaaaa';
+        ctx.lineWidth = 1;
+        ctx.stroke();
+        
+        // Center Tick (Straight Ahead)
+        ctx.beginPath();
+        ctx.moveTo(size / 2, barY - 5);
+        ctx.lineTo(size / 2, barY + 5);
+        ctx.strokeStyle = '#ffffff';
+        ctx.stroke();
+
+        // Indicator Position
+        const maxDeflection = 45; // Degrees for full scale
+        let xOffset = relBearing * (barWidth / 2) / maxDeflection;
+        
+        // Clamp
+        if (xOffset > barWidth / 2) xOffset = barWidth / 2;
+        if (xOffset < -barWidth / 2) xOffset = -barWidth / 2;
+        
+        const indX = size / 2 + xOffset;
+
+        // Color Logic
+        let indColor = '#00ff00';
+        if (Math.abs(relBearing) > 5) indColor = '#ffff00';
+        if (Math.abs(relBearing) > 15) indColor = '#ff0000';
+
+        // Draw Indicator (Rectangle/Diamond)
+        ctx.beginPath();
+        ctx.rect(indX - 4, barY - 6, 8, 12);
+        ctx.fillStyle = indColor;
+        ctx.fill();
+        ctx.strokeStyle = '#ffffff';
+        ctx.stroke();
+      }
 
       ctx.save();
       ctx.translate(center, center);

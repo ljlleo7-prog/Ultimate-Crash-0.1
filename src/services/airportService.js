@@ -236,33 +236,73 @@ class AirportService {
     // Heading is direction OF the runway. 
     // Start point is "behind" the midpoint, End point is "ahead".
     // But which end is which depends on the runway name used (e.g. 09 vs 27).
-    // The headingDeg derived from "09" is 90 degrees.
-    // So the vector points East.
-    // The "Start" (Threshold 09) is at the West end.
-    // So we subtract the vector from midpoint to get start.
     
-    const dLat = (halfLength * Math.cos(headingDeg * toRad)) / R * toDeg;
-    const dLon = (halfLength * Math.sin(headingDeg * toRad)) / (R * Math.cos(airport.latitude * toRad)) * toDeg;
+    // 1. Determine the PRIMARY heading from the database object (e.g. "06/24" -> 06 -> 60deg)
+    // This defines the physical orientation of the strip in the DB.
+    // Vector P points from Start(06) to End(24).
+    const primaryHeadingMatch = runway.name.match(/^(\d{2})/);
+    let primaryHeadingDeg = 0;
+    if (primaryHeadingMatch) {
+      primaryHeadingDeg = parseInt(primaryHeadingMatch[1]) * 10;
+    }
+    
+    // 2. Determine the REQUESTED heading from the user input (runwayName)
+    // e.g. "24" -> 240deg.
+    let requestedHeadingDeg = primaryHeadingDeg;
+    if (runwayName) {
+        const reqMatch = runwayName.match(/^(\d{2})/);
+        if (reqMatch) {
+            requestedHeadingDeg = parseInt(reqMatch[1]) * 10;
+        }
+    }
 
-    const start = {
+    // 3. Calculate geometry based on PRIMARY heading first
+    const dLat = (halfLength * Math.cos(primaryHeadingDeg * toRad)) / R * toDeg;
+    const dLon = (halfLength * Math.sin(primaryHeadingDeg * toRad)) / (R * Math.cos(airport.latitude * toRad)) * toDeg;
+
+    // Primary Start (e.g. 06 Threshold) is "behind" the center relative to 06 heading
+    const p1 = {
       latitude: airport.latitude - dLat,
       longitude: airport.longitude - dLon
     };
     
-    const end = {
+    // Primary End (e.g. 24 Threshold) is "ahead" of the center
+    const p2 = {
       latitude: airport.latitude + dLat,
       longitude: airport.longitude + dLon
     };
 
+    // 4. Decide which point is Start/End based on Requested Heading
+    // If requested heading is close to primary (e.g. 06 vs 06), use p1->p2
+    // If requested heading is opposite (e.g. 24 vs 06), use p2->p1
+    
+    let diff = Math.abs(requestedHeadingDeg - primaryHeadingDeg);
+    if (diff > 180) diff = 360 - diff;
+    
+    let start, end, finalHeading;
+    
+    if (diff > 90) {
+        // Opposite direction requested
+        start = p2;
+        end = p1;
+        finalHeading = requestedHeadingDeg;
+    } else {
+        // Same direction requested
+        start = p1;
+        end = p2;
+        finalHeading = requestedHeadingDeg; // Use requested (e.g. might be slightly different if needed, but usually same block)
+        // If the DB says "06" and user asks "06", heading is 60.
+    }
+
     return {
       airportLat: airport.latitude,
       airportLon: airport.longitude,
-      heading: headingDeg,
+      heading: finalHeading,
       length: lengthM,
       width: widthM,
       thresholdStart: start,
       thresholdEnd: end,
-      runwayName: runway.name
+      runwayName: runwayName || runway.name
     };
   }
 
