@@ -706,8 +706,8 @@ const FlightInProgress = ({
       </div>
 
       <div style={{ flex: 1, display: 'flex', position: 'relative' }}>
-        {/* Debug Panel - Always shown as requested or toggleable */}
-        {true && (
+        {/* Debug Panel - Toggled via Sidebar or Button */}
+        {showDebugPhysics && (
           <DebugPhysicsPanel 
             debugPhysicsData={flightData?.debugPhysics}
             thrust={flightData?.thrust}
@@ -743,6 +743,7 @@ const FlightInProgress = ({
         <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', zIndex: 10 }}>
           <FlightPanelModular
             flightData={flightData}
+            physicsState={physicsState}
             weatherData={weatherData}
             aircraftModel={aircraftModel}
             selectedArrival={selectedArrival}
@@ -829,6 +830,18 @@ const FlightInProgress = ({
                   console.log(`📡 FlightPanel Action: ${action} = ${JSON.stringify(payload)}`);
                   break;
                 }
+                case 'load-flight': {
+                  if (physicsService && typeof physicsService.loadFlightState === 'function') {
+                    physicsService.loadFlightState(payload);
+                  }
+                  console.log(`📡 FlightPanel Action: ${action} = ${JSON.stringify(payload)}`);
+                  break;
+                }
+                case 'toggle-debug': {
+                  setShowDebugPhysics(prev => !prev);
+                  console.log(`📡 FlightPanel Action: ${action} -> New State: ${!showDebugPhysics}`);
+                  break;
+                }
                 default:
                   console.log('Unhandled action:', action);
               }
@@ -839,7 +852,7 @@ const FlightInProgress = ({
       </div>
       
       {/* Debug Panel for LNAV/PID */}
-      {flightData && (
+      {showDebugPhysics && flightData && (
         <div style={{
           position: 'absolute',
           top: '90px',

@@ -13,11 +13,15 @@ import CentralPanel from './CentralPanel';
 import ControlSurfacePanel from './ControlSurfacePanel';
 import OverheadPanel from './OverheadPanel';
 import RudderPedal from './RudderPedal';
+import Sidebar from './Sidebar';
+import SaveLoadPanel from './SaveLoadPanel';
 import './FlightPanel.css';
 
-const FlightPanelModular = ({ flightData, weatherData, onActionRequest, aircraftModel, selectedArrival, flightPlan, radioMessages, onRadioFreqChange, npcs, frequencyContext, currentRegion }) => {
+const FlightPanelModular = ({ flightData, physicsState, weatherData, onActionRequest, aircraftModel, selectedArrival, flightPlan, radioMessages, onRadioFreqChange, npcs, frequencyContext, currentRegion }) => {
   // Use flightData from parent component instead of creating own physics service
   const [showOverhead, setShowOverhead] = useState(false);
+  const [activeSidebarPanel, setActiveSidebarPanel] = useState(null);
+
   const [flightState, setFlightState] = useState({
     // Navigation
     heading: flightData?.heading || 270,
@@ -267,39 +271,74 @@ const FlightPanelModular = ({ flightData, weatherData, onActionRequest, aircraft
     }
   };
 
+  const handleSidebarToggle = (panelId) => {
+    if (panelId === 'inspect') {
+      if (onActionRequest) {
+        onActionRequest('toggle-debug');
+      }
+    } else {
+      setActiveSidebarPanel(prev => prev === panelId ? null : panelId);
+    }
+  };
+
+  const handleLoadFlight = (data) => {
+    if (onActionRequest) {
+      onActionRequest('load-flight', data);
+    }
+    setActiveSidebarPanel(null);
+  };
+
   // Main render function
-  return React.createElement('div', { className: 'modern-flight-panel', style: { userSelect: 'none' } },
-    // Overhead Panel Overlay
-    showOverhead && React.createElement(OverheadPanel, {
-      onClose: () => setShowOverhead(false),
-      flightState,
-      onSystemAction: handleSystemAction
+  return React.createElement('div', { className: 'modern-flight-panel', style: { userSelect: 'none', display: 'flex', flexDirection: 'row', gap: '10px', padding: 0 } },
+    
+    // Sidebar (Leftmost)
+    React.createElement(Sidebar, { activePanel: activeSidebarPanel, onTogglePanel: handleSidebarToggle }),
+
+    // Save & Load Panel Overlay
+    activeSidebarPanel === 'save_load' && React.createElement(SaveLoadPanel, {
+        flightData,
+        physicsState,
+        flightPlan,
+        weatherData,
+        aircraftModel,
+        onClose: () => setActiveSidebarPanel(null),
+        onLoadFlight: handleLoadFlight
     }),
 
-    // Crash warning flash
-    React.createElement(CrashWarningFlash, { flashActive, flashText, onAlertComplete: handleAlertComplete }),
-    
-    // Crash panel (if crashed)
-    React.createElement(CrashPanel, { showCrashPanel, resetFlight }),
+    // Main Content Area (Wrapped in a div to take remaining width)
+    React.createElement('div', { style: { flex: 1, position: 'relative', padding: '20px' } },
 
-    // Debug frame panel
-    React.createElement('div', {
-      style: {
-        position: 'absolute',
-        bottom: '10px',
-        left: '10px',
-        padding: '6px 10px',
-        background: 'rgba(0, 0, 0, 0.7)',
-        color: '#0f0',
-        fontSize: '12px',
-        borderRadius: '4px',
-        zIndex: 1000
-      }
-    }, `Frame: ${flightState.frame !== undefined ? flightState.frame : 0}`),
-    
-    // Modern cockpit layout
-    React.createElement('div', { className: 'modern-cockpit' },
-      // Top Row: Autopilot + Comm
+      // Overhead Panel Overlay
+      showOverhead && React.createElement(OverheadPanel, {
+        onClose: () => setShowOverhead(false),
+        flightState,
+        onSystemAction: handleSystemAction
+      }),
+
+      // Crash warning flash
+      React.createElement(CrashWarningFlash, { flashActive, flashText, onAlertComplete: handleAlertComplete }),
+      
+      // Crash panel (if crashed)
+      React.createElement(CrashPanel, { showCrashPanel, resetFlight }),
+
+      // Debug frame panel
+      React.createElement('div', {
+        style: {
+          position: 'absolute',
+          bottom: '10px',
+          left: '10px',
+          padding: '6px 10px',
+          background: 'rgba(0, 0, 0, 0.7)',
+          color: '#0f0',
+          fontSize: '12px',
+          borderRadius: '4px',
+          zIndex: 1000
+        }
+      }, `Frame: ${flightState.frame !== undefined ? flightState.frame : 0}`),
+      
+      // Modern cockpit layout
+      React.createElement('div', { className: 'modern-cockpit' },
+        // Top Row: Autopilot + Comm
       React.createElement('div', { 
         style: { 
           display: 'flex', 
@@ -368,6 +407,7 @@ const FlightPanelModular = ({ flightData, weatherData, onActionRequest, aircraft
         })
       )
     )
+  )
   );
 };
 

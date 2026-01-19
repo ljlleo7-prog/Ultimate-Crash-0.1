@@ -1,0 +1,155 @@
+.save-load-panel {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 600px;
+  background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
+  border: 2px solid #3b82f6;
+  border-radius: 12px;
+  box-shadow: 0 0 40px rgba(0, 0, 0, 0.8);
+  z-index: 2000;
+  color: #e2e8f0;
+  font-family: 'Courier New', monospace;
+  display: flex;
+  flex-direction: column;
+}
+
+.panel-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 15px 20px;
+  background: rgba(0, 0, 0, 0.3);
+  border-bottom: 1px solid #334155;
+}
+
+.panel-header h3 {
+  margin: 0;
+  color: #60a5fa;
+  font-size: 1.2rem;
+}
+
+.close-btn {
+  background: none;
+  border: none;
+  color: #94a3b8;
+  font-size: 1.5rem;
+  cursor: pointer;
+  transition: color 0.2s;
+}
+
+.close-btn:hover {
+  color: #ef4444;
+}
+
+.panel-content {
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.flight-manifest {
+  background: rgba(15, 23, 42, 0.5);
+  border: 1px solid #334155;
+  border-radius: 8px;
+  padding: 15px;
+}
+
+.flight-manifest h4 {
+  margin: 0 0 10px 0;
+  color: #fbbf24;
+  border-bottom: 1px solid #334155;
+  padding-bottom: 5px;
+}
+
+.manifest-details {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.manifest-details p {
+  margin: 5px 0;
+  font-size: 0.9rem;
+}
+
+.actions-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+}
+
+.action-card {
+  background: rgba(30, 41, 59, 0.5);
+  border: 1px solid #475569;
+  border-radius: 8px;
+  padding: 15px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+}
+
+.action-card h5 {
+  margin: 0 0 10px 0;
+  font-size: 1.1rem;
+  color: #e2e8f0;
+}
+
+.action-card p {
+  margin: 0 0 15px 0;
+  font-size: 0.8rem;
+  color: #94a3b8;
+  flex-grow: 1;
+}
+
+.action-btn {
+  padding: 10px 20px;
+  border: none;
+  border-radius: 6px;
+  font-weight: bold;
+  cursor: pointer;
+  transition: all 0.2s;
+  width: 100%;
+  display: inline-block;
+  box-sizing: border-box;
+}
+
+.save-btn {
+  background: #10b981;
+  color: #064e3b;
+}
+
+.save-btn:hover {
+  background: #34d399;
+}
+
+.load-btn {
+  background: #3b82f6;
+  color: #1e3a8a;
+}
+
+.load-btn:hover {
+  background: #60a5fa;
+}
+
+.status-msg {
+  padding: 10px;
+  border-radius: 6px;
+  text-align: center;
+  font-weight: bold;
+}
+
+.status-msg.error {
+  background: rgba(239, 68, 68, 0.2);
+  color: #ef4444;
+  border: 1px solid #ef4444;
+}
+
+.status-msg.success {
+  background: rgba(16, 185, 129, 0.2);
+  color: #10b981;
+  border: 1px solid #10b981;
+}

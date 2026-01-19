@@ -1840,6 +1840,157 @@ class RealisticFlightPhysicsService {
         this.autopilot.setTargets(targets);
     }
     
+    loadFlightState(data) {
+        if (!data) return;
+        
+        console.log('🔄 Loading flight state...', data);
+
+        // 1. Restore Physics State
+        if (data.physicsState) {
+            const ps = data.physicsState;
+            
+            // Position
+            if (ps.position) {
+                this.state.pos = new Vector3(ps.position.x, ps.position.y, ps.position.z);
+            }
+            
+            // Velocity
+            if (ps.velocity) {
+                this.state.vel = new Vector3(ps.velocity.x, ps.velocity.y, ps.velocity.z);
+            }
+            
+            // Orientation (Quaternion)
+            if (ps.orientation) {
+                // Check if we have quaternion components directly
+                if (ps.orientation.w !== undefined) {
+                    this.state.quat = new Quaternion(ps.orientation.w, ps.orientation.x, ps.orientation.y, ps.orientation.z);
+                } 
+                // Fallback to Euler if only theta/phi/psi available (from view model)
+                else if (ps.orientation.theta !== undefined) {
+                     this.state.quat = Quaternion.fromEuler(ps.orientation.phi, ps.orientation.theta, ps.orientation.psi);
+                }
+            }
+            
+            // Angular Rates
+            if (ps.rates) {
+                this.state.rates = new Vector3(ps.rates.x, ps.rates.y, ps.rates.z);
+            } else {
+                this.state.rates = new Vector3(0, 0, 0);
+            }
+
+            // Controls
+            if (ps.controls) {
+                this.controls = { ...this.controls, ...ps.controls };
+            }
+
+            // Engines
+            if (ps.engineParams) {
+                // This is a bit tricky as engineParams in update() output is simplified
+                // We might need to approximate or just reset to idle if not detailed enough
+                // But for now, let's assume we can at least set throttle
+                if (ps.controls && ps.controls.throttle !== undefined) {
+                    this.engines.forEach(e => e.throttle = ps.controls.throttle);
+                }
+            }
+            
+            // Autopilot
+            if (ps.autopilot) {
+                this.autopilot.setEngaged(ps.autopilot.engaged);
+                if (ps.autopilot.mode) this.autopilot.setTargets({ mode: ps.autopilot.mode });
+                if (ps.autopilot.targets) this.autopilot.setTargets(ps.autopilot.targets);
+            }
+            
+            // Systems
+            if (ps.systems) {
+                this.systems = { ...this.systems, ...ps.systems };
+            }
+        }
+        // Fallback: Restore from Flight Data (View Model)
+        else if (data.flightData) {
+            const fd = data.flightData;
+            
+            if (fd.position) {
+                this.state.pos = new Vector3(fd.position.x, fd.position.y, fd.position.z);
+            }
+            
+            // Estimate orientation from Euler
+            const pitch = (fd.pitch || 0) * Math.PI / 180;
+            const roll = (fd.roll || 0) * Math.PI / 180;
+            const heading = (fd.heading || 0) * Math.PI / 180;
+            this.state.quat = Quaternion.fromEuler(roll, pitch, heading);
+            
+            // Estimate velocity from airspeed/heading
+            // This is lossy but better than nothing
+            const tasMs = (fd.airspeed || 0) * 0.514444;
+            // Assuming level flight aligned with heading
+            const vx = tasMs * Math.cos(pitch) * Math.cos(heading);
+            const vy = tasMs * Math.cos(pitch) * Math.sin(heading);
+            const vz = -tasMs * Math.sin(pitch); // Approximate
+            // We need velocity in Body frame or NED? 
+            // state.vel is Body Frame (FRD).
+            // V_body = [TAS, 0, 0] approx if no slip/AoA
+            this.state.vel = new Vector3(tasMs, 0, 0);
+            
+            this.state.rates = new Vector3(0, 0, 0);
+        }
+
+        // 2. Restore Flight Plan
+        if (data.flightPlan) {
+            this.flightPlan = data.flightPlan;
+            // Try to find nearest waypoint index?
+            // For now reset to 0 or use saved index if available
+            this.currentWaypointIndex = data.flightData?.currentWaypointIndex || 0;
+        }
+
+        // 3. Reset Crash State & Re-validate Ground Status
+        this.crashed = false;
+        this.crashReason = "";
+        this.time = data.flightData?.frame ? (data.flightData.frame * 0.016) : 0; // Approximate time
+        
+        // Ensure altitude is safe if we just loaded
+        // If we are "on ground", ensure we aren't underground
+        // groundStatus logic will run next frame, but we need to prevent immediate crash
+        
+        // Recalculate derived state to ensure consistency
+        if (this.state.pos.z > 0) {
+            // NED z is positive down. So positive Z means underground (if ground is 0).
+            // But we treat ground as negative usually? 
+            // Wait, standard NED: Z is Down. Altitude is -Z.
+            // If Altitude is positive, Z is negative.
+            // If Z is positive, we are below sea level (or whatever 0 reference is).
+            // Ground Z is stored in currentGroundZ (NED).
+            // If Z > currentGroundZ, we are underground.
+        }
+
+        // Force ground status update if we have runway geometry
+        // Note: We might be restoring to a point where we don't have the geometry loaded yet?
+        // Ideally we should save runwayGeometry too.
+        if (data.runwayGeometry) {
+            this.runwayGeometry = data.runwayGeometry;
+        }
+        
+        // Reset ground status to avoid immediate "unsafe altitude" trigger
+        // We'll let the next update loop figure out the real status
+        // But if we are low, we must ensure we don't crash instantly.
+        const altitude = -this.state.pos.z;
+        if (altitude < 100) { // If low altitude
+             // Check if we assume on ground?
+             // If velocity is low, assume on ground
+             if (this.state.vel.magnitude() < 40) {
+                 this.onGround = true;
+             } else {
+                 this.onGround = false;
+             }
+        } else {
+            this.onGround = false;
+        }
+        
+        // Explicitly clear ground status to force re-evaluation without carrying over 'unsafe' state
+        this.groundStatus = { status: 'UNKNOWN', remainingLength: 0 };
+        
+        console.log('✅ Flight state loaded. Crash state reset.');
+    }
+
     getFlapIncrements() {
         const profile = this.aircraft.flapProfile;
         if (!profile || !profile.positions || profile.positions.length === 0) {
