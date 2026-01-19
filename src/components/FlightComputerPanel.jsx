@@ -105,8 +105,12 @@ const FlightComputerPanel = ({ onClose, flightPlan, onUpdateFlightPlan, flightSt
     if (!flightState || !flightState.latitude || !flightState.longitude) return;
     
     setLoadingNearest(true);
-    // Find within 100nm first, if none, expand
-    let results = airportService.getAirportsWithinRadius(flightState.latitude, flightState.longitude, 100);
+    // Find within 100nm first, if none, expand to 300nm
+    let results = airportService.getAirportsWithinRadius(flightState.latitude, flightState.longitude, 100, { type: 'all' });
+    
+    if (results.length === 0) {
+      results = airportService.getAirportsWithinRadius(flightState.latitude, flightState.longitude, 300, { type: 'all' });
+    }
     
     // Sort by distance
     results.sort((a, b) => {

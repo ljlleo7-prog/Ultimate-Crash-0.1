@@ -159,13 +159,16 @@ const FlightPanelModular = ({ flightData, physicsState, weatherData, onActionReq
     if (flightData?.crashWarning) {
         warningMsg = flightData.crashWarning;
     } 
-    // Priority 2: Flashing Warnings
+    // Priority 2: Flashing Warnings - DISABLED HUGE FLASHING BOXES per user request
+    // Warnings will now appear in the EICAS list (Central Panel)
+    /* 
     else if (flightData?.activeWarnings) {
         const flashWarning = flightData.activeWarnings.find(w => w.isFlashing);
         if (flashWarning) {
             warningMsg = flashWarning.message;
         }
     }
+    */
 
     if (!warningMsg) {
       return;

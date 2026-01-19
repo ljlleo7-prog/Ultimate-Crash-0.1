@@ -81,12 +81,7 @@ export function useAircraftPhysics(config = {}, autoStart = true, model = 'reali
         let aircraftDatabase;
         try {
           aircraftDatabase = await loadAircraftData();
-          console.log('🎮 useAircraftPhysics: AIRCRAFT DATABASE LOADED:', {
-            isArray: Array.isArray(aircraftDatabase),
-            length: aircraftDatabase?.length || 0,
-            type: typeof aircraftDatabase,
-            hasLength: 'length' in aircraftDatabase
-          });
+          // console.log('🎮 useAircraftPhysics: AIRCRAFT DATABASE LOADED:', { ... });
         } catch (dbError) {
           console.error('❌ Failed to load aircraft database:', dbError);
           aircraftDatabase = null;
@@ -96,7 +91,16 @@ export function useAircraftPhysics(config = {}, autoStart = true, model = 'reali
         if (aircraftDatabase && Array.isArray(aircraftDatabase) && aircraftDatabase.length > 0) {
           if (config && (config.aircraftModel || config.model)) {
             const targetModel = config.aircraftModel || config.model;
+            // Ensure we match exact model string
             selectedAircraft = aircraftDatabase.find(a => a.model === targetModel) || aircraftDatabase[0];
+            
+            // Critical: Ensure maxThrustPerEngine is present. If not, try to find it in the DB again if we have a partial object
+            if (selectedAircraft && !selectedAircraft.maxThrustPerEngine) {
+                 const dbMatch = aircraftDatabase.find(a => a.model === selectedAircraft.model);
+                 if (dbMatch) {
+                     selectedAircraft = { ...selectedAircraft, ...dbMatch };
+                 }
+            }
           } else {
             selectedAircraft = aircraftDatabase[0];
           }
@@ -107,7 +111,7 @@ export function useAircraftPhysics(config = {}, autoStart = true, model = 'reali
           : {
               name: 'Boeing 737-800',
               mass: 41410,
-              maxThrustPerEngine: 85000,
+              maxThrustPerEngine: 120000, // Updated default from 85000
               engineCount: 2,
               emptyWeight: 41410,
               fuelWeight: 21800,
@@ -237,17 +241,17 @@ export function useAircraftPhysics(config = {}, autoStart = true, model = 'reali
             service.aircraft.mass = service.aircraft.emptyWeight + fuelWeight + payloadWeight;
           }
         }
-        console.log('🎮 useAircraftPhysics: PHYSICS SERVICE CREATED');
-        console.log('🎮 useAircraftPhysics: AIRCRAFT DATA IN PHYSICS SERVICE:', {
-          basicLiftCoefficient: service?.aircraft?.basicLiftCoefficient,
-          horizontalStabilizerArea: service?.aircraft?.horizontalStabilizerArea,
-          horizontalStabilizerCL: service?.aircraft?.horizontalStabilizerCL,
-          horizontalStabilizerMomentArm: service?.aircraft?.horizontalStabilizerMomentArm
-        });
+        // console.log('🎮 useAircraftPhysics: PHYSICS SERVICE CREATED');
+        // console.log('🎮 useAircraftPhysics: AIRCRAFT DATA IN PHYSICS SERVICE:', {
+        //   basicLiftCoefficient: service?.aircraft?.basicLiftCoefficient,
+        //   horizontalStabilizerArea: service?.aircraft?.horizontalStabilizerArea,
+        //   horizontalStabilizerCL: service?.aircraft?.horizontalStabilizerCL,
+        //   horizontalStabilizerMomentArm: service?.aircraft?.horizontalStabilizerMomentArm
+        // });
         
         physicsServiceRef.current = service;
         setIsInitialized(true);
-        console.log('🎮 useAircraftPhysics: PHYSICS SERVICE INITIALIZED SUCCESSFULLY WITH DATABASE DATA');
+        // console.log('🎮 useAircraftPhysics: PHYSICS SERVICE INITIALIZED SUCCESSFULLY WITH DATABASE DATA');
       } catch (err) {
         console.error('🎮 useAircraftPhysics: PHYSICS SERVICE INITIALIZATION FAILED', err);
         console.error('🎮 useAircraftPhysics: ERROR STACK:', err.stack);
@@ -259,21 +263,21 @@ export function useAircraftPhysics(config = {}, autoStart = true, model = 'reali
   }, [model]);
 
   useEffect(() => {
-    console.log('🎮 useAircraftPhysics: AUTO-START EFFECT TRIGGERED', {
-      autoStart,
-      isInitialized,
-      physicsService: !!physicsServiceRef.current,
-      timestamp: new Date().toISOString()
-    });
+    // console.log('🎮 useAircraftPhysics: AUTO-START EFFECT TRIGGERED', {
+    //   autoStart,
+    //   isInitialized,
+    //   physicsService: !!physicsServiceRef.current,
+    //   timestamp: new Date().toISOString()
+    // });
 
     if (autoStart && isInitialized && physicsServiceRef.current) {
-      console.log('🎮 useAircraftPhysics: STARTING PHYSICS ENGINE...');
+      // console.log('🎮 useAircraftPhysics: STARTING PHYSICS ENGINE...');
       startPhysics();
     }
   }, [autoStart, isInitialized]);
 
   const startPhysics = () => {
-    console.log('🎮 useAircraftPhysics: STARTING PHYSICS ANIMATION LOOP...');
+    // console.log('🎮 useAircraftPhysics: STARTING PHYSICS ANIMATION LOOP...');
     const targetStep = 1 / 60;
     const animate = () => {
       const currentTime = Date.now();
@@ -291,7 +295,7 @@ export function useAircraftPhysics(config = {}, autoStart = true, model = 'reali
     };
     
     requestAnimationFrame(animate);
-    console.log('🎮 useAircraftPhysics: PHYSICS ANIMATION LOOP STARTED');
+    // console.log('🎮 useAircraftPhysics: PHYSICS ANIMATION LOOP STARTED');
   };
 
   const updatePhysics = useCallback((fixedDt = 1 / 60, currentTimeOverride = null) => {
@@ -422,6 +426,7 @@ export function useAircraftPhysics(config = {}, autoStart = true, model = 'reali
         timeToCrash: typeof newState.timeToCrash === 'number' ? newState.timeToCrash : null,
         crashWarning,
         alarms,
+        activeWarnings: newState.activeWarnings || [],
         autopilotEngaged,
         autopilotMode,
         autopilotTargets,

@@ -282,6 +282,7 @@ const FlightInitialization = ({
   // Calculate flight plan when route or parameters change
   useEffect(() => {
     const calculatePlan = async () => {
+      // Trigger if we have departure and arrival
       if (selectedDeparture && selectedArrival) {
         // Safe parsing for calculations
         const safePayload = parseFloat(payload) || 0;
@@ -298,7 +299,7 @@ const FlightInitialization = ({
           distance.nauticalMiles, 
           aircraftModel, 
           safePayload,
-          safeReserve // Use state value
+          safeReserve
         );
         
         // Calculate flight time (simple estimation)
@@ -317,7 +318,7 @@ const FlightInitialization = ({
     };
     
     calculatePlan();
-  }, [selectedDeparture, selectedArrival, aircraftModel, payload, reserveHours]);
+  }, [selectedDeparture, selectedArrival, aircraftModel, payload, reserveHours, currentStep]); // Added currentStep to ensure recalc when moving to route page
 
   return (
     <div className="flight-initialization">

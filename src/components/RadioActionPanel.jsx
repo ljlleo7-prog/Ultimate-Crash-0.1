@@ -7,8 +7,9 @@ const RadioActionPanel = ({ onTransmit, currentStation = 'Unicom', callsign = 'C
   const [selectedTemplate, setSelectedTemplate] = useState(null);
   const [paramValues, setParamValues] = useState({});
 
-  // Derive valid waypoints from flight plan
-  const validWaypoints = flightPlan?.waypoints?.map(wp => wp.name || wp.id).filter(Boolean) || [];
+  // Derive valid waypoints from flight plan (handle both object and array formats)
+  const waypoints = Array.isArray(flightPlan) ? flightPlan : (flightPlan?.waypoints || []);
+  const validWaypoints = waypoints.map(wp => wp.name || wp.label || wp.id || `WPT`).filter(Boolean);
 
   const handleTabChange = (tab) => {
     setActiveTab(tab);

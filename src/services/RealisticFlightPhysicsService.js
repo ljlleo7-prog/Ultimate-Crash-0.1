@@ -828,10 +828,7 @@ class RealisticFlightPhysicsService {
 
              engine.update(dt, engineThrottle, mach, -this.state.pos.z, airDensityRatio, env.temp);
              
-             // Consume Fuel
-             // fuelFlow is kg/s
-             const fuelBurned = engine.state.fuelFlow * dt;
-             this.state.fuel -= fuelBurned;
+             // Fuel consumption is handled in the main update loop via totalFuelFlow to avoid double counting
         });
         
         if (this.state.fuel < 0) {
@@ -1503,6 +1500,8 @@ class RealisticFlightPhysicsService {
             
             debugPhysics: {
                 theta: euler.theta,
+                phi: euler.phi,
+                psi: euler.psi,
                 dynamicPressure_q: this.debugData?.q || 0,
                 pitchMoment_y: this.debugData?.pitchMoment || 0,
                 pitchRate_q: this.state.rates.y,
@@ -1853,6 +1852,9 @@ class RealisticFlightPhysicsService {
             this.flightPlan = [];
         }
         
+        // Reset index to start from the beginning of the new plan
+        this.currentWaypointIndex = 0;
+        
         // Optionally reset index if it was invalid, or keep it if within bounds
         if (this.currentWaypointIndex >= this.flightPlan.length) {
             this.currentWaypointIndex = Math.max(0, this.flightPlan.length - 1);
@@ -1865,7 +1867,7 @@ class RealisticFlightPhysicsService {
     loadFlightState(data) {
         if (!data) return;
         
-        console.log('🔄 Loading flight state...', data);
+        // console.log('🔄 Loading flight state...', data);
 
         // 1. Restore Physics State
         if (data.physicsState) {

@@ -23,8 +23,24 @@ class WarningSystem {
             sinkRatePullUp: 4000, // ft/min
             terrainClosureWarn: 2000, // ft/min closure rate
             gearWarningAlt: 500, // ft RA (Radio Altitude)
-            flapsWarningAlt: 200 // ft RA
+            flapsWarningAlt: 200, // ft RA
+            
+            // New Thresholds
+            vle: 270, // Max Gear Extended Speed
+            vlo: 250, // Max Gear Operation Speed
+            vfe: [ // Max Flap Extended Speeds (Index 0 = Flaps 1, etc. - Simplified)
+                250, // Flaps 1
+                230, // Flaps 5
+                210, // Flaps 15
+                190, // Flaps 20
+                180, // Flaps 25
+                170  // Flaps 30
+            ],
+            tailStrikePitch: 10, // Degrees
+            altitudeAlertDiff: 300 // ft
         };
+        
+        this.prevApEngaged = false;
     }
 
     /**
@@ -43,40 +59,41 @@ class WarningSystem {
             controls,
             systems,
             debugPhysics,
-            controls: { gear, flaps },
+            controls: { gear, flaps, throttle, airBrakes, brakes },
             verticalSpeed, // ft/min
             fuel,
             engineParams,
-            groundStatus
+            groundStatus,
+            autopilot,
+            autopilotTargets
         } = physicsState;
 
         const altitudeAGL = derived.altitude_agl_ft;
-        const airspeed = derived.airspeed;
-        const roll = Math.abs(physicsState.debugPhysics.theta * 180 / Math.PI); // Assuming theta is pitch? Wait, check rotation order.
-        // Physics Service: euler.phi is roll, euler.theta is pitch. 
-        // physicsState.debugPhysics.theta is passed as pitch.
-        // Let's use the raw euler angles if available, or rely on what's passed.
-        // Looking at RealisticFlightPhysicsService:
-        // const euler = this.state.quat.toEuler();
-        // apState = { ..., pitch: euler.theta, roll: euler.phi, ... }
-        // getOutputState returns: derived.heading, debugPhysics.theta (pitch).
-        // It seems 'roll' might not be directly in debugPhysics.
-        // But 'autopilot' state has pitch and roll.
-        // Let's check where we can get Roll. 
-        // 'autopilot' object in output state has 'roll' (radians).
+        const altitudeMSL = derived.altitude_ft;
+        const airspeed = derived.indicatedAirspeed || derived.airspeed; // Use IAS for structural limits
         
-        const rollDeg = (physicsState.autopilot?.roll || 0) * 180 / Math.PI;
-        const pitchDeg = (physicsState.autopilot?.pitch || 0) * 180 / Math.PI;
+        // Roll is available in debugPhysics.phi (radians)
+        const rollRad = physicsState.debugPhysics.phi || 0;
+        const pitchRad = physicsState.debugPhysics.theta || 0;
+        
+        const rollDeg = rollRad * 180 / Math.PI;
+        const pitchDeg = pitchRad * 180 / Math.PI;
         const alpha = debugPhysics.alpha * 180 / Math.PI;
         
         // --- GPWS Checks ---
         this.checkGPWS(altitudeAGL, verticalSpeed, gear, flaps, airspeed, groundStatus);
 
         // --- Flight Envelope Checks ---
-        this.checkEnvelope(alpha, airspeed, rollDeg, pitchDeg);
+        this.checkEnvelope(alpha, airspeed, rollDeg, pitchDeg, flaps, gear);
+
+        // --- Configuration Checks ---
+        this.checkConfiguration(flaps, gear, airBrakes, throttle, groundStatus, pitchDeg, brakes);
 
         // --- System Checks ---
         this.checkSystems(systems, fuel, engineParams, altitudeAGL);
+        
+        // --- Autopilot/Nav Checks ---
+        this.checkAutomation(autopilot, autopilotTargets, altitudeMSL);
 
         // Sort by priority (Critical first)
         this.activeWarnings.sort((a, b) => {
@@ -145,7 +162,7 @@ class WarningSystem {
 
         // Bank Angle
         if (Math.abs(roll) > this.thresholds.bankAngleWarn) {
-            this.addWarning('BANK_ANGLE', 'BANK ANGLE', 'WARNING');
+            this.addWarning('BANK_ANGLE', 'BANK ANGLE', 'WARNING', true);
         }
     }
 

@@ -197,9 +197,9 @@ const CentralPanel = ({ flightState, onToggleSystems }) => {
       React.createElement('div', { 
         className: 'status-items',
         style: {
-            display: 'grid',
-            gridTemplateColumns: '1fr 1fr',
-            gap: '8px',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '4px',
             overflowY: 'auto',
             height: '100%',
             paddingRight: '5px'
@@ -209,14 +209,15 @@ const CentralPanel = ({ flightState, onToggleSystems }) => {
           ? allWarnings.map((warning, index) => {
               // Determine color based on level
               let color = '#ffff00'; // Advisory/Info
-              let bg = 'rgba(255, 255, 0, 0.1)';
+              // No background, just text per user request "plain text"
+              let bg = 'transparent';
               
               if (warning.level === 'CRITICAL') {
-                  color = '#ff4444';
-                  bg = 'rgba(255, 0, 0, 0.1)';
+                  color = '#ff4444'; // Red
               } else if (warning.level === 'WARNING') {
-                  color = '#ff9900';
-                  bg = 'rgba(255, 153, 0, 0.1)';
+                  color = '#ffaa00'; // Amber
+              } else {
+                  color = '#00ffff'; // Cyan for advisory
               }
 
               return React.createElement('div', { 
@@ -225,31 +226,30 @@ const CentralPanel = ({ flightState, onToggleSystems }) => {
                 style: {
                   color: color,
                   backgroundColor: bg,
-                  padding: '4px 6px',
-                  borderRadius: '3px',
-                  fontSize: '11px',
+                  padding: '2px 0',
+                  fontSize: '14px',
                   fontWeight: 'bold',
-                  textTransform: 'uppercase',
-                  border: `1px solid ${color}`,
-                  textAlign: 'center',
+                  fontFamily: 'monospace',
+                  textAlign: 'left',
                   whiteSpace: 'nowrap',
                   overflow: 'hidden',
-                  textOverflow: 'ellipsis'
+                  textOverflow: 'ellipsis',
+                  borderBottom: '1px solid rgba(255,255,255,0.1)'
                 }
               }, warning.message);
             })
           : React.createElement('div', { 
               className: 'status-ok', 
               style: {
-                gridColumn: '1 / -1', // Span both columns
                 color: '#00ff00',
                 fontSize: '12px',
                 fontWeight: 'bold',
-                textAlign: 'center',
-                padding: '10px',
-                fontStyle: 'italic'
+                textAlign: 'left',
+                padding: '5px 0',
+                fontStyle: 'italic',
+                fontFamily: 'monospace'
               }
-            }, 'ALL SYSTEMS NORMAL')
+            }, 'NO ACTIVE ALERTS')
       ),
     )
   );
