@@ -79,8 +79,27 @@ class RealisticAutopilotService {
         // Kp ~ 0.26 / 10 = 0.026
         this.headingPID = new PIDController(0.026, 0.005, 0.01, -30 * Math.PI / 180, 30 * Math.PI / 180);
 
+        // --- ILS PID Configurations ---
+        
+        // Glideslope (Altitude Error -> Target VS)
+        // Input: Altitude Error (ft) (Target - Current)
+        // Output: Target VS (ft/min)
+        // 100ft low -> Need +500 ft/min? Kp = 5.
+        this.glideslopePID = new PIDController(5.0, 0.5, 0.1, -1500, 1000); 
+
+        // Localizer (Cross Track Error -> Target Heading Adjustment)
+        // Input: Cross Track Error (meters) (Positive = Right of centerline)
+        // Output: Heading Correction (degrees)
+        // 100m right -> Need Turn Left (-10 deg).
+        // Error = 0 - 100 = -100.
+        // We want Output = -10.
+        // Kp * (-100) = -10 => Kp = 0.1 (Positive).
+        this.localizerPID = new PIDController(0.15, 0.005, 0.05, -30, 30);
+
         this.engaged = false;
         this.mode = 'HDG'; // Default mode
+        this.runwayGeometry = null;
+
         this.targets = {
             speed: 0, // Knots
             vs: 0,    // ft/min
@@ -99,6 +118,10 @@ class RealisticAutopilotService {
         };
     }
 
+    setRunwayGeometry(geometry) {
+        this.runwayGeometry = geometry;
+    }
+
     setTargets(targets) {
         if (targets.mode) {
             this.mode = targets.mode;
@@ -114,6 +137,8 @@ class RealisticAutopilotService {
             this.pitchPID.reset();
             this.rollPID.reset();
             this.headingPID.reset();
+            this.glideslopePID.reset();
+            this.localizerPID.reset();
 
             // If we have current state, capture targets if they are currently 0
             if (currentState) {
@@ -131,7 +156,7 @@ class RealisticAutopilotService {
 
     /**
      * Calculate Control Outputs
-     * @param {Object} state - Current aircraft state { airspeed (kts), verticalSpeed (ft/min), pitch (rad), roll (rad), altitude (ft), heading (deg) }
+     * @param {Object} state - Current aircraft state { airspeed (kts), verticalSpeed (ft/min), pitch (rad), roll (rad), altitude (ft), heading (deg), latitude, longitude }
      * @param {Object} currentControls - Current control inputs { throttle, elevator, trim, aileron } (for trim offloading)
      * @param {number} dt - Time step
      * @returns {Object} New control inputs { throttle, elevator, trim, aileron } or null if not engaged
@@ -139,7 +164,7 @@ class RealisticAutopilotService {
     update(state, currentControls, dt) {
         if (!this.engaged) return null;
 
-        const { airspeed, verticalSpeed, pitch, roll, heading } = state;
+        const { airspeed, verticalSpeed, pitch, roll, heading, latitude, longitude, altitude } = state;
         
         // Ensure targets are initialized if they were somehow left at 0
         if (this.targets.speed === 0) this.targets.speed = Math.round(airspeed);
@@ -148,6 +173,84 @@ class RealisticAutopilotService {
         }
         if (this.targets.heading === 0) {
             this.targets.heading = heading === 0 ? 360 : heading;
+        }
+
+        // --- ILS Logic ---
+        let ilsDebug = {
+            active: false,
+            distAlong: 0,
+            distCross: 0,
+            altError: 0,
+            targetAltitude: 0
+        };
+
+        if (this.mode === 'ILS' && this.runwayGeometry && typeof latitude === 'number' && typeof longitude === 'number') {
+             const { thresholdStart, heading: runwayHeading } = this.runwayGeometry;
+             
+             // Convert Geo to Meters relative to Threshold
+             const latRad = thresholdStart.latitude * Math.PI / 180;
+             const metersPerLat = 111132.92;
+             const metersPerLon = 111412.84 * Math.cos(latRad);
+             
+             const dx = (latitude - thresholdStart.latitude) * metersPerLat;
+             const dy = (longitude - thresholdStart.longitude) * metersPerLon;
+             
+             const rH = runwayHeading * Math.PI / 180;
+             const ux = Math.cos(rH);
+             const uy = Math.sin(rH);
+             
+             // Distance ALONG the runway (positive = past threshold, negative = approaching)
+             const distAlong = dx * ux + dy * uy;
+             
+             // Cross Track Error (positive = right of centerline)
+             const distCross = -dx * uy + dy * ux;
+             
+             // 1. Glideslope (VNAV)
+             // Target Altitude Calculation: 3 degree slope aiming at 50ft above threshold
+             // Alt = 50 + distance * tan(3deg). Distance is -distAlong (positive distance to go)
+             const distToThresholdFt = -distAlong * 3.28084;
+             
+             let targetAltitude = 50 + (distToThresholdFt * Math.tan(3 * Math.PI / 180));
+             
+             // If we are past the threshold (distAlong > 0), maintain 50ft or flare
+             if (distToThresholdFt < 0) targetAltitude = 50;
+
+             const altError = targetAltitude - altitude;
+             
+             // Update VS Target via Glideslope PID
+             // Error > 0 (Too Low) -> Positive VS (Climb)
+             const vsCorrection = this.glideslopePID.update(altError, 0, dt);
+             
+             // Feed Forward: Base Descent Rate for 3 degree slope
+             // VS = -GroundSpeed(kts) * 5 (approx rule of thumb)
+             // Precise: GS * 1.6878 * tan(3) * 60
+             const groundSpeedKts = airspeed; // Using IAS as proxy for GS
+             const baseDescentRate = -groundSpeedKts * 5.2; 
+             
+             this.targets.vs = baseDescentRate + vsCorrection;
+             
+             // Clamp VS for safety
+             if (this.targets.vs < -2000) this.targets.vs = -2000;
+             if (this.targets.vs > 1500) this.targets.vs = 1500;
+
+             // 2. Localizer (LNAV)
+             // Target: distCross = 0.
+             const headingCorrection = this.localizerPID.update(0, distCross, dt);
+             
+             // Target Heading = Runway Heading + Correction
+             let targetH = runwayHeading + headingCorrection;
+             
+             // Normalize
+             this.targets.heading = (targetH + 360) % 360;
+
+             ilsDebug = {
+                 active: true,
+                 runway: this.runwayGeometry.runwayName,
+                 distAlong: distAlong * 3.28084, // ft
+                 distCross: distCross * 3.28084, // ft
+                 altError: altError,
+                 targetAltitude
+             };
         }
 
         const { speed: targetSpeed, vs: targetVS, heading: targetHeading } = this.targets;
@@ -167,10 +270,10 @@ class RealisticAutopilotService {
         
         const elevatorCmd = pitchCmd * 0.1;
 
-        // 3. Directional Control (Heading/LNAV -> Roll -> Aileron)
+        // 3. Directional Control (Heading/LNAV/ILS -> Roll -> Aileron)
         let targetRoll = 0;
         let headingError = 0;
-        if (this.mode === 'HDG' || this.mode === 'LNAV') {
+        if (this.mode === 'HDG' || this.mode === 'LNAV' || this.mode === 'ILS') {
             // Calculate heading error with wrap-around
             headingError = targetHeading - heading;
             if (headingError > 180) headingError -= 360;
@@ -193,7 +296,8 @@ class RealisticAutopilotService {
             aileronCmd,
             elevatorCmd,
             mode: this.mode,
-            engaged: this.engaged
+            engaged: this.engaged,
+            ils: ilsDebug
         };
 
         return {

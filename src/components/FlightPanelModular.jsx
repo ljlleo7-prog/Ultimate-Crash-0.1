@@ -314,7 +314,8 @@ const FlightPanelModular = ({ flightData, weatherData, onActionRequest, aircraft
           setAutopilotTargets, 
           toggleAutopilot,
           setAutopilotMode,
-          setAltimeter: (val) => setFlightState(prev => ({ ...prev, altimeter: val }))
+          setAltimeter: (val) => setFlightState(prev => ({ ...prev, altimeter: val })),
+          frequencyContext // Pass frequency context for ILS availability
         }),
         React.createElement(CommunicationModule, {
           flightState,

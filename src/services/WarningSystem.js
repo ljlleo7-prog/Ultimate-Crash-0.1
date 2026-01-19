@@ -44,7 +44,10 @@ class WarningSystem {
             systems,
             debugPhysics,
             controls: { gear, flaps },
-            verticalSpeed // ft/min
+            verticalSpeed, // ft/min
+            fuel,
+            engineParams,
+            groundStatus
         } = physicsState;
 
         const altitudeAGL = derived.altitude_agl_ft;
@@ -67,13 +70,13 @@ class WarningSystem {
         const alpha = debugPhysics.alpha * 180 / Math.PI;
         
         // --- GPWS Checks ---
-        this.checkGPWS(altitudeAGL, verticalSpeed, gear, flaps, airspeed);
+        this.checkGPWS(altitudeAGL, verticalSpeed, gear, flaps, airspeed, groundStatus);
 
         // --- Flight Envelope Checks ---
         this.checkEnvelope(alpha, airspeed, rollDeg, pitchDeg);
 
         // --- System Checks ---
-        this.checkSystems(systems);
+        this.checkSystems(systems, fuel, engineParams, altitudeAGL);
 
         // Sort by priority (Critical first)
         this.activeWarnings.sort((a, b) => {
@@ -91,7 +94,12 @@ class WarningSystem {
         }
     }
 
-    checkGPWS(agl, vs, gear, flaps, airspeed) {
+    checkGPWS(agl, vs, gear, flaps, airspeed, groundStatus) {
+        // Disable GPWS if on runway or ground
+        if (groundStatus && (groundStatus.status === 'RUNWAY' || groundStatus.status === 'GRASS')) {
+            return;
+        }
+
         // Mode 1: Excessive Sink Rate
         // Don't warn if on ground or very low (landing flare)
         if (agl > 50 && agl < 2500) {
@@ -102,8 +110,11 @@ class WarningSystem {
             }
         }
 
-        // Mode 2: Terrain (Simplified - just low alt + high speed + descent)
-        if (agl < 500 && airspeed > 250 && vs < -1000) {
+        // Mode 2: Terrain
+        // Disabled if in landing configuration (Gear Down + Flaps) which implies "Airport Region" intent
+        const isLandingConfig = gear > 0.9 && flaps > 0.5;
+
+        if (!isLandingConfig && agl < 500 && airspeed > 250 && vs < -1000) {
             this.addWarning('GPWS_TERRAIN', 'TERRAIN', 'CRITICAL', true);
         }
 
@@ -138,7 +149,7 @@ class WarningSystem {
         }
     }
 
-    checkSystems(systems) {
+    checkSystems(systems, fuel, engines, agl) {
         if (!systems) return;
 
         // Fire
@@ -159,6 +170,30 @@ class WarningSystem {
         // Pressurization
         if (systems.pressurization.cabinAlt > 10000) {
             this.addWarning('CABIN_ALT', 'CABIN ALTITUDE', 'CRITICAL', true);
+        }
+        
+        // Fuel
+        if (fuel < 500) { // Arbitrary low fuel mass
+             this.addWarning('FUEL_LOW', 'LOW FUEL', 'WARNING');
+        }
+
+        // Engine Failure (In Air)
+        // Check engineParams structure (arrays of values)
+        if (agl > 500 && engines) {
+            if (Array.isArray(engines.n1)) {
+                 engines.n1.forEach((n1Val, i) => {
+                    if (n1Val < 10) { 
+                        this.addWarning(`ENG_${i+1}_FAIL`, `ENGINE ${i+1} FAIL`, 'CRITICAL', true);
+                    }
+                });
+            } else if (Array.isArray(engines)) {
+                // Fallback for legacy format if any
+                 engines.forEach((eng, i) => {
+                    if (eng.n1 < 10) {
+                        this.addWarning(`ENG_${i+1}_FAIL`, `ENGINE ${i+1} FAIL`, 'CRITICAL', true);
+                    }
+                });
+            }
         }
     }
 }

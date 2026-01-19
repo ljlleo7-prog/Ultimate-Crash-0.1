@@ -49,21 +49,24 @@ const CrashWarningFlash = ({ flashActive, flashText, onAlertComplete }) => {
       width: 'auto',
       minWidth: '300px',
       height: 'auto',
-      backgroundColor: 'rgba(255, 0, 0, 0.9)',
+      backgroundColor: 'rgba(0, 0, 0, 0.8)',
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'center',
       zIndex: 1000,
-      fontSize: '3rem',
+      fontSize: '4rem',
       fontWeight: 'bold',
-      color: 'white',
-      textShadow: '2px 2px 4px black',
-      padding: '20px 40px',
+      color: '#ff0000',
+      textShadow: '0 0 20px #ff0000, 0 0 40px #ff0000',
+      padding: '30px 60px',
       borderRadius: '10px',
-      border: '3px solid white',
+      border: '4px solid #ff0000',
+      boxShadow: '0 0 50px rgba(255, 0, 0, 0.5)',
       animation: blinkAnimation,
       pointerEvents: 'none',
-      transition: 'opacity 0.3s ease'
+      transition: 'opacity 0.3s ease',
+      fontFamily: 'monospace',
+      letterSpacing: '5px'
     }
   }, flashText);
 };

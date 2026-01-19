@@ -144,8 +144,11 @@ class RealisticFlightPhysicsService {
             
             // Mass Properties
             mass: this.aircraft.mass,
-            fuel: (this.aircraft.fuelWeight ?? this.aircraft.maxFuelCapacity ?? 10000)
+            fuel: (typeof aircraftData.fuelWeight === 'number' ? aircraftData.fuelWeight : (this.aircraft.maxFuelCapacity ?? 10000))
         };
+        
+        // Payload Mass (Pax + Cargo)
+        this.payloadMass = typeof aircraftData.payloadWeight === 'number' ? aircraftData.payloadWeight : ((this.aircraft.maxPayload || 15000) * 0.7);
 
         // Control State
         this.controls = {
@@ -186,15 +189,17 @@ class RealisticFlightPhysicsService {
         this.currentGroundZ = 0; // NED Z coordinate of ground (usually negative or zero)
 
         // If starting on ground, set initial Z based on airport elevation
-        if (this.onGround && this.airportElevation > 0) {
-             // We want AMSL = airportElevation.
-             // AMSL = -pos.z + airportElevation.
-             // So -pos.z should be 0 (relative to airport).
-             // But gear height?
-             // pos.z = -gearHeight.
-             // AMSL = gearHeight + airportElevation.
-             // This seems correct for "On Runway".
-             // currentGroundZ should be 0 (relative to airport).
+        if (this.onGround) {
+             // We want AMSL = airportElevation + gearHeight (approx)
+             // NED Frame: Z is Down. Altitude is -Z.
+             // So -Z = airportElevation + gearHeight
+             // Z = -(airportElevation + gearHeight)
+             const gearHeight = this.aircraft.gearHeight || 2;
+             this.state.pos.z = -(this.airportElevation + gearHeight);
+             
+             // Also update currentGroundZ so we don't think we are underground relative to terrain
+             // If terrain is flat at airport elevation:
+             this.currentGroundZ = -this.airportElevation;
         }
 
         // Autopilot
@@ -445,7 +450,9 @@ class RealisticFlightPhysicsService {
             pitch: euler.theta,
             roll: euler.phi,
             altitude: -this.state.pos.z * 3.28084,
-            heading: currentHeading
+            heading: currentHeading,
+            latitude: this.state.geo.lat,
+            longitude: this.state.geo.lon
         };
 
         // --- Waypoint Sequencing & LNAV ---
@@ -509,6 +516,15 @@ class RealisticFlightPhysicsService {
 
             // 3. Engine Dynamics
             this.updateEngines(env, subDt);
+
+            // 3.1 Fuel Consumption & Dynamic Mass
+            const totalFuelFlow = this.engines.reduce((sum, e) => sum + (e.state.fuelFlow || 0), 0); // kg/s
+            const fuelBurned = totalFuelFlow * subDt;
+            this.state.fuel = Math.max(0, this.state.fuel - fuelBurned);
+            
+            // Recalculate Total Mass: Empty + Fuel + Payload
+            const emptyWeight = this.aircraft.emptyWeight || 40000;
+            this.state.mass = emptyWeight + this.state.fuel + this.payloadMass;
 
             // 4. Calculate Forces and Moments
             const { forces, moments, aeroForces, thrustForces, gravityForces, groundForces, debug } = this.calculateAerodynamicsAndGround(env);
@@ -1508,7 +1524,8 @@ class RealisticFlightPhysicsService {
                 elevator: this.controls.elevator,
                 trim: this.controls.trim
             },
-            runwayGeometry: this.runwayGeometry
+            runwayGeometry: this.runwayGeometry,
+            groundStatus: this.groundStatus
         };
 
         if (this.warningSystem) {
@@ -1593,6 +1610,9 @@ class RealisticFlightPhysicsService {
 
     setRunwayGeometry(geometry) {
         this.runwayGeometry = geometry;
+        if (this.autopilot && typeof this.autopilot.setRunwayGeometry === 'function') {
+            this.autopilot.setRunwayGeometry(geometry);
+        }
         console.log("Physics Service: Runway Geometry Set", geometry);
     }
 
@@ -1946,7 +1966,11 @@ class RealisticFlightPhysicsService {
         // Let's stick to global throttle for physics update inputs, but we can store it.
     }
     reset() {
-        this.state.pos = new Vector3(0, 0, -this.aircraft.gearHeight);
+        const gearHeight = this.aircraft.gearHeight || 2;
+        const initialZ = -(this.airportElevation + gearHeight);
+        this.state.pos = new Vector3(0, 0, initialZ);
+        this.currentGroundZ = -this.airportElevation; // Reset ground level to airport level
+        
         this.state.vel = new Vector3(0, 0, 0);
         this.state.rates = new Vector3(0, 0, 0);
         this.state.quat = new Quaternion();

@@ -203,6 +203,8 @@ const FlightInProgress = ({
   const getFrequencyType = (freq) => {
     const f = parseFloat(freq);
     const alt = flightData?.altitude || 0;
+    const lat = flightData?.position?.latitude;
+    const lon = flightData?.position?.longitude;
 
     // Check Region Control Frequency first
     if (currentRegion && Math.abs(f - parseFloat(currentRegion.frequency)) < 0.005) {
@@ -210,13 +212,37 @@ const FlightInProgress = ({
     }
 
     // High Altitude Logic (> 5000ft)
-    // "Disable airport frequency if altitude is 5000ft higher"
     if (alt > 5000) {
         if (Math.abs(f - 121.5) < 0.1) return 'GUARD';
-        return 'UNICOM'; // Effectively disables TOWER/GROUND responses
+        return 'UNICOM'; 
     }
 
-    // Low Altitude Logic (Standard)
+    // Dynamic Airport Frequency Check
+    if (lat && lon) {
+        // Find nearest airport within 20nm
+        const nearbyAirports = airportService.getAirportsWithinRadius(lat, lon, 20);
+        if (nearbyAirports.length > 0) {
+            // Sort by distance to prioritize the closest one
+            nearbyAirports.sort((a, b) => {
+                const distA = airportService.calculateDistance({ latitude: lat, longitude: lon }, a);
+                const distB = airportService.calculateDistance({ latitude: lat, longitude: lon }, b);
+                return distA - distB;
+            });
+
+            const nearest = nearbyAirports[0];
+            if (nearest.frequencies) {
+                const matchedFreq = nearest.frequencies.find(freqObj => 
+                    Math.abs(f - freqObj.frequency) < 0.005 // Stricter tolerance for specific freqs
+                );
+                
+                if (matchedFreq) {
+                    return matchedFreq.type.toUpperCase();
+                }
+            }
+        }
+    }
+
+    // Low Altitude Logic (Standard/Fallback)
     if (Math.abs(f - 118.0) < 0.1) return 'TOWER';
     if (Math.abs(f - 121.9) < 0.1) return 'GROUND';
     if (Math.abs(f - 121.5) < 0.1) return 'GUARD';
@@ -869,6 +895,32 @@ const FlightInProgress = ({
             <span style={{ color: '#9ca3af' }}>Act Roll:</span>
             <span>{(flightData.orientation?.phi * 180 / Math.PI).toFixed(1)}°</span>
           </div>
+
+          {flightData.autopilotDebug?.ils?.active && (
+            <>
+              <div style={{ margin: '8px 0', borderTop: '1px solid rgba(74, 222, 128, 0.2)' }}></div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: '4px 8px' }}>
+                <span style={{ color: '#f59e0b', fontWeight: 'bold' }}>ILS STATUS</span>
+                <span style={{ color: '#f59e0b', fontWeight: 'bold', textAlign: 'right' }}>{flightData.autopilotDebug.ils.runway}</span>
+                
+                <span style={{ color: '#9ca3af' }}>Dist:</span>
+                <span>{(flightData.autopilotDebug.ils.distAlong / 6076).toFixed(1)} nm</span>
+                
+                <span style={{ color: '#9ca3af' }}>LOC Err:</span>
+                <span style={{ color: Math.abs(flightData.autopilotDebug.ils.distCross) > 50 ? '#ef4444' : '#4ade80' }}>
+                  {flightData.autopilotDebug.ils.distCross.toFixed(0)} ft
+                </span>
+
+                <span style={{ color: '#9ca3af' }}>G/S Err:</span>
+                <span style={{ color: Math.abs(flightData.autopilotDebug.ils.altError) > 50 ? '#ef4444' : '#4ade80' }}>
+                  {flightData.autopilotDebug.ils.altError.toFixed(0)} ft
+                </span>
+
+                <span style={{ color: '#9ca3af' }}>Tgt Alt:</span>
+                <span>{flightData.autopilotDebug.ils.targetAltitude.toFixed(0)} ft</span>
+              </div>
+            </>
+          )}
           
           <div style={{ margin: '8px 0', borderTop: '1px solid rgba(74, 222, 128, 0.2)' }}></div>
           

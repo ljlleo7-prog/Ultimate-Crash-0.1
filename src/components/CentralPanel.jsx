@@ -19,12 +19,6 @@ const CentralPanel = ({ flightState, onToggleSystems }) => {
       allWarnings.unshift({ id: 'CRASH_WARN', message: crashWarning, level: 'CRITICAL' });
     }
   }
-  // Add legacy alarms
-  alarms.forEach((alarm, i) => {
-    if (!allWarnings.find(w => w.message === alarm)) {
-      allWarnings.push({ id: `ALARM_${i}`, message: alarm, level: 'WARNING' });
-    }
-  });
   
   // Get engine count from the arrays (supports 2, 3, or 4 engines)
   const engineCount = Math.max(2, Math.min(4, engineN1.length || 2));

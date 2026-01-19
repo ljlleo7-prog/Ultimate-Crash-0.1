@@ -8,8 +8,8 @@
       "emergency": "Only available for DIVERT emergency landing requests"
     },
     "statistics": {
-      "totalAirports": 456,
-      "normalAirports": 78,
+      "totalAirports": 461,
+      "normalAirports": 83,
       "emergencyAirports": 378
     }
   },
@@ -13743,6 +13743,183 @@
         {
           "type": "Ground",
           "frequency": 121.9
+        }
+      ]
+    },
+    {
+      "iata": "LXA",
+      "icao": "ZULS",
+      "name": "Lhasa Gonggar Airport",
+      "latitude": 29.1013889,
+      "longitude": 91.4805556,
+      "category": "4E",
+      "type": "normal",
+      "region": "asian",
+      "runways": [
+        {
+          "name": "15/33",
+          "length": 14852,
+          "surface": "Asphalt",
+          "category": "Heavy"
+        }
+      ],
+      "city": "Lhasa",
+      "country": "China",
+      "elevation": 14315,
+      "frequencies": [
+        {
+          "type": "ATIS",
+          "frequency": 127.25
+        },
+        {
+          "type": "Tower",
+          "frequency": 118.2
+        },
+        {
+          "type": "Ground",
+          "frequency": 121.7
+        }
+      ]
+    },
+    {
+      "iata": "HKG",
+      "icao": "VHHH",
+      "name": "Kai Tak Airport (Historical)",
+      "latitude": 22.3194444,
+      "longitude": 114.1694444,
+      "category": "4F",
+      "type": "normal",
+      "region": "asian",
+      "runways": [
+        {
+          "name": "13/31",
+          "length": 8999,
+          "surface": "Asphalt",
+          "category": "Heavy"
+        },
+        {
+          "name": "07/25",
+          "length": 6909,
+          "surface": "Asphalt",
+          "category": "Medium"
+        }
+      ],
+      "city": "Hong Kong",
+      "country": "China",
+      "elevation": 20,
+      "frequencies": [
+        {
+          "type": "ATIS",
+          "frequency": 128.6
+        },
+        {
+          "type": "Tower",
+          "frequency": 118.7
+        },
+        {
+          "type": "Ground",
+          "frequency": 121.8
+        }
+      ]
+    },
+    {
+      "iata": "PBH",
+      "icao": "VQPR",
+      "name": "Paro International Airport",
+      "latitude": 27.4113889,
+      "longitude": 89.6336111,
+      "category": "4D",
+      "type": "normal",
+      "region": "asian",
+      "runways": [
+        {
+          "name": "15/33",
+          "length": 6500,
+          "surface": "Asphalt",
+          "category": "Medium"
+        }
+      ],
+      "city": "Paro",
+      "country": "Bhutan",
+      "elevation": 7332,
+      "frequencies": [
+        {
+          "type": "ATIS",
+          "frequency": 126.2
+        },
+        {
+          "type": "Tower",
+          "frequency": 118.0
+        },
+        {
+          "type": "Ground",
+          "frequency": 121.7
+        }
+      ]
+    },
+    {
+      "iata": "CVF",
+      "icao": "LFLJ",
+      "name": "Courchevel Airport",
+      "latitude": 45.3613889,
+      "longitude": 6.6997222,
+      "category": "A1",
+      "type": "normal",
+      "region": "european",
+      "runways": [
+        {
+          "name": "06/24",
+          "length": 1722,
+          "surface": "Asphalt",
+          "category": "Light"
+        }
+      ],
+      "city": "Courchevel",
+      "country": "France",
+      "elevation": 6588,
+      "frequencies": [
+        {
+          "type": "Tower",
+          "frequency": 118.25
+        },
+        {
+          "type": "Ground",
+          "frequency": 121.8
+        }
+      ]
+    },
+    {
+      "iata": "TGU",
+      "icao": "MHTG",
+      "name": "Toncontin International Airport",
+      "latitude": 14.0658333,
+      "longitude": -87.1944444,
+      "category": "4D",
+      "type": "normal",
+      "region": "american",
+      "runways": [
+        {
+          "name": "02/20",
+          "length": 6126,
+          "surface": "Asphalt",
+          "category": "Medium"
+        }
+      ],
+      "city": "Tegucigalpa",
+      "country": "Honduras",
+      "elevation": 3294,
+      "frequencies": [
+        {
+          "type": "ATIS",
+          "frequency": 126.4
+        },
+        {
+          "type": "Tower",
+          "frequency": 118.0
+        },
+        {
+          "type": "Ground",
+          "frequency": 121.7
         }
       ]
     }

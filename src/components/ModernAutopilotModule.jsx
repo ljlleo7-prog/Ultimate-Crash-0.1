@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 
-const ModernAutopilotModule = ({ flightState, setAutopilotTargets, toggleAutopilot, setAutopilotMode, setAltimeter }) => {
+const ModernAutopilotModule = ({ flightState, setAutopilotTargets, toggleAutopilot, setAutopilotMode, setAltimeter, frequencyContext }) => {
   const initialTargets = flightState?.autopilotTargets
     ? {
         ias: Number(flightState.autopilotTargets.ias) || Number(flightState.indicatedAirspeed) || 0,
@@ -96,6 +96,29 @@ const ModernAutopilotModule = ({ flightState, setAutopilotTargets, toggleAutopil
           disabled: flightState.hasCrashed
         }, flightState.autopilot ? 'AP ON' : 'AP OFF'),
         
+        // APP Mode Button
+        React.createElement('button', {
+          style: {
+            padding: '4px 8px',
+            fontSize: '10px',
+            fontWeight: 'bold',
+            borderRadius: '4px',
+            cursor: 'pointer',
+            background: currentMode === 'ILS' ? '#f59e0b' : '#334155', 
+            color: 'white',
+            border: currentMode === 'ILS' ? '1px solid #fbbf24' : '1px solid #475569',
+            transition: 'all 0.2s',
+            opacity: frequencyContext === 'TOWER' ? 1 : 0.5
+          },
+          onClick: () => {
+              if (frequencyContext === 'TOWER') {
+                  setAutopilotMode && setAutopilotMode(currentMode === 'ILS' ? 'HDG' : 'ILS');
+              }
+          },
+          disabled: flightState.hasCrashed || frequencyContext !== 'TOWER',
+          title: frequencyContext !== 'TOWER' ? 'Requires Tower Frequency' : 'Approach Mode'
+        }, 'APP'),
+
         // Mode Toggle
         React.createElement('button', {
           style: {
