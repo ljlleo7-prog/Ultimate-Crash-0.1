@@ -15,9 +15,11 @@ import OverheadPanel from './OverheadPanel';
 import RudderPedal from './RudderPedal';
 import Sidebar from './Sidebar';
 import SaveLoadPanel from './SaveLoadPanel';
+import TimerPanel from './TimerPanel';
+import FlightComputerPanel from './FlightComputerPanel';
 import './FlightPanel.css';
 
-const FlightPanelModular = ({ flightData, physicsState, weatherData, onActionRequest, aircraftModel, selectedArrival, flightPlan, radioMessages, onRadioFreqChange, npcs, frequencyContext, currentRegion }) => {
+const FlightPanelModular = ({ flightData, physicsState, weatherData, onActionRequest, aircraftModel, selectedArrival, flightPlan, radioMessages, onRadioFreqChange, npcs, frequencyContext, currentRegion, timeScale, setTimeScale, onUpdateFlightPlan }) => {
   // Use flightData from parent component instead of creating own physics service
   const [showOverhead, setShowOverhead] = useState(false);
   const [activeSidebarPanel, setActiveSidebarPanel] = useState(null);
@@ -293,6 +295,31 @@ const FlightPanelModular = ({ flightData, physicsState, weatherData, onActionReq
     
     // Sidebar (Leftmost)
     React.createElement(Sidebar, { activePanel: activeSidebarPanel, onTogglePanel: handleSidebarToggle }),
+
+    // Flight Computer Panel Overlay
+    activeSidebarPanel === 'flight_computer' && React.createElement(FlightComputerPanel, {
+      onClose: () => setActiveSidebarPanel(null),
+      flightPlan: flightPlan,
+      onUpdateFlightPlan: onUpdateFlightPlan,
+      flightState: flightState
+    }),
+
+    // Timer Panel Overlay
+    activeSidebarPanel === 'timer' && React.createElement(TimerPanel, {
+        timeScale,
+        setTimeScale,
+        flightData,
+        flightPlan,
+        onClose: () => setActiveSidebarPanel(null)
+    }),
+    
+    // Flight Computer Overlay
+    activeSidebarPanel === 'flight_computer' && React.createElement(FlightComputerPanel, {
+        flightData,
+        flightPlan,
+        onUpdateFlightPlan,
+        onClose: () => setActiveSidebarPanel(null)
+    }),
 
     // Save & Load Panel Overlay
     activeSidebarPanel === 'save_load' && React.createElement(SaveLoadPanel, {

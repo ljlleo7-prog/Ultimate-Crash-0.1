@@ -55,6 +55,15 @@ export function useAircraftPhysics(config = {}, autoStart = true, model = 'reali
     yaw: 0
   });
   const lastUpdateTimeRef = useRef(Date.now());
+  const [timeScaleState, setTimeScaleState] = useState(1);
+  const timeScaleRef = useRef(1);
+
+  const setTimeScale = useCallback((scale) => {
+    console.log(`⏩ Time Scale set to ${scale}x`);
+    const s = Math.max(1, Math.floor(scale));
+    timeScaleRef.current = s;
+    setTimeScaleState(s);
+  }, []);
   const animationFrameRef = useRef(null);
 
   console.log('🎮 useAircraftPhysics: STATE INITIALIZED', {
@@ -295,21 +304,26 @@ export function useAircraftPhysics(config = {}, autoStart = true, model = 'reali
       const physicsService = physicsServiceRef.current;
       const currentTime = currentTimeOverride || Date.now();
       const timeStep = fixedDt;
+      const iterations = timeScaleRef.current;
       
       const throttleValue = currentControlsRef.current.throttle;
       if (isNaN(throttleValue)) {
         console.error('⚠️ Throttle is NaN in useAircraftPhysics update:', throttleValue);
       }
       
-      // console.log('🎮 useAircraftPhysics: Calling physicsService.update()');
-      const newState = physicsService.update({
-        throttle: isNaN(throttleValue) ? 0 : throttleValue,
-        pitch: currentControlsRef.current.pitch,
-        roll: currentControlsRef.current.roll,
-        yaw: currentControlsRef.current.yaw,
-        trim: currentControlsRef.current.trim || 0
-      }, timeStep);
-      // console.log('🎮 useAircraftPhysics: physicsService.update() returned:', newState);
+      let newState;
+      
+      for (let i = 0; i < iterations; i++) {
+        newState = physicsService.update({
+            throttle: isNaN(throttleValue) ? 0 : throttleValue,
+            pitch: currentControlsRef.current.pitch,
+            roll: currentControlsRef.current.roll,
+            yaw: currentControlsRef.current.yaw,
+            trim: currentControlsRef.current.trim || 0
+        }, timeStep);
+        
+        if (newState.hasCrashed) break;
+      }
 
       const altitude_m = Math.max(0, newState.position.z);
       const altitude = altitude_m * 3.28084;
@@ -521,6 +535,12 @@ export function useAircraftPhysics(config = {}, autoStart = true, model = 'reali
     }
   }, []);
 
+  const updateFlightPlan = useCallback((newFlightPlan) => {
+    if (physicsServiceRef.current) {
+      physicsServiceRef.current.updateFlightPlan(newFlightPlan);
+    }
+  }, []);
+
   const resetAircraft = useCallback(() => {
     if (physicsServiceRef.current) {
       physicsServiceRef.current.reset();
@@ -595,6 +615,9 @@ export function useAircraftPhysics(config = {}, autoStart = true, model = 'reali
       }
     }, []),
     updatePhysics,
-    resetAircraft
+    resetAircraft,
+    updateFlightPlan,
+    setTimeScale,
+    timeScale: timeScaleState
   };
 }

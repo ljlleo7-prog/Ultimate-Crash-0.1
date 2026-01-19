@@ -121,7 +121,10 @@ const FlightInProgress = ({
     setTrim,
     performSystemAction,
     setEnvironment,
-    physicsService
+    physicsService,
+    setTimeScale,
+    timeScale,
+    updateFlightPlan
   } = useAircraftPhysics(aircraftConfig, false, physicsModel);
 
   // Control state for UI components
@@ -196,6 +199,24 @@ const FlightInProgress = ({
   const [isChannelBusy, setIsChannelBusy] = useState(false);
   const [npcs, setNpcs] = useState([]);
   const [currentRegion, setCurrentRegion] = useState(null);
+  
+  // Dynamic Flight Plan State
+  const [activeFlightPlan, setActiveFlightPlan] = useState(flightPlan);
+
+  // Sync prop flightPlan to state if it changes (e.g. reset)
+  useEffect(() => {
+    setActiveFlightPlan(flightPlan);
+  }, [flightPlan]);
+  
+  // Handle Flight Plan Update
+   const handleUpdateFlightPlan = (newPlan) => {
+     console.log("📝 Flight Plan Updated:", newPlan);
+     setActiveFlightPlan(newPlan);
+     // Update Physics Service
+     if (updateFlightPlan) {
+         updateFlightPlan(newPlan);
+     }
+   };
   
   const lastNpcUpdateRef = React.useRef(Date.now());
   const lastRegionUpdateRef = React.useRef(0);
@@ -278,7 +299,9 @@ const FlightInProgress = ({
     }
 
     // Update NPCs
-    const messages = npcService.update(dt, flightData.position, atcManager); // Pass atcManager for blocking checks
+    // Use timeScale for acceleration
+    const effectiveDt = dt * (timeScale || 1);
+    const messages = npcService.update(effectiveDt, flightData.position, atcManager); // Pass atcManager for blocking checks
     setNpcs([...npcService.npcs]); // Update state for radar
 
     // Update ATC Logic (Proactive & ATIS)
@@ -289,7 +312,7 @@ const FlightInProgress = ({
         station: freqType === 'CENTER' && currentRegion ? currentRegion.name : freqType
     };
 
-    atcManager.update(dt, {
+    atcManager.update(effectiveDt, {
         altitude: flightData.altitude,
         verticalSpeed: flightData.verticalSpeed,
         callsign: callsign,
@@ -747,12 +770,15 @@ const FlightInProgress = ({
             weatherData={weatherData}
             aircraftModel={aircraftModel}
             selectedArrival={selectedArrival}
-            flightPlan={flightPlan}
+            flightPlan={activeFlightPlan} // Pass active dynamic plan
             radioMessages={radioMessages}
             onRadioFreqChange={setCurrentFreq}
             npcs={npcs}
             frequencyContext={getFrequencyType(currentFreq)}
             currentRegion={currentRegion}
+            timeScale={timeScale}
+            setTimeScale={setTimeScale}
+            onUpdateFlightPlan={handleUpdateFlightPlan}
             onActionRequest={(action, payload) => {
               const payloadStr = typeof payload === 'number' ? payload.toFixed(5) : JSON.stringify(payload);
               console.log(`📡 UI Action: ${action} = ${payloadStr}`);

@@ -29,47 +29,15 @@ const NavigationPanel = ({ flightState, selectedArrival, flightPlan, npcs = [] }
     setMapRange(rangeOptions[nextIndex]);
   };
 
-  // Effect to find nearby runways
+  // Effect to find nearby runways and airports
   useEffect(() => {
     if (!flightState?.latitude || !flightState?.longitude) return;
 
-    // Throttle: Only run if we haven't run in the last 2 seconds, 
-    // or use a simpler approach: Run every time but inside a debounce/interval? 
-    // Since flightState updates frequently, we should throttle.
-    // For now, let's just run it. The service is local and fast enough for < 10 airports.
-    
-    // Optimization: Only check every 60 frames (~1s) or check distance changes.
-    // We'll rely on the fact that getAirportsWithinRadius is efficient.
-    
-    // Only search if range is small enough to matter, or always?
-    // User wants "within 10nm", so we must search when near.
-    
-    const airports = airportService.getAirportsWithinRadius(flightState.latitude, flightState.longitude, 15); // Search 15nm
-    const runways = [];
+    // Get airports within range for display
+    const airports = airportService.getAirportsWithinRadius(flightState.latitude, flightState.longitude, Math.max(mapRange, 20)); 
+    setNearbyRunways(airports); // Using this state for airports too, we'll process runways inside loop
 
-    airports.forEach(airport => {
-      // Get all runways for this airport
-      let airportRunways = [];
-      if (airport.runways && Array.isArray(airport.runways)) {
-        airportRunways = airport.runways;
-      } else if (airport.runway) {
-        airportRunways = [{ name: airport.runway, length: airport.runwayLength }];
-      } else {
-        // Default mock if nothing exists
-        airportRunways = [{ name: "09/27", length: 8000 }];
-      }
-
-      airportRunways.forEach(r => {
-        const geom = airportService.getRunwayGeometry(airport.iata || airport.icao, r.name);
-        if (geom) {
-          runways.push(geom);
-        }
-      });
-    });
-
-    setNearbyRunways(runways);
-
-  }, [flightState?.latitude, flightState?.longitude]); // Depends on position
+  }, [flightState?.latitude, flightState?.longitude, mapRange]); // Depends on position and range
 
   // Effect to update Terrain Radar
   useEffect(() => {
@@ -131,7 +99,7 @@ const NavigationPanel = ({ flightState, selectedArrival, flightPlan, npcs = [] }
         }
 
         if (activeWaypoint) {
-          setCurrentNextWaypointName(activeWaypoint.name);
+          setCurrentNextWaypointName(activeWaypoint.label || activeWaypoint.name || 'WPT');
           setCurrentDistanceToNextWaypoint(distanceToActive);
         }
       }
@@ -383,19 +351,83 @@ const NavigationPanel = ({ flightState, selectedArrival, flightPlan, npcs = [] }
       }
 
       let alignmentBarData = null;
-
+      
+      // Draw Airports and Runways
       if (nearbyRunways.length > 0 && typeof flightState?.latitude === 'number') {
         let closestRw = null;
         let minRwDist = Infinity;
-
-        nearbyRunways.forEach(rw => {
-          const midLat = (rw.thresholdStart.latitude + rw.thresholdEnd.latitude) / 2;
-          const midLon = (rw.thresholdStart.longitude + rw.thresholdEnd.longitude) / 2;
-          const d = calculateDistance(flightState.latitude, flightState.longitude, midLat, midLon);
-          if (d < minRwDist) {
-            minRwDist = d;
-            closestRw = { ...rw, midLat, midLon };
-          }
+        
+        nearbyRunways.forEach(airport => {
+            // Draw Airport Symbol
+            const distNm = calculateDistance(flightState.latitude, flightState.longitude, airport.latitude, airport.longitude);
+            if (distNm < mapRange * 1.2) {
+                 const brg = bearingTo(flightState.latitude, flightState.longitude, airport.latitude, airport.longitude) * Math.PI / 180;
+                 const r = Math.min(mapRange * 2, distNm) / mapRange * radius;
+                 const x = r * Math.sin(brg);
+                 const y = -r * Math.cos(brg);
+                 
+                 // Draw Circle
+                 ctx.beginPath();
+                 ctx.arc(x, y, 4, 0, Math.PI * 2);
+                 ctx.strokeStyle = '#00ffff'; // Cyan for airports
+                 ctx.lineWidth = 1;
+                 ctx.stroke();
+                 
+                 // Draw Label
+                 ctx.save();
+                 ctx.translate(x, y);
+                 ctx.rotate(heading * Math.PI / 180);
+                 ctx.fillStyle = '#00ffff';
+                 ctx.font = '9px monospace';
+                 ctx.textAlign = 'center';
+                 ctx.fillText(airport.iata || airport.icao, 0, 10);
+                 ctx.restore();
+            }
+            
+            // Get runways for logic
+            let airportRunways = [];
+            if (airport.runways && Array.isArray(airport.runways)) {
+                airportRunways = airport.runways;
+            } else if (airport.runway) {
+                airportRunways = [{ name: airport.runway, length: airport.runwayLength }];
+            } else {
+                airportRunways = [{ name: "09/27", length: 8000 }];
+            }
+            
+            airportRunways.forEach(r => {
+                const geom = airportService.getRunwayGeometry(airport.iata || airport.icao, r.name);
+                if (geom) {
+                    // Logic for alignment bar (find closest)
+                    const midLat = (geom.thresholdStart.latitude + geom.thresholdEnd.latitude) / 2;
+                    const midLon = (geom.thresholdStart.longitude + geom.thresholdEnd.longitude) / 2;
+                    const d = calculateDistance(flightState.latitude, flightState.longitude, midLat, midLon);
+                    if (d < minRwDist) {
+                        minRwDist = d;
+                        closestRw = { ...geom, midLat, midLon };
+                    }
+                    
+                    // Draw Runway Line
+                    if (distNm < mapRange * 1.2) {
+                         ctx.strokeStyle = '#d8b4fe'; // Light Purple
+                         ctx.lineWidth = 2;
+                         
+                         const brgStart = bearingTo(flightState.latitude, flightState.longitude, geom.thresholdStart.latitude, geom.thresholdStart.longitude) * Math.PI / 180;
+                         const rStart = Math.min(mapRange * 2, calculateDistance(flightState.latitude, flightState.longitude, geom.thresholdStart.latitude, geom.thresholdStart.longitude) / mapRange * radius);
+                         const xStart = rStart * Math.sin(brgStart);
+                         const yStart = -rStart * Math.cos(brgStart);
+    
+                         const brgEnd = bearingTo(flightState.latitude, flightState.longitude, geom.thresholdEnd.latitude, geom.thresholdEnd.longitude) * Math.PI / 180;
+                         const rEnd = Math.min(mapRange * 2, calculateDistance(flightState.latitude, flightState.longitude, geom.thresholdEnd.latitude, geom.thresholdEnd.longitude) / mapRange * radius);
+                         const xEnd = rEnd * Math.sin(brgEnd);
+                         const yEnd = -rEnd * Math.cos(brgEnd);
+    
+                         ctx.beginPath();
+                         ctx.moveTo(xStart, yStart);
+                         ctx.lineTo(xEnd, yEnd);
+                         ctx.stroke();
+                    }
+                }
+            });
         });
 
         if (closestRw && minRwDist < 10) {
@@ -408,36 +440,6 @@ const NavigationPanel = ({ flightState, selectedArrival, flightPlan, npcs = [] }
         }
       }
 
-      // Draw Runways (Purple Lines)
-      if (nearbyRunways.length > 0 && typeof flightState?.latitude === 'number') {
-         ctx.strokeStyle = '#d8b4fe'; // Light Purple
-         ctx.lineWidth = 3;
-
-         nearbyRunways.forEach(rw => {
-            // Check distance to runway start
-            const distNm = calculateDistance(flightState.latitude, flightState.longitude, rw.thresholdStart.latitude, rw.thresholdStart.longitude);
-            
-            if (distNm < mapRange * 1.2) { // Show if roughly within range
-                 // Calculate Start Point
-                 const brgStart = bearingTo(flightState.latitude, flightState.longitude, rw.thresholdStart.latitude, rw.thresholdStart.longitude) * Math.PI / 180;
-                 const rStart = Math.min(mapRange * 2, calculateDistance(flightState.latitude, flightState.longitude, rw.thresholdStart.latitude, rw.thresholdStart.longitude) / mapRange * radius); // Clamp for safety
-                 const xStart = rStart * Math.sin(brgStart);
-                 const yStart = -rStart * Math.cos(brgStart);
-
-                 // Calculate End Point
-                 const brgEnd = bearingTo(flightState.latitude, flightState.longitude, rw.thresholdEnd.latitude, rw.thresholdEnd.longitude) * Math.PI / 180;
-                 const rEnd = Math.min(mapRange * 2, calculateDistance(flightState.latitude, flightState.longitude, rw.thresholdEnd.latitude, rw.thresholdEnd.longitude) / mapRange * radius);
-                 const xEnd = rEnd * Math.sin(brgEnd);
-                 const yEnd = -rEnd * Math.cos(brgEnd);
-
-                 ctx.beginPath();
-                 ctx.moveTo(xStart, yStart);
-                 ctx.lineTo(xEnd, yEnd);
-                 ctx.stroke();
-            }
-         });
-      }
-
       if (Array.isArray(waypoints) && waypoints.length > 0 && typeof flightState?.latitude === 'number' && typeof flightState?.longitude === 'number') {
         const maxRangeNm = mapRange; 
         const points = waypoints.map(wp => {
@@ -446,7 +448,7 @@ const NavigationPanel = ({ flightState, selectedArrival, flightPlan, npcs = [] }
           const r = Math.min(1, distNm / maxRangeNm) * radius;
           const x = r * Math.sin(brg);
           const y = -r * Math.cos(brg);
-          return { x, y, name: wp.name, distNm };
+          return { x, y, name: wp.label || wp.name || 'WPT', distNm };
         });
         if (points.length > 0) {
           ctx.strokeStyle = '#00ff88';
@@ -611,7 +613,7 @@ const NavigationPanel = ({ flightState, selectedArrival, flightPlan, npcs = [] }
                   justifyContent: 'space-between'
                 }
               },
-                React.createElement('span', { style: { fontWeight: 'bold', color: wp.name === currentNextWaypointName ? '#ffdd00' : '#00ff00' } }, wp.name),
+                React.createElement('span', { style: { fontWeight: 'bold', color: (wp.label || wp.name) === currentNextWaypointName ? '#ffdd00' : '#00ff00' } }, wp.label || wp.name || 'WPT'),
                 React.createElement('span', { style: { color: '#aaaaaa' } }, `${wp.latitude.toFixed(2)}, ${wp.longitude.toFixed(2)}`)
               )
             )

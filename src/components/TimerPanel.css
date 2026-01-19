@@ -1,0 +1,145 @@
+.timer-panel {
+  position: absolute;
+  top: 60px;
+  left: 80px; /* Right of sidebar */
+  width: 300px;
+  background: rgba(16, 20, 35, 0.95);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+  color: #e2e8f0;
+  z-index: 1000;
+  animation: slideIn 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  font-family: 'Inter', sans-serif;
+}
+
+@keyframes slideIn {
+  from { opacity: 0; transform: translateX(-20px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+.panel-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px 20px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.panel-header h3 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+  color: #f8fafc;
+}
+
+.close-btn {
+  background: none;
+  border: none;
+  color: #94a3b8;
+  font-size: 24px;
+  cursor: pointer;
+  padding: 0;
+  line-height: 1;
+}
+
+.close-btn:hover {
+  color: #fff;
+}
+
+.panel-content {
+  padding: 20px;
+}
+
+.status-card {
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 8px;
+  padding: 16px;
+  text-align: center;
+  margin-bottom: 20px;
+}
+
+.status-indicator {
+  font-size: 24px;
+  font-weight: 800;
+  color: #94a3b8;
+  margin-bottom: 12px;
+  letter-spacing: 1px;
+}
+
+.status-indicator.active {
+  color: #fbbf24; /* Amber/Yellow for caution */
+  text-shadow: 0 0 10px rgba(251, 191, 36, 0.5);
+}
+
+.start-btn, .stop-btn {
+  width: 100%;
+  padding: 10px;
+  border-radius: 6px;
+  border: none;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.start-btn {
+  background: #3b82f6;
+  color: white;
+}
+
+.start-btn:hover {
+  background: #2563eb;
+}
+
+.stop-btn {
+  background: #ef4444;
+  color: white;
+}
+
+.stop-btn:hover {
+  background: #dc2626;
+}
+
+.settings-section h4 {
+  margin: 0 0 12px 0;
+  font-size: 13px;
+  text-transform: uppercase;
+  color: #64748b;
+  letter-spacing: 0.5px;
+}
+
+.checkbox-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 8px;
+  cursor: pointer;
+  font-size: 14px;
+}
+
+.checkbox-row input[type="checkbox"] {
+  accent-color: #3b82f6;
+}
+
+.timer-input-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 5px;
+  margin-left: 24px;
+  font-size: 13px;
+  color: #94a3b8;
+}
+
+.timer-input-row input[type="range"] {
+  flex: 1;
+}
+
+.countdown-display {
+  margin-top: 10px;
+  text-align: center;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 18px;
+  color: #fbbf24;
+}

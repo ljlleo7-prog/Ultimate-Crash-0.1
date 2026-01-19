@@ -1840,6 +1840,28 @@ class RealisticFlightPhysicsService {
         this.autopilot.setTargets(targets);
     }
     
+    updateFlightPlan(newFlightPlan) {
+        console.log('🔄 Updating Flight Plan:', newFlightPlan);
+        
+        // Extract waypoints array to ensure consistency
+        if (Array.isArray(newFlightPlan)) {
+            this.flightPlan = newFlightPlan;
+        } else if (newFlightPlan && Array.isArray(newFlightPlan.waypoints)) {
+            this.flightPlan = newFlightPlan.waypoints;
+        } else {
+            console.warn('⚠️ Invalid flight plan format provided to physics service');
+            this.flightPlan = [];
+        }
+        
+        // Optionally reset index if it was invalid, or keep it if within bounds
+        if (this.currentWaypointIndex >= this.flightPlan.length) {
+            this.currentWaypointIndex = Math.max(0, this.flightPlan.length - 1);
+        }
+        
+        // If we want to "Direct To", the UI should have already set the waypoints list appropriately.
+        // If the new plan has waypoints, ensure we are targeting something valid.
+    }
+
     loadFlightState(data) {
         if (!data) return;
         
@@ -1851,12 +1873,29 @@ class RealisticFlightPhysicsService {
             
             // Position
             if (ps.position) {
-                this.state.pos = new Vector3(ps.position.x, ps.position.y, ps.position.z);
+                // Restore Geo Position
+                if (ps.position.latitude !== undefined) this.state.geo.lat = ps.position.latitude;
+                if (ps.position.longitude !== undefined) this.state.geo.lon = ps.position.longitude;
+                
+                // Restore Local Position (NED)
+                // Note: ps.position.z is Altitude (Positive Up), but state.pos.z is NED (Positive Down)
+                // If saved z was altitude, we negate it.
+                // We check if z seems to be altitude (>0 usually)
+                this.state.pos = new Vector3(
+                    ps.position.x, 
+                    ps.position.y, 
+                    -Math.abs(ps.position.z) // Ensure Z is negative (Up in NED)
+                );
             }
             
             // Velocity
             if (ps.velocity) {
-                this.state.vel = new Vector3(ps.velocity.x, ps.velocity.y, ps.velocity.z);
+                // Check if saved as u,v,w (OutputState format) or x,y,z (Direct serialization)
+                if (ps.velocity.u !== undefined) {
+                    this.state.vel = new Vector3(ps.velocity.u, ps.velocity.v, ps.velocity.w);
+                } else {
+                    this.state.vel = new Vector3(ps.velocity.x, ps.velocity.y, ps.velocity.z);
+                }
             }
             
             // Orientation (Quaternion)
@@ -1872,7 +1911,9 @@ class RealisticFlightPhysicsService {
             }
             
             // Angular Rates
-            if (ps.rates) {
+            if (ps.angularRates) {
+                this.state.rates = new Vector3(ps.angularRates.p, ps.angularRates.q, ps.angularRates.r);
+            } else if (ps.rates) {
                 this.state.rates = new Vector3(ps.rates.x, ps.rates.y, ps.rates.z);
             } else {
                 this.state.rates = new Vector3(0, 0, 0);
@@ -1883,11 +1924,19 @@ class RealisticFlightPhysicsService {
                 this.controls = { ...this.controls, ...ps.controls };
             }
 
-            // Engines
+            // Engines (Restore Internal State)
             if (ps.engineParams) {
-                // This is a bit tricky as engineParams in update() output is simplified
-                // We might need to approximate or just reset to idle if not detailed enough
-                // But for now, let's assume we can at least set throttle
+                this.engines.forEach((e, i) => {
+                    if (ps.engineParams.n1 && ps.engineParams.n1[i] !== undefined) e.state.n1 = ps.engineParams.n1[i];
+                    if (ps.engineParams.n2 && ps.engineParams.n2[i] !== undefined) e.state.n2 = ps.engineParams.n2[i];
+                    if (ps.engineParams.egt && ps.engineParams.egt[i] !== undefined) e.state.egt = ps.engineParams.egt[i];
+                    if (ps.engineParams.fuelFlow && ps.engineParams.fuelFlow[i] !== undefined) e.state.fuelFlow = ps.engineParams.fuelFlow[i];
+                    
+                    // Ensure engine running state matches N2
+                    e.running = e.state.n2 > 20;
+                });
+                
+                // Set commanded throttle
                 if (ps.controls && ps.controls.throttle !== undefined) {
                     this.engines.forEach(e => e.throttle = ps.controls.throttle);
                 }
@@ -1897,12 +1946,23 @@ class RealisticFlightPhysicsService {
             if (ps.autopilot) {
                 this.autopilot.setEngaged(ps.autopilot.engaged);
                 if (ps.autopilot.mode) this.autopilot.setTargets({ mode: ps.autopilot.mode });
-                if (ps.autopilot.targets) this.autopilot.setTargets(ps.autopilot.targets);
+                // If targets are nested in ps.autopilot.targets or directly in ps.autopilotTargets
+                const targets = ps.autopilot.targets || data.physicsState.autopilotTargets;
+                if (targets) this.autopilot.setTargets(targets);
+                
+                // Restore PID states if available (ps.autopilotDebug might contain them?)
+                // For now, resetting is safer than restoring partial state
+                // this.autopilot.reset(); // Maybe too aggressive?
             }
             
             // Systems
             if (ps.systems) {
                 this.systems = { ...this.systems, ...ps.systems };
+            }
+            
+            // Fuel
+            if (data.flightData && data.flightData.fuel !== undefined) {
+                this.state.fuel = data.flightData.fuel;
             }
         }
         // Fallback: Restore from Flight Data (View Model)

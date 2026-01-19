@@ -1,0 +1,349 @@
+.flight-computer-panel {
+  position: absolute;
+  top: 10px;
+  left: 70px; /* Offset from Sidebar */
+  width: 350px;
+  height: 600px;
+  background: rgba(10, 10, 15, 0.95);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+  display: flex;
+  flex-direction: column;
+  z-index: 1000;
+  color: #e0e0e0;
+  backdrop-filter: blur(10px);
+  font-family: 'Roboto Mono', monospace;
+}
+
+.fc-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 15px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.fc-header h3 {
+  margin: 0;
+  font-size: 16px;
+  color: #4facfe;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+.close-btn {
+  background: none;
+  border: none;
+  color: #888;
+  font-size: 20px;
+  cursor: pointer;
+}
+
+.close-btn:hover {
+  color: #fff;
+}
+
+.fc-tabs {
+  display: flex;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.fc-tabs button {
+  flex: 1;
+  background: none;
+  border: none;
+  padding: 12px;
+  color: #888;
+  cursor: pointer;
+  font-family: inherit;
+  transition: all 0.2s;
+}
+
+.fc-tabs button.active {
+  color: #4facfe;
+  border-bottom: 2px solid #4facfe;
+  background: rgba(79, 172, 254, 0.1);
+}
+
+.fc-tabs button:hover:not(.active) {
+  color: #ccc;
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.fc-content {
+  flex: 1;
+  overflow-y: auto;
+  padding: 15px;
+}
+
+/* Waypoints List */
+.waypoints-list ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.waypoint-item {
+  display: flex;
+  align-items: center;
+  padding: 10px;
+  background: rgba(255, 255, 255, 0.03);
+  margin-bottom: 5px;
+  border-radius: 4px;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.wp-index {
+  width: 25px;
+  color: #666;
+  font-weight: bold;
+}
+
+.wp-info {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.wp-label {
+  color: #fff;
+  font-weight: bold;
+}
+
+.wp-coords {
+  font-size: 10px;
+  color: #888;
+}
+
+.delete-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  opacity: 0.5;
+  transition: opacity 0.2s;
+}
+
+.delete-btn:hover {
+  opacity: 1;
+}
+
+/* Add Section */
+.add-waypoint-section h4 {
+  margin-top: 0;
+  color: #ccc;
+  font-size: 12px;
+  text-transform: uppercase;
+}
+
+.input-group {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.input-group input {
+  flex: 1;
+}
+
+input[type="text"] {
+  width: 100%;
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  padding: 8px;
+  color: #fff;
+  border-radius: 4px;
+  font-family: inherit;
+  box-sizing: border-box;
+}
+
+input[type="text"]:focus {
+  border-color: #4facfe;
+  outline: none;
+}
+
+.label-input {
+  margin-bottom: 10px;
+}
+
+.action-btn {
+  width: 100%;
+  padding: 10px;
+  background: #4facfe;
+  color: #000;
+  border: none;
+  border-radius: 4px;
+  font-weight: bold;
+  cursor: pointer;
+  font-family: inherit;
+  transition: background 0.2s;
+}
+
+.action-btn:hover {
+  background: #00f2fe;
+}
+
+.action-btn.secondary {
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff;
+}
+
+.action-btn.secondary:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.divider {
+  text-align: center;
+  margin: 20px 0;
+  color: #666;
+  font-size: 10px;
+  position: relative;
+}
+
+.divider::before, .divider::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  width: 45%;
+  height: 1px;
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.divider::before { left: 0; }
+.divider::after { right: 0; }
+
+.search-options {
+  display: flex;
+  gap: 15px;
+  margin: 10px 0;
+  font-size: 12px;
+  color: #aaa;
+}
+
+.search-results {
+  margin-top: 15px;
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+.search-result-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.airport-info {
+  display: flex;
+  flex-direction: column;
+}
+
+.airport-code {
+  color: #4facfe;
+  font-weight: bold;
+}
+
+.airport-name {
+  font-size: 10px;
+  color: #888;
+}
+
+.add-btn {
+  background: rgba(79, 172, 254, 0.2);
+  color: #4facfe;
+  border: 1px solid #4facfe;
+  width: 24px;
+  height: 24px;
+  border-radius: 4px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.add-btn:hover {
+  background: #4facfe;
+  color: #000;
+}
+
+/* Nearest Section */
+.nearest-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.nearest-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px;
+  background: rgba(255, 255, 255, 0.03);
+  margin-bottom: 5px;
+  border-radius: 4px;
+}
+
+.airport-details {
+  display: flex;
+  flex-direction: column;
+}
+
+.airport-details .code {
+  color: #fff;
+  font-weight: bold;
+}
+
+.airport-details .name {
+  font-size: 10px;
+  color: #aaa;
+}
+
+.airport-details .dist {
+  font-size: 10px;
+  color: #4facfe;
+}
+
+.tag.emergency {
+  font-size: 9px;
+  background: #ff4b4b;
+  color: white;
+  padding: 2px 4px;
+  border-radius: 2px;
+  display: inline-block;
+  margin-top: 2px;
+  width: fit-content;
+}
+
+.direct-btn {
+  padding: 5px 10px;
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  color: #fff;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 10px;
+}
+
+.direct-btn:hover {
+  background: #4facfe;
+  border-color: #4facfe;
+  color: #000;
+}
+
+.refresh-btn {
+  width: 100%;
+  margin-top: 15px;
+  padding: 10px;
+  background: rgba(255, 255, 255, 0.1);
+  color: #888;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.refresh-btn:hover {
+  background: rgba(255, 255, 255, 0.2);
+  color: #fff;
+}
