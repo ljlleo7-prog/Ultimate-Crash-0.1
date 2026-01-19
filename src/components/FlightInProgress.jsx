@@ -278,14 +278,29 @@ const FlightInProgress = ({
     }
 
     // Update NPCs
-    const messages = npcService.update(dt, flightData.position);
+    const messages = npcService.update(dt, flightData.position, atcManager); // Pass atcManager for blocking checks
     setNpcs([...npcService.npcs]); // Update state for radar
+
+    // Update ATC Logic (Proactive & ATIS)
+    const freqType = getFrequencyType(currentFreq);
+    const freqInfo = {
+        frequency: currentFreq,
+        type: freqType,
+        station: freqType === 'CENTER' && currentRegion ? currentRegion.name : freqType
+    };
+
+    atcManager.update(dt, {
+        altitude: flightData.altitude,
+        verticalSpeed: flightData.verticalSpeed,
+        callsign: callsign,
+        weather: weatherData
+    }, freqInfo, (msg) => {
+        setRadioMessages(prev => [...prev, { ...msg, frequency: freqType }]);
+    });
 
     if (messages.length > 0) {
         // Handle incoming NPC messages
         messages.forEach(msg => {
-            // Block channel for 3 seconds per message
-            atcManager.blockChannel(3000);
             setRadioMessages(prev => [...prev, msg]);
         });
     }
@@ -685,6 +700,7 @@ const FlightInProgress = ({
             callsign={callsign || 'N12345'}
             flightPlan={flightPlan}
             isChannelBusy={isChannelBusy}
+            frequencyType={getFrequencyType(currentFreq)}
           />
         </div>
       </div>

@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { RADIO_TEMPLATES } from '../data/radioTemplates';
 
-const RadioActionPanel = ({ onTransmit, currentStation = 'Unicom', callsign = 'Cessna 172', flightPlan, isChannelBusy }) => {
+const RadioActionPanel = ({ onTransmit, currentStation = 'Unicom', callsign = 'Cessna 172', flightPlan, isChannelBusy, frequencyType = 'UNICOM' }) => {
   const [activeTab, setActiveTab] = useState('REQUEST');
   const [selectedTemplate, setSelectedTemplate] = useState(null);
   const [paramValues, setParamValues] = useState({});
@@ -101,7 +101,14 @@ const RadioActionPanel = ({ onTransmit, currentStation = 'Unicom', callsign = 'C
       <div style={{ flex: 'none', height: '80px', padding: '4px', overflowY: 'auto' }}>
         {!selectedTemplate ? (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-            {RADIO_TEMPLATES[activeTab].map(template => (
+            {RADIO_TEMPLATES[activeTab].filter(template => {
+              if (!template.allowedTypes) return true;
+              if (template.allowedTypes.includes('ALL')) return true;
+              
+              const type = frequencyType.toUpperCase();
+              const titleCase = type.charAt(0).toUpperCase() + type.slice(1).toLowerCase();
+              return template.allowedTypes.includes(titleCase);
+            }).map(template => (
               <button
                 key={template.id}
                 onClick={() => handleTemplateSelect(template)}

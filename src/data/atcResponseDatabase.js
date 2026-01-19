@@ -4,10 +4,13 @@
 
 export const ATC_RESPONSES = {
   // Requests
-  'req_alt': (params) => {
+  'req_alt': (params, context) => {
     // 80% chance to approve, 20% to standby/deny
     if (Math.random() > 0.2) {
-      return `Climb and maintain ${params.altitude}, {callsign}.`;
+      const currentAlt = context && context.altitude ? context.altitude : 0;
+      const targetAlt = parseInt(params.altitude, 10);
+      const action = targetAlt < currentAlt ? 'Descend' : 'Climb';
+      return `${action} and maintain ${params.altitude}, {callsign}.`;
     } else {
       return `Unable ${params.altitude} at this time due to traffic, maintain present altitude, {callsign}.`;
     }
@@ -51,6 +54,10 @@ export const ATC_RESPONSES = {
           return `Current Weather: Wind ${wind}, Visibility ${vis}, Temperature ${temp}, QNH ${qnh}. {callsign}.`;
       }
       return `Information Kilo. Wind Calm, Visibility 10km, Sky Clear, Temperature 15, QNH 1013. {callsign}.`;
+  },
+  'req_freq_change': (params, context) => {
+      const nextFreq = (118 + Math.random() * 10).toFixed(3);
+      return `Frequency change approved. Contact Center on ${nextFreq}. Good day, {callsign}.`;
   },
 
   // Informs

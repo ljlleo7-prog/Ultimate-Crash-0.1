@@ -6,6 +6,13 @@ export class ATCLogic {
     this.pendingResponse = null;
     this.responseTimeout = null;
     this.frequencyLocks = new Map(); // frequency -> busyUntil timestamp
+    
+    // State Tracking
+    this.assignedAltitude = null;
+    this.lastAssignmentTime = 0;
+    this.atisTimer = 0;
+    this.lastComplianceCheck = 0;
+    this.lastReadbackError = 0;
   }
 
   isBusy(frequency) {
@@ -21,6 +28,61 @@ export class ATCLogic {
   }
 
   /**
+   * Main update loop for ATC logic
+   * @param {number} dt - Time delta in seconds
+   * @param {Object} flightState - Current aircraft state
+   * @param {Object} freqInfo - Current frequency info { frequency, type, station }
+   * @param {Function} onMessage - Callback to send a message from ATC
+   */
+  update(dt, flightState, freqInfo, onMessage) {
+    if (!flightState || !freqInfo) return;
+
+    // 1. ATIS Service
+    if (freqInfo.type === 'ATIS' || (freqInfo.station && freqInfo.station.includes('ATIS'))) {
+      this.atisTimer -= dt;
+      if (this.atisTimer <= 0) {
+        this.atisTimer = 60; // Reset to 60s
+        const msg = getATCResponse('req_atis', {}, { weather: flightState.weather, callsign: 'ALL STATIONS' });
+        onMessage({
+          sender: 'ATIS',
+          text: msg,
+          timestamp: Date.now(),
+          frequency: freqInfo.frequency
+        });
+      }
+    } else {
+      this.atisTimer = 0; // Reset if not tuned
+    }
+
+    // 2. Compliance Monitoring (Every 5s)
+    if (this.assignedAltitude && Date.now() - this.lastComplianceCheck > 5000) {
+      this.lastComplianceCheck = Date.now();
+      
+      // Give 60s grace period after assignment
+      if (Date.now() - this.lastAssignmentTime > 60000) {
+        const diff = flightState.altitude - this.assignedAltitude;
+        if (Math.abs(diff) > 500) {
+          // Check vertical speed (are they correcting?)
+          const vs = flightState.verticalSpeed || 0;
+          const isCorrecting = (diff > 0 && vs < -500) || (diff < 0 && vs > 500);
+          
+          if (!isCorrecting) {
+            const action = diff > 0 ? 'descend and maintain' : 'climb and maintain';
+            onMessage({
+              sender: 'ATC',
+              text: `${flightState.callsign || 'Station'}, traffic alert. Check altitude. Immediately ${action} ${this.assignedAltitude}.`,
+              timestamp: Date.now(),
+              frequency: freqInfo.frequency
+            });
+            // Reset timer to avoid spam
+            this.lastAssignmentTime = Date.now(); 
+          }
+        }
+      }
+    }
+  }
+
+  /**
    * Process a pilot message and generate an ATC response
    * @param {Object} message - The pilot's message object { type, templateId, params, text }
    * @param {Object} context - Context data { callsign, altitude, etc. }
@@ -32,6 +94,22 @@ export class ATCLogic {
         return;
     }
 
+    // Handle Readbacks
+    if (message.templateId === 'rb_alt') {
+      const readbackAlt = parseInt(message.params.altitude, 10);
+      if (this.assignedAltitude && Math.abs(readbackAlt - this.assignedAltitude) > 100) {
+        // Wrong readback
+        setTimeout(() => {
+          onResponse({
+            sender: 'ATC',
+            text: `Negative ${context.callsign}, maintain ${this.assignedAltitude}.`,
+            timestamp: Date.now()
+          });
+        }, 1500);
+        return;
+      }
+    }
+
     // Cancel any existing pending response
     if (this.responseTimeout) {
       clearTimeout(this.responseTimeout);
@@ -39,6 +117,13 @@ export class ATCLogic {
     }
 
     const responseText = getATCResponse(message.templateId, message.params || {}, context);
+
+    // Track Assignments
+    if (message.templateId === 'req_alt' && responseText.includes('Unable') === false) {
+      // Assuming approval
+      this.assignedAltitude = parseInt(message.params.altitude, 10);
+      this.lastAssignmentTime = Date.now();
+    }
 
     if (responseText) {
       // Simulate delay (1-3 seconds)

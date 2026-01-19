@@ -48,45 +48,59 @@ export const RADIO_TEMPLATES = {
       label: 'Request Altitude', 
       template: '{station}, {callsign} requesting climb/descent to {altitude}.', 
       params: ['altitude'],
-      type: 'request'
+      type: 'request',
+      allowedTypes: ['Center', 'Approach', 'Departure']
     },
     { 
       id: 'req_direct', 
       label: 'Request Direct', 
       template: '{station}, {callsign} requesting direct to {waypoint}.', 
       params: ['waypoint'],
-      type: 'request'
+      type: 'request',
+      allowedTypes: ['Center', 'Approach', 'Departure']
     },
     { 
       id: 'req_land', 
       label: 'Request Landing', 
       template: '{station}, {callsign} inbound for landing.',
-      type: 'request'
+      type: 'request',
+      allowedTypes: ['Tower']
     },
     {
       id: 'req_startup',
       label: 'Request Startup',
       template: '{station}, {callsign} ready for startup and pushback.',
-      type: 'request'
+      type: 'request',
+      allowedTypes: ['Ground']
     },
     {
       id: 'req_taxi',
       label: 'Request Taxi',
       template: '{station}, {callsign} ready for taxi.',
-      type: 'request'
+      type: 'request',
+      allowedTypes: ['Ground']
     },
     {
       id: 'req_takeoff',
       label: 'Request Takeoff',
       template: '{station}, {callsign} ready for takeoff, runway {runway}.',
       params: ['runway'],
-      type: 'request'
+      type: 'request',
+      allowedTypes: ['Tower']
     },
     {
       id: 'req_atis',
       label: 'Request ATIS',
       template: '{station}, {callsign} requesting current weather / ATIS.',
-      type: 'request'
+      type: 'request',
+      allowedTypes: ['Tower', 'Ground']
+    },
+    {
+      id: 'req_freq_change',
+      label: 'Request Freq Change',
+      template: '{station}, {callsign} requesting frequency change.',
+      type: 'request',
+      allowedTypes: ['Tower', 'Ground', 'Center', 'Approach', 'Departure']
     }
   ],
   INFORM: [
@@ -95,28 +109,32 @@ export const RADIO_TEMPLATES = {
       label: 'Check In', 
       template: '{station}, {callsign} with you at {altitude}.',
       params: ['altitude'],
-      type: 'inform'
+      type: 'inform',
+      allowedTypes: ['Center', 'Approach', 'Departure', 'Tower']
     },
     { 
       id: 'inf_pos', 
       label: 'Position Report', 
       template: '{station}, {callsign} passing {waypoint} at {altitude}.',
       params: ['waypoint', 'altitude'],
-      type: 'inform'
+      type: 'inform',
+      allowedTypes: ['Center', 'Approach', 'Departure', 'Tower']
     },
     { 
       id: 'inf_mayday', 
       label: 'Declare Emergency', 
       template: 'MAYDAY MAYDAY MAYDAY, {station}, {callsign} declaring emergency due to {failure}. Requesting immediate return/diversion.',
       params: ['failure'],
-      type: 'inform'
+      type: 'inform',
+      allowedTypes: ['ALL']
     },
     {
       id: 'inf_pan',
       label: 'Declare Pan-Pan',
       template: 'PAN-PAN PAN-PAN PAN-PAN, {station}, {callsign} has {issue}. Requesting priority handling.',
       params: ['issue'],
-      type: 'inform'
+      type: 'inform',
+      allowedTypes: ['ALL']
     }
   ]
 };
