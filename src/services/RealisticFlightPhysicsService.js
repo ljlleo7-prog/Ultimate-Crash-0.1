@@ -1810,7 +1810,15 @@ class RealisticFlightPhysicsService {
         }
 
         // Reset velocities and rates for initial state
-        this.state.vel = new Vector3(0, 0, 0);
+        if (conditions.velocity) {
+             const u = conditions.velocity.u || conditions.velocity.x || 0;
+             const v = conditions.velocity.v || conditions.velocity.y || 0;
+             const w = conditions.velocity.w || conditions.velocity.z || 0;
+             this.state.vel = new Vector3(u, v, w);
+        } else {
+             this.state.vel = new Vector3(0, 0, 0);
+        }
+        
         this.state.rates = new Vector3(0, 0, 0);
         
         // Update autopilot targets if available

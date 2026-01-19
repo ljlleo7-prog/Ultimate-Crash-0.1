@@ -439,6 +439,7 @@ export function useAircraftPhysics(config = {}, autoStart = true, model = 'reali
       setPhysicsState(newState);
       
       lastUpdateTimeRef.current = currentTime;
+      return newState;
     } catch (err) {
       console.error('❌ Physics update error:', err);
       setError(err.message);
