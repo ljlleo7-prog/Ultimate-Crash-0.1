@@ -30,6 +30,95 @@ const FlightInitialization = ({
   
   // Fuel Reserve State (hours)
   const [reserveHours, setReserveHours] = useState(1.0);
+  
+  // Step Management
+  const [currentStep, setCurrentStep] = useState(1);
+  
+  // Input validation helper
+  const isValidNumber = (val, min, max) => {
+    if (val === '' || val === null || val === undefined) return false;
+    const num = parseFloat(val);
+    return !isNaN(num) && num >= min && num <= max;
+  };
+  
+  // Step 1 Validation: Difficulty is always selected (it has a default)
+  const isStep1Valid = () => !!difficulty;
+  
+  // Step 2 Validation: Flight Parameters
+  const isStep2Valid = () => {
+    return (
+      airline.trim() !== '' &&
+      callsign.trim() !== '' &&
+      aircraftModel &&
+      isValidNumber(pax, 0, 1000) &&
+      isValidNumber(payload, 0, 100000) &&
+      isValidNumber(cruiseHeight, 1000, 50000) &&
+      isValidNumber(reserveHours, 0.5, 5.0) &&
+      isValidNumber(crewCount, 1, 10) &&
+      (useRandomTime || timeZulu.trim() !== '') &&
+      (useRandomSeason || season)
+    );
+  };
+
+  // Step 3 Validation: Route
+  const isStep3Valid = () => {
+    return selectedDeparture && selectedArrival;
+  };
+
+  const handleNextStep = () => {
+    if (currentStep === 1 && isStep1Valid()) {
+      // Auto-generate hidden parameters based on difficulty when proceeding
+      const randomWeather = generateRandomWeather(difficulty);
+      setWeatherData(randomWeather);
+      const randomFailure = generateRandomFailure(difficulty);
+      setFailureType(randomFailure);
+      
+      setCurrentStep(2);
+    }
+    else if (currentStep === 2 && isStep2Valid()) setCurrentStep(3);
+  };
+
+  // Randomize Helpers
+  const randomizeStep1 = () => {
+    const difficulties = ['rookie', 'amateur', 'intermediate', 'advanced', 'pro', 'devil'];
+    const randomDiff = difficulties[Math.floor(Math.random() * difficulties.length)];
+    setDifficulty(randomDiff);
+  };
+
+  const randomizeStep2 = async () => {
+    try {
+      const randomParams = await randomFlightService.generateRandomFlightParameters();
+      setAirline(randomParams.airline);
+      setCallsign(randomParams.callsign);
+      setAircraftModel(randomParams.aircraftModel);
+      setPax(randomParams.pax);
+      setPayload(randomParams.payload);
+      setFuelReserve(randomParams.fuelReserve);
+      setCruiseHeight(randomParams.cruiseHeight);
+      setUseRandomTime(true);
+      setUseRandomSeason(true);
+      setCrewCount(Math.floor(Math.random() * 4) + 2); // Random crew 2-5
+      
+      // Also randomize hidden weather/failure based on current difficulty
+      const randomWeather = generateRandomWeather(difficulty);
+      setWeatherData(randomWeather);
+      const randomFailure = generateRandomFailure(difficulty);
+      setFailureType(randomFailure);
+    } catch (error) {
+      console.error("Error randomizing flight params:", error);
+    }
+  };
+
+  const randomizeStep3 = async () => {
+    try {
+      const randomParams = await randomFlightService.generateRandomFlightParameters();
+      selectDeparture(randomParams.selectedDeparture);
+      selectArrival(randomParams.selectedArrival);
+    } catch (error) {
+      console.error("Error randomizing route:", error);
+    }
+  };
+
 
   const generateRandomTime = () => {
     const hours = Math.floor(Math.random() * 24).toString().padStart(2, '0');
@@ -194,6 +283,10 @@ const FlightInitialization = ({
   useEffect(() => {
     const calculatePlan = async () => {
       if (selectedDeparture && selectedArrival) {
+        // Safe parsing for calculations
+        const safePayload = parseFloat(payload) || 0;
+        const safeReserve = parseFloat(reserveHours) || 1.0;
+
         // Calculate distance
         const distance = distanceCalculator.calculateDistance(
           selectedDeparture.lat, selectedDeparture.lon,
@@ -204,16 +297,11 @@ const FlightInitialization = ({
         const fuel = await distanceCalculator.calculateFuelConsumption(
           distance.nauticalMiles, 
           aircraftModel, 
-          payload,
-          reserveHours // Use state value
+          safePayload,
+          safeReserve // Use state value
         );
         
         // Calculate flight time (simple estimation)
-        // Note: Fuel calculation now handles more complex time estimation, we should sync this if possible
-        // For now, distanceCalculator uses a basic speed/distance.
-        // Let's use the fuel object's implied time if available, or basic.
-        // The fuel object from aircraftService (via distanceCalculator) doesn't return time yet in all paths,
-        // but let's assume standard cruise.
         const speed = 450; // knots (approx)
         const timeHours = distance.nauticalMiles / speed;
         
@@ -234,8 +322,21 @@ const FlightInitialization = ({
   return (
     <div className="flight-initialization">
       {/* 01. DIFFICULTY & INTEL */}
-      <div className="dispatch-section">
-        <h2 className="section-header">01. OPERATIONAL LEVEL & INTEL</h2>
+      <div 
+        className="dispatch-section"
+        style={{ 
+          opacity: currentStep === 1 ? 1 : 0.5, 
+          pointerEvents: currentStep === 1 ? 'auto' : 'none',
+          transition: 'all 0.3s ease'
+        }}
+      >
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', borderBottom: '2px solid #30363d' }}>
+          <h2 className="section-header" style={{ borderBottom: 'none', marginBottom: 0 }}>01. OPERATIONAL LEVEL & INTEL</h2>
+          <button className="dispatch-btn random" onClick={randomizeStep1} title="Randomize Difficulty">
+            🎲
+          </button>
+        </div>
+        
         <div className="difficulty-grid">
           <div className="difficulty-buttons">
             {['rookie', 'amateur', 'intermediate', 'advanced', 'pro', 'devil'].map((level) => (
@@ -268,78 +369,36 @@ const FlightInitialization = ({
             </div>
           </div>
         </div>
+        
+        {currentStep === 1 && (
+          <div style={{ marginTop: '1.5rem', display: 'flex', justifyContent: 'flex-end' }}>
+            <button 
+              className="dispatch-btn primary" 
+              onClick={handleNextStep}
+              disabled={!isStep1Valid()}
+            >
+              NEXT: FLIGHT PARAMETERS →
+            </button>
+          </div>
+        )}
       </div>
 
-      {/* 02. METAR & CONDITIONS */}
-      <div className="dispatch-section">
-        <h2 className="section-header">02. METAR & ENVIRONMENTAL CONDITIONS</h2>
-        <div className="dispatch-grid">
-          <div className="parameter-group">
-            <label>WEATHER TYPE</label>
-            <select
-              value={weatherData.type || 'clear'}
-              onChange={(e) => setWeatherData({...weatherData, type: e.target.value})}
-              className="dispatch-select"
-            >
-              {getAvailableWeatherTypes().map((type) => (
-                <option key={type} value={type}>{type.toUpperCase()}</option>
-              ))}
-            </select>
-          </div>
-
-          <div className="parameter-group">
-            <label>WIND SPEED (KTS)</label>
-            <input
-              type="number"
-              value={weatherData.windSpeed || 0}
-              onChange={(e) => setWeatherData({...weatherData, windSpeed: parseInt(e.target.value) || 0})}
-              className="dispatch-input"
-              min="0" max="100"
-            />
-          </div>
-
-          <div className="parameter-group">
-            <label>VISIBILITY (MI)</label>
-            <input
-              type="number"
-              value={weatherData.visibility || 10}
-              onChange={(e) => setWeatherData({...weatherData, visibility: parseFloat(e.target.value) || 0})}
-              className="dispatch-input"
-              min="0" max="50" step="0.1"
-            />
-          </div>
-
-          <div className="parameter-group">
-            <label>FAILURE MODE</label>
-            <select
-              value={failureType}
-              onChange={(e) => setFailureType(e.target.value)}
-              className="dispatch-select"
-            >
-              {getAvailableFailureTypes().map((type) => (
-                <option key={type} value={type}>
-                  {type.split('_').map(w => w.toUpperCase()).join(' ')}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div className="parameter-group">
-            <label>CREW COUNT</label>
-            <input
-              type="number"
-              value={crewCount}
-              onChange={(e) => setCrewCount(parseInt(e.target.value) || 1)}
-              className="dispatch-input"
-              min="1" max="10"
-            />
-          </div>
+      {/* 02. FLIGHT PARAMETERS (Merged with Crew Count) */}
+      <div 
+        className="dispatch-section"
+        style={{ 
+          opacity: currentStep === 2 ? 1 : 0.5, 
+          pointerEvents: currentStep === 2 ? 'auto' : 'none',
+          transition: 'all 0.3s ease'
+        }}
+      >
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', borderBottom: '2px solid #30363d' }}>
+          <h2 className="section-header" style={{ borderBottom: 'none', marginBottom: 0 }}>02. FLIGHT PARAMETERS</h2>
+          <button className="dispatch-btn random" onClick={randomizeStep2} title="Randomize Parameters">
+            🎲
+          </button>
         </div>
-      </div>
 
-      {/* 03. FLIGHT PARAMETERS */}
-      <div className="dispatch-section">
-        <h2 className="section-header">03. FLIGHT PARAMETERS</h2>
         <div className="dispatch-grid">
           <div className="parameter-group">
             <label>AIRLINE</label>
@@ -379,13 +438,26 @@ const FlightInitialization = ({
           </div>
 
           <div className="parameter-group">
+            <label>CREW COUNT</label>
+            <input
+              type="number"
+              value={crewCount}
+              onChange={(e) => setCrewCount(e.target.value)}
+              className="dispatch-input"
+              min="1" max="10"
+              placeholder="1-10"
+            />
+          </div>
+
+          <div className="parameter-group">
             <label>PASSENGERS (PAX)</label>
             <input
               type="number"
               value={pax}
-              onChange={(e) => setPax(parseInt(e.target.value) || 0)}
+              onChange={(e) => setPax(e.target.value)}
               className="dispatch-input"
               min="0" max="1000"
+              placeholder="0-1000"
             />
           </div>
 
@@ -394,9 +466,10 @@ const FlightInitialization = ({
             <input
               type="number"
               value={payload}
-              onChange={(e) => setPayload(parseInt(e.target.value) || 0)}
+              onChange={(e) => setPayload(e.target.value)}
               className="dispatch-input"
               min="0" max="100000"
+              placeholder="KG"
             />
           </div>
 
@@ -405,9 +478,10 @@ const FlightInitialization = ({
             <input
               type="number"
               value={cruiseHeight}
-              onChange={(e) => setCruiseHeight(parseInt(e.target.value) || 0)}
+              onChange={(e) => setCruiseHeight(e.target.value)}
               className="dispatch-input"
               min="1000" max="50000"
+              placeholder="FT"
             />
           </div>
 
@@ -416,9 +490,10 @@ const FlightInitialization = ({
             <input
               type="number"
               value={reserveHours}
-              onChange={(e) => setReserveHours(parseFloat(e.target.value) || 1.0)}
+              onChange={(e) => setReserveHours(e.target.value)}
               className="dispatch-input"
               min="0.5" max="5.0" step="0.1"
+              placeholder="HRS"
             />
           </div>
 
@@ -473,11 +548,36 @@ const FlightInitialization = ({
             </div>
           </div>
         </div>
+
+        {currentStep === 2 && (
+          <div style={{ marginTop: '1.5rem', display: 'flex', justifyContent: 'flex-end' }}>
+             <button 
+              className="dispatch-btn primary" 
+              onClick={handleNextStep}
+              disabled={!isStep2Valid()}
+            >
+              NEXT: ROUTE SELECTION →
+            </button>
+          </div>
+        )}
       </div>
 
-      {/* 04. ROUTE SELECTION */}
-      <div className="dispatch-section">
-        <h2 className="section-header">04. ROUTE SELECTION</h2>
+      {/* 03. ROUTE SELECTION */}
+      <div 
+        className="dispatch-section"
+        style={{ 
+          opacity: currentStep === 3 ? 1 : 0.5, 
+          pointerEvents: currentStep === 3 ? 'auto' : 'none',
+          transition: 'all 0.3s ease'
+        }}
+      >
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', borderBottom: '2px solid #30363d' }}>
+          <h2 className="section-header" style={{ borderBottom: 'none', marginBottom: 0 }}>03. ROUTE SELECTION</h2>
+          <button className="dispatch-btn random" onClick={randomizeStep3} title="Randomize Route">
+            🎲
+          </button>
+        </div>
+
         <div className="airport-selection-grid">
           <div className="parameter-group">
             <label>DEPARTURE AIRPORT</label>
@@ -530,18 +630,18 @@ const FlightInitialization = ({
       )}
 
       {/* ACTION BUTTONS */}
-      <div className="dispatch-actions">
-        <button className="dispatch-btn random" onClick={handleRandomInitialize}>
-          🎲 GENERATE RANDOM MISSION
-        </button>
-        <button
-          className="dispatch-btn primary"
-          onClick={handleInitializeFlight}
-          disabled={!selectedDeparture || !selectedArrival}
-        >
-          FINALIZE DISPATCH & INITIALIZE
-        </button>
-      </div>
+      {currentStep === 3 && (
+        <div className="dispatch-actions" style={{ borderTop: 'none', paddingTop: 0 }}>
+          <button
+            className="dispatch-btn primary"
+            onClick={handleInitializeFlight}
+            disabled={!isStep3Valid()}
+            style={{ width: '100%' }}
+          >
+            FINALIZE DISPATCH & INITIALIZE
+          </button>
+        </div>
+      )}
     </div>
   );
 };

@@ -48,9 +48,15 @@ const FlightInProgress = ({
 
   const averagePassengerWeight = 90;
   const averageCrewWeight = 90;
-  const totalPassengerWeight = (pax || 0) * averagePassengerWeight;
-  const totalCrewWeight = (crewCount || 0) * averageCrewWeight;
-  const additionalPayloadWeight = payload || 0;
+  // Parse inputs safely as they might be strings from the initialization form
+  const safePax = parseInt(pax) || 0;
+  const safeCrew = parseInt(crewCount) || 0;
+  const safePayload = parseFloat(payload) || 0;
+  const safeCruiseHeight = parseInt(cruiseHeight) || 0;
+
+  const totalPassengerWeight = safePax * averagePassengerWeight;
+  const totalCrewWeight = safeCrew * averageCrewWeight;
+  const additionalPayloadWeight = safePayload;
   const totalPayloadWeight = totalPassengerWeight + totalCrewWeight + additionalPayloadWeight;
   const flightPlanFuelWeight = flightPlan && flightPlan.fuel && typeof flightPlan.fuel.totalFuel === 'number'
     ? flightPlan.fuel.totalFuel
