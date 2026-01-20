@@ -172,14 +172,15 @@ const CommunicationModule = ({ flightState, setRadioFreq, flightPlan, radioMessa
   }, [flightState?.latitude, flightState?.longitude]);
 
   // 2. Build available stations list when airports or flight plan changes
+  const altitude = flightState?.altitude || 0;
+  const isHighAltitude = altitude > 5000;
+
   useEffect(() => {
     // Debug log
     if (currentRegion) console.log('CommunicationModule: currentRegion available:', currentRegion);
     
     const stations = [];
     const currentPos = referencePos || { lat: flightState?.latitude, lon: flightState?.longitude };
-    const altitude = flightState?.altitude || 0;
-    const isHighAltitude = altitude > 5000;
 
     // Add Region Control (Always available, priority at high altitude)
     if (currentRegion) {
@@ -229,8 +230,15 @@ const CommunicationModule = ({ flightState, setRadioFreq, flightPlan, radioMessa
     
     // Take nearest 3
     const nearest3 = uniqueStations.slice(0, 3);
-    setAvailableStations(nearest3);
-  }, [nearbyAirports, flightPlan, referencePos, currentRegion, flightState?.altitude]);
+    
+    // Only update if changed to prevent render loops
+    setAvailableStations(prev => {
+        if (JSON.stringify(prev) !== JSON.stringify(nearest3)) {
+            return nearest3;
+        }
+        return prev;
+    });
+  }, [nearbyAirports, flightPlan, referencePos, currentRegion, isHighAltitude]);
 
   // 3. Check connection status (fast, runs on freq change)
   useEffect(() => {

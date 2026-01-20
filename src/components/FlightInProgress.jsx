@@ -7,6 +7,7 @@ import { airportService } from '../services/airportService';
 import weatherConfig from '../config/weatherConfig.json';
 import FlightPanelModular from './FlightPanelModular';
 import DebugPhysicsPanel from './DebugPhysicsPanel';
+import FailureDebugPanel from './FailureDebugPanel';
 import commandDatabase from '../commandDatabase.json';
 import sceneManager from '../services/sceneManager.js';
 import eventBus from '../services/eventBus.js';
@@ -202,6 +203,7 @@ const FlightInProgress = ({
   const [activeFailures, setActiveFailures] = useState([]);
   const [phaseName, setPhaseName] = useState('');
   const [showDebugPhysics, setShowDebugPhysics] = useState(false);
+  const [showFailurePanel, setShowFailurePanel] = useState(false);
   const [isChannelBusy, setIsChannelBusy] = useState(false);
   const [npcs, setNpcs] = useState([]);
   const [currentRegion, setCurrentRegion] = useState(null);
@@ -420,6 +422,8 @@ const FlightInProgress = ({
 
   // Weather update effect
   useEffect(() => {
+    let interval;
+    
     if (useRealWeather) {
        const fetchRealWeather = async () => {
          const lat = physicsService?.state?.geo?.lat || initialDeparture?.latitude || 37.6188;
@@ -427,30 +431,33 @@ const FlightInProgress = ({
          
          try {
              const data = await realWeatherService.getWeather(lat, lon);
-             setWeatherData(data);
-             if (setEnvironment) setEnvironment(data);
-             console.log("🌦️ Real Weather Updated:", data);
+             // Only update if data changed (deep comparison would be better, but simplified check helps)
+             setWeatherData(prev => {
+                 if (JSON.stringify(prev) !== JSON.stringify(data)) {
+                     console.log("🌦️ Real Weather Updated:", data);
+                     if (setEnvironment) setEnvironment(data);
+                     return data;
+                 }
+                 return prev;
+             });
          } catch (e) {
              console.error("❌ Real Weather Fetch Failed", e);
          }
        };
        
        fetchRealWeather();
-       const interval = setInterval(fetchRealWeather, 5 * 60 * 1000); // Update every 5 minutes
-       return () => clearInterval(interval);
+       interval = setInterval(fetchRealWeather, 5 * 60 * 1000); // Update every 5 minutes
+    } else {
+        interval = setInterval(() => {
+          setWeatherData(prevWeatherData => {
+            const updated = updateWeather(prevWeatherData, weatherConfig.atisUpdateIntervalMinutes);
+            return updated;
+          });
+        }, weatherConfig.atisUpdateIntervalMinutes * 60 * 1000);
     }
 
-    const interval = setInterval(() => {
-      setWeatherData(prevWeatherData => {
-        const updated = updateWeather(prevWeatherData, weatherConfig.atisUpdateIntervalMinutes);
-        // Optionally, publish weather updates to eventBus if other components need to react
-        // eventBus.publish(eventBus.Types.WEATHER_UPDATE, updated);
-        return updated;
-      });
-    }, weatherConfig.atisUpdateIntervalMinutes * 60 * 1000); // Convert minutes to milliseconds
-
     return () => clearInterval(interval);
-  }, [weatherData, setWeatherData, useRealWeather, setEnvironment, physicsService]);
+  }, [useRealWeather, setEnvironment, physicsService]); // Removed weatherData and setWeatherData to prevent loops
 
   // Terrain update effect
   useEffect(() => {
@@ -783,26 +790,9 @@ const FlightInProgress = ({
           />
         )}
 
-        <button
-          onClick={() => setShowDebugPhysics(!showDebugPhysics)}
-          style={{
-            position: 'absolute',
-            bottom: '10px',
-            right: '10px',
-            zIndex: 2000,
-            background: 'rgba(30, 41, 59, 0.8)',
-            color: showDebugPhysics ? '#38bdf8' : '#94a3b8',
-            border: `1px solid ${showDebugPhysics ? '#38bdf8' : '#334155'}`,
-            borderRadius: '4px',
-            padding: '4px 8px',
-            fontSize: '10px',
-            fontWeight: 'bold',
-            cursor: 'pointer',
-            transition: 'all 0.2s'
-          }}
-        >
-          {showDebugPhysics ? 'HIDE DEBUG' : 'SHOW DEBUG'}
-        </button>
+        {showFailurePanel && (
+          <FailureDebugPanel physicsService={physicsService} />
+        )}
 
         <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', zIndex: 10 }}>
           <FlightPanelModular
