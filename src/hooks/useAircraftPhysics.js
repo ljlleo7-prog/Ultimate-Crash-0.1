@@ -386,6 +386,9 @@ export function useAircraftPhysics(config = {}, autoStart = true, model = 'reali
       const hasCrashed = !!newState.hasCrashed;
       const autopilotTargets = newState.autopilotTargets || autopilotStatus.targets || null;
 
+      const fuelFlowArray = Array.isArray(newState.engineParams?.fuelFlow) ? newState.engineParams.fuelFlow : [];
+      const fuelFlowTotal = fuelFlowArray.reduce((sum, value) => sum + (typeof value === 'number' ? value : 0), 0);
+
       const newFlightData = {
         altitude: altitude,
         airspeed: trueAirspeed,
@@ -420,6 +423,8 @@ export function useAircraftPhysics(config = {}, autoStart = true, model = 'reali
         engineN1: newState.engineParams?.n1 !== undefined ? newState.engineParams.n1 : [22, 22],
         engineN2: newState.engineParams?.n2 !== undefined ? newState.engineParams.n2 : [45, 45],
         engineEGT: newState.engineParams?.egt !== undefined ? newState.engineParams.egt : [400, 400],
+        fuelFlow: fuelFlowArray,
+        fuelFlowTotal,
         fuel: newState.fuel !== undefined ? newState.fuel : 100,
         currentWaypointIndex: newState.currentWaypointIndex || 0,
         hasCrashed,

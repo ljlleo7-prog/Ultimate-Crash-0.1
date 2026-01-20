@@ -1544,16 +1544,6 @@ class RealisticFlightPhysicsService {
         console.log("Physics Service: Runway Geometry Set", geometry);
     }
 
-    setILSRunway(airportCode, runwayName) {
-        const geometry = airportService.getRunwayGeometry(airportCode, runwayName);
-        if (geometry) {
-            this.setRunwayGeometry(geometry);
-            console.log(`📡 ILS Tuned to ${airportCode} RWY ${runwayName}`);
-        } else {
-            console.warn(`⚠️ Could not find ILS geometry for ${airportCode} ${runwayName}`);
-        }
-    }
-
     updateGroundStatus() {
         if (!this.runwayGeometry) {
             this.groundStatus = { status: 'UNKNOWN', remainingLength: 0 };
