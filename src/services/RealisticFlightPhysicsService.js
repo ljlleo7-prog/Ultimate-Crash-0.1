@@ -472,8 +472,8 @@ class RealisticFlightPhysicsService {
                 const nextWaypoint = this.flightPlan[this.currentWaypointIndex];
                 const dist = this._calculateDistance(this.state.geo.lat, this.state.geo.lon, nextWaypoint.latitude, nextWaypoint.longitude);
                 
-                // Switch to next waypoint if within 2km
-                if (dist < 2000) {
+                // Switch to next waypoint if within 2km (UNLESS HOLDING)
+                if (dist < 2000 && !nextWaypoint.isHold) {
                     this.currentWaypointIndex++;
                     console.log(`📍 Reached waypoint ${nextWaypoint.label || this.currentWaypointIndex - 1}. Sequencing to index ${this.currentWaypointIndex}`);
                 }
@@ -482,7 +482,49 @@ class RealisticFlightPhysicsService {
                 if (this.autopilot.mode === 'LNAV' && this.currentWaypointIndex < this.flightPlan.length) {
                     const targetWP = this.flightPlan[this.currentWaypointIndex];
                     const bearing = this._calculateBearing(this.state.geo.lat, this.state.geo.lon, targetWP.latitude, targetWP.longitude);
-                    this.autopilot.setTargets({ heading: bearing });
+                    
+                    if (targetWP.isHold) {
+                        // --- HOLD PATTERN LOGIC (Right Turn Orbit) ---
+                        // Target a circular orbit around the waypoint
+                        const HOLD_RADIUS = 3000; // 3km radius (~1.6nm)
+                        const CONVERGENCE_GAIN = 0.001; // Sensitivity of convergence
+                        
+                        // Calculate heading relative to bearing
+                        // If on radius: Bearing + 90
+                        // If outside: Turn In (Bearing + 90 - correction)
+                        // If inside: Turn Out (Bearing + 90 + correction) (Wait, inside means we are closer, we want to widen turn?)
+                        // Let's visualize: Center North. Tangent East. 
+                        // If we are South (Bearing 0), we fly East (90).
+                        // If we are South but Far (Outside), we want to fly North-East (45). (90 - 45).
+                        // If we are South but Close (Inside), we want to fly South-East (135). (90 + 45).
+                        
+                        // Correction should be positive if Inside (Dist < Radius) -> 90 + pos
+                        // Correction should be negative if Outside (Dist > Radius) -> 90 - pos
+                        
+                        // dist - radius > 0 (Outside). We want negative correction.
+                        // So: -1 * (dist - radius) * gain
+                        
+                        const distError = dist - HOLD_RADIUS;
+                        const correction = Math.atan(distError * CONVERGENCE_GAIN); // radians, range -PI/2 to PI/2
+                        
+                        // Target Heading = Bearing + 90 - Correction
+                        // But wait, if we are outside (dist > radius), distError > 0. Correction > 0.
+                        // We want Bearing + 90 - Correction.
+                        // Example: Outside. Bearing 0. Target 90 - 45 = 45. Correct.
+                        // Example: Inside. Bearing 0. DistError < 0. Correction < 0.
+                        // Target 90 - (-45) = 135. Correct.
+                        
+                        let targetHeading = bearing + 90 - (correction * 180 / Math.PI);
+                        
+                        // Normalize to 0-360
+                        targetHeading = (targetHeading + 360) % 360;
+                        
+                        this.autopilot.setTargets({ heading: targetHeading });
+                        // console.log(`🔄 Holding at ${targetWP.label}: Dist ${Math.round(dist)}m, Hdg ${Math.round(targetHeading)}`);
+                    } else {
+                        // Standard Direct-To
+                        this.autopilot.setTargets({ heading: bearing });
+                    }
                 }
 
                 // Update Runway Geometry if target is an airport with a selected runway
@@ -1502,6 +1544,16 @@ class RealisticFlightPhysicsService {
         console.log("Physics Service: Runway Geometry Set", geometry);
     }
 
+    setILSRunway(airportCode, runwayName) {
+        const geometry = airportService.getRunwayGeometry(airportCode, runwayName);
+        if (geometry) {
+            this.setRunwayGeometry(geometry);
+            console.log(`📡 ILS Tuned to ${airportCode} RWY ${runwayName}`);
+        } else {
+            console.warn(`⚠️ Could not find ILS geometry for ${airportCode} ${runwayName}`);
+        }
+    }
+
     updateGroundStatus() {
         if (!this.runwayGeometry) {
             this.groundStatus = { status: 'UNKNOWN', remainingLength: 0 };
@@ -1729,18 +1781,31 @@ class RealisticFlightPhysicsService {
     updateFlightPlan(newFlightPlan) {
         console.log('🔄 Updating Flight Plan:', newFlightPlan);
         
+        let newWaypoints = [];
         // Extract waypoints array to ensure consistency
         if (Array.isArray(newFlightPlan)) {
-            this.flightPlan = newFlightPlan;
+            newWaypoints = newFlightPlan;
         } else if (newFlightPlan && Array.isArray(newFlightPlan.waypoints)) {
-            this.flightPlan = newFlightPlan.waypoints;
+            newWaypoints = newFlightPlan.waypoints;
         } else {
             console.warn('⚠️ Invalid flight plan format provided to physics service');
             this.flightPlan = [];
+            return;
         }
         
-        // Reset index to start from the beginning of the new plan
-        this.currentWaypointIndex = 0;
+        // Smart Index Preservation: If length matches, keep index. 
+        // This allows property updates (like 'isHold') without resetting progress.
+        const preserveIndex = (this.flightPlan && this.flightPlan.length === newWaypoints.length);
+        const oldIndex = this.currentWaypointIndex;
+
+        this.flightPlan = newWaypoints;
+        
+        if (preserveIndex) {
+            this.currentWaypointIndex = oldIndex;
+        } else {
+            // Reset index to start from the beginning of the new plan
+            this.currentWaypointIndex = 0;
+        }
         
         // Optionally reset index if it was invalid, or keep it if within bounds
         if (this.currentWaypointIndex >= this.flightPlan.length) {

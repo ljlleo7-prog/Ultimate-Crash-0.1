@@ -217,10 +217,26 @@ const FlightInProgress = ({
   // Handle Flight Plan Update
    const handleUpdateFlightPlan = (newPlan) => {
      console.log("📝 Flight Plan Updated:", newPlan);
-     setActiveFlightPlan(newPlan);
+     
+     let updatedPlanObject;
+     if (Array.isArray(newPlan)) {
+         // If we received just an array of waypoints, merge it into the existing plan object
+         updatedPlanObject = {
+             ...activeFlightPlan,
+             waypoints: newPlan
+         };
+     } else {
+         // If we received a full object, use it
+         updatedPlanObject = newPlan;
+     }
+
+     setActiveFlightPlan(updatedPlanObject);
+     
      // Update Physics Service
      if (updateFlightPlan) {
-         updateFlightPlan(newPlan);
+         // Physics service handles both array and object, but let's pass the array if that's what changed,
+         // or just pass the full object which the service also handles.
+         updateFlightPlan(updatedPlanObject);
      }
    };
   
@@ -579,6 +595,22 @@ const FlightInProgress = ({
     setCommandInput('');
   };
 
+  const availableRunways = React.useMemo(() => {
+    // Combine runways from arrival airport and nearby airports if needed
+    // For now, prioritize selected Arrival
+    if (selectedArrival) {
+      const runways = airportService.getRunwayInfo(selectedArrival.iata || selectedArrival.icao);
+      // Map to simple strings or objects
+      return runways.flatMap(r => {
+          // Split pairs like "09L/27R" into individual options
+          if (r.name.includes('/')) return r.name.split('/').map(p => p.trim());
+          if (r.name.includes('-')) return r.name.split('-').map(p => p.trim());
+          return [r.name];
+      }).sort();
+    }
+    return [];
+  }, [selectedArrival]);
+
 
 
 
@@ -785,6 +817,7 @@ const FlightInProgress = ({
             timeScale={timeScale}
             setTimeScale={setTimeScale}
             onUpdateFlightPlan={handleUpdateFlightPlan}
+            availableRunways={availableRunways} // Pass available runways
             onActionRequest={(action, payload) => {
               const payloadStr = typeof payload === 'number' ? payload.toFixed(5) : JSON.stringify(payload);
               console.log(`📡 UI Action: ${action} = ${payloadStr}`);
@@ -851,6 +884,14 @@ const FlightInProgress = ({
                     };
                     
                     physicsService.updateAutopilotTargets(targets);
+                  }
+                  console.log(`📡 FlightPanel Action: ${action} = ${JSON.stringify(payload)}`);
+                  break;
+                }
+                case 'set-ils-runway': {
+                  if (physicsService && typeof physicsService.setILSRunway === 'function' && payload) {
+                      // payload: { airportCode, runwayName }
+                      physicsService.setILSRunway(payload.airportCode, payload.runwayName);
                   }
                   console.log(`📡 FlightPanel Action: ${action} = ${JSON.stringify(payload)}`);
                   break;

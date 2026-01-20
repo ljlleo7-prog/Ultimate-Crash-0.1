@@ -16,11 +16,33 @@ const ModernAutopilotModule = ({ flightState, setAutopilotTargets, toggleAutopil
       };
 
   const [targets, setTargets] = useState(initialTargets);
+  const [ilsRunway, setIlsRunway] = useState('');
 
   // Only sync targets from flightState if they are explicitly provided by the physics service
   // and differ from our local state. We remove current airspeed/alt/vs from dependencies
   // to prevent the target from "following" the current state.
   const currentMode = flightState.autopilotMode || 'LNAV';
+
+  useEffect(() => {
+    if (availableRunways && availableRunways.length > 0) {
+        // If no runway selected, or selected runway is not in the new list (e.g. airport changed)
+        if (!ilsRunway || !availableRunways.includes(ilsRunway)) {
+            const defaultRunway = availableRunways[0];
+            setIlsRunway(defaultRunway);
+            if (setILSRunway && selectedArrival) {
+                setILSRunway(selectedArrival.iata || selectedArrival.icao, defaultRunway);
+            }
+        }
+    }
+  }, [availableRunways, selectedArrival, ilsRunway]);
+
+  const handleRunwayChange = (e) => {
+      const newRunway = e.target.value;
+      setIlsRunway(newRunway);
+      if (setILSRunway && selectedArrival) {
+          setILSRunway(selectedArrival.iata || selectedArrival.icao, newRunway);
+      }
+  };
 
   useEffect(() => {
     if (flightState?.autopilotTargets) {
@@ -205,24 +227,24 @@ const ModernAutopilotModule = ({ flightState, setAutopilotTargets, toggleAutopil
           } 
         },
           React.createElement('button', {
-            style: { background: 'none', border: 'none', color: '#64748b', cursor: 'pointer', padding: '0 4px', fontSize: '14px' },
+            style: { background: 'none', border: 'none', color: isILS ? '#475569' : '#64748b', cursor: isILS ? 'not-allowed' : 'pointer', padding: '0 4px', fontSize: '14px' },
             onClick: () => updateTarget('heading', (targets.heading - 5 + 360) % 360),
-            disabled: flightState.hasCrashed
+            disabled: flightState.hasCrashed || isILS
           }, '-'),
           React.createElement('span', { 
             style: { 
               flex: 1, 
               textAlign: 'center', 
               fontSize: '13px', 
-              color: currentMode === 'LNAV' ? '#64748b' : '#f8fafc', 
+              color: currentMode === 'LNAV' ? '#64748b' : (isILS ? '#fbbf24' : '#f8fafc'), 
               fontFamily: 'monospace',
               fontWeight: 'bold'
             } 
           }, `${targets.heading.toFixed(0)}`),
           React.createElement('button', {
-            style: { background: 'none', border: 'none', color: '#64748b', cursor: 'pointer', padding: '0 4px', fontSize: '14px' },
+            style: { background: 'none', border: 'none', color: isILS ? '#475569' : '#64748b', cursor: isILS ? 'not-allowed' : 'pointer', padding: '0 4px', fontSize: '14px' },
             onClick: () => updateTarget('heading', (targets.heading + 5) % 360),
-            disabled: flightState.hasCrashed
+            disabled: flightState.hasCrashed || isILS
           }, '+')
         )
       ),
@@ -241,24 +263,24 @@ const ModernAutopilotModule = ({ flightState, setAutopilotTargets, toggleAutopil
           } 
         },
           React.createElement('button', {
-            style: { background: 'none', border: 'none', color: '#64748b', cursor: 'pointer', padding: '0 4px', fontSize: '14px' },
+            style: { background: 'none', border: 'none', color: isILS ? '#475569' : '#64748b', cursor: isILS ? 'not-allowed' : 'pointer', padding: '0 4px', fontSize: '14px' },
             onClick: () => updateTarget('vs', Math.max(-4000, targets.vs - 100)),
-            disabled: flightState.hasCrashed
+            disabled: flightState.hasCrashed || isILS
           }, '-'),
           React.createElement('span', { 
             style: { 
               flex: 1, 
               textAlign: 'center', 
               fontSize: '13px', 
-              color: '#f8fafc', 
+              color: isILS ? '#fbbf24' : '#f8fafc', 
               fontFamily: 'monospace',
               fontWeight: 'bold'
             } 
           }, `${targets.vs >= 0 ? '+' : ''}${targets.vs.toFixed(0)}`),
           React.createElement('button', {
-            style: { background: 'none', border: 'none', color: '#64748b', cursor: 'pointer', padding: '0 4px', fontSize: '14px' },
+            style: { background: 'none', border: 'none', color: isILS ? '#475569' : '#64748b', cursor: isILS ? 'not-allowed' : 'pointer', padding: '0 4px', fontSize: '14px' },
             onClick: () => updateTarget('vs', Math.min(4000, targets.vs + 100)),
-            disabled: flightState.hasCrashed
+            disabled: flightState.hasCrashed || isILS
           }, '+')
         )
       ),

@@ -50,6 +50,15 @@ const FlightComputerPanel = ({ onClose, flightPlan, onUpdateFlightPlan, flightSt
     updateParent(newWaypoints);
   };
 
+  const handleToggleHold = (index) => {
+    const newWaypoints = [...waypoints];
+    newWaypoints[index] = { 
+      ...newWaypoints[index], 
+      isHold: !newWaypoints[index].isHold 
+    };
+    updateParent(newWaypoints);
+  };
+
   const handleAddManual = () => {
     const lat = parseFloat(manualLat);
     const lon = parseFloat(manualLon);
@@ -198,6 +207,25 @@ const FlightComputerPanel = ({ onClose, flightPlan, onUpdateFlightPlan, flightSt
                         </select>
                       )}
                     </div>
+                    <button 
+                      className="hold-btn" 
+                      onClick={() => handleToggleHold(index)}
+                      style={{
+                        marginLeft: '8px',
+                        background: wp.isHold ? '#eab308' : '#334155',
+                        color: wp.isHold ? 'black' : 'white',
+                        border: '1px solid #475569',
+                        borderRadius: '3px',
+                        cursor: 'pointer',
+                        fontSize: '10px',
+                        padding: '2px 6px',
+                        fontWeight: 'bold',
+                        transition: 'all 0.2s'
+                      }}
+                      title="Toggle Hold Pattern (Orbit)"
+                    >
+                      {wp.isHold ? 'HOLDING' : 'HOLD'}
+                    </button>
                     <button className="delete-btn" onClick={() => handleDeleteWaypoint(index)}>🗑️</button>
                   </li>
                 ))}

@@ -19,7 +19,7 @@ import TimerPanel from './TimerPanel';
 import FlightComputerPanel from './FlightComputerPanel';
 import './FlightPanel.css';
 
-const FlightPanelModular = ({ flightData, physicsState, weatherData, onActionRequest, aircraftModel, selectedArrival, flightPlan, radioMessages, onRadioFreqChange, npcs, frequencyContext, currentRegion, timeScale, setTimeScale, onUpdateFlightPlan }) => {
+const FlightPanelModular = ({ flightData, physicsState, weatherData, onActionRequest, aircraftModel, selectedArrival, flightPlan, radioMessages, onRadioFreqChange, npcs, frequencyContext, currentRegion, timeScale, setTimeScale, onUpdateFlightPlan, availableRunways }) => {
   // Use flightData from parent component instead of creating own physics service
   const [showOverhead, setShowOverhead] = useState(false);
   const [activeSidebarPanel, setActiveSidebarPanel] = useState(null);
@@ -242,6 +242,12 @@ const FlightPanelModular = ({ flightData, physicsState, weatherData, onActionReq
     }
   };
 
+  const setILSRunway = (airportCode, runwayName) => {
+    if (onActionRequest) {
+      onActionRequest('set-ils-runway', { airportCode, runwayName });
+    }
+  };
+
   const controlFlaps = (position) => {
     if (onActionRequest) {
       onActionRequest('flaps', position);
@@ -377,7 +383,10 @@ const FlightPanelModular = ({ flightData, physicsState, weatherData, onActionReq
           toggleAutopilot,
           setAutopilotMode,
           setAltimeter: (val) => setFlightState(prev => ({ ...prev, altimeter: val })),
-          frequencyContext // Pass frequency context for ILS availability
+          frequencyContext, // Pass frequency context for ILS availability
+          availableRunways,
+          selectedArrival,
+          setILSRunway
         }),
         React.createElement(CommunicationModule, {
           flightState,
