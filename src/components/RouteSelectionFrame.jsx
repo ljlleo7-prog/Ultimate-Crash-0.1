@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import './RouteSelectionFrame.css';
-import { generateWaypoints, generateSID, generateSTAR, generateGate, generateTaxiway, getRunways, generateRouteWaypoints } from '../utils/routeGenerator';
+import { generateWaypoints, generateSID, generateSTAR, generateGate, generateTaxiway, getRunways, generateRouteWaypoints, generateSmartRoute } from '../utils/routeGenerator';
 
 const RouteSelectionFrame = ({ 
   isOpen, 
@@ -26,6 +26,7 @@ const RouteSelectionFrame = ({
   const [availableRunwaysDep, setAvailableRunwaysDep] = useState([]);
   const [availableRunwaysArr, setAvailableRunwaysArr] = useState([]);
   const [generatedWaypoints, setGeneratedWaypoints] = useState([]);
+  const [isGeneratingRoute, setIsGeneratingRoute] = useState(false);
 
   useEffect(() => {
     if (isOpen && departure && arrival) {
@@ -34,41 +35,47 @@ const RouteSelectionFrame = ({
       setAvailableRunwaysDep(depRunways);
       setAvailableRunwaysArr(arrRunways);
 
-      const waypoints = generateRouteWaypoints(departure, arrival);
-      console.log('📍 Generated route waypoints:', waypoints);
-      setGeneratedWaypoints(waypoints);
+      const fetchRoute = async () => {
+        setIsGeneratingRoute(true);
+        const waypoints = await generateSmartRoute(departure, arrival);
+        console.log('📍 Generated route waypoints:', waypoints);
+        setGeneratedWaypoints(waypoints);
 
-      const sid = generateSID((waypoints[0] && waypoints[0].name) || 'ABC');
-      const star = generateSTAR((waypoints[waypoints.length - 1] && waypoints[waypoints.length - 1].name) || 'ABC');
-      const depGate = generateGate();
-      const arrGate = generateGate();
-      const depTaxi = generateTaxiway();
-      const arrTaxi = generateTaxiway();
+        const sid = generateSID((waypoints[0] && waypoints[0].name) || 'ABC');
+        const star = generateSTAR((waypoints[waypoints.length - 1] && waypoints[waypoints.length - 1].name) || 'ABC');
+        const depGate = generateGate();
+        const arrGate = generateGate();
+        const depTaxi = generateTaxiway();
+        const arrTaxi = generateTaxiway();
 
-      const isEastward = arrival.longitude > departure.longitude;
-      const bestDepRunway = depRunways.length > 0 ? [...depRunways].sort((a, b) => parseInt(a) - parseInt(b))[isEastward ? 0 : depRunways.length - 1] : '';
-      const bestArrRunway = arrRunways.length > 0 ? [...arrRunways].sort((a, b) => parseInt(a) - parseInt(b))[isEastward ? 0 : arrRunways.length - 1] : '';
+        const isEastward = arrival.longitude > departure.longitude;
+        const bestDepRunway = depRunways.length > 0 ? [...depRunways].sort((a, b) => parseInt(a) - parseInt(b))[isEastward ? 0 : depRunways.length - 1] : '';
+        const bestArrRunway = arrRunways.length > 0 ? [...arrRunways].sort((a, b) => parseInt(a) - parseInt(b))[isEastward ? 0 : arrRunways.length - 1] : '';
 
-      // Pre-fill based on difficulty to assist user
-      // Or leave empty if "must set".
-      // Let's pre-fill for everyone but require interaction for specific levels?
-      // Actually, standard UX is pre-fill with smart defaults.
-      
-      const isAmateurOrHigher = ['amateur', 'intermediate', 'advanced', 'pro', 'devil'].includes(difficulty);
-      const isIntermediateOrHigher = ['intermediate', 'advanced', 'pro', 'devil'].includes(difficulty);
-      const isAdvancedOrHigher = ['advanced', 'pro', 'devil'].includes(difficulty);
+        // Pre-fill based on difficulty to assist user
+        // Or leave empty if "must set".
+        // Let's pre-fill for everyone but require interaction for specific levels?
+        // Actually, standard UX is pre-fill with smart defaults.
+        
+        const isAmateurOrHigher = ['amateur', 'intermediate', 'advanced', 'pro', 'devil'].includes(difficulty);
+        const isIntermediateOrHigher = ['intermediate', 'advanced', 'pro', 'devil'].includes(difficulty);
+        const isAdvancedOrHigher = ['advanced', 'pro', 'devil'].includes(difficulty);
 
-      setRouteData({
-        departureGate: isAmateurOrHigher ? '' : depGate, // Amateur+ must set
-        departureTaxiway: depTaxi,
-        departureRunway: isAmateurOrHigher ? '' : bestDepRunway, // Amateur+ must set
-        sid: isAdvancedOrHigher ? '' : sid, // Advanced+ must set
-        waypoints: isIntermediateOrHigher ? [] : waypoints, // Intermediate+ must set
-        star: isAdvancedOrHigher ? '' : star, // Advanced+ must set
-        landingRunway: isAmateurOrHigher ? '' : bestArrRunway, // Amateur+ must set
-        landingTaxiway: arrTaxi,
-        arrivalGate: isAmateurOrHigher ? '' : arrGate // Amateur+ must set
-      });
+        setRouteData({
+          departureGate: isAmateurOrHigher ? '' : depGate, // Amateur+ must set
+          departureTaxiway: depTaxi,
+          departureRunway: isAmateurOrHigher ? '' : bestDepRunway, // Amateur+ must set
+          sid: isAdvancedOrHigher ? '' : sid, // Advanced+ must set
+          waypoints: isIntermediateOrHigher ? [] : waypoints, // Intermediate+ must set
+          star: isAdvancedOrHigher ? '' : star, // Advanced+ must set
+          landingRunway: isAmateurOrHigher ? '' : bestArrRunway, // Amateur+ must set
+          landingTaxiway: arrTaxi,
+          arrivalGate: isAmateurOrHigher ? '' : arrGate // Amateur+ must set
+        });
+        setIsGeneratingRoute(false);
+      };
+
+      fetchRoute();
     }
   }, [isOpen, departure, arrival, difficulty]);
 
@@ -76,14 +83,16 @@ const RouteSelectionFrame = ({
     setRouteData(prev => ({ ...prev, [field]: value }));
   };
 
-  const handleGenerateWaypoints = () => {
-     const wps = generateRouteWaypoints(departure, arrival);
+  const handleGenerateWaypoints = async () => {
+     setIsGeneratingRoute(true);
+     const wps = await generateSmartRoute(departure, arrival);
      setGeneratedWaypoints(wps);
      handleChange('waypoints', wps);
      
      // Also update SID/STAR if they depend on waypoints
      if (!routeData.sid) handleChange('sid', generateSID((wps[0] && wps[0].name) || 'ABC'));
      if (!routeData.star) handleChange('star', generateSTAR((wps[wps.length - 1] && wps[wps.length - 1].name) || 'ABC'));
+     setIsGeneratingRoute(false);
   };
 
   const isFormValid = () => {
@@ -189,8 +198,8 @@ const RouteSelectionFrame = ({
                       ? routeData.waypoints.map(wp => typeof wp === 'string' ? wp : (wp.name || 'WPT')).join(' ➝ ')
                       : ''}
                  </div>
-                 <button className="action-btn" onClick={handleGenerateWaypoints}>
-                   Generate New Route
+                 <button className="action-btn" onClick={handleGenerateWaypoints} disabled={isGeneratingRoute}>
+                   {isGeneratingRoute ? 'Generating...' : 'Generate New Route'}
                  </button>
               </div>
             </div>

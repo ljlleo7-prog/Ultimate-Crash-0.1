@@ -10,8 +10,8 @@ class TerrainRadarService {
         this.maxCacheSize = 5000; // Limit cache size
         
         // Open-Elevation API endpoint
-        // Using a public free instance. In production, use your own instance or a paid plan.
-        this.API_ENDPOINT = 'https://api.open-elevation.com/api/v1/lookup';
+        // Using local proxy to avoid CORS in development
+        this.API_ENDPOINT = '/api/openelevation/api/v1/lookup';
         
         // Start the fetch loop
         this.startFetcher();
@@ -144,37 +144,70 @@ class TerrainRadarService {
         processBatch();
     }
 
-    // Call Open-Elevation API
+    // Call Terrain API with Fallback (Double-Entry)
     async fetchElevationData(batch) {
         // Format: locations=lat,lon|lat,lon...
         const locationsParam = batch.map(item => `${item.lat.toFixed(5)},${item.lon.toFixed(5)}`).join('|');
-        const url = `${this.API_ENDPOINT}?locations=${locationsParam}`;
+        
+        // Primary: Open-Elevation
+        const urlPrimary = `${this.API_ENDPOINT}?locations=${locationsParam}`;
+        
+        // Secondary: OpenTopoData (ASTER 30m Global)
+        // Public API: https://api.opentopodata.org/v1/aster30m
+        // Using local proxy to avoid CORS in development
+        const urlSecondary = `/api/opentopodata/v1/aster30m?locations=${locationsParam}`;
 
+        let success = false;
+
+        // Try Primary
         try {
-            const response = await fetch(url);
-            if (!response.ok) {
-                throw new Error(`API Error: ${response.status}`);
-            }
-            
+            // console.log("Terrain: Trying Primary (Open-Elevation)...");
+            const response = await fetch(urlPrimary);
+            if (!response.ok) throw new Error(`Primary API Error: ${response.status}`);
             const data = await response.json();
-            
             if (data && data.results) {
-                data.results.forEach((result, index) => {
-                    // Match result back to batch item (assuming order is preserved as per API docs)
-                    // Or match by coordinates if unsure, but API docs say order preserved.
-                    if (index < batch.length) {
-                        const item = batch[index];
-                        const elevationMeters = result.elevation;
-                        const elevationFeet = elevationMeters * 3.28084;
-                        this.cache.set(item.key, elevationFeet);
-                    }
-                });
+                this.processResults(batch, data.results);
+                success = true;
             }
         } catch (error) {
-            // Fallback to 0 if API fails, or dont set cache so it retries
-            // console.error(error);
-            throw error;
+            console.warn("Terrain: Primary API failed, switching to Secondary (OpenTopoData)...", error);
         }
+
+        // Try Secondary if Primary failed
+        if (!success) {
+            try {
+                // console.log("Terrain: Trying Secondary (OpenTopoData)...");
+                const response = await fetch(urlSecondary);
+                if (!response.ok) throw new Error(`Secondary API Error: ${response.status}`);
+                const data = await response.json();
+                if (data && data.results) {
+                    this.processResults(batch, data.results);
+                    success = true;
+                }
+            } catch (error) {
+                console.warn("Terrain: Secondary API also failed.", error);
+            }
+        }
+        
+        // If both failed, we just leave them as null (pending) or could cache 0s
+        if (!success) {
+             // Optional: Cache 0s to stop retrying immediately? 
+             // batch.forEach(item => this.cache.set(item.key, 0));
+        }
+    }
+
+    processResults(batch, results) {
+        results.forEach((result, index) => {
+            // Match result back to batch item
+            if (index < batch.length) {
+                const item = batch[index];
+                const elevationMeters = result.elevation;
+                // Handle null elevation (ocean/error)
+                const validElev = (elevationMeters !== null && elevationMeters !== undefined) ? elevationMeters : 0;
+                const elevationFeet = validElev * 3.28084;
+                this.cache.set(item.key, elevationFeet);
+            }
+        });
     }
 }
 

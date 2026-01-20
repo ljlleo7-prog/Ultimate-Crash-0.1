@@ -34,6 +34,52 @@ export const generateWaypoints = (count = 3) => {
   return waypoints;
 };
 
+/**
+ * Attempts to fetch a real flight route from FlightLabs API.
+ * Fallback to geometric Great Circle route if API fails or quota exceeded.
+ * @param {Object} startAirport - { iata, latitude, longitude }
+ * @param {Object} endAirport - { iata, latitude, longitude }
+ * @returns {Promise<Array>} List of waypoints
+ */
+export const generateSmartRoute = async (startAirport, endAirport) => {
+    // 1. Try FlightLabs API (Placeholder for real implementation)
+    // Note: FlightLabs requires an API Key. If you have one, set it here.
+    // Free tier often doesn't support full routing, but we implement the logic structure.
+    const FLIGHTLABS_API_KEY = ''; // Leave empty to force fallback for now
+    
+    if (FLIGHTLABS_API_KEY && startAirport.iata && endAirport.iata) {
+        try {
+            console.log(`✈️ RouteGen: Attempting FlightLabs API for ${startAirport.iata}-${endAirport.iata}...`);
+            const url = `https://app.goflightlabs.com/flights?access_key=${FLIGHTLABS_API_KEY}&dep_iata=${startAirport.iata}&arr_iata=${endAirport.iata}`;
+            
+            const response = await fetch(url);
+            if (!response.ok) throw new Error(`API Status ${response.status}`);
+            
+            const data = await response.json();
+            // Note: Actual response structure depends on specific endpoint (Routes API vs Flights API)
+            // This is a hypothetical parsing logic.
+            if (data && data.route && Array.isArray(data.route)) {
+                console.log("✈️ RouteGen: Successfully retrieved real route!");
+                return data.route.map((pt, i) => ({
+                    name: pt.name || `WPT${i+1}`,
+                    latitude: pt.lat,
+                    longitude: pt.lon,
+                    type: 'WAYPOINT',
+                    frequency: generateUniqueFrequency()
+                }));
+            }
+        } catch (error) {
+            console.warn("✈️ RouteGen: FlightLabs API failed or not accessible. Falling back to Great Circle.", error);
+        }
+    } else {
+        // console.log("✈️ RouteGen: No API Key or invalid IATA. Using Great Circle.");
+    }
+
+    // 2. Fallback: Geometric Great Circle Route (Shortest Path)
+    // Add a small delay to simulate "thinking" if desired, or return immediately
+    return generateRouteWaypoints(startAirport, endAirport);
+};
+
 export const generateSID = (firstWaypoint) => {
   if (!firstWaypoint || firstWaypoint.length < 3) return 'DEF01D';
   const prefix = firstWaypoint.substring(0, 3);
