@@ -19,7 +19,7 @@ import TimerPanel from './TimerPanel';
 import FlightComputerPanel from './FlightComputerPanel';
 import './FlightPanel.css';
 
-const FlightPanelModular = ({ flightData, physicsState, weatherData, onActionRequest, aircraftModel, selectedArrival, flightPlan, radioMessages, onRadioFreqChange, npcs, frequencyContext, currentRegion, timeScale, setTimeScale, onUpdateFlightPlan }) => {
+const FlightPanelModular = ({ flightData, physicsState, weatherData, onActionRequest, aircraftModel, selectedArrival, flightPlan, radioMessages, onRadioFreqChange, npcs, frequencyContext, currentRegion, timeScale, setTimeScale, onUpdateFlightPlan, availableRunways }) => {
   // Use flightData from parent component instead of creating own physics service
   const [showOverhead, setShowOverhead] = useState(false);
   const [activeSidebarPanel, setActiveSidebarPanel] = useState(null);
@@ -46,6 +46,7 @@ const FlightPanelModular = ({ flightData, physicsState, weatherData, onActionReq
     engineN1: [85.2, 85.1],
     engineN2: [95.3, 95.2],
     engineEGT: [650, 645],
+    engineFuelFlow: [0, 0],
     fuel: 8500,
     
     // Systems
@@ -118,6 +119,7 @@ const FlightPanelModular = ({ flightData, physicsState, weatherData, onActionReq
         engineN1: flightData.engineN1 || prevState.engineN1,
         engineN2: flightData.engineN2 || prevState.engineN2,
         engineEGT: flightData.engineEGT || prevState.engineEGT,
+        engineFuelFlow: flightData.engineFuelFlow || prevState.engineFuelFlow || [0, 0],
         fuel: flightData.fuel || prevState.fuel,
         
         // Systems
@@ -140,7 +142,8 @@ const FlightPanelModular = ({ flightData, physicsState, weatherData, onActionReq
         headingHold: prevState.headingHold,
         autopilotTargets: flightData.autopilotTargets || prevState.autopilotTargets,
         frame: typeof flightData.frame === 'number' ? flightData.frame : prevState.frame,
-        systems: flightData.systems || prevState.systems || {}
+        systems: flightData.systems || prevState.systems || {},
+        currentWaypointIndex: flightData.currentWaypointIndex !== undefined ? flightData.currentWaypointIndex : (prevState.currentWaypointIndex || 0)
       }));
     }
   }, [flightData, weatherData]);
@@ -239,6 +242,12 @@ const FlightPanelModular = ({ flightData, physicsState, weatherData, onActionReq
   const setAutopilotMode = (mode) => {
     if (onActionRequest) {
       onActionRequest('set-autopilot-mode', mode);
+    }
+  };
+
+  const setILSRunway = (airportCode, runwayName) => {
+    if (onActionRequest) {
+      onActionRequest('set-ils-runway', { airportCode, runwayName });
     }
   };
 
@@ -377,7 +386,10 @@ const FlightPanelModular = ({ flightData, physicsState, weatherData, onActionReq
           toggleAutopilot,
           setAutopilotMode,
           setAltimeter: (val) => setFlightState(prev => ({ ...prev, altimeter: val })),
-          frequencyContext // Pass frequency context for ILS availability
+          frequencyContext, // Pass frequency context for ILS availability
+          availableRunways,
+          selectedArrival,
+          setILSRunway
         }),
         React.createElement(CommunicationModule, {
           flightState,

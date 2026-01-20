@@ -20,6 +20,102 @@ const FlightComputerPanel = ({ onClose, flightPlan, onUpdateFlightPlan, flightSt
   const [nearestAirports, setNearestAirports] = useState([]);
   const [loadingNearest, setLoadingNearest] = useState(false);
 
+  // Utils State
+  const [utilsTargetAlt, setUtilsTargetAlt] = useState(35000);
+  const [convertVal, setConvertVal] = useState('');
+  const [convertFrom, setConvertFrom] = useState('ft');
+  const [convertTo, setConvertTo] = useState('m');
+  const [convertResult, setConvertResult] = useState(null);
+
+  // Auto-convert when inputs change
+  useEffect(() => {
+    const val = parseFloat(convertVal);
+    if (isNaN(val)) {
+        setConvertResult(null);
+        return;
+    }
+    
+    let res = 0;
+    // Conversions
+    if (convertFrom === 'ft' && convertTo === 'm') res = val * 0.3048;
+    else if (convertFrom === 'm' && convertTo === 'ft') res = val / 0.3048;
+    else if (convertFrom === 'kts' && convertTo === 'kmh') res = val * 1.852;
+    else if (convertFrom === 'kmh' && convertTo === 'kts') res = val / 1.852;
+    else if (convertFrom === 'inHg' && convertTo === 'hPa') res = val * 33.8639;
+    else if (convertFrom === 'hPa' && convertTo === 'inHg') res = val / 33.8639;
+    else if (convertFrom === 'nm' && convertTo === 'km') res = val * 1.852;
+    else if (convertFrom === 'km' && convertTo === 'nm') res = val / 1.852;
+    else if (convertFrom === convertTo) res = val;
+    
+    setConvertResult(res);
+  }, [convertVal, convertFrom, convertTo]);
+
+  const calculatePredictions = () => {
+     // Time to WPT
+     let timeToWpt = '---';
+     let distToWpt = '---';
+     let nextWpLabel = '---';
+     
+     if (waypoints.length > 0 && flightState.groundSpeed > 10) {
+         // flightState.currentWaypointIndex might be undefined if not passed yet, handle gracefully
+         let nextIdx = flightState.currentWaypointIndex || 0;
+         
+         // If index is past end, we are done
+         if (nextIdx < waypoints.length) {
+             const wp = waypoints[nextIdx];
+             nextWpLabel = wp.label || `WP${nextIdx+1}`;
+             
+             // Simple haversine or use service
+             // We can use airportService.calculateDistance even for non-airports if we pass {latitude, longitude}
+             const dist = airportService.calculateDistance(
+                 {latitude: flightState.latitude, longitude: flightState.longitude},
+                 {latitude: wp.latitude, longitude: wp.longitude}
+             );
+             distToWpt = dist.toFixed(1) + ' nm';
+             
+             // Time = Dist / Speed
+             const hours = dist / flightState.groundSpeed;
+             const mins = Math.floor(hours * 60);
+             const secs = Math.floor((hours * 3600) % 60);
+             timeToWpt = `${mins}m ${secs}s`;
+         } else {
+             nextWpLabel = 'End of Flight Plan';
+         }
+     }
+     
+     // Fuel
+     let timeFuel = '---';
+     const totalFlow = (flightState.engineFuelFlow || [0,0]).reduce((a,b)=>a+b, 0); // kg/s
+     let flowKgH = 0;
+     if (totalFlow > 0.01) {
+         flowKgH = totalFlow * 3600;
+         const fuelKg = flightState.fuel || 0;
+         const hours = fuelKg / flowKgH;
+         const mins = Math.floor(hours * 60);
+         timeFuel = `${Math.floor(hours)}h ${mins%60}m`;
+     }
+     
+     // Altitude
+     let timeAlt = '---';
+     const vs = flightState.verticalSpeed; // ft/min
+     if (Math.abs(vs) > 50) {
+         const diff = utilsTargetAlt - (flightState.altitude || 0);
+         // If moving in right direction
+         if ((diff > 0 && vs > 0) || (diff < 0 && vs < 0)) {
+             const mins = Math.abs(diff / vs);
+             timeAlt = `${Math.floor(mins)}m ${Math.floor((mins%1)*60)}s`;
+         } else {
+             timeAlt = 'Wrong VS Direction';
+         }
+     } else {
+         timeAlt = 'Stable';
+     }
+     
+     return { timeToWpt, distToWpt, nextWpLabel, timeFuel, timeAlt, totalFlow: flowKgH };
+  };
+
+  const preds = calculatePredictions();
+
   // Initialize local state from props
   useEffect(() => {
     if (flightPlan) {
@@ -170,6 +266,7 @@ const FlightComputerPanel = ({ onClose, flightPlan, onUpdateFlightPlan, flightSt
         <button className={activeTab === 'waypoints' ? 'active' : ''} onClick={() => setActiveTab('waypoints')}>Plan</button>
         <button className={activeTab === 'add' ? 'active' : ''} onClick={() => setActiveTab('add')}>Add</button>
         <button className={activeTab === 'nearest' ? 'active' : ''} onClick={() => setActiveTab('nearest')}>Nearest</button>
+        <button className={activeTab === 'utils' ? 'active' : ''} onClick={() => setActiveTab('utils')}>Perf</button>
       </div>
       
       <div className="fc-content">
@@ -342,6 +439,105 @@ const FlightComputerPanel = ({ onClose, flightPlan, onUpdateFlightPlan, flightSt
               </ul>
             )}
             <button className="refresh-btn" onClick={findNearestAirports}>Refresh</button>
+          </div>
+        )}
+        
+        {activeTab === 'utils' && (
+          <div className="utils-section" style={{ padding: '10px', color: '#e2e8f0' }}>
+            
+            <div className="utils-block" style={{ marginBottom: '20px', background: 'rgba(0,0,0,0.2)', padding: '10px', borderRadius: '4px' }}>
+              <h4 style={{ margin: '0 0 10px 0', borderBottom: '1px solid #475569', paddingBottom: '5px' }}>Predictions</h4>
+              
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', fontSize: '12px' }}>
+                <div style={{ color: '#94a3b8' }}>Next Waypoint:</div>
+                <div style={{ textAlign: 'right', fontWeight: 'bold' }}>{preds.nextWpLabel}</div>
+                
+                <div style={{ color: '#94a3b8' }}>Distance:</div>
+                <div style={{ textAlign: 'right' }}>{preds.distToWpt}</div>
+                
+                <div style={{ color: '#94a3b8' }}>ETE to WPT:</div>
+                <div style={{ textAlign: 'right', color: '#4ade80' }}>{preds.timeToWpt}</div>
+                
+                <div style={{ borderTop: '1px solid #334155', gridColumn: '1/-1', margin: '4px 0' }}></div>
+                
+                <div style={{ color: '#94a3b8' }}>Fuel Flow:</div>
+                <div style={{ textAlign: 'right' }}>{preds.totalFlow.toFixed(0)} kg/h</div>
+                
+                <div style={{ color: '#94a3b8' }}>Time to Empty:</div>
+                <div style={{ textAlign: 'right', color: '#f59e0b' }}>{preds.timeFuel}</div>
+                
+                <div style={{ borderTop: '1px solid #334155', gridColumn: '1/-1', margin: '4px 0' }}></div>
+                
+                <div style={{ color: '#94a3b8', alignSelf: 'center' }}>Target Alt (ft):</div>
+                <div style={{ textAlign: 'right' }}>
+                  <input 
+                    type="number" 
+                    value={utilsTargetAlt} 
+                    onChange={(e) => setUtilsTargetAlt(parseFloat(e.target.value))}
+                    style={{ width: '60px', background: '#1e293b', border: '1px solid #475569', color: 'white', padding: '2px' }}
+                  />
+                </div>
+                
+                <div style={{ color: '#94a3b8' }}>Time to Alt:</div>
+                <div style={{ textAlign: 'right', color: '#60a5fa' }}>{preds.timeAlt}</div>
+              </div>
+            </div>
+
+            <div className="utils-block" style={{ background: 'rgba(0,0,0,0.2)', padding: '10px', borderRadius: '4px' }}>
+              <h4 style={{ margin: '0 0 10px 0', borderBottom: '1px solid #475569', paddingBottom: '5px' }}>Unit Converter</h4>
+              
+              <div style={{ display: 'flex', gap: '8px', marginBottom: '8px' }}>
+                <input 
+                  type="number" 
+                  value={convertVal} 
+                  onChange={(e) => setConvertVal(e.target.value)}
+                  placeholder="Value"
+                  style={{ flex: 1, background: '#1e293b', border: '1px solid #475569', color: 'white', padding: '4px' }}
+                />
+              </div>
+              
+              <div style={{ display: 'flex', gap: '8px', alignItems: 'center', marginBottom: '10px' }}>
+                <select 
+                  value={convertFrom} 
+                  onChange={(e) => setConvertFrom(e.target.value)}
+                  style={{ background: '#1e293b', border: '1px solid #475569', color: 'white', padding: '4px', flex: 1 }}
+                >
+                  <option value="ft">Feet (ft)</option>
+                  <option value="m">Meters (m)</option>
+                  <option value="kts">Knots (kts)</option>
+                  <option value="kmh">Km/h</option>
+                  <option value="inHg">inHg</option>
+                  <option value="hPa">hPa</option>
+                  <option value="nm">Naut. Miles</option>
+                  <option value="km">Kilometers</option>
+                </select>
+                
+                <span>→</span>
+                
+                <select 
+                  value={convertTo} 
+                  onChange={(e) => setConvertTo(e.target.value)}
+                  style={{ background: '#1e293b', border: '1px solid #475569', color: 'white', padding: '4px', flex: 1 }}
+                >
+                  <option value="ft">Feet (ft)</option>
+                  <option value="m">Meters (m)</option>
+                  <option value="kts">Knots (kts)</option>
+                  <option value="kmh">Km/h</option>
+                  <option value="inHg">inHg</option>
+                  <option value="hPa">hPa</option>
+                  <option value="nm">Naut. Miles</option>
+                  <option value="km">Kilometers</option>
+                </select>
+              </div>
+              
+              <div style={{ textAlign: 'center', padding: '10px', background: '#0f172a', borderRadius: '4px', border: '1px solid #334155' }}>
+                <span style={{ color: '#94a3b8', fontSize: '12px' }}>Result: </span>
+                <span style={{ fontSize: '16px', fontWeight: 'bold', color: '#fff' }}>
+                  {convertResult !== null ? convertResult.toFixed(2) : '---'}
+                </span>
+              </div>
+            </div>
+            
           </div>
         )}
       </div>
