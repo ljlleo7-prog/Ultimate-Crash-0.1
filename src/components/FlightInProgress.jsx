@@ -695,28 +695,35 @@ const FlightInProgress = ({
           >
             {phaseName || 'Situation'}
           </div>
-          <div
-            style={{
-              fontSize: '18px',
-              fontWeight: 600,
-              color: narrative?.severity === 'critical' ? '#ef4444' : narrative?.severity === 'warning' ? '#f59e0b' : '#E5E7EB',
-              marginBottom: '4px'
-            }}
-          >
-            {narrative?.title || 'Awaiting flight instructions...'}
-          </div>
-          <div
-            style={{
-              fontSize: '13px',
-              color: '#D1D5DB',
-              opacity: 0.9,
-              marginBottom: '8px'
-            }}
-          >
-            {narrative?.content || 'Prepare for takeoff.'}
-          </div>
           
-          {/* Active Failures Display */}
+          {/* Conditional Rendering: Only show narrative in Header if Physics is ACTIVE (PHY-ON) 
+              In PHY-OFF mode, narrative is shown in the immersive full-screen view. */}
+          {sceneState.physicsActive && (
+            <>
+              <div
+                style={{
+                  fontSize: '18px',
+                  fontWeight: 600,
+                  color: narrative?.severity === 'critical' ? '#ef4444' : narrative?.severity === 'warning' ? '#f59e0b' : '#E5E7EB',
+                  marginBottom: '4px'
+                }}
+              >
+                {narrative?.title || 'Awaiting flight instructions...'}
+              </div>
+              <div
+                style={{
+                  fontSize: '13px',
+                  color: '#D1D5DB',
+                  opacity: 0.9,
+                  marginBottom: '8px'
+                }}
+              >
+                {narrative?.content || 'Prepare for takeoff.'}
+              </div>
+            </>
+          )}
+          
+          {/* Active Failures Display - Always visible if failures exist */}
           {activeFailures.length > 0 && (
             <div style={{ marginTop: '8px' }}>
               <div style={{
@@ -799,7 +806,12 @@ const FlightInProgress = ({
 
         <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', zIndex: 10 }}>
           <FlightPanelModular
-            flightData={flightData}
+            flightData={{
+              ...flightData,
+              physicsActive: sceneState.physicsActive,
+              narrativeHistory: sceneState.narrativeHistory,
+              phaseName: sceneState.phase?.name
+            }}
             physicsState={physicsState}
             weatherData={weatherData}
             aircraftModel={aircraftModel}
@@ -900,6 +912,11 @@ const FlightInProgress = ({
                 case 'toggle-debug': {
                   setShowDebugPhysics(prev => !prev);
                   console.log(`📡 FlightPanel Action: ${action} -> New State: ${!showDebugPhysics}`);
+                  break;
+                }
+                case 'skip-phase': {
+                  sceneManager.skipPhase();
+                  console.log(`📡 FlightPanel Action: ${action}`);
                   break;
                 }
                 default:

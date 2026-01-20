@@ -3,7 +3,10 @@ import { getRunwayHeading } from '../utils/routeGenerator';
 
 // Flight phases with typical parameters
 export const FlightPhases = {
-  BRIEFING: 'briefing',
+  BOARDING: 'boarding',
+  DEPARTURE_CLEARANCE: 'departure_clearance',
+  PUSHBACK: 'pushback',
+  TAXIING: 'taxiing',
   TAKEOFF: 'takeoff',
   CLIMB: 'climb',
   INITIAL_CLIMB: 'initial_climb',
@@ -12,6 +15,8 @@ export const FlightPhases = {
   DESCENT: 'descent',
   APPROACH: 'approach',
   LANDING: 'landing',
+  AFTER_LAND_TAXIING: 'after_land_taxiing',
+  SHUTOFF: 'shutoff',
   EMERGENCY: 'emergency',
   POST_MORTEM: 'post_mortem'
 };
@@ -25,21 +30,52 @@ const defaultScenario = {
   callsign: 'SKY123',
   departure: 'KJFK',
   arrival: 'KLAX',
-  targetCruiseAltitude: 35000, // New: Define target cruise altitude in feet
+  targetCruiseAltitude: 35000,
   
   // Flight phases with detailed parameters
   phases: [
     {
-      id: 'phase-briefing',
-      name: 'Pre-Flight Briefing',
-      type: FlightPhases.BRIEFING,
-      durationSeconds: 10,
-      physics: {
-        mode: 'off'
-      },
+      id: 'phase-boarding',
+      name: 'Boarding',
+      type: FlightPhases.BOARDING,
+      durationSeconds: 15, // Shortened for gameplay
+      physics: { mode: 'off' },
       narrative: {
-        title: 'Welcome to ${callsign}',
-        content: 'You are captain of a ${aircraft} bound for ${arrival}. Weather is clear, but be prepared for possible turbulence ahead.'
+        title: 'Boarding at ${departure}',
+        content: 'The smell of jet fuel and coffee fills the cabin as passengers stow their luggage. Outside, the ground crew is prepping for our departure. "Welcome aboard ${callsign}," the flight attendant announces over the PA. The ${aircraft} is ready for the journey to ${arrival}.'
+      }
+    },
+    {
+      id: 'phase-departure-clearance',
+      name: 'Departure Clearance',
+      type: FlightPhases.DEPARTURE_CLEARANCE,
+      durationSeconds: 15,
+      physics: { mode: 'off' },
+      narrative: {
+        title: 'IFR Clearance',
+        content: 'The radio crackles. "${callsign}, cleared to ${arrival} via flight plan route. Climb and maintain FL350. Departure frequency 124.7. Squawk 4211." You read back the clearance as the systems come online.'
+      }
+    },
+    {
+      id: 'phase-pushback',
+      name: 'Pushback & Start',
+      type: FlightPhases.PUSHBACK,
+      durationSeconds: 20,
+      physics: { mode: 'off' },
+      narrative: {
+        title: 'Pushback Approved',
+        content: 'A gentle jolt as the tug connects. "Ground to Cockpit, brakes released." The terminal building slowly drifts away as you start the engines. The hum of the APU is replaced by the roar of the main turbines.'
+      }
+    },
+    {
+      id: 'phase-taxiing',
+      name: 'Taxi',
+      type: FlightPhases.TAXIING,
+      durationSeconds: 20,
+      physics: { mode: 'off' },
+      narrative: {
+        title: 'Taxi to Runway ${departureRunway}',
+        content: '"${callsign}, taxi to runway ${departureRunway} via Alpha, Bravo." You release the parking brake. The tires thump rhythmically over the concrete joints as you weave through the maze of taxiways. Sunlight glints off the tarmac.'
       }
     },
     {
@@ -55,39 +91,37 @@ const defaultScenario = {
       },
       narrative: {
         title: 'Takeoff Clearance',
-        content: '${departure} Tower: "${callsign}, cleared for takeoff runway 13R." Rotate at 135 knots.'
+        content: 'Lined up on runway ${departureRunway}. "Wind 130 at 8, runway ${departureRunway} cleared for takeoff." Throttles forward. The engines roar to life, pressing you back into the seat. Rotate at Vr.'
       }
     },
     {
       id: 'phase-initial-climb',
       name: 'Initial Climb',
       type: FlightPhases.INITIAL_CLIMB,
-      durationSeconds: 120, // Placeholder, will be condition-based
+      durationSeconds: 120,
       physics: {
         mode: 'continuous',
-        initialAltitude: 3000, // Start of this phase
-        targetAltitude: 10000,
+        targetAltitude: 5000,
         targetSpeed: 250 // IAS
       },
       narrative: {
-        title: 'Initial Climb',
-        content: '${callsign}, positive rate, gear up. Accelerate to 250 knots below 10,000 feet.'
+        title: 'Positive Rate',
+        content: 'The ground falls away beneath you. "Gear up." Punching through the lower cloud layer into the sunlight. The city of ${departure} shrinks into a miniature grid below. Speed increasing to 250 knots.'
       }
     },
     {
       id: 'phase-main-climb',
       name: 'Main Climb',
       type: FlightPhases.MAIN_CLIMB,
-      durationSeconds: 300, // Placeholder, will be condition-based
+      durationSeconds: 300,
       physics: {
         mode: 'continuous',
-        initialAltitude: 10000, // Start of this phase
-        targetAltitude: 35000, // Example cruise altitude
+        targetAltitude: 35000,
         targetSpeed: 270 // IAS
       },
       narrative: {
-        title: 'Main Climb',
-        content: '${callsign}, climbing through 10,000 feet. Accelerate to 270 knots.'
+        title: 'Climb to Cruise',
+        content: 'Passing 10,000 feet. "Accelerate to cruise speed." The sky darkens to a deeper blue as we ascend. The air is smooth. Climbing steadily to Flight Level 350.'
       }
     },
     {
@@ -97,13 +131,12 @@ const defaultScenario = {
       durationSeconds: 180,
       physics: {
         mode: 'continuous',
-        initialAltitude: 35000,
         targetAltitude: 35000,
         targetSpeed: 450 // TAS
       },
       narrative: {
-        title: 'Cruise at FL350',
-        content: '${callsign}, maintain 35,000 feet, 450 knots. Enjoy the smooth ride.'
+        title: 'Cruising at FL350',
+        content: 'Level at 35,000 feet. The horizon is a curved line of haze. "Maintain Mach 0.78." The engines hum with a steady, reassuring rhythm. Passengers are settling in for the flight to ${arrival}.'
       },
       // Potential failure points during cruise
       failurePoints: [
@@ -112,7 +145,7 @@ const defaultScenario = {
           type: 'engine',
           engineIndex: 0,
           probability: 0.3,
-          triggerTime: 60 // Seconds into this phase
+          triggerTime: 60
         },
         {
           id: 'failure-hydraulic',
@@ -130,13 +163,12 @@ const defaultScenario = {
       durationSeconds: 120,
       physics: {
         mode: 'continuous',
-        initialAltitude: 35000,
         targetAltitude: 10000,
         targetSpeed: 300
       },
       narrative: {
-        title: 'Beginning Descent',
-        content: 'ATC: "${callsign}, descend and maintain 10,000 feet, reduce speed to 300 knots."'
+        title: 'Top of Descent',
+        content: 'Throttles back. The pitch drops slightly as we begin our descent. "Descend and maintain 10,000 feet." The destination ${arrival} lies ahead.'
       }
     },
     {
@@ -146,13 +178,12 @@ const defaultScenario = {
       durationSeconds: 60,
       physics: {
         mode: 'continuous',
-        initialAltitude: 10000,
         targetAltitude: 2000,
         targetSpeed: 180
       },
       narrative: {
-        title: 'Final Approach to ${arrival}',
-        content: '${callsign}, configure for landing: flaps 30, gear down. Maintain 180 knots until glideslope intercept.'
+        title: 'Approach to ${arrival}',
+        content: 'Lined up for runway ${landingRunway}. "Gear down, flaps 30." The runway threshold looms ahead through the haze. Speed checked, localized captured.'
       }
     },
     {
@@ -162,13 +193,34 @@ const defaultScenario = {
       durationSeconds: 30,
       physics: {
         mode: 'continuous',
-        initialAltitude: 2000,
         targetAltitude: 0,
         targetSpeed: 0
       },
       narrative: {
-        title: 'Landing at ${arrival}',
-        content: '${callsign}, flare at 50 feet, maintain positive pitch until touchdown. Reverse thrust and brakes after wheels down.'
+        title: 'Touchdown',
+        content: 'Flare... Touchdown. Spoilers deployed. Reverse thrust roaring. "${callsign}, welcome to ${arrival}." Braking to taxi speed.'
+      }
+    },
+    {
+      id: 'phase-after-land-taxiing',
+      name: 'Taxi to Gate',
+      type: FlightPhases.AFTER_LAND_TAXIING,
+      durationSeconds: 30,
+      physics: { mode: 'off' },
+      narrative: {
+        title: 'Taxi to Gate',
+        content: '"Turn left next taxiway, contact Ground." The flight is over. Taxing past other aircraft to our assigned gate.'
+      }
+    },
+    {
+      id: 'phase-shutoff',
+      name: 'Shutdown',
+      type: FlightPhases.SHUTOFF,
+      durationSeconds: 15,
+      physics: { mode: 'off' },
+      narrative: {
+        title: 'Engine Shutdown',
+        content: 'Parking brake set. Fuel cutoff. The engines spin down into silence. APU off. "Thank you for flying with us." Flight complete.'
       }
     }
   ]
@@ -205,6 +257,16 @@ class SceneManager {
 
   currentPhase() {
     return this.scenario.phases[this.currentIndex] || null;
+  }
+  
+  // Skip the current phase (User Requested)
+  skipPhase() {
+    const phase = this.currentPhase();
+    if (phase) {
+      console.log(`⏩ Skipping phase: ${phase.name}`);
+      this.elapsedInPhase = phase.durationSeconds + 1; // Force completion
+      this.checkPhaseCompletion(0, null); // Trigger completion check immediately
+    }
   }
 
   start() {
@@ -341,19 +403,22 @@ class SceneManager {
     if (phase.type === FlightPhases.TAKEOFF) {
       const altitude_m = payload?.position?.z || 0;
       const altitude_ft = altitude_m * 3.28084;
-      const verticalSpeed_fps = payload?.velocity?.w || 0; // Vertical speed in ft/s
-      const verticalSpeed_fpm = verticalSpeed_fps * 60; // Vertical speed in ft/min
-      const apEngaged = payload?.autopilot?.engaged || false;
-      const gearUp = payload?.gearValue === false; // gearValue is true for down, false for up
-      const flapsUp = payload?.flapsValue === 0; // flapsValue is 0 for up
+      
+      // Calculate vertical speed safely (support both structure types)
+      let verticalSpeed_fpm = 0;
+      if (typeof payload?.velocity?.z === 'number') {
+        verticalSpeed_fpm = payload.velocity.z * 60 * 3.28084; // m/s to ft/min
+      } else if (typeof payload?.velocity?.w === 'number') {
+        verticalSpeed_fpm = payload.velocity.w * 60; // Assuming ft/s if using w (legacy)
+      } else if (payload?.verticalSpeed) {
+        verticalSpeed_fpm = payload.verticalSpeed; // Direct value if available
+      }
       
       // Transition from TAKEOFF to INITIAL_CLIMB
+      // Relaxed conditions to ensure smooth transition
       if (
-        verticalSpeed_fpm > 500 && // Positive climb rate
-        gearUp &&
-        flapsUp &&
-        altitude_ft >= 3000 &&
-        apEngaged
+        verticalSpeed_fpm > 200 && // Positive climb rate
+        altitude_ft >= 400 // Lowered from 800 to 400 to catch early climb
       ) {
         isPhaseComplete = true;
       }
@@ -362,7 +427,7 @@ class SceneManager {
       const altitude_ft = altitude_m * 3.28084;
       
       // Transition from INITIAL_CLIMB to MAIN_CLIMB
-      if (altitude_ft >= 10000) {
+      if (altitude_ft >= 5000) { // Lowered from 10000 to ensure progression
         isPhaseComplete = true;
       }
     } else if (phase.type === FlightPhases.MAIN_CLIMB) {
@@ -370,7 +435,8 @@ class SceneManager {
       const altitude_ft = altitude_m * 3.28084;
       
       // Transition from MAIN_CLIMB to CRUISE
-      if (altitude_ft >= this.scenario.targetCruiseAltitude) {
+      // Allow transition if within 1000ft of cruise altitude
+      if (altitude_ft >= (this.scenario.targetCruiseAltitude - 1000)) {
         isPhaseComplete = true;
       }
     } else {
@@ -625,12 +691,33 @@ class SceneManager {
   }
 
   // Set initial physics conditions for the current phase
-  setPhaseInitialConditions(phase) {
+  setPhaseInitialConditions(phase, previousPhase = null) {
     if (!phase || !phase.physics) {
       return;
     }
 
     const physics = phase.physics;
+    
+    // Logic: If transitioning from PHY-ON (continuous) to PHY-ON (continuous),
+    // we should NOT reset physics state (teleport) unless explicitly forced.
+    // This allows smooth transitions between Climb, Cruise, Descent, etc.
+    const isPreviousContinuous = previousPhase && previousPhase.physics && previousPhase.physics.mode === 'continuous';
+    const isNextContinuous = physics.mode === 'continuous';
+    const shouldSkipReset = isPreviousContinuous && isNextContinuous && !physics.forceReset;
+
+    if (shouldSkipReset) {
+      // Just update targets without resetting position/velocity
+       eventBus.publishWithMetadata(EventTypes.PHYSICS_INITIALIZE, {
+        phaseId: phase.id,
+        phaseType: phase.type,
+        // No initialConditions to prevent reset
+        targetAltitude: physics.targetAltitude ? physics.targetAltitude * 0.3048 : undefined,
+        targetSpeed: physics.targetSpeed ? physics.targetSpeed * 0.514444 : undefined,
+        targetHeading: physics.targetHeading ? physics.targetHeading * Math.PI / 180 : undefined
+      });
+      return;
+    }
+
     const initialConditions = {
       position: { x: 0, y: 0, z: 0 },
       velocity: { u: 0, v: 0, w: 0 },

@@ -80,6 +80,8 @@ const FlightPanelModular = ({ flightData, physicsState, weatherData, onActionReq
     
     // Central Display
     flightPhase: 'CRUISE',
+    physicsActive: false, // New: Track physics state
+    currentNarrative: null, // New: Track narrative
     nextWaypoint: 'WPT3',
     distanceToWaypoint: 125.4,
     timeToWaypoint: 18.2,
@@ -128,6 +130,13 @@ const FlightPanelModular = ({ flightData, physicsState, weatherData, onActionReq
         alarms: flightData.alarms || prevState.alarms,
         activeWarnings: flightData.activeWarnings || [],
         
+        // Scene State
+        physicsActive: flightData.physicsActive,
+        currentNarrative: flightData.narrativeHistory && flightData.narrativeHistory.length > 0 
+          ? flightData.narrativeHistory[flightData.narrativeHistory.length - 1] 
+          : prevState.currentNarrative,
+        flightPhase: flightData.phaseName || prevState.flightPhase,
+
         // Surface controls
         flapsValue: flightData.flapsValue,
         gearValue: flightData.gearValue,
@@ -162,16 +171,13 @@ const FlightPanelModular = ({ flightData, physicsState, weatherData, onActionReq
     if (flightData?.crashWarning) {
         warningMsg = flightData.crashWarning;
     } 
-    // Priority 2: Flashing Warnings - DISABLED HUGE FLASHING BOXES per user request
-    // Warnings will now appear in the EICAS list (Central Panel)
-    /* 
+    // Priority 2: Flashing Warnings (Re-enabled for critical incidents)
     else if (flightData?.activeWarnings) {
         const flashWarning = flightData.activeWarnings.find(w => w.isFlashing);
         if (flashWarning) {
             warningMsg = flashWarning.message;
         }
     }
-    */
 
     if (!warningMsg) {
       return;
@@ -303,74 +309,119 @@ const FlightPanelModular = ({ flightData, physicsState, weatherData, onActionReq
   };
 
   // Main render function
-  return React.createElement('div', { className: 'modern-flight-panel', style: { userSelect: 'none', display: 'flex', flexDirection: 'row', gap: '10px', padding: 0 } },
-    
-    // Sidebar (Leftmost)
-    React.createElement(Sidebar, { activePanel: activeSidebarPanel, onTogglePanel: handleSidebarToggle }),
-
-    // Flight Computer Panel Overlay
-    activeSidebarPanel === 'flight_computer' && React.createElement(FlightComputerPanel, {
-      onClose: () => setActiveSidebarPanel(null),
-      flightPlan: flightPlan,
-      onUpdateFlightPlan: onUpdateFlightPlan,
-      flightState: flightState
-    }),
-
-    // Timer Panel Overlay
-    activeSidebarPanel === 'timer' && React.createElement(TimerPanel, {
-        timeScale,
-        setTimeScale,
-        flightData,
-        flightPlan,
-        onClose: () => setActiveSidebarPanel(null)
-    }),
-    
-    // Save & Load Panel Overlay
-    activeSidebarPanel === 'save_load' && React.createElement(SaveLoadPanel, {
-        flightData,
-        physicsState,
-        flightPlan,
-        weatherData,
-        aircraftModel,
-        onClose: () => setActiveSidebarPanel(null),
-        onLoadFlight: handleLoadFlight
-    }),
-
-    // Main Content Area (Wrapped in a div to take remaining width)
-    React.createElement('div', { style: { flex: 1, position: 'relative', padding: '20px' } },
-
-      // Overhead Panel Overlay
-      showOverhead && React.createElement(OverheadPanel, {
-        onClose: () => setShowOverhead(false),
-        flightState,
-        onSystemAction: handleSystemAction,
-        aircraftModel: aircraftModel // Pass model for styling
-      }),
-
-      // Crash warning flash
-      React.createElement(CrashWarningFlash, { flashActive, flashText, onAlertComplete: handleAlertComplete }),
-      
-      // Crash panel (if crashed)
-      React.createElement(CrashPanel, { showCrashPanel, resetFlight }),
-
-      // Debug frame panel
-      React.createElement('div', {
+  const renderContent = () => {
+    // PHY-OFF INTERFACE (Immersive Narrative Mode)
+    if (!flightState.physicsActive) {
+      return React.createElement('div', { 
+        className: 'immersive-mode',
         style: {
-          position: 'absolute',
-          bottom: '10px',
-          left: '10px',
-          padding: '6px 10px',
-          background: 'rgba(0, 0, 0, 0.7)',
-          color: '#0f0',
-          fontSize: '12px',
-          borderRadius: '4px',
-          zIndex: 1000
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          justifyContent: 'center',
+          height: '100%',
+          width: '100%',
+          background: 'radial-gradient(circle at center, #1a1a2e 0%, #000000 100%)',
+          color: '#e6e6e6',
+          padding: '40px',
+          boxSizing: 'border-box'
         }
-      }, `Frame: ${flightState.frame !== undefined ? flightState.frame : 0}`),
-      
-      // Modern cockpit layout
-      React.createElement('div', { className: 'modern-cockpit' },
-        // Top Row: Autopilot + Comm
+      },
+        // Animation Styles
+        React.createElement('style', null, `
+          @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+          }
+        `),
+        
+        // Narrative Container
+        React.createElement('div', {
+          style: {
+            maxWidth: '800px',
+            textAlign: 'center',
+            marginBottom: '40px',
+            animation: 'fadeIn 1s ease-out'
+          }
+        },
+          React.createElement('h1', {
+            style: {
+              fontSize: '3rem',
+              marginBottom: '20px',
+              color: '#4ade80',
+              textShadow: '0 0 20px rgba(74, 222, 128, 0.3)'
+            }
+          }, flightState.currentNarrative?.title || flightState.flightPhase),
+          React.createElement('p', {
+            style: {
+              fontSize: '1.5rem',
+              lineHeight: '1.6',
+              color: '#cbd5e1'
+            }
+          }, flightState.currentNarrative?.content || "Awaiting instructions...")
+        ),
+
+        // Communication Module (Immersive Style)
+        React.createElement('div', {
+          style: {
+            width: '100%',
+            maxWidth: '600px',
+            background: 'rgba(0, 0, 0, 0.5)',
+            border: '1px solid #334155',
+            borderRadius: '8px',
+            padding: '20px',
+            marginBottom: '30px'
+          }
+        },
+          React.createElement(CommunicationModule, {
+            flightState,
+            setRadioFreq: (freq) => {
+              setFlightState(prev => ({ ...prev, radioFreq: freq }));
+              if (onRadioFreqChange) onRadioFreqChange(freq);
+            },
+            flightPlan,
+            radioMessages,
+            frequencyContext,
+            currentRegion,
+            immersiveMode: true
+          })
+        ),
+        
+        // Skip/Continue Button
+        React.createElement('button', {
+          onClick: () => onActionRequest && onActionRequest('skip-phase'),
+          style: {
+            padding: '12px 30px',
+            background: 'transparent',
+            border: '1px solid #4ade80',
+            color: '#4ade80',
+            borderRadius: '4px',
+            cursor: 'pointer',
+            fontSize: '1rem',
+            letterSpacing: '2px',
+            transition: 'all 0.3s ease',
+            opacity: 0.8,
+            textTransform: 'uppercase'
+          },
+          onMouseEnter: (e) => {
+            e.target.style.background = 'rgba(74, 222, 128, 0.1)';
+            e.target.style.opacity = 1;
+            e.target.style.boxShadow = '0 0 15px rgba(74, 222, 128, 0.2)';
+          },
+          onMouseLeave: (e) => {
+            e.target.style.background = 'transparent';
+            e.target.style.opacity = 0.8;
+            e.target.style.boxShadow = 'none';
+          }
+        }, 'CONTINUE ►')
+      );
+    }
+
+    // PHY-ON INTERFACE (Simulation Mode)
+    return React.createElement('div', { className: 'modern-cockpit' },
+      // Narrative Overlay REMOVED as requested (using Head Bar instead)
+
+      // Top Row: Autopilot + Comm
       React.createElement('div', { 
         style: { 
           display: 'flex', 
@@ -441,8 +492,77 @@ const FlightPanelModular = ({ flightData, physicsState, weatherData, onActionReq
           aircraftModel
         })
       )
+    );
+  };
+
+  return React.createElement('div', { className: 'modern-flight-panel', style: { userSelect: 'none', display: 'flex', flexDirection: 'row', gap: '10px', padding: 0 } },
+    
+    // Sidebar (Leftmost)
+    React.createElement(Sidebar, { activePanel: activeSidebarPanel, onTogglePanel: handleSidebarToggle }),
+
+    // Flight Computer Panel Overlay
+    activeSidebarPanel === 'flight_computer' && React.createElement(FlightComputerPanel, {
+      onClose: () => setActiveSidebarPanel(null),
+      flightPlan: flightPlan,
+      onUpdateFlightPlan: onUpdateFlightPlan,
+      flightState: flightState
+    }),
+
+    // Timer Panel Overlay
+    activeSidebarPanel === 'timer' && React.createElement(TimerPanel, {
+        timeScale,
+        setTimeScale,
+        flightData,
+        flightPlan,
+        onClose: () => setActiveSidebarPanel(null)
+    }),
+    
+    // Save & Load Panel Overlay
+    activeSidebarPanel === 'save_load' && React.createElement(SaveLoadPanel, {
+        flightData,
+        physicsState,
+        flightPlan,
+        weatherData,
+        aircraftModel,
+        onClose: () => setActiveSidebarPanel(null),
+        onLoadFlight: handleLoadFlight
+    }),
+
+    // Main Content Area (Wrapped in a div to take remaining width)
+    React.createElement('div', { style: { flex: 1, position: 'relative', padding: '20px' } },
+
+      // Overhead Panel Overlay
+      showOverhead && React.createElement(OverheadPanel, {
+        onClose: () => setShowOverhead(false),
+        flightState,
+        onSystemAction: handleSystemAction,
+        aircraftModel: aircraftModel // Pass model for styling
+      }),
+
+      // Crash warning flash
+      React.createElement(CrashWarningFlash, { flashActive, flashText, onAlertComplete: handleAlertComplete }),
+      
+      // Crash panel (if crashed)
+      React.createElement(CrashPanel, { showCrashPanel, resetFlight }),
+
+      // Debug frame panel
+      React.createElement('div', {
+        style: {
+          position: 'absolute',
+          bottom: '10px',
+          left: '10px',
+          padding: '6px 10px',
+          background: 'rgba(0, 0, 0, 0.7)',
+          color: '#0f0',
+          fontSize: '12px',
+          borderRadius: '4px',
+          zIndex: 1000
+        }
+      }, `Frame: ${flightState.frame !== undefined ? flightState.frame : 0}`),
+      
+      // Render Content based on Mode
+      renderContent()
     )
-  )
   );
 };
 
