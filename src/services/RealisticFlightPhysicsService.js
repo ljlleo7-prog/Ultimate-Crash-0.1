@@ -15,6 +15,8 @@ import EnginePhysicsService from './EnginePhysicsService.js';
 import RealisticAutopilotService from './RealisticAutopilotService.js';
 import FailureSystem from './FailureSystem.js';
 import WarningSystem from './WarningSystem.js';
+import OverheadLogic from './OverheadLogic.js';
+import { airportService } from './airportService.js';
 
 // ==========================================
 // Math Utilities
@@ -234,9 +236,18 @@ class RealisticFlightPhysicsService {
                 bleed: false,
                 egt: 0
             },
+            starters: {
+                engine1: false,
+                engine2: false
+            },
             hydraulics: {
                 sysA: { pressure: 3000, engPump: true, elecPump: false },
                 sysB: { pressure: 3000, engPump: true, elecPump: false }
+            },
+            transponder: {
+                code: 2000,
+                mode: 'STBY', // STBY, ALT, TA/RA
+                ident: false
             },
             pressurization: {
                 packL: true,
@@ -261,11 +272,6 @@ class RealisticFlightPhysicsService {
                 strobe: true,
                 logo: false,
                 wing: false
-            },
-            transponder: {
-                code: '2000',
-                mode: 'TA/RA',
-                altRpt: true
             },
             nav: {
                 irsL: true,
@@ -478,6 +484,22 @@ class RealisticFlightPhysicsService {
                     const bearing = this._calculateBearing(this.state.geo.lat, this.state.geo.lon, targetWP.latitude, targetWP.longitude);
                     this.autopilot.setTargets({ heading: bearing });
                 }
+
+                // Update Runway Geometry if target is an airport with a selected runway
+                if (this.currentWaypointIndex < this.flightPlan.length) {
+                    const targetWP = this.flightPlan[this.currentWaypointIndex];
+                    if ((targetWP.type === 'airport' || targetWP.type === 'runway') && targetWP.selectedRunway && targetWP.details) {
+                        const airportCode = targetWP.details.iata || targetWP.details.icao || targetWP.label;
+                        // Check if we need to update (simple check to avoid spamming)
+                        if (!this.runwayGeometry || (this.runwayGeometry.runwayName !== targetWP.selectedRunway && this.runwayGeometry.airportCode !== airportCode)) {
+                             const geom = airportService.getRunwayGeometry(airportCode, targetWP.selectedRunway);
+                             if (geom) {
+                                 this.setRunwayGeometry(geom);
+                                 console.log(`📍 Physics: Auto-selected runway ${targetWP.selectedRunway} at ${airportCode}`);
+                             }
+                        }
+                    }
+                }
             }
         }
 
@@ -497,6 +519,7 @@ class RealisticFlightPhysicsService {
         }
 
         this.processInputs(finalInput, dt); // Process inputs once per frame
+        this.updateSystems(dt); // Update overhead systems logic
 
         for (let i = 0; i < subSteps; i++) {
             this.time += subDt;
@@ -577,170 +600,16 @@ class RealisticFlightPhysicsService {
     }
 
     updateSystems(dt) {
-        // --- APU Logic ---
-        const apu = this.systems.apu;
-        if (apu.start) {
-            // Momentary start switch logic could be handled here or UI
-            // Assuming start initiates sequence
-            if (!apu.running) {
-                apu.egt += 50 * dt; // Spool up
-                if (apu.egt > 400) {
-                    apu.running = true;
-                    apu.start = false; // Reset start switch
-                }
-            }
-        } else if (apu.master) {
-             if (apu.running) {
-                 // Stabilize
-                 apu.egt = 420;
-             }
-        } else {
-            // Shutdown
-            if (apu.running) {
-                apu.running = false;
-            }
-            if (apu.egt > 0) apu.egt -= 10 * dt;
-        }
+        // Construct context for OverheadLogic
+        const context = {
+            engineN2: this.engines.map(e => e.state.n2 || 0),
+            altitude: -this.state.pos.z * 3.28084, // ft
+            onGround: this.onGround,
+            airspeed: this.state.vel.magnitude() * 1.94384 // kts
+        };
 
-        // --- Hydraulics ---
-        const hyd = this.systems.hydraulics;
-        const eng1Running = this.engines[0]?.state.n2 > 50;
-        const eng2Running = this.engines[1]?.state.n2 > 50;
-        
-        // System A
-        if ((hyd.sysA.engPump && eng1Running) || hyd.sysA.elecPump) {
-            if (hyd.sysA.pressure < 3000) hyd.sysA.pressure += 1000 * dt;
-            if (hyd.sysA.pressure > 3000) hyd.sysA.pressure = 3000;
-        } else {
-            if (hyd.sysA.pressure > 0) hyd.sysA.pressure -= 100 * dt;
-        }
-
-        // System B
-        if ((hyd.sysB.engPump && eng2Running) || hyd.sysB.elecPump) {
-            if (hyd.sysB.pressure < 3000) hyd.sysB.pressure += 1000 * dt;
-            if (hyd.sysB.pressure > 3000) hyd.sysB.pressure = 3000;
-        } else {
-             if (hyd.sysB.pressure > 0) hyd.sysB.pressure -= 100 * dt;
-        }
-
-        // --- Pressurization ---
-        const press = this.systems.pressurization;
-        const aircraftAlt = -this.state.pos.z * 3.28084;
-        
-        if (press.mode === 'AUTO') {
-            // Simple logic: maintain cabin alt schedule
-            let targetCabinAlt = 0;
-            if (aircraftAlt > 8000) {
-                // E.g. 8000ft cabin at 40000ft
-                targetCabinAlt = Math.min(8000, aircraftAlt);
-                // Actually usually a ratio
-                targetCabinAlt = (aircraftAlt / 40000) * 8000; 
-                if (targetCabinAlt > 8000) targetCabinAlt = 8000;
-            } else {
-                targetCabinAlt = aircraftAlt;
-            }
-            
-            // Rate of change
-            const rate = 500 * dt; // 500 fpm
-            if (press.cabinAlt < targetCabinAlt) press.cabinAlt += rate * (dt/60);
-            else if (press.cabinAlt > targetCabinAlt) press.cabinAlt -= rate * (dt/60);
-            
-            // Diff pressure (PSI)
-            // 1 PSI approx 2000ft roughly at altitude? No, calculate from pressure
-            // Simple approx for display
-            press.diffPressure = ((aircraftAlt - press.cabinAlt) / 1000) * 0.2; 
-            if (press.diffPressure < 0) press.diffPressure = 0;
-        }
-
-        // --- Electrical ---
-        const elec = this.systems.electrical;
-        const gen1Ok = eng1Running && elec.gen1;
-        const gen2Ok = eng2Running && elec.gen2;
-        const apuOk = apu.running && elec.apuGen;
-        
-        if (gen1Ok || gen2Ok || apuOk) {
-            elec.dcVolts = 28.4;
-            elec.acAmps = 140; // Dummy load
-        } else if (elec.battery) {
-            elec.dcVolts = 24.0;
-            elec.acAmps = 0;
-        } else {
-            elec.dcVolts = 0;
-            elec.acAmps = 0;
-        }
-    }
-
-    performSystemAction(system, action, value) {
-        console.log(`System Action: ${system} -> ${action}`);
-        
-        if (!this.systems[system]) return;
-        
-        // Handle nested properties if action is like 'sysA.engPump' or direct 'battery'
-        // For simplicity, we assume action maps to property or we use custom logic
-        
-        if (system === 'electrical') {
-            if (this.systems.electrical.hasOwnProperty(action)) {
-                this.systems.electrical[action] = !this.systems.electrical[action];
-            }
-        }
-        else if (system === 'fuel') {
-            if (this.systems.fuel.hasOwnProperty(action)) {
-                this.systems.fuel[action] = !this.systems.fuel[action];
-            }
-        }
-        else if (system === 'apu') {
-            if (action === 'master') this.systems.apu.master = !this.systems.apu.master;
-            if (action === 'start') {
-                 if (this.systems.apu.master && !this.systems.apu.running) {
-                     this.systems.apu.start = true;
-                 }
-            }
-            if (action === 'bleed') this.systems.apu.bleed = !this.systems.apu.bleed;
-        }
-        else if (system === 'hydraulics') {
-            // action might be 'eng1Pump'
-            if (action === 'eng1Pump') this.systems.hydraulics.sysA.engPump = !this.systems.hydraulics.sysA.engPump;
-            if (action === 'elec1Pump') this.systems.hydraulics.sysA.elecPump = !this.systems.hydraulics.sysA.elecPump;
-            if (action === 'eng2Pump') this.systems.hydraulics.sysB.engPump = !this.systems.hydraulics.sysB.engPump;
-            if (action === 'elec2Pump') this.systems.hydraulics.sysB.elecPump = !this.systems.hydraulics.sysB.elecPump;
-        }
-        else if (system === 'lighting') {
-            if (this.systems.lighting.hasOwnProperty(action)) {
-                this.systems.lighting[action] = !this.systems.lighting[action];
-            }
-        }
-        else if (system === 'pressurization') {
-             if (this.systems.pressurization.hasOwnProperty(action)) {
-                 if (typeof this.systems.pressurization[action] === 'boolean') {
-                    this.systems.pressurization[action] = !this.systems.pressurization[action];
-                 }
-            }
-        }
-        else if (system === 'oxygen') {
-            if (action === 'masks') this.systems.oxygen.masks = !this.systems.oxygen.masks;
-        }
-        else if (system === 'transponder') {
-            // Specialized actions
-            if (action === 'mode_tara') {
-                this.systems.transponder.mode = (this.systems.transponder.mode === 'TA/RA') ? 'STBY' : 'TA/RA';
-            }
-            if (action === 'altRpt') this.systems.transponder.altRpt = !this.systems.transponder.altRpt;
-        }
-        else if (system === 'nav') {
-             if (this.systems.nav.hasOwnProperty(action)) {
-                this.systems.nav[action] = !this.systems.nav[action];
-            }
-        }
-        else if (system === 'fire') {
-             if (this.systems.fire.hasOwnProperty(action)) {
-                this.systems.fire[action] = !this.systems.fire[action];
-            }
-        }
-        else if (system === 'starters') {
-             if (this.systems.starters.hasOwnProperty(action)) {
-                this.systems.starters[action] = !this.systems.starters[action];
-            }
-        }
+        // Delegate logic to OverheadLogic service
+        OverheadLogic.update(this.systems, context, dt);
     }
 
     calculateEnvironment(z_down) {
@@ -1568,23 +1437,41 @@ class RealisticFlightPhysicsService {
             return;
         }
 
-        // Handle nested properties or direct assignment
-        // For now, we assume direct assignment to the system state
-        // Special logic for specific systems can be added here
-        
-        console.log(`Physics Service: System Action ${system}.${action} = ${value}`);
+        // Handle Toggle Logic (if value is undefined)
+        const toggle = (current) => {
+            if (value !== undefined) return value;
+            if (typeof current === 'boolean') return !current;
+            return current; // No change if not boolean and no value
+        };
 
-        // Update the state
-        if (this.systems[system][action] !== undefined) {
-             this.systems[system][action] = value;
-        } else {
-             // If action is not a direct property, it might be a method or complex logic
-             // For toggle switches, it's usually a direct property
-             console.warn(`Action ${action} not found on system ${system}`);
+        // Special System Handling
+        if (system === 'hydraulics') {
+            if (action === 'eng1Pump') this.systems.hydraulics.sysA.engPump = toggle(this.systems.hydraulics.sysA.engPump);
+            else if (action === 'elec1Pump') this.systems.hydraulics.sysA.elecPump = toggle(this.systems.hydraulics.sysA.elecPump);
+            else if (action === 'eng2Pump') this.systems.hydraulics.sysB.engPump = toggle(this.systems.hydraulics.sysB.engPump);
+            else if (action === 'elec2Pump') this.systems.hydraulics.sysB.elecPump = toggle(this.systems.hydraulics.sysB.elecPump);
+            else console.warn(`Hydraulics action ${action} not found`);
+        } 
+        else if (system === 'transponder') {
+            // Transponder has specific fields
+            if (action === 'code') this.systems.transponder.code = value;
+            else if (action === 'mode') this.systems.transponder.mode = value;
+            else if (action === 'ident') this.systems.transponder.ident = value;
+        }
+        else {
+            // Generic Handling
+            if (this.systems[system][action] !== undefined) {
+                this.systems[system][action] = toggle(this.systems[system][action]);
+            } else {
+                console.warn(`Action ${action} not found on system ${system}`);
+            }
         }
 
+        console.log(`Physics Service: System Action ${system}.${action} -> ${value === undefined ? 'TOGGLE' : value}`);
+
         // Side effects
-        this.updateSystemLogic(system, action, value);
+        const newValue = this.systems[system][action]; // Get the actual new value
+        this.updateSystemLogic(system, action, newValue);
     }
 
     updateSystemLogic(system, action, value) {
@@ -1810,15 +1697,7 @@ class RealisticFlightPhysicsService {
         }
 
         // Reset velocities and rates for initial state
-        if (conditions.velocity) {
-             const u = conditions.velocity.u || conditions.velocity.x || 0;
-             const v = conditions.velocity.v || conditions.velocity.y || 0;
-             const w = conditions.velocity.w || conditions.velocity.z || 0;
-             this.state.vel = new Vector3(u, v, w);
-        } else {
-             this.state.vel = new Vector3(0, 0, 0);
-        }
-        
+        this.state.vel = new Vector3(0, 0, 0);
         this.state.rates = new Vector3(0, 0, 0);
         
         // Update autopilot targets if available

@@ -11,7 +11,6 @@ import commandDatabase from '../commandDatabase.json';
 import sceneManager from '../services/sceneManager.js';
 import eventBus from '../services/eventBus.js';
 import { getRunwayHeading } from '../utils/routeGenerator';
-import { FadeOverlay } from './CinematicComponents';
 import RadioActionPanel from './RadioActionPanel';
 import { atcManager } from '../services/ATCLogic';
 import { npcService } from '../services/NPCService';
@@ -142,7 +141,6 @@ const FlightInProgress = ({
   const [useRealWeather, setUseRealWeather] = useState(true); // Enable Real Weather by default
   const [sceneState, setSceneState] = useState(sceneManager.getState());
   const [narrative, setNarrative] = useState(null);
-  const [fadeState, setFadeState] = useState({ visible: false, text: '' });
 
   // Radio Message Handler
   const handleRadioTransmit = (messageDataOrText, type, templateId, params) => {
@@ -788,19 +786,6 @@ const FlightInProgress = ({
             setTimeScale={setTimeScale}
             onUpdateFlightPlan={handleUpdateFlightPlan}
             onActionRequest={(action, payload) => {
-              // Block controls if physics is inactive (Cinematic Mode)
-              if (!sceneState.physicsActive && action !== 'toggle-debug' && action !== 'system-action') {
-                  // Allow system actions (like APU start) even if physics is off?
-                  // User said "Gate off/pushback (disable flight simulation)".
-                  // Usually checklists happen here. So we should ALLOW system actions but BLOCK flight controls.
-                  // Actions: throttle, flaps, gear, trim, pitch, roll, yaw.
-                  const flightControls = ['pitch', 'roll', 'yaw', 'throttle', 'flaps', 'gear', 'trim', 'airBrakes'];
-                  if (flightControls.includes(action)) {
-                      console.log('Action blocked: Cinematic Mode Active');
-                      return;
-                  }
-              }
-
               const payloadStr = typeof payload === 'number' ? payload.toFixed(5) : JSON.stringify(payload);
               console.log(`📡 UI Action: ${action} = ${payloadStr}`);
 
@@ -1015,14 +1000,6 @@ const FlightInProgress = ({
              </div>
           </div>
         </div>
-      )}
-
-      {fadeState.visible && (
-        <FadeOverlay phase="fade-in">
-          <div style={{ fontSize: '24px', letterSpacing: '4px', textAlign: 'center' }}>
-            {fadeState.text}
-          </div>
-        </FadeOverlay>
       )}
 
       {isCrashed && (

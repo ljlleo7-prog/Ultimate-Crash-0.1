@@ -87,7 +87,7 @@ class WarningSystem {
         this.checkEnvelope(alpha, airspeed, rollDeg, pitchDeg, flaps, gear);
 
         // --- Configuration Checks ---
-        this.checkConfiguration(flaps, gear, airBrakes, throttle, groundStatus, pitchDeg, brakes, airspeed);
+        this.checkConfiguration(flaps, gear, airBrakes, throttle, groundStatus, pitchDeg, brakes);
 
         // --- System Checks ---
         this.checkSystems(systems, fuel, engineParams, altitudeAGL);
@@ -146,65 +146,6 @@ class WarningSystem {
         }
         if (agl < this.thresholds.flapsWarningAlt && flaps < 0.1 && gear && airspeed < 160) {
             this.addWarning('GPWS_TOO_LOW_FLAPS', 'TOO LOW FLAPS', 'WARNING');
-        }
-    }
-
-    checkConfiguration(flaps, gear, airBrakes, throttle, groundStatus, pitch, brakes, airspeed) {
-        const onGround = groundStatus && groundStatus.status !== 'AIR';
-
-        // Takeoff Configuration
-        if (onGround && throttle > 0.75) {
-            if (flaps < 0.1) { // Assuming flaps is index or normalized, usually > 0 for takeoff
-                this.addWarning('CONFIG_FLAPS', 'CONFIG FLAPS', 'WARNING', true);
-            }
-            if (airBrakes > 0.1) {
-                this.addWarning('CONFIG_SPOILERS', 'CONFIG SPOILERS', 'WARNING', true);
-            }
-            if (brakes > 0.1) {
-                this.addWarning('CONFIG_BRAKES', 'CONFIG BRAKES', 'WARNING', true);
-            }
-            if (Math.abs(pitch) > 5 && pitch < -2) { // Rudimentary trim check proxy (not real trim)
-                 // Skipping trim check for now as we don't have trim value passed
-            }
-        }
-
-        // Tail Strike
-        if (onGround && pitch > this.thresholds.tailStrikePitch) {
-            this.addWarning('TAIL_STRIKE', 'TAIL STRIKE', 'CRITICAL', true);
-        }
-
-        // Gear/Flap Speeds
-        if (gear > 0.1) {
-            // Vle (Extended)
-            if (airspeed > this.thresholds.vle) {
-                this.addWarning('OVERSPEED_GEAR', 'OVERSPEED GEAR', 'WARNING');
-            }
-        }
-
-        if (flaps > 0.1) {
-            // Simplified Vfe check - just using first limit for any flaps for now to be safe
-            // Ideally we map flap index to speed
-            const flapIndex = Math.floor(flaps) - 1;
-            const limit = this.thresholds.vfe[Math.max(0, flapIndex)] || this.thresholds.vfe[0];
-            
-            if (airspeed > limit) {
-                this.addWarning('OVERSPEED_FLAPS', 'OVERSPEED FLAPS', 'WARNING');
-            }
-        }
-    }
-
-    checkAutomation(autopilot, targets, altitude) {
-        if (!autopilot || !autopilot.engaged) return;
-
-        // Altitude Alert
-        if (targets && targets.altitude) {
-            const diff = Math.abs(altitude - targets.altitude);
-            if (diff > this.thresholds.altitudeAlertDiff && diff < 1000) {
-                 // Only warn if we are close but deviating? 
-                 // Or maybe just if we are diverging?
-                 // Simple implementation:
-                 this.addWarning('ALT_ALERT', 'ALTITUDE ALERT', 'ADVISORY');
-            }
         }
     }
 
@@ -270,6 +211,48 @@ class WarningSystem {
                     }
                 });
             }
+        }
+    }
+
+    checkConfiguration(flaps, gear, airBrakes, throttle, groundStatus, pitch, brakes) {
+        // 1. Takeoff Configuration
+        // If on ground, high throttle, and flaps not set or brakes on
+        const onGround = groundStatus && (groundStatus.status === 'RUNWAY' || groundStatus.status === 'GRASS');
+        if (onGround && throttle > 0.7) {
+            if (flaps < 0.1) {
+                this.addWarning('CONFIG_FLAPS', 'CONFIG FLAPS', 'WARNING', true);
+            }
+            if (airBrakes > 0.1) {
+                this.addWarning('CONFIG_SPOILERS', 'CONFIG SPOILERS', 'WARNING', true);
+            }
+            if (brakes > 0.1) {
+                this.addWarning('CONFIG_BRAKES', 'CONFIG BRAKES', 'WARNING', true);
+            }
+        }
+
+        // 2. Landing Configuration
+        // If in air, low altitude, gear not down
+        // (Covered partially by GPWS, but specific config warning here)
+
+        // 3. Tail Strike Risk
+        if (onGround && pitch > this.thresholds.tailStrikePitch) {
+            this.addWarning('TAIL_STRIKE', 'TAIL STRIKE RISK', 'CRITICAL', true);
+        }
+    }
+
+    checkAutomation(autopilot, autopilotTargets, altitudeMSL) {
+        if (!autopilot) return;
+
+        // Altitude Alert
+        if (autopilotTargets && typeof autopilotTargets.altitude === 'number') {
+            const diff = Math.abs(altitudeMSL - autopilotTargets.altitude);
+            
+            // Approaching target? (Not implemented statefully yet)
+            
+            // Deviation alert (if we were supposed to be there)
+            // For now, just a simple check if we are significantly off while in ALT HOLD mode? 
+            // Simplified: If diff > 300ft and AP is engaged, maybe just advisory if it persists?
+            // Leaving out for now to avoid nuisance warnings during climb/descent
         }
     }
 }

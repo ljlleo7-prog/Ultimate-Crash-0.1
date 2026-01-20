@@ -316,14 +316,6 @@ const FlightPanelModular = ({ flightData, physicsState, weatherData, onActionReq
         onClose: () => setActiveSidebarPanel(null)
     }),
     
-    // Flight Computer Overlay
-    activeSidebarPanel === 'flight_computer' && React.createElement(FlightComputerPanel, {
-        flightData,
-        flightPlan,
-        onUpdateFlightPlan,
-        onClose: () => setActiveSidebarPanel(null)
-    }),
-
     // Save & Load Panel Overlay
     activeSidebarPanel === 'save_load' && React.createElement(SaveLoadPanel, {
         flightData,
@@ -342,7 +334,8 @@ const FlightPanelModular = ({ flightData, physicsState, weatherData, onActionReq
       showOverhead && React.createElement(OverheadPanel, {
         onClose: () => setShowOverhead(false),
         flightState,
-        onSystemAction: handleSystemAction
+        onSystemAction: handleSystemAction,
+        aircraftModel: aircraftModel // Pass model for styling
       }),
 
       // Crash warning flash

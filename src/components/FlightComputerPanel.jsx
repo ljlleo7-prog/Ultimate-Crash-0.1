@@ -88,12 +88,22 @@ const FlightComputerPanel = ({ onClose, flightPlan, onUpdateFlightPlan, flightSt
   };
 
   const handleAddAirport = (airport) => {
+    // Extract individual runway designators (e.g. "08L/26R" -> ["08L", "26R"])
+    const runwayOptions = [];
+    if (airport.runways) {
+      airport.runways.forEach(r => {
+        const parts = r.name.split('/');
+        parts.forEach(p => runwayOptions.push(p.trim()));
+      });
+    }
+
     const newWaypoint = {
       latitude: airport.latitude,
       longitude: airport.longitude,
       label: airport.iata || airport.icao,
       type: 'airport',
-      details: airport
+      details: airport,
+      selectedRunway: runwayOptions.length > 0 ? runwayOptions[0] : null
     };
     
     const newWaypoints = [...waypoints, newWaypoint];
@@ -101,25 +111,36 @@ const FlightComputerPanel = ({ onClose, flightPlan, onUpdateFlightPlan, flightSt
     setActiveTab('waypoints');
   };
 
+  const handleRunwayChange = (index, runway) => {
+    const newWaypoints = [...waypoints];
+    newWaypoints[index] = { ...newWaypoints[index], selectedRunway: runway };
+    updateParent(newWaypoints);
+  };
+
   const findNearestAirports = () => {
     if (!flightState || !flightState.latitude || !flightState.longitude) return;
     
     setLoadingNearest(true);
-    // Find within 100nm first, if none, expand to 300nm
-    let results = airportService.getAirportsWithinRadius(flightState.latitude, flightState.longitude, 100, { type: 'all' });
     
-    if (results.length === 0) {
-      results = airportService.getAirportsWithinRadius(flightState.latitude, flightState.longitude, 300, { type: 'all' });
-    }
+    // Get ALL airports and sort by distance (simple, robust approach)
+    const allAirports = airportService.getAllAirports();
     
-    // Sort by distance
-    results.sort((a, b) => {
-      const distA = airportService.calculateDistance({ latitude: flightState.latitude, longitude: flightState.longitude }, a);
-      const distB = airportService.calculateDistance({ latitude: flightState.latitude, longitude: flightState.longitude }, b);
-      return distA - distB;
+    // Create a lightweight array for sorting to avoid mutating original or heavy operations
+    const airportsWithDist = allAirports.map(airport => {
+      const distance = airportService.calculateDistance(
+        { latitude: flightState.latitude, longitude: flightState.longitude },
+        { latitude: airport.latitude, longitude: airport.longitude }
+      );
+      return { airport, distance };
     });
     
-    setNearestAirports(results.slice(0, 10)); // Top 10
+    // Sort by distance ascending
+    airportsWithDist.sort((a, b) => a.distance - b.distance);
+    
+    // Take top 20 and extract the airport object
+    const results = airportsWithDist.slice(0, 20).map(item => item.airport);
+    
+    setNearestAirports(results);
     setLoadingNearest(false);
   };
 
@@ -155,6 +176,27 @@ const FlightComputerPanel = ({ onClose, flightPlan, onUpdateFlightPlan, flightSt
                     <div className="wp-info">
                       <span className="wp-label">{wp.label}</span>
                       <span className="wp-coords">{wp.latitude.toFixed(4)}, {wp.longitude.toFixed(4)}</span>
+                      {wp.type === 'airport' && wp.details?.runways && (
+                        <select 
+                          value={wp.selectedRunway || ''} 
+                          onChange={(e) => handleRunwayChange(index, e.target.value)}
+                          className="runway-select"
+                          onClick={(e) => e.stopPropagation()}
+                          style={{ 
+                            marginLeft: '8px', 
+                            padding: '2px 4px', 
+                            fontSize: '11px',
+                            background: '#333',
+                            color: '#0f0',
+                            border: '1px solid #0f0',
+                            borderRadius: '3px'
+                          }}
+                        >
+                          {wp.details.runways.flatMap(r => r.name.split('/').map(p => p.trim())).map(r => (
+                            <option key={r} value={r}>RWY {r}</option>
+                          ))}
+                        </select>
+                      )}
                     </div>
                     <button className="delete-btn" onClick={() => handleDeleteWaypoint(index)}>🗑️</button>
                   </li>
@@ -249,7 +291,7 @@ const FlightComputerPanel = ({ onClose, flightPlan, onUpdateFlightPlan, flightSt
             {loadingNearest ? (
               <div>Finding airports...</div>
             ) : nearestAirports.length === 0 ? (
-              <div>No airports found within 100nm.</div>
+              <div>No airports found.</div>
             ) : (
               <ul className="nearest-list">
                 {nearestAirports.map(airport => {
