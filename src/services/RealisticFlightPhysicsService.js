@@ -472,10 +472,25 @@ class RealisticFlightPhysicsService {
                 const nextWaypoint = this.flightPlan[this.currentWaypointIndex];
                 const dist = this._calculateDistance(this.state.geo.lat, this.state.geo.lon, nextWaypoint.latitude, nextWaypoint.longitude);
                 
-                // Switch to next waypoint if within 2km (UNLESS HOLDING)
-                if (dist < 2000 && !nextWaypoint.isHold) {
+                // Track distance history for "moving away" detection
+                if (this._lastWaypointIndex !== this.currentWaypointIndex) {
+                    this._prevDistToWaypoint = dist;
+                    this._lastWaypointIndex = this.currentWaypointIndex;
+                }
+                
+                const isMovingAway = (dist > (this._prevDistToWaypoint || dist) + 50); // 50m buffer
+                const wasClose = dist < 4000; // 4km proximity
+                
+                this._prevDistToWaypoint = dist;
+
+                // Switch to next waypoint if:
+                // 1. Within 2km (Fly-over)
+                // 2. Moving away and was close (Fly-by / Passed)
+                // 3. User requested "Auto-delete" -> We simulate this by advancing index and never looking back
+                if ((dist < 2000 || (isMovingAway && wasClose)) && !nextWaypoint.isHold) {
                     this.currentWaypointIndex++;
-                    console.log(`📍 Reached waypoint ${nextWaypoint.label || this.currentWaypointIndex - 1}. Sequencing to index ${this.currentWaypointIndex}`);
+                    this._prevDistToWaypoint = Infinity; 
+                    console.log(`📍 Reached/Passed waypoint ${nextWaypoint.label || this.currentWaypointIndex - 1}. Sequencing to index ${this.currentWaypointIndex}`);
                 }
 
                 // If LNAV is engaged, update target heading to waypoint bearing
@@ -1532,6 +1547,119 @@ class RealisticFlightPhysicsService {
             if (action === 'master' && value === false) {
                 this.systems.apu.running = false;
                 this.systems.apu.egt = 0;
+            }
+        }
+    }
+
+    /**
+     * Handle Radio Tuning Event
+     * Automatically sets ILS/Runway Geometry if a tower/approach frequency is tuned.
+     * @param {number} frequency - Tuned frequency in MHz
+     * @param {Object} flightPlan - Current flight plan object
+     */
+    handleRadioTuning(frequency, flightPlan) {
+        if (!frequency) return;
+        
+        // console.log(`Physics: Radio tuned to ${frequency.toFixed(3)} MHz`);
+        
+        const airport = airportService.getAirportByFrequency(frequency);
+        
+        if (airport) {
+            const airportCode = airport.iata || airport.icao;
+            // console.log(`Physics: Identified airport ${airportCode} for frequency ${frequency}`);
+            
+            // Determine which runway to use
+            let runwayName = null;
+            
+            // 1. Check Flight Plan (Arrival)
+            if (flightPlan && flightPlan.arrival && (flightPlan.arrival.iata === airportCode || flightPlan.arrival.icao === airportCode)) {
+                // If this is the arrival airport, check for selected runway
+                // Note: flightPlan.arrival.runways is usually an array of available runways, not necessarily the selected one.
+                // However, in this sim, usually the first one is picked or we need to check routeDetails.
+                // But let's look at waypoints first as they are more editable.
+            }
+            
+            // 2. Check Flight Plan Waypoints (Specific Waypoint Selection)
+            // This is the most reliable source for user selection in F-Comp
+            if (flightPlan && flightPlan.waypoints) {
+                 const wp = flightPlan.waypoints.find(w => w.type === 'airport' && (w.label === airport.iata || w.label === airport.icao));
+                 if (wp && wp.selectedRunway) {
+                     runwayName = wp.selectedRunway;
+                 }
+            }
+            
+            // 3. Fallback to Arrival default if listed
+            if (!runwayName && flightPlan && flightPlan.arrival && (flightPlan.arrival.iata === airportCode || flightPlan.arrival.icao === airportCode)) {
+                 if (flightPlan.arrival.runways && flightPlan.arrival.runways.length > 0) {
+                     runwayName = flightPlan.arrival.runways[0].name;
+                 }
+            }
+
+            // 4. Fallback to first runway if no specific selection
+            if (!runwayName) {
+                if (airport.runways && airport.runways.length > 0) {
+                    runwayName = airport.runways[0].name.split('/')[0].trim();
+                } else if (airport.runway) {
+                    runwayName = airport.runway.split('/')[0].trim();
+                } else {
+                    runwayName = "09"; 
+                }
+                console.log(`Physics: No specific runway selected for ${airportCode}, defaulting to ${runwayName}`);
+            }
+            
+            // 5. Smart Runway Selection (Auto-Align)
+            // If the selected/default runway is "behind" us (Reciprocal), swap to the other end.
+            if (runwayName) {
+                // Collect all available runway ends
+                let options = [];
+                if (airport.runways) {
+                    options = airport.runways.flatMap(r => r.name.split('/').map(p => p.trim()));
+                } else if (airport.runway) {
+                    options = airport.runway.split('/').map(p => p.trim());
+                } else {
+                    options = ["09", "27"];
+                }
+
+                const aircraftHeading = this.state.heading || 0;
+                
+                // Parse current selection heading
+                // Handle "09L" -> 09 -> 90
+                const getHeading = (name) => {
+                    const match = name.match(/^(\d{2})/);
+                    return match ? parseInt(match[1]) * 10 : 0;
+                };
+
+                const currentRunwayH = getHeading(runwayName);
+                
+                // Calculate alignment
+                let diff = Math.abs(aircraftHeading - currentRunwayH);
+                if (diff > 180) diff = 360 - diff;
+                
+                // If misalignment is > 90 degrees (Reciprocal Approach), try to find a better end
+                if (diff > 90) {
+                    const betterOption = options.find(opt => {
+                        const optH = getHeading(opt);
+                        let d = Math.abs(aircraftHeading - optH);
+                        if (d > 180) d = 360 - d;
+                        return d <= 90; // Found one facing us
+                    });
+                    
+                    if (betterOption) {
+                        console.log(`Physics: Auto-switching runway from ${runwayName} to ${betterOption} based on approach heading (Hdg: ${aircraftHeading.toFixed(0)} vs Rwy: ${currentRunwayH})`);
+                        runwayName = betterOption;
+                    }
+                }
+            }
+            
+            if (runwayName) {
+                const geom = airportService.getRunwayGeometry(airportCode, runwayName);
+                if (geom) {
+                    this.setRunwayGeometry(geom);
+                    console.log(`Physics: ILS tuned to ${airportCode} RWY ${runwayName}`);
+                    
+                    // Optional: Engage ILS mode if close enough? No, let pilot do that.
+                    // But we ensure the geometry is ready.
+                }
             }
         }
     }

@@ -118,6 +118,14 @@ class AirportService {
     return airportsToSearch.filter(airport => airport.category === category);
   }
 
+  getAirportByFrequency(frequency) {
+    const TOLERANCE = 0.005;
+    return this.allAirports.find(airport => {
+      if (!airport.frequencies) return false;
+      return airport.frequencies.some(f => Math.abs(f.frequency - frequency) < TOLERANCE);
+    });
+  }
+
   getRunwayInfo(airportCode) {
     const airport = this.getAirportByCode(airportCode);
     if (!airport) return [];

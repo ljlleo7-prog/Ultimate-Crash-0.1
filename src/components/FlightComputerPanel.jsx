@@ -200,6 +200,12 @@ const FlightComputerPanel = ({ onClose, flightPlan, onUpdateFlightPlan, flightSt
         const parts = r.name.split('/');
         parts.forEach(p => runwayOptions.push(p.trim()));
       });
+    } else if (airport.runway) {
+      const parts = airport.runway.split('/');
+      parts.forEach(p => runwayOptions.push(p.trim()));
+    } else {
+      runwayOptions.push("09");
+      runwayOptions.push("27");
     }
 
     const newWaypoint = {
@@ -208,6 +214,7 @@ const FlightComputerPanel = ({ onClose, flightPlan, onUpdateFlightPlan, flightSt
       label: airport.iata || airport.icao,
       type: 'airport',
       details: airport,
+      availableRunways: runwayOptions,
       selectedRunway: runwayOptions.length > 0 ? runwayOptions[0] : null
     };
     
@@ -276,29 +283,41 @@ const FlightComputerPanel = ({ onClose, flightPlan, onUpdateFlightPlan, flightSt
               <div className="empty-state">No waypoints in flight plan.</div>
             ) : (
               <ul>
-                {waypoints.map((wp, index) => (
-                  <li key={index} className="waypoint-item">
-                    <span className="wp-index">{index + 1}</span>
-                    <div className="wp-info">
-                      <span className="wp-label">{wp.label}</span>
-                      <span className="wp-coords">{wp.latitude.toFixed(4)}, {wp.longitude.toFixed(4)}</span>
-                      {wp.type === 'airport' && wp.details?.runways && (
-                        <select 
-                          value={wp.selectedRunway || ''} 
-                          onChange={(e) => handleRunwayChange(index, e.target.value)}
-                          className="runway-select"
-                          onClick={(e) => e.stopPropagation()}
-                          style={{ 
-                            marginLeft: '8px', 
-                            padding: '2px 4px', 
-                            fontSize: '11px',
-                            background: '#333',
-                            color: '#0f0',
-                            border: '1px solid #0f0',
-                            borderRadius: '3px'
-                          }}
+                {waypoints.map((wp, index) => {
+                  // Determine status based on flightState.currentWaypointIndex
+                  const currentIdx = flightState && flightState.currentWaypointIndex !== undefined ? flightState.currentWaypointIndex : 0;
+                  const isPassed = index < currentIdx;
+                  const isActive = index === currentIdx;
+                  
+                  return (
+                    <li key={index} className="waypoint-item" style={{
+                        opacity: isPassed ? 0.5 : 1,
+                        borderLeft: isActive ? '3px solid #4facfe' : '1px solid rgba(255, 255, 255, 0.05)',
+                        background: isActive ? 'rgba(79, 172, 254, 0.1)' : 'rgba(255, 255, 255, 0.03)'
+                    }}>
+                        <span className="wp-index" style={{ color: isActive ? '#4facfe' : '#666' }}>{index + 1}</span>
+                        <div className="wp-info">
+                        <span className="wp-label" style={{ color: isActive ? '#fff' : (isPassed ? '#888' : '#e0e0e0') }}>
+                            {wp.label} {isActive && <small style={{color: '#4facfe', marginLeft: '5px'}}>(ACTIVE)</small>}
+                        </span>
+                        <span className="wp-coords">{wp.latitude.toFixed(4)}, {wp.longitude.toFixed(4)}</span>
+                        {wp.type === 'airport' && (wp.availableRunways || wp.details?.runways) && (
+                            <select 
+                            value={wp.selectedRunway || ''} 
+                            onChange={(e) => handleRunwayChange(index, e.target.value)}
+                            className="runway-select"
+                            onClick={(e) => e.stopPropagation()}
+                            style={{ 
+                                marginLeft: '8px', 
+                                padding: '2px 4px', 
+                                fontSize: '11px',
+                                background: '#333',
+                                color: '#0f0',
+                                border: '1px solid #0f0',
+                                borderRadius: '3px'
+                            }}
                         >
-                          {wp.details.runways.flatMap(r => r.name.split('/').map(p => p.trim())).map(r => (
+                          {(wp.availableRunways || (wp.details?.runways ? wp.details.runways.flatMap(r => r.name.split('/').map(p => p.trim())) : [])).map(r => (
                             <option key={r} value={r}>RWY {r}</option>
                           ))}
                         </select>
@@ -325,7 +344,8 @@ const FlightComputerPanel = ({ onClose, flightPlan, onUpdateFlightPlan, flightSt
                     </button>
                     <button className="delete-btn" onClick={() => handleDeleteWaypoint(index)}>🗑️</button>
                   </li>
-                ))}
+                  );
+                })}
               </ul>
             )}
           </div>

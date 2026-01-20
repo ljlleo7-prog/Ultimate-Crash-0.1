@@ -90,11 +90,11 @@ class RealisticAutopilotService {
         // Localizer (Cross Track Error -> Target Heading Adjustment)
         // Input: Cross Track Error (meters) (Positive = Right of centerline)
         // Output: Heading Correction (degrees)
-        // 100m right -> Need Turn Left (-10 deg).
-        // Error = 0 - 100 = -100.
-        // We want Output = -10.
-        // Kp * (-100) = -10 => Kp = 0.1 (Positive).
-        this.localizerPID = new PIDController(0.15, 0.005, 0.05, -30, 30);
+        // Increased gains for tighter tracking and stability
+        // Kp: 0.15 -> 0.3 (Stronger correction)
+        // Ki: 0.005 -> 0.02 (Better steady state handling)
+        // Kd: 0.05 -> 0.2 (Damping for the stronger Kp)
+        this.localizerPID = new PIDController(0.3, 0.02, 0.2, -40, 40);
 
         this.engaged = false;
         this.mode = 'HDG'; // Default mode
@@ -210,27 +210,43 @@ class RealisticAutopilotService {
              // Alt = 50 + distance * tan(3deg). Distance is -distAlong (positive distance to go)
              const distToThresholdFt = -distAlong * 3.28084;
              
-             let targetAltitude = 50 + (distToThresholdFt * Math.tan(3 * Math.PI / 180));
+             // Safety: If we are passed the threshold (distToThresholdFt < 0) or too far behind (> 20nm),
+             // Do not engage Glideslope dive. Maintain current altitude or safe minimum.
+             let targetAltitude = altitude; // Default to hold current
              
-             // If we are past the threshold (distAlong > 0), maintain 50ft or flare
-             if (distToThresholdFt < 0) targetAltitude = 50;
-
+             // Active Zone: Approaching (dist > 0) and within reasonable range (< 20nm)
+             // and not "behind" the runway (distAlong < 0)
+             if (distToThresholdFt > 0 && distToThresholdFt < 120000) {
+                targetAltitude = 50 + (distToThresholdFt * Math.tan(3 * Math.PI / 180));
+             } else if (distToThresholdFt <= 0 && distToThresholdFt > -10000) {
+                 // Over runway: Flare / Hold 50ft
+                 targetAltitude = 50;
+             }
+             
              const altError = targetAltitude - altitude;
              
              // Update VS Target via Glideslope PID
              // Error > 0 (Too Low) -> Positive VS (Climb)
-             const vsCorrection = this.glideslopePID.update(altError, 0, dt);
+             // If we are passed threshold and high, don't dive aggressively
+             let vsCorrection = this.glideslopePID.update(altError, 0, dt);
              
              // Feed Forward: Base Descent Rate for 3 degree slope
              // VS = -GroundSpeed(kts) * 5 (approx rule of thumb)
              // Precise: GS * 1.6878 * tan(3) * 60
              const groundSpeedKts = airspeed; // Using IAS as proxy for GS
-             const baseDescentRate = -groundSpeedKts * 5.2; 
+             let baseDescentRate = -groundSpeedKts * 5.2; 
              
+             // If not in active approach zone, disable base descent
+             if (distToThresholdFt <= 0 || distToThresholdFt > 120000) {
+                 baseDescentRate = 0;
+                 // Dampen correction to avoid jumps
+                 vsCorrection = vsCorrection * 0.1;
+             }
+
              this.targets.vs = baseDescentRate + vsCorrection;
              
              // Clamp VS for safety
-             if (this.targets.vs < -2000) this.targets.vs = -2000;
+             if (this.targets.vs < -1500) this.targets.vs = -1500; // Cap descent at 1500 fpm
              if (this.targets.vs > 1500) this.targets.vs = 1500;
 
              // 2. Localizer (LNAV)

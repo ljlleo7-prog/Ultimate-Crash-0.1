@@ -513,6 +513,18 @@ const FlightInProgress = ({
     }
   }, [callsign, selectedDeparture, selectedArrival, aircraftModel, routeDetails, runwayHeadingDeg]);
 
+  // Trigger Physics ILS update when radio frequency changes
+  useEffect(() => {
+    if (physicsService && isInitialized) {
+        const currentFlightPlan = {
+            waypoints: routeDetails?.waypoints || flightPlan?.waypoints || [],
+            departure: selectedDeparture,
+            arrival: selectedArrival
+        };
+        physicsService.handleRadioTuning(currentFreq, currentFlightPlan);
+    }
+  }, [currentFreq, isInitialized, physicsService, routeDetails, flightPlan, selectedDeparture, selectedArrival]);
+
   // Main update loop
   useEffect(() => {
     sceneManager.start();
