@@ -13,7 +13,7 @@
 
 import EnginePhysicsService from './EnginePhysicsService.js';
 import RealisticAutopilotService from './RealisticAutopilotService.js';
-import FailureSystem from './FailureSystem.js';
+import FailureHandler from './failures/FailureHandler.js';
 import WarningSystem from './WarningSystem.js';
 import OverheadLogic from './OverheadLogic.js';
 import { airportService } from './airportService.js';
@@ -1881,11 +1881,10 @@ class RealisticFlightPhysicsService {
             // Re-initialize failure system with new config if provided
             const failureConfig = {};
             if (conditions.difficulty) failureConfig.difficulty = conditions.difficulty;
-            if (conditions.failureType) failureConfig.failureType = conditions.failureType;
             
             // Only re-create if we have new config, otherwise just reset
-            if (conditions.difficulty || conditions.failureType) {
-                this.failureSystem = new FailureSystem(failureConfig);
+            if (conditions.difficulty) {
+                this.failureSystem = new FailureHandler(failureConfig);
             } else {
                 this.failureSystem.reset();
             }
@@ -2259,7 +2258,40 @@ class RealisticFlightPhysicsService {
         this.state.quat = new Quaternion();
         this.crashed = false;
         this.currentWaypointIndex = 0;
-        this.engines.forEach(e => { e.n1 = 0; e.thrust = 0; });
+        
+        // Reset Engines
+        this.engines.forEach(e => { 
+            e.n1 = 0; 
+            e.thrust = 0; 
+            e.setFailed(false); // Reset failure state
+        });
+
+        // Reset Sensors
+        this.sensors = { pitotBlocked: false };
+
+        // Reset Critical System States (Flags that might be stuck)
+        if (this.systems) {
+            if (this.systems.pressurization) this.systems.pressurization.breach = false;
+            
+            // Restore Electrical
+            if (this.systems.electrical) {
+                this.systems.electrical.gen1 = true;
+                this.systems.electrical.gen2 = true;
+                this.systems.electrical.stbyPower = true;
+            }
+            
+            // Reset APU
+            if (this.systems.apu) {
+                this.systems.apu.running = false;
+                this.systems.apu.starting = false;
+                this.systems.apu.egt = 0;
+            }
+        }
+
+        // Reset Failure System
+        if (this.failureSystem) {
+            this.failureSystem.reset();
+        }
     }
     calculateAirspeeds() {
         const wind = this.environment?.wind || new Vector3(0, 0, 0);

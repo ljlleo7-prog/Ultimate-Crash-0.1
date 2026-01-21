@@ -1,0 +1,37 @@
+Rank,FailureType,Category,DifficultyLevel,Description
+1,Minor instrument failure,Instrument/Avionics,Low,Non-critical display/sensor errors
+2,Circuit breaker trip,Electrical,Low,Temporary electrical dropout
+3,Non-critical sensor anomaly,Sensor,Low,Incorrect non-primary reading
+4,Navigation radio glitch,Avionics,Low,Temporary loss of nav radio
+5,Communication radio failure,Avionics,Low,Comms lost but flight controllable
+6,Pitot tube blockage (single),Sensor/Instrument,Moderate,Airspeed indication error risk
+7,Landing gear extension issue,Hydraulic/Landing Gear,Moderate,Requires procedure for alternate extension
+8,Brake/tyre failure on landing,Landing Gear/Ground,Moderate,Ground handling issue
+9,Hydraulic leak,Hydraulic,Moderate,Loss of some control functions possible
+10,Partial electrical failure,Electrical,Moderate,Reduces system availability
+11,Single engine loss (en route),Engine/Powerplant,Moderate,Crew handles with checklist procedures
+12,Sensor misread in approach,Instrument/Avionics,Moderate,Can lead to unstable approach if unrecovered
+13,Severe icing/deicing failure,Environmental/Flight Control,Moderate,Impact on lift and control surfaces
+14,Severe turbulence encounter,Environmental,Moderate,High workload to maintain control
+15,Wind shear on approach,Environmental,Moderate,Requires specialized escape procedures
+16,Fuel contamination leading to engine rough running,Engine/Fuel,High,Fuel system degradation affects thrust
+17,Engine compressor stall/rough,Engine/Powerplant,High,Unstable thrust requiring corrective action
+18,Unintended VFR to IMC weather transition,Human/Environmental,High,Risk of spatial disorientation
+19,CFIT (Controlled Flight Into Terrain) scenario,Human/Environmental,High,Terrain impact risk
+20,Autopilot flight control anomaly,Flight Controls/Automation,High,Unexpected flight control behavior
+21,Autothrottle mode miscommand,Automation/Flight Control,High,Can lead to energy state issues
+22,Bird strike causing engine damage,Environmental/Engine,High,Engine thrust loss and structural damage risk :contentReference[oaicite:1]{index=1}
+23,Bird strike causing dual engine concern,Environmental/Engine,High,Requires diversion/emergency procedures :contentReference[oaicite:2]{index=2}
+24,Major hydraulic system failure,Hydraulic,High,Loss of primary control actuators
+25,Severe airframe icing (lift degradation),Environmental/Flight Control,High,Can trigger stall or control loss
+26,Structural control surface jam,Flight Control/Structure,High,Partial or asymmetric control
+27,Runway excursion (takeoff/landing),Ground Operations/Crew,High,Risk of collision or abort
+28,Severe weather convective encounter,Environmental,High,Thunderstorm wind shear/induced loads :contentReference[oaicite:3]{index=3}
+29,Electrical bus failure affecting critical systems,Electrical,High,Loss of key systems
+30,Dual engine failure,Engine/Powerplant,Critical,Loss of primary thrust requiring glide + restart
+31,Rapid depressurization (cabin breach),Pressurization/Structure,Critical,Immediate emergency descent required
+32,Total flight control system failure,Flight Controls/Critical,Critical,Almost complete loss of control authority
+33,Uncontained engine failure (fan/LP shaft),Engine/Structure,Critical,Possible collateral systems damage
+34,Hull breach/structural failure,Airframe/Structure,Critical,Severe aerostructural integrity loss
+35,Onboard fire (uncontrolled),Fire/Smoke,Critical,Rapidly escalating hazard to systems and structure
+36,Sabotage/IED explosion,Security/Catastrophic,Critical,Unpredictable rapid catastrophic failure

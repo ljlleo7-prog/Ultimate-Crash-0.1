@@ -56,39 +56,55 @@ class OverheadLogic {
 
     updateAPU(systems, context, dt) {
         // APU Start Logic
+        // Requires Battery
+        if (!systems.electrical.battery) {
+            systems.apu.running = false;
+            systems.apu.starting = false;
+            return;
+        }
+
         if (systems.apu.master) {
             if (systems.apu.start) {
-                // User held start switch (momentary usually, but we might track state)
-                // In this sim, let's say 'start' triggers the sequence
-                if (!systems.apu.running && systems.apu.egt < 100) {
+                // User triggers start
+                if (!systems.apu.running && !systems.apu.starting) {
                     systems.apu.starting = true;
+                    systems.apu.egt = 200; // Initial bump
                 }
-                // Reset switch to neutral/on if it's momentary (handled in UI or here)
-                // For now, assume 'start' is a persistent state until engine running? 
-                // Usually it's spring-loaded. We'll handle 'starting' flag.
+                // Toggle switch back usually handled by UI, but if not:
+                // We leave it true until running? Or assume momentary.
+                // Let's leave it, but logic below handles 'starting' state.
             }
 
             if (systems.apu.starting) {
-                systems.apu.egt += 50 * dt; // EGT rises
-                if (systems.apu.egt > 400 && systems.apu.egt < 800) {
-                    // Spool up
-                }
+                // Spool up sequence
+                systems.apu.egt += 80 * dt; // EGT rises
+                
+                // Simulate N2 rise (not stored in systems.apu but implied by time/egt)
+                
                 if (systems.apu.egt >= 600) { // Stabilized
                     systems.apu.running = true;
                     systems.apu.starting = false;
-                    systems.apu.start = false; // Reset switch
+                    systems.apu.start = false; // Kick switch off
+                    systems.apu.egt = 400; // Stabilize normal EGT
                 }
             } else if (systems.apu.running) {
-                systems.apu.egt = 650 + Math.random() * 10; // Stable
+                // Normal Ops
+                systems.apu.egt = 400 + (Math.random() * 5); 
+                
+                // Bleed load increases EGT
+                if (systems.apu.bleed) systems.apu.egt += 50;
+                // Gen load increases EGT
+                if (systems.apuGen) systems.apu.egt += 30;
+                
             } else {
-                // Cool down
-                if (systems.apu.egt > 0) systems.apu.egt -= 10 * dt;
+                // Cool down (Master On but not running/starting)
+                if (systems.apu.egt > 20) systems.apu.egt -= 15 * dt;
             }
         } else {
             // Shutdown
             systems.apu.running = false;
             systems.apu.starting = false;
-            if (systems.apu.egt > 0) systems.apu.egt -= 15 * dt;
+            if (systems.apu.egt > 20) systems.apu.egt -= 25 * dt;
         }
     }
 
@@ -139,27 +155,48 @@ class OverheadLogic {
                                (systems.apu.bleed && systems.apu.running);
         
         const packsOn = systems.pressurization.packL || systems.pressurization.packR;
+        const hasBreach = systems.pressurization.breach === true;
 
-        if (bleedAvailable && packsOn) {
+        if (hasBreach) {
+            // Rapid Depressurization
+            // Equalize to aircraft altitude very fast
+            const rate = 10000 * dt / 60; // 10,000 fpm
+            if (current < aircraftAlt) systems.pressurization.cabinAlt += rate;
+            else if (current > aircraftAlt) systems.pressurization.cabinAlt -= rate;
+        }
+        else if (bleedAvailable && packsOn) {
             // Pressurizing to target
             // Rate ~500fpm
             const rate = 500 * dt / 60; // ft per frame
-            if (current < target) systems.pressurization.cabinAlt += rate; // shouldn't happen usually unless target > current
-            // Actually, we want cabin alt to be lower than aircraft alt (higher pressure)
-            // But usually we set Landing Alt or Cruise Alt. 
-            // Let's assume auto mode maintains 8000ft max cabin alt
+            
+            // Auto Schedule Logic
+            // Cabin Altitude Target is usually computed based on Landing Altitude + differential
+            // Simplified: Maintain 8000ft or Aircraft Altitude (whichever is lower)
             
             let desiredCabinAlt = aircraftAlt;
             if (aircraftAlt > 8000) desiredCabinAlt = 8000;
             
             // Move towards desired
-            if (current < desiredCabinAlt) systems.pressurization.cabinAlt += rate;
-            else if (current > desiredCabinAlt) systems.pressurization.cabinAlt -= rate;
+            if (Math.abs(current - desiredCabinAlt) < rate) {
+                systems.pressurization.cabinAlt = desiredCabinAlt;
+            } else if (current < desiredCabinAlt) {
+                systems.pressurization.cabinAlt += rate;
+            } else if (current > desiredCabinAlt) {
+                systems.pressurization.cabinAlt -= rate;
+            }
             
         } else {
             // Depressurizing to outside altitude (leak rate)
-            if (current < aircraftAlt) {
-                systems.pressurization.cabinAlt += 100 * dt; // Leak
+            // Should equalize to aircraft altitude (whether Up or Down)
+            // Natural leak rate ~500 fpm typically if sealed, but let's say 3000fpm if valve open
+            const leakRate = 500 * dt / 60; 
+            
+            if (Math.abs(current - aircraftAlt) < leakRate) {
+                systems.pressurization.cabinAlt = aircraftAlt;
+            } else if (current < aircraftAlt) {
+                systems.pressurization.cabinAlt += leakRate; // Climbing cabin (losing pressure)
+            } else if (current > aircraftAlt) {
+                systems.pressurization.cabinAlt -= leakRate; // Descending cabin (gaining pressure - rare unless diving fast)
             }
         }
     }
