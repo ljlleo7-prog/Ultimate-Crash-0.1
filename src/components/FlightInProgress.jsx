@@ -797,7 +797,10 @@ const FlightInProgress = ({
         )}
 
         {showFailurePanel && (
-          <FailureDebugPanel physicsService={physicsService} />
+          <FailureDebugPanel 
+            physicsService={physicsService} 
+            onClose={() => setShowFailurePanel(false)}
+          />
         )}
 
         <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', zIndex: 10 }}>

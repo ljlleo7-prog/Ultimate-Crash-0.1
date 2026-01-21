@@ -208,7 +208,7 @@ class RealisticFlightPhysicsService {
         this.autopilot = new RealisticAutopilotService();
         
         // Failure System
-        this.failureSystem = new FailureSystem();
+        this.failureSystem = new FailureHandler({ difficulty: this.difficulty });
         this.warningSystem = new WarningSystem();
         this.sensors = { pitotBlocked: false };
 
@@ -2229,6 +2229,14 @@ class RealisticFlightPhysicsService {
         return { cl, cd };
     }
     
+    setDifficulty(difficulty) {
+        this.difficulty = difficulty;
+        if (this.failureSystem) {
+            this.failureSystem.difficulty = difficulty;
+            this.failureSystem.settings = this.failureSystem.getDifficultySettings(difficulty);
+        }
+    }
+
     setAutopilotMode(mode) {
         this.autopilot.setTargets({ mode: mode });
     }

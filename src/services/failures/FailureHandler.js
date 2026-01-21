@@ -1,5 +1,5 @@
 
-import eventBus from '../../eventBus.js';
+import eventBus from '../eventBus.js';
 import BaseFailure from './BaseFailure.js';
 
 // Registry of all failure definitions (will be populated)

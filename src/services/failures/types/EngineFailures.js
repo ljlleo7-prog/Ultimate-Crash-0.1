@@ -114,6 +114,49 @@ const EngineFailures = {
                 }
             }
         }
+    },
+
+    BIRD_STRIKE: {
+        id: 'bird_strike',
+        name: 'Bird Strike',
+        category: 'engine',
+        stages: {
+            inactive: { next: 'active' },
+            active: {
+                description: (ctx) => `BIRD STRIKE: Engine ${ctx.engineIndex + 1}.`,
+                effect: (sys, intensity, ctx) => {
+                    const eng = sys.engines[ctx.engineIndex];
+                    if (eng) {
+                        // High damage probability
+                        eng.setFailed(true);
+                        eng.state.n1 = 0;
+                        sys.systems.fire[`eng${ctx.engineIndex + 1}`] = Math.random() > 0.5;
+                    }
+                }
+            }
+        }
+    },
+
+    UNCONTAINED_ENGINE: {
+        id: 'uncontained_engine_failure',
+        name: 'Uncontained Failure',
+        category: 'engine',
+        stages: {
+            inactive: { next: 'active' },
+            active: {
+                description: (ctx) => `UNCONTAINED FAILURE: Engine ${ctx.engineIndex + 1}.`,
+                effect: (sys, intensity, ctx) => {
+                    const eng = sys.engines[ctx.engineIndex];
+                    if (eng) {
+                        eng.setFailed(true);
+                        sys.systems.fire[`eng${ctx.engineIndex + 1}`] = true;
+                        // Collateral Damage
+                        sys.systems.hydraulics.sysA.pressure = 0;
+                        sys.systems.pressurization.breach = true;
+                    }
+                }
+            }
+        }
     }
 };
 

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 
-const FailureDebugPanel = ({ physicsService }) => {
+const FailureDebugPanel = ({ physicsService, onClose }) => {
     const [activeFailures, setActiveFailures] = useState([]);
     const [registry, setRegistry] = useState(new Map());
     const [settings, setSettings] = useState(null);
@@ -118,7 +118,7 @@ const FailureDebugPanel = ({ physicsService }) => {
                         RESET ALL
                     </button>
                     <button 
-                        onClick={() => {/* Close handler usually from parent */}}
+                        onClick={onClose}
                         style={{
                             background: 'transparent',
                             border: 'none',
@@ -230,9 +230,9 @@ const FailureDebugPanel = ({ physicsService }) => {
                                         borderRadius: '0 4px 4px 0'
                                     }}>
                                         <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
-                                            <span style={{ fontWeight: 'bold', color: '#ffaaaa' }}>{failure.definition?.label || failure.id}</span>
+                                            <span style={{ fontWeight: 'bold', color: '#ffaaaa' }}>{failure.name || failure.id}</span>
                                             <span style={{ fontSize: '10px', color: '#ff6666', border: '1px solid #552222', padding: '0 4px', borderRadius: '2px' }}>
-                                                {failure.stage.toUpperCase()}
+                                                {(failure.currentStage || 'UNKNOWN').toUpperCase()}
                                             </span>
                                         </div>
                                         

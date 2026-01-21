@@ -9,16 +9,37 @@ const SystemFailures = {
             active: {
                 description: (ctx) => `Hydraulic Pressure Loss.`,
                 effect: (sys, intensity) => {
-                    // Reduce control authority
-                    const limit = 1.0 - (intensity * 0.8); // down to 20%
+                    const limit = 1.0 - (intensity * 0.8);
                     sys.controls.aileron *= limit;
                     sys.controls.elevator *= limit;
                     sys.controls.rudder *= limit;
-                    
-                    // System indication
                     if (sys.systems.hydraulics) {
                         sys.systems.hydraulics.sysA.pressure = 0;
                         sys.systems.hydraulics.sysB.pressure = 0;
+                    }
+                }
+            }
+        }
+    },
+
+    MAJOR_HYDRAULIC: {
+        id: 'major_hydraulic_failure',
+        name: 'Major Hydraulic Failure',
+        category: 'systems',
+        stages: {
+            inactive: { next: 'active' },
+            active: {
+                description: (ctx) => `TOTAL HYDRAULIC LOSS. Controls stiff.`,
+                effect: (sys) => {
+                    // Severe control restriction
+                    sys.controls.aileron *= 0.1;
+                    sys.controls.elevator *= 0.1;
+                    sys.controls.rudder *= 0.1;
+                    sys.controls.gear = sys.controls.gear; // Stuck
+                    if (sys.systems.hydraulics) {
+                        sys.systems.hydraulics.sysA.pressure = 0;
+                        sys.systems.hydraulics.sysB.pressure = 0;
+                        sys.systems.hydraulics.sysC.pressure = 0; // If modeled
                     }
                 }
             }
@@ -36,7 +57,37 @@ const SystemFailures = {
                 effect: (sys) => {
                     sys.systems.electrical.gen1 = false;
                     sys.systems.electrical.gen2 = false;
-                    sys.systems.electrical.dcVolts = 0; // Battery only?
+                    sys.systems.electrical.dcVolts = 0;
+                }
+            }
+        }
+    },
+
+    PARTIAL_ELECTRICAL: {
+        id: 'partial_electrical_failure',
+        name: 'Partial Electrical Failure',
+        category: 'systems',
+        stages: {
+            inactive: { next: 'active' },
+            active: {
+                description: (ctx) => `Utility Bus Off. Non-essential systems lost.`,
+                effect: (sys) => {
+                    // Just a flag or minor annoyance
+                }
+            }
+        }
+    },
+
+    CIRCUIT_BREAKER: {
+        id: 'circuit_breaker_trip',
+        name: 'Circuit Breaker Trip',
+        category: 'systems',
+        stages: {
+            inactive: { next: 'active' },
+            active: {
+                description: (ctx) => `Circuit Breaker Pop: Avionics.`,
+                effect: (sys) => {
+                    // Temporary loss of specific instrument
                 }
             }
         }
@@ -68,15 +119,175 @@ const SystemFailures = {
                 duration: 20.0,
                 next: 'active',
                 description: (ctx) => `Nav Radio Signal Intermittent.`,
-                effect: (sys) => {
-                    // Need to implement effect on VOR/ILS in physics service
-                    // For now, maybe just log?
-                }
+                effect: (sys) => {}
             },
             active: {
                 description: (ctx) => `Nav Radio Failure.`,
+                effect: (sys) => {}
+            }
+        }
+    },
+
+    COMM_RADIO_FAILURE: {
+        id: 'communication_radio_failure',
+        name: 'Comm Radio Failure',
+        category: 'systems',
+        stages: {
+            inactive: { next: 'active' },
+            active: {
+                description: (ctx) => `COM 1 Transmit Failure.`,
+                effect: (sys) => {}
+            }
+        }
+    },
+
+    SENSOR_ANOMALY: {
+        id: 'non_critical_sensor_anomaly',
+        name: 'Sensor Anomaly',
+        category: 'systems',
+        stages: {
+            inactive: { next: 'active' },
+            active: {
+                description: (ctx) => `AOA Sensor Disagree.`,
+                effect: (sys) => {}
+            }
+        }
+    },
+
+    MINOR_INSTRUMENT: {
+        id: 'minor_instrument_failure',
+        name: 'Minor Instrument Failure',
+        category: 'systems',
+        stages: {
+            inactive: { next: 'active' },
+            active: {
+                description: (ctx) => `PFD Symbol Generator Fault.`,
+                effect: (sys) => {}
+            }
+        }
+    },
+
+    BRAKE_FAILURE: {
+        id: 'brake_failure',
+        name: 'Brake Failure',
+        category: 'systems',
+        stages: {
+            inactive: { next: 'active' },
+            active: {
+                description: (ctx) => `Autobrake Fault. Manual Braking Required.`,
                 effect: (sys) => {
-                     // Flag for UI to hide needles
+                    // Disable autobrake logic if implemented
+                }
+            }
+        }
+    },
+
+    MINOR_INSTRUMENT: {
+        id: 'minor_instrument_failure',
+        name: 'Minor Instrument Failure',
+        category: 'systems',
+        stages: {
+            inactive: { next: 'active' },
+            active: {
+                description: (ctx) => `Instrument Display Flicker/Loss.`,
+                effect: (sys) => {
+                    // Cosmetic: flicker screens?
+                }
+            }
+        }
+    },
+
+    SENSOR_ANOMALY: {
+        id: 'non_critical_sensor_anomaly',
+        name: 'Sensor Anomaly',
+        category: 'systems',
+        stages: {
+            inactive: { next: 'active' },
+            active: {
+                description: (ctx) => `Sensor Reading Anomaly.`,
+                effect: (sys) => {
+                    // Minor jitter in readings
+                }
+            }
+        }
+    },
+
+    NAV_RADIO_GLITCH: {
+        id: 'navigation_radio_glitch',
+        name: 'Nav Radio Glitch',
+        category: 'systems',
+        stages: {
+            inactive: { next: 'active' },
+            active: {
+                description: (ctx) => `NAV Radio Signal Lost.`,
+                effect: (sys) => {
+                    // Disable NAV updates
+                }
+            }
+        }
+    },
+
+    COMM_RADIO_FAILURE: {
+        id: 'communication_radio_failure',
+        name: 'Comm Radio Failure',
+        category: 'systems',
+        stages: {
+            inactive: { next: 'active' },
+            active: {
+                description: (ctx) => `COMMS LOST.`,
+                effect: (sys) => {
+                    // Block ATC
+                }
+            }
+        }
+    },
+
+    BRAKE_FAILURE: {
+        id: 'brake_failure',
+        name: 'Brake Failure',
+        category: 'systems',
+        stages: {
+            inactive: { next: 'active' },
+            active: {
+                description: (ctx) => `Brake System Malfunction.`,
+                effect: (sys) => {
+                    sys.controls.brakes = 0;
+                }
+            }
+        }
+    },
+
+    SENSOR_MISREAD: {
+        id: 'sensor_misread_approach',
+        name: 'Sensor Misread (Approach)',
+        category: 'systems',
+        stages: {
+            inactive: { next: 'active' },
+            active: {
+                description: (ctx) => `Altimeter/Speed Mismatch.`,
+                effect: (sys) => {
+                    // Critical phase error
+                    // sys.sensors.altimeterError = 500;
+                }
+            }
+        }
+    },
+    
+    SABOTAGE: {
+        id: 'sabotage_explosion',
+        name: 'Sabotage / Explosion',
+        category: 'systems',
+        stages: {
+            inactive: { next: 'active' },
+            active: {
+                description: (ctx) => `EXPLOSION DETECTED. CRITICAL DAMAGE.`,
+                effect: (sys) => {
+                    sys.systems.electrical.gen1 = false;
+                    sys.systems.electrical.gen2 = false;
+                    sys.systems.hydraulics.sysA.pressure = 0;
+                    sys.systems.pressurization.breach = true;
+                    // Fire
+                    sys.systems.fire.cargo = true;
                 }
             }
         }
