@@ -213,7 +213,13 @@ const FlightInProgress = ({
 
   // Sync prop flightPlan to state if it changes (e.g. reset)
   useEffect(() => {
-    setActiveFlightPlan(flightPlan);
+    // Only update if the plan actually changed content-wise to prevent object identity loops
+    setActiveFlightPlan(prev => {
+        if (JSON.stringify(prev) !== JSON.stringify(flightPlan)) {
+            return flightPlan;
+        }
+        return prev;
+    });
   }, [flightPlan]);
   
   // Handle Flight Plan Update
@@ -901,7 +907,8 @@ const FlightInProgress = ({
                 }
                 case 'toggle-debug': {
                   setShowDebugPhysics(prev => !prev);
-                  console.log(`📡 FlightPanel Action: ${action} -> New State: ${!showDebugPhysics}`);
+                  setShowFailurePanel(prev => !prev);
+                  console.log(`📡 FlightPanel Action: ${action} -> Toggling Debug & Failure Panels`);
                   break;
                 }
                 case 'skip-phase': {

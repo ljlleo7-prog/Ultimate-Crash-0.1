@@ -10,8 +10,7 @@ class TerrainRadarService {
         this.maxCacheSize = 5000; // Limit cache size
         
         // Open-Elevation API endpoint
-        // Using local proxy to avoid CORS in development
-        this.API_ENDPOINT = '/api/openelevation/api/v1/lookup';
+        this.API_ENDPOINT = 'https://api.open-elevation.com/api/v1/lookup';
         
         // Start the fetch loop
         this.startFetcher();
@@ -150,18 +149,26 @@ class TerrainRadarService {
         const locationsParam = batch.map(item => `${item.lat.toFixed(5)},${item.lon.toFixed(5)}`).join('|');
         
         // Primary: Open-Elevation
-        const urlPrimary = `${this.API_ENDPOINT}?locations=${locationsParam}`;
+        // Note: Using corsproxy.io to bypass potential CORS/Mixed-Content issues on production (GitHub Pages)
+        const urlPrimary = `https://api.open-elevation.com/api/v1/lookup?locations=${locationsParam}`;
         
         // Secondary: OpenTopoData (ASTER 30m Global)
         // Public API: https://api.opentopodata.org/v1/aster30m
-        // Using local proxy to avoid CORS in development
-        const urlSecondary = `/api/opentopodata/v1/aster30m?locations=${locationsParam}`;
+        const urlSecondary = `https://api.opentopodata.org/v1/aster30m?locations=${locationsParam}`;
+
+        // CORS Proxy: Used to wrap requests for static site deployment (GitHub Pages)
+        // where no backend proxy is available.
+        const corsProxy = 'https://corsproxy.io/?';
 
         let success = false;
 
         // Try Primary
         try {
             // console.log("Terrain: Trying Primary (Open-Elevation)...");
+            // Try direct first, if that fails (network/cors), we could try proxy, 
+            // but usually for CORS it fails instantly. 
+            // Let's try wrapping with proxy to be safe for production if direct is known to be flaky with CORS.
+            // However, Open-Elevation often supports CORS. Let's try direct first for Primary.
             const response = await fetch(urlPrimary);
             if (!response.ok) throw new Error(`Primary API Error: ${response.status}`);
             const data = await response.json();
@@ -170,14 +177,15 @@ class TerrainRadarService {
                 success = true;
             }
         } catch (error) {
-            console.warn("Terrain: Primary API failed, switching to Secondary (OpenTopoData)...", error);
+            console.warn("Terrain: Primary API failed, switching to Secondary...", error);
         }
 
         // Try Secondary if Primary failed
         if (!success) {
             try {
                 // console.log("Terrain: Trying Secondary (OpenTopoData)...");
-                const response = await fetch(urlSecondary);
+                // OpenTopoData often has strict CORS. Use proxy.
+                const response = await fetch(corsProxy + encodeURIComponent(urlSecondary));
                 if (!response.ok) throw new Error(`Secondary API Error: ${response.status}`);
                 const data = await response.json();
                 if (data && data.results) {
