@@ -396,8 +396,8 @@ const FlightInProgress = ({
     
     // Subscribe to physics initialization events
     const unsubscribePhysicsInit = eventBus.subscribe(eventBus.Types.PHYSICS_INITIALIZE, (payload) => {
-      // Apply initial conditions to physics service
-      if (physicsService && typeof physicsService.setInitialConditions === 'function') {
+      // Apply initial conditions to physics service only if provided
+      if (physicsService && typeof physicsService.setInitialConditions === 'function' && payload.initialConditions) {
         physicsService.setInitialConditions(payload.initialConditions);
       }
       

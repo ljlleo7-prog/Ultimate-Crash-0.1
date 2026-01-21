@@ -1,5 +1,6 @@
 import eventBus, { EventTypes } from './eventBus.js';
 import { getRunwayHeading } from '../utils/routeGenerator';
+import { getRandomTemplate } from './narrativeTemplates.js';
 
 // Flight phases with typical parameters
 export const FlightPhases = {
@@ -279,6 +280,7 @@ class SceneManager {
     this.activeFailures.clear();
     this.completedPhases.clear();
     this.narrativeHistory = [];
+    this.currentPhaseData = null;
     
     const initialPhase = this.currentPhase();
     
@@ -291,7 +293,16 @@ class SceneManager {
     
     // Publish initial narrative
     if (initialPhase.narrative) {
-      this.publishNarrative(initialPhase.narrative);
+      let activeNarrative = initialPhase.narrative;
+      const template = getRandomTemplate(initialPhase.type);
+      if (template) {
+        activeNarrative = { ...activeNarrative, ...template };
+      }
+      
+      // Store active narrative for updates
+      this.currentPhaseData = { ...this.currentPhaseData, activeNarrative };
+      
+      this.publishNarrative(activeNarrative);
     }
   }
 
@@ -326,7 +337,7 @@ class SceneManager {
     }
     
     // Set initial physics conditions for the new phase
-    this.setPhaseInitialConditions(nextPhase);
+    this.setPhaseInitialConditions(nextPhase, currentPhase);
 
     // Publish phase changed event
     eventBus.publishWithMetadata(EventTypes.PHASE_CHANGED, {
@@ -338,7 +349,16 @@ class SceneManager {
     
     // Publish narrative for new phase
     if (nextPhase.narrative) {
-      this.publishNarrative(nextPhase.narrative);
+      let activeNarrative = nextPhase.narrative;
+      const template = getRandomTemplate(nextPhase.type);
+      if (template) {
+        activeNarrative = { ...activeNarrative, ...template };
+      }
+      
+      // Store active narrative for updates
+      this.currentPhaseData = { ...this.currentPhaseData, activeNarrative };
+      
+      this.publishNarrative(activeNarrative);
     }
   }
 
@@ -350,9 +370,13 @@ class SceneManager {
     };
     
     // If running, update current phase narrative
-    const currentPhase = this.currentPhase();
-    if (currentPhase && currentPhase.narrative) {
-      this.publishNarrative(currentPhase.narrative);
+    if (this.currentPhaseData && this.currentPhaseData.activeNarrative) {
+      this.publishNarrative(this.currentPhaseData.activeNarrative);
+    } else {
+      const currentPhase = this.currentPhase();
+      if (currentPhase && currentPhase.narrative) {
+        this.publishNarrative(currentPhase.narrative);
+      }
     }
     
     return this.scenario;
