@@ -5,17 +5,9 @@ const EnvironmentFailures = {
         name: 'Rapid Depressurization',
         category: 'environment',
         stages: {
-            inactive: { next: 'warning' },
-            warning: {
-                duration: 3.0,
-                next: 'active',
-                description: (ctx) => `Loud hissing sound from door seal. Ears popping.`,
-                effect: (sys) => {
-                    // Nothing
-                }
-            },
+            inactive: { next: 'active' },
             active: {
-                description: (ctx) => `CABIN ALTITUDE HORN. Oxygen masks drop. Fog in cabin.`,
+                description: (ctx) => `CABIN PRESSURE WARNING. HULL INTEGRITY COMPROMISED.`,
                 effect: (sys) => {
                     sys.systems.pressurization.breach = true;
                 }
@@ -28,18 +20,9 @@ const EnvironmentFailures = {
         name: 'Hull Breach',
         category: 'environment',
         stages: {
-            inactive: { next: 'explosion' },
-            explosion: {
-                duration: 2.0,
-                next: 'active',
-                description: (ctx) => `Loud bang. Wind noise deafening. Debris flying in cabin.`,
-                effect: (sys) => {
-                    // Maybe tilt aircraft
-                    sys.state.rates.x += 0.2; // Roll jerk
-                }
-            },
+            inactive: { next: 'active' },
             active: {
-                description: (ctx) => `Cold air rushing in. Papers blowing around cockpit. Drag increased.`,
+                description: (ctx) => `STRUCTURAL DAMAGE. DECOMPRESSION.`,
                 effect: (sys) => {
                     sys.systems.pressurization.breach = true;
                     // Drag increase?
@@ -53,17 +36,9 @@ const EnvironmentFailures = {
         name: 'Severe Turbulence',
         category: 'environment',
         stages: {
-            inactive: { next: 'chop' },
-            chop: {
-                duration: 10.0,
-                next: 'active',
-                description: (ctx) => `Coffee shaking in cup. Seatbelt sign audible.`,
-                effect: (sys) => {
-                    sys.setEnvironment({ turbulence: 1.0 });
-                }
-            },
+            inactive: { next: 'active' },
             active: {
-                description: (ctx) => `Violent jolts. Loose items hitting ceiling. Passengers screaming.`,
+                description: (ctx) => `Encountering Severe Turbulence.`,
                 effect: (sys, intensity) => {
                     sys.setEnvironment({
                         turbulence: 5.0 * intensity
@@ -80,7 +55,7 @@ const EnvironmentFailures = {
         stages: {
             inactive: { next: 'active' },
             active: {
-                description: (ctx) => `Roaring rain sound. Sudden sink sensation. Airspeed fluctuations.`,
+                description: (ctx) => `WINDSHEAR AHEAD.`,
                 effect: (sys, intensity) => {
                     // Sudden airspeed loss/gain logic in physics
                     // sys.applyWindShear(intensity);
@@ -98,13 +73,13 @@ const EnvironmentFailures = {
             accumulating: {
                 duration: 30.0,
                 next: 'critical',
-                description: (ctx) => `Ice building on wiper blades. Windshield opaque. Wing leading edge white.`,
+                description: (ctx) => `Ice Accumulation Detected.`,
                 effect: (sys, intensity) => {
                     // Reduce lift slightly
                 }
             },
             critical: {
-                description: (ctx) => `Buffet felt through airframe. Controls feel sluggish/heavy.`,
+                description: (ctx) => `Severe Icing. Stall Speed Increased.`,
                 effect: (sys) => {
                     // Degrade aerodynamic coeffs
                 }
@@ -117,21 +92,13 @@ const EnvironmentFailures = {
         name: 'Fuel Contamination',
         category: 'environment',
         stages: {
-            inactive: { next: 'clogging' },
-            clogging: {
-                duration: 20.0,
-                next: 'active',
-                description: (ctx) => `Engine RPM needle wavering slightly.`,
-                effect: (sys) => {
-                    // warning
-                }
-            },
+            inactive: { next: 'active' },
             active: {
-                description: (ctx) => `Engines sputtering. Thrust surges. Fuel flow erratic.`,
+                description: (ctx) => `Fuel Filter Bypass. Engine Roughness.`,
                 effect: (sys) => {
                     // Random thrust fluctuations
                     sys.engines.forEach(e => {
-                        e.state.fuelFlow *= 0.8;
+                        e.thrust *= 0.8 + (Math.random() * 0.2);
                     });
                 }
             }
@@ -147,13 +114,13 @@ const EnvironmentFailures = {
             impact: {
                 next: 'damage',
                 duration: 0.5,
-                description: (ctx) => `Loud THUDs on nose/windshield. Blood smear visible.`,
+                description: (ctx) => `IMPACT DETECTED.`,
                 effect: (sys, intensity, ctx) => {
                     // Loud bang
                 }
             },
             damage: {
-                description: (ctx) => `Burning smell. Vibration from engines.`,
+                description: (ctx) => `Bird Ingestion: Engine Damage.`,
                 effect: (sys, intensity, ctx) => {
                     const idx = ctx.engineIndex !== undefined ? ctx.engineIndex : 0;
                     if (sys.engines[idx]) sys.engines[idx].setFailed(true);

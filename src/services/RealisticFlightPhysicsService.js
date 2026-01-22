@@ -2249,17 +2249,12 @@ class RealisticFlightPhysicsService {
         };
     }
 
-    setEngineThrottle(index, value) {
-        // Map index 0->throttle1, 1->throttle2, etc.
-        const key = `throttle${index + 1}`;
-        this.controls[key] = Math.max(-0.7, Math.min(1, value));
-        
-        // Also update global throttle if all engines are roughly same? 
-        // No, let's keep global separate or just use individual if set.
-        // If we set individual, we should probably ensure updateEngines uses it.
-        // (updateEngines already checks for throttleN)
+    setEngineThrottle() {  
+        // We simulate global throttle mostly, but can handle array if needed
+        // For now, update global target which updateEngines uses
+        // But if individual control is needed, updateEngines needs modification.
+        // Let's stick to global throttle for physics update inputs, but we can store it.
     }
-
     reset() {
         const gearHeight = this.aircraft.gearHeight || 2;
         const initialZ = -(this.airportElevation + gearHeight);

@@ -5,17 +5,9 @@ const SystemFailures = {
         name: 'Hydraulic System Failure',
         category: 'systems',
         stages: {
-            inactive: { next: 'leak' },
-            leak: {
-                duration: 15.0,
-                next: 'active',
-                description: (ctx) => `Whining noise from hydraulic pumps. Fluid visible on strut.`,
-                effect: (sys, intensity) => {
-                    // Nothing yet, just warning
-                }
-            },
+            inactive: { next: 'active' },
             active: {
-                description: (ctx) => `Controls feel mushy. Low Pressure Light illuminated.`,
+                description: (ctx) => `Hydraulic Pressure Loss.`,
                 effect: (sys, intensity) => {
                     const limit = 1.0 - (intensity * 0.8);
                     sys.controls.aileron *= limit;
@@ -35,17 +27,9 @@ const SystemFailures = {
         name: 'Major Hydraulic Failure',
         category: 'systems',
         stages: {
-            inactive: { next: 'burst' },
-            burst: {
-                duration: 2.0,
-                next: 'active',
-                description: (ctx) => `Loud popping sound. Hissing noise from floorboards.`,
-                effect: (sys) => {
-                     // Fast drop
-                }
-            },
+            inactive: { next: 'active' },
             active: {
-                description: (ctx) => `Controls completely limp. Zero resistance. 'HYD PRESS' warning.`,
+                description: (ctx) => `TOTAL HYDRAULIC LOSS. Controls stiff.`,
                 effect: (sys) => {
                     // Severe control restriction
                     sys.controls.aileron *= 0.1;
@@ -69,7 +53,7 @@ const SystemFailures = {
         stages: {
             inactive: { next: 'active' },
             active: {
-                description: (ctx) => `Cockpit lights flickering then out. Hum of avionics fans stops.`,
+                description: (ctx) => `Electrical Bus Failure. Main AC Bus Lost.`,
                 effect: (sys) => {
                     sys.systems.electrical.gen1 = false;
                     sys.systems.electrical.gen2 = false;
@@ -86,7 +70,7 @@ const SystemFailures = {
         stages: {
             inactive: { next: 'active' },
             active: {
-                description: (ctx) => `Utility Bus Off. Galley power lost.`,
+                description: (ctx) => `Utility Bus Off. Non-essential systems lost.`,
                 effect: (sys) => {
                     // Just a flag or minor annoyance
                 }
@@ -101,7 +85,7 @@ const SystemFailures = {
         stages: {
             inactive: { next: 'active' },
             active: {
-                description: (ctx) => `Loud 'POP' sound. Smell of ozone. Breaker collared.`,
+                description: (ctx) => `Circuit Breaker Pop: Avionics.`,
                 effect: (sys) => {
                     // Temporary loss of specific instrument
                 }
@@ -114,18 +98,11 @@ const SystemFailures = {
         name: 'Pitot Tube Blockage',
         category: 'systems',
         stages: {
-            inactive: { next: 'fluctuating' },
-            fluctuating: {
-                duration: 10.0,
-                next: 'active',
-                description: (ctx) => `Airspeed needle jumping erratically. Wind noise constant.`,
-                effect: (sys) => {
-                    // Nothing, just confusion
-                }
-            },
+            inactive: { next: 'active' },
             active: {
-                description: (ctx) => `Airspeed zero/frozen. Stick shaker intermittent. Pitot Heat Fail.`,
+                description: (ctx) => `Airspeed Indication Unreliable.`,
                 effect: (sys) => {
+                    if (!sys.sensors) sys.sensors = {};
                     sys.sensors.pitotBlocked = true;
                 }
             }
@@ -141,13 +118,11 @@ const SystemFailures = {
             intermittent: {
                 duration: 20.0,
                 next: 'active',
-                description: (ctx) => `VOR needle swinging wildy. Static on audio ID.`,
-                effect: (sys) => {
-                     // Could jitter CDI
-                }
+                description: (ctx) => `Nav Radio Signal Intermittent.`,
+                effect: (sys) => {}
             },
             active: {
-                description: (ctx) => `Nav Radio Failure. Signal Lost. Red flag on CDI.`,
+                description: (ctx) => `Nav Radio Failure.`,
                 effect: (sys) => {}
             }
         }
@@ -160,7 +135,7 @@ const SystemFailures = {
         stages: {
             inactive: { next: 'active' },
             active: {
-                description: (ctx) => `Dead silence on COM 1. Sidetone lost.`,
+                description: (ctx) => `COM 1 Transmit Failure.`,
                 effect: (sys) => {}
             }
         }
@@ -173,7 +148,7 @@ const SystemFailures = {
         stages: {
             inactive: { next: 'active' },
             active: {
-                description: (ctx) => `AOA Vane stuck. Stall Warning unreliable.`,
+                description: (ctx) => `AOA Sensor Disagree.`,
                 effect: (sys) => {}
             }
         }
@@ -186,7 +161,7 @@ const SystemFailures = {
         stages: {
             inactive: { next: 'active' },
             active: {
-                description: (ctx) => `PFD flickering. Display artifacts visible.`,
+                description: (ctx) => `PFD Symbol Generator Fault.`,
                 effect: (sys) => {}
             }
         }
@@ -199,7 +174,82 @@ const SystemFailures = {
         stages: {
             inactive: { next: 'active' },
             active: {
-                description: (ctx) => `Brake pedals go to floor. No deceleration felt.`,
+                description: (ctx) => `Autobrake Fault. Manual Braking Required.`,
+                effect: (sys) => {
+                    // Disable autobrake logic if implemented
+                }
+            }
+        }
+    },
+
+    MINOR_INSTRUMENT: {
+        id: 'minor_instrument_failure',
+        name: 'Minor Instrument Failure',
+        category: 'systems',
+        stages: {
+            inactive: { next: 'active' },
+            active: {
+                description: (ctx) => `Instrument Display Flicker/Loss.`,
+                effect: (sys) => {
+                    // Cosmetic: flicker screens?
+                }
+            }
+        }
+    },
+
+    SENSOR_ANOMALY: {
+        id: 'non_critical_sensor_anomaly',
+        name: 'Sensor Anomaly',
+        category: 'systems',
+        stages: {
+            inactive: { next: 'active' },
+            active: {
+                description: (ctx) => `Sensor Reading Anomaly.`,
+                effect: (sys) => {
+                    // Minor jitter in readings
+                }
+            }
+        }
+    },
+
+    NAV_RADIO_GLITCH: {
+        id: 'navigation_radio_glitch',
+        name: 'Nav Radio Glitch',
+        category: 'systems',
+        stages: {
+            inactive: { next: 'active' },
+            active: {
+                description: (ctx) => `NAV Radio Signal Lost.`,
+                effect: (sys) => {
+                    // Disable NAV updates
+                }
+            }
+        }
+    },
+
+    COMM_RADIO_FAILURE: {
+        id: 'communication_radio_failure',
+        name: 'Comm Radio Failure',
+        category: 'systems',
+        stages: {
+            inactive: { next: 'active' },
+            active: {
+                description: (ctx) => `COMMS LOST.`,
+                effect: (sys) => {
+                    // Block ATC
+                }
+            }
+        }
+    },
+
+    BRAKE_FAILURE: {
+        id: 'brake_failure',
+        name: 'Brake Failure',
+        category: 'systems',
+        stages: {
+            inactive: { next: 'active' },
+            active: {
+                description: (ctx) => `Brake System Malfunction.`,
                 effect: (sys) => {
                     sys.controls.brakes = 0;
                 }
@@ -214,9 +264,10 @@ const SystemFailures = {
         stages: {
             inactive: { next: 'active' },
             active: {
-                description: (ctx) => `Altimeter/Speed Mismatch. Check Instruments.`,
+                description: (ctx) => `Altimeter/Speed Mismatch.`,
                 effect: (sys) => {
                     // Critical phase error
+                    // sys.sensors.altimeterError = 500;
                 }
             }
         }
@@ -229,7 +280,7 @@ const SystemFailures = {
         stages: {
             inactive: { next: 'active' },
             active: {
-                description: (ctx) => `DEAFENING EXPLOSION. Decompression fog. Smoke filling cabin.`,
+                description: (ctx) => `EXPLOSION DETECTED. CRITICAL DAMAGE.`,
                 effect: (sys) => {
                     sys.systems.electrical.gen1 = false;
                     sys.systems.electrical.gen2 = false;
