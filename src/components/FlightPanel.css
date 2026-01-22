@@ -580,21 +580,21 @@
 .manual-controls {
   display: flex;
   justify-content: center;
-  align-items: stretch;
+  align-items: flex-start;
   gap: 15px;
   margin-top: 15px;
-  flex-wrap: nowrap;
+  flex-wrap: wrap;
   width: 100%;
-  max-width: 1100px;
   margin-left: auto;
   margin-right: auto;
 }
 
-/* Reduced size for individual controls to fit in 75% view */
+/* Reduced size for individual controls to fit better */
 .manual-controls > * {
-  transform: scale(0.9);
+  transform: scale(0.85);
   transform-origin: center center;
   flex: 0 1 auto;
+  min-width: 200px;
 }
 
 /* Specific alignment for ThrustManager to match others' height */
@@ -611,6 +611,18 @@
   
   .manual-controls > * {
     transform: scale(0.75);
+  }
+}
+
+@media (max-width: 768px) {
+  .manual-controls {
+    flex-direction: column;
+    align-items: center;
+  }
+  
+  .manual-controls > * {
+    transform: scale(0.7);
+    min-width: 180px;
   }
 }
 

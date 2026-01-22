@@ -830,8 +830,13 @@ const FlightInProgress = ({
 
               switch (action) {
                 case 'throttle':
-                  handleThrustControl(0, payload);
-                  console.log(`📡 FlightPanel Action: ${action} = ${payload}`);
+                  // Support object payload {index, value} or legacy number value
+                  if (typeof payload === 'object' && payload !== null && typeof payload.value === 'number') {
+                    handleThrustControl(payload.index, payload.value);
+                  } else {
+                    handleThrustControl(0, payload);
+                  }
+                  console.log(`📡 FlightPanel Action: ${action} = ${JSON.stringify(payload)}`);
                   break;
                 case 'flaps':
                   handleFlapsControl(payload);

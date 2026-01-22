@@ -221,7 +221,7 @@ const FlightPanelModular = ({ flightData, physicsState, weatherData, onActionReq
   };
 
   const controlThrust = (engineIndex, throttleValue) => {
-    // ✅ CLEAN ARCHITECTURE: Pass throttle in 0-1 range to parent
+    // ✅ CLEAN ARCHITECTURE: Pass throttle in 0-1 range to parent with index
     console.log('📡 FlightPanelModular: Thrust control:', {
       engineIndex,
       throttleValue,
@@ -229,7 +229,8 @@ const FlightPanelModular = ({ flightData, physicsState, weatherData, onActionReq
     });
     
     if (onActionRequest) {
-      onActionRequest('throttle', throttleValue); // Already in 0-1 range
+      // Send object with index and value to support individual engine control
+      onActionRequest('throttle', { index: engineIndex, value: throttleValue });
     }
   };
 

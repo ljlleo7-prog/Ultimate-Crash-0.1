@@ -140,40 +140,40 @@ const ThrustManager = ({ controlThrust, flightState }) => {
       key: index,
       style: {
         background: 'rgba(0, 0, 0, 0.3)',
-        padding: '10px',
-        borderRadius: '10px',
+        padding: '8px',
+        borderRadius: '8px',
         border: '1px solid #475569',
-        width: '110px'
+        width: '80px'
       }
     },
-      React.createElement('div', { style: { textAlign: 'center', marginBottom: '8px', color: '#00ff00', fontFamily: 'monospace', fontSize: '12px' } }, `ENG ${index+1}`),
+      React.createElement('div', { style: { textAlign: 'center', marginBottom: '6px', color: '#00ff00', fontFamily: 'monospace', fontSize: '10px' } }, `ENG ${index+1}`),
       React.createElement('div', {
         style: {
           position: 'relative',
-          height: '140px',
-          width: '30px',
+          height: '120px',
+          width: '25px',
           background: '#2a2a2a',
-          borderRadius: '16px',
-          margin: '8px auto',
-          border: '2px solid #555',
+          borderRadius: '12px',
+          margin: '6px auto',
+          border: '1px solid #555',
           cursor: 'grab',
           userSelect: 'none'
         },
         onMouseDown: (e) => onDrag(index, e),
         onTouchStart: (e) => onDrag(index, e)
       },
-        React.createElement('div', { style: { position: 'absolute', top: '6px', left: '6px', right: '6px', bottom: '6px', background: 'linear-gradient(to top, #ff4444 0%, #ffaa00 50%, #00ff00 100%)', borderRadius: '10px', opacity: 0.25 } }),
-        React.createElement('div', { style: { position: 'absolute', bottom: `${pct}%`, left: '3px', right: '3px', height: '18px', background: 'linear-gradient(to top, #ff4444, #ffaa00, #00ff00)', borderRadius: '10px', boxShadow: '0 0 6px rgba(0,255,0,0.7)' } }),
-        React.createElement('div', { style: { position: 'absolute', bottom: `${pct}%`, left: '-6px', width: '42px', height: '18px', background: '#fff', border: '2px solid #000', borderRadius: '10px', transform: 'translateY(50%)', fontSize: '10px', fontWeight: 'bold', color: '#000', display: 'flex', alignItems: 'center', justifyContent: 'center' } }, isRev ? 'REV' : 'THR')
+        React.createElement('div', { style: { position: 'absolute', top: '4px', left: '4px', right: '4px', bottom: '4px', background: 'linear-gradient(to top, #ff4444 0%, #ffaa00 50%, #00ff00 100%)', borderRadius: '8px', opacity: 0.25 } }),
+        React.createElement('div', { style: { position: 'absolute', bottom: `${pct}%`, left: '2px', right: '2px', height: '14px', background: 'linear-gradient(to top, #ff4444, #ffaa00, #00ff00)', borderRadius: '8px', boxShadow: '0 0 4px rgba(0,255,0,0.7)' } }),
+        React.createElement('div', { style: { position: 'absolute', bottom: `${pct}%`, left: '-5px', width: '35px', height: '14px', background: '#fff', border: '1px solid #000', borderRadius: '8px', transform: 'translateY(50%)', fontSize: '8px', fontWeight: 'bold', color: '#000', display: 'flex', alignItems: 'center', justifyContent: 'center' } }, isRev ? 'REV' : 'THR')
       ),
-      React.createElement('div', { style: { display: 'flex', justifyContent: 'space-between', gap: '6px', marginTop: '6px' } },
-        React.createElement('div', { style: { width: '100%', height: '18px', background: isRev ? '#ef4444' : '#10b981', color: '#fff', borderRadius: '5px', textAlign: 'center', lineHeight: '18px', fontSize: '10px', cursor: 'pointer' }, onClick: () => toggleReverse(index) }, isRev ? 'REV ON' : 'REV OFF')
+      React.createElement('div', { style: { display: 'flex', justifyContent: 'space-between', gap: '4px', marginTop: '4px' } },
+        React.createElement('div', { style: { width: '100%', height: '14px', background: isRev ? '#ef4444' : '#10b981', color: '#fff', borderRadius: '4px', textAlign: 'center', lineHeight: '14px', fontSize: '8px', cursor: 'pointer' }, onClick: () => toggleReverse(index) }, isRev ? 'REV' : 'FWD')
       ),
-      React.createElement('div', { style: { marginTop: '8px', background: '#0a0a0a', borderRadius: '6px', border: '1px solid #333', padding: '6px' } },
-        React.createElement('div', { style: { fontSize: '10px', color: '#888', marginBottom: '4px', textAlign: 'center' } }, 'ENGINE'),
-        React.createElement('div', { style: { fontSize: '10px', fontFamily: 'monospace', textAlign: 'center' } },
-          React.createElement('div', { style: { color: '#00ff00' } }, `N1: ${(n1 || 0).toFixed(1)}%`),
-          React.createElement('div', { style: { color: '#00ff00' } }, `N2: ${(n2 || 0).toFixed(1)}%`),
+      React.createElement('div', { style: { marginTop: '6px', background: '#0a0a0a', borderRadius: '4px', border: '1px solid #333', padding: '4px' } },
+        React.createElement('div', { style: { fontSize: '8px', color: '#888', marginBottom: '2px', textAlign: 'center' } }, 'ENG'),
+        React.createElement('div', { style: { fontSize: '8px', fontFamily: 'monospace', textAlign: 'center' } },
+          React.createElement('div', { style: { color: '#00ff00' } }, `N1: ${(n1 || 0).toFixed(0)}%`),
+          React.createElement('div', { style: { color: '#00ff00' } }, `N2: ${(n2 || 0).toFixed(0)}%`),
           React.createElement('div', { style: { color: '#ffaa00' } }, `EGT: ${(egt || 0).toFixed(0)}°C`),
           isRev && React.createElement('div', { style: { color: '#ef4444', fontWeight: 'bold' } }, 'REV')
         )
