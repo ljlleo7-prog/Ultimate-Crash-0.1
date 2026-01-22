@@ -1,6 +1,7 @@
 {
   "name": "ultimate-crash",
   "version": "0.1.0",
+  "homepage": "https://geeksproductionstudio.com",
   "description": "An aviation-themed React web application",
   "type": "module",
   "scripts": {
