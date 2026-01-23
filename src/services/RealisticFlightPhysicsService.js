@@ -222,33 +222,47 @@ class RealisticFlightPhysicsService {
         this.systems = {
             electrical: {
                 battery: true,
+                batteryCharge: 100, // %
                 stbyPower: true,
                 gen1: true,
                 gen2: true,
                 apuGen: false,
-                dcVolts: 28.4,
-                acAmps: 140
+                busTie: true, // Auto
+                dcVolts: 28.0,
+                acVolts: 115,
+                acFreq: 400,
+                acAmps: 50,
+                sourceOff1: false,
+                sourceOff2: false,
+                apuGenOff: true
             },
             fuel: {
                 leftPumps: true,
                 rightPumps: true,
                 centerPumps: false,
-                crossfeed: false
+                crossfeed: false,
+                tanks: {
+                    left: 5000,
+                    right: 5000,
+                    center: 2000
+                },
+                pressL: 35,
+                pressR: 35,
+                pressC: 0
             },
             apu: {
                 master: false,
                 start: false,
                 running: false,
+                starting: false,
                 bleed: false,
-                egt: 0
-            },
-            starters: {
-                engine1: false,
-                engine2: false
+                egt: 0,
+                n2: 0,
+                state: 'OFF'
             },
             hydraulics: {
-                sysA: { pressure: 3000, engPump: true, elecPump: false },
-                sysB: { pressure: 3000, engPump: true, elecPump: false }
+                sysA: { pressure: 3000, engPump: true, elecPump: false, qty: 100 },
+                sysB: { pressure: 3000, engPump: true, elecPump: false, qty: 100 }
             },
             transponder: {
                 code: 2000,
@@ -260,9 +274,12 @@ class RealisticFlightPhysicsService {
                 packR: true,
                 bleed1: true,
                 bleed2: true,
+                isolationValve: true, // Auto/Open
                 cabinAlt: 0,
                 diffPressure: 0,
                 targetAlt: 35000,
+                ductPressL: 30,
+                ductPressR: 30,
                 mode: 'AUTO'
             },
             oxygen: {
@@ -277,7 +294,8 @@ class RealisticFlightPhysicsService {
                 beacon: true,
                 strobe: true,
                 logo: false,
-                wing: false
+                wing: false,
+                powered: true
             },
             nav: {
                 irsL: true,
@@ -292,6 +310,14 @@ class RealisticFlightPhysicsService {
             starters: {
                 engine1: false,
                 engine2: false
+            },
+            signs: {
+                seatBelts: true,
+                noSmoking: true
+            },
+            wipers: {
+                left: false,
+                right: false
             }
         };
     }
@@ -1602,23 +1628,8 @@ class RealisticFlightPhysicsService {
     }
 
     updateSystemLogic(system, action, value) {
-        // APU Logic
-        if (system === 'apu') {
-            if (action === 'start' && value === true) {
-                // Start sequence simulation (simplified)
-                if (this.systems.apu.master) {
-                    setTimeout(() => {
-                        this.systems.apu.running = true;
-                        this.systems.apu.egt = 400; // Normal EGT
-                        this.systems.apu.start = false; // Reset start switch
-                    }, 5000); // 5 seconds start time
-                }
-            }
-            if (action === 'master' && value === false) {
-                this.systems.apu.running = false;
-                this.systems.apu.egt = 0;
-            }
-        }
+        // Legacy logic removed. 
+        // All system logic is now handled by OverheadLogic.js in the update loop.
     }
 
     /**
