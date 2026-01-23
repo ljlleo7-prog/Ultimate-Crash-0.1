@@ -103,64 +103,6 @@ const EnvironmentFailures = {
                 }
             }
         }
-    },
-
-    BIRD_STRIKE: {
-        id: 'bird_strike',
-        name: 'Bird Strike',
-        category: 'environment',
-        stages: {
-            inactive: { next: 'impact' },
-            impact: {
-                next: 'damage',
-                duration: 0.5,
-                description: (ctx) => `IMPACT DETECTED.`,
-                effect: (sys, intensity, ctx) => {
-                    // Loud bang
-                }
-            },
-            damage: {
-                description: (ctx) => `Bird Ingestion: Engine Damage.`,
-                effect: (sys, intensity, ctx) => {
-                    const idx = ctx.engineIndex !== undefined ? ctx.engineIndex : 0;
-                    if (sys.engines[idx]) sys.engines[idx].setFailed(true);
-                }
-            }
-        }
-    },
-
-    UNCONTAINED_ENGINE: {
-        id: 'uncontained_engine_failure',
-        name: 'Uncontained Engine Failure',
-        category: 'environment',
-        stages: {
-            inactive: { next: 'active' },
-            active: {
-                description: (ctx) => `EXPLOSION ENGINE ${ctx.engineIndex + 1}. STRUCTURAL DAMAGE.`,
-                effect: (sys, intensity, ctx) => {
-                    const idx = ctx.engineIndex !== undefined ? ctx.engineIndex : 0;
-                    if (sys.engines[idx]) sys.engines[idx].setFailed(true);
-                    sys.systems.hydraulics.sysA.pressure = 0; // Collateral damage
-                }
-            }
-        }
-    },
-    
-    SABOTAGE: {
-        id: 'sabotage_explosion',
-        name: 'Sabotage/IED',
-        category: 'environment',
-        stages: {
-            inactive: { next: 'active' },
-            active: {
-                description: (ctx) => `CATASTROPHIC FAILURE.`,
-                effect: (sys) => {
-                    sys.engines.forEach(e => e.setFailed(true));
-                    sys.systems.pressurization.breach = true;
-                    // Chaos
-                }
-            }
-        }
     }
 };
 

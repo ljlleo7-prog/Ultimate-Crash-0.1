@@ -71,10 +71,11 @@ class OverheadLogic {
      */
     updateElectrical(systems, context, dt) {
         const elec = systems.electrical;
+        const fails = systems.failures || {};
         
         // --- Sources ---
         // Battery
-        if (elec.battery) {
+        if (elec.battery && !fails.battery) {
             // Simple drain simulation
             if (!elec.gen1On && !elec.gen2On && !elec.apuGenOn) {
                 elec.batteryCharge = Math.max(0, (elec.batteryCharge || 100) - (0.05 * dt));
@@ -88,9 +89,9 @@ class OverheadLogic {
 
         // Generators (Engine Driven)
         // Require Engine N2 > 55% and IDG Connected (Assumed connected)
-        const gen1Ready = context.engineN2[0] > 55;
-        const gen2Ready = context.engineN2[1] > 55;
-        const apuGenReady = systems.apu.running && systems.apu.n2 > 95;
+        const gen1Ready = context.engineN2[0] > 55 && !fails.gen1;
+        const gen2Ready = context.engineN2[1] > 55 && !fails.gen2;
+        const apuGenReady = systems.apu.running && systems.apu.n2 > 95 && !fails.apuGen;
 
         // --- Buses ---
         // Transfer Buses (The main AC arteries)
@@ -166,13 +167,14 @@ class OverheadLogic {
      */
     updateAPU(systems, context, dt) {
         const apu = systems.apu;
+        const fails = systems.failures || {};
         
         // Ensure state variables exist
         if (apu.n2 === undefined) apu.n2 = 0;
         if (apu.state === undefined) apu.state = 'OFF'; // OFF, DOOR_OPEN, CRANK, IGNITION, RUNNING, COOLDOWN
 
         // Inputs
-        const hasBat = systems.electrical.battery;
+        const hasBat = systems.electrical.battery && !fails.battery;
         const masterSw = apu.master;
         const startSw = apu.start;
 
@@ -183,6 +185,7 @@ class OverheadLogic {
             apu.egt = 0;
             return;
         }
+
 
         switch (apu.state) {
             case 'OFF':
@@ -263,14 +266,15 @@ class OverheadLogic {
     updatePneumatics(systems, context, dt) {
         const pneu = systems.pressurization; // Using existing structure but expanding logic
         const apu = systems.apu;
+        const fails = systems.failures || {};
         
         // 1. Bleed Sources
         // Engines
         const eng1N2 = context.engineN2[0];
         const eng2N2 = context.engineN2[1];
         
-        const bleed1Pressure = (pneu.bleed1 && eng1N2 > 15) ? (30 + (eng1N2/100)*15) : 0;
-        const bleed2Pressure = (pneu.bleed2 && eng2N2 > 15) ? (30 + (eng2N2/100)*15) : 0;
+        const bleed1Pressure = (pneu.bleed1 && eng1N2 > 15 && !fails.bleed1) ? (30 + (eng1N2/100)*15) : 0;
+        const bleed2Pressure = (pneu.bleed2 && eng2N2 > 15 && !fails.bleed2) ? (30 + (eng2N2/100)*15) : 0;
         
         // APU
         const apuBleedPressure = (apu.bleed && apu.running) ? 40 : 0;
@@ -293,8 +297,8 @@ class OverheadLogic {
 
         // 3. Packs
         // Packs need duct pressure to work
-        pneu.packLFlow = (pneu.packL && pneu.ductPressL > 15);
-        pneu.packRFlow = (pneu.packR && pneu.ductPressR > 15);
+        pneu.packLFlow = (pneu.packL && pneu.ductPressL > 15 && !fails.packL);
+        pneu.packRFlow = (pneu.packR && pneu.ductPressR > 15 && !fails.packR);
     }
 
     /**
@@ -302,19 +306,29 @@ class OverheadLogic {
      * Sys A/B, Standby, Pressure building
      */
     updateHydraulics(systems, context, dt) {
+        const fails = systems.failures || {};
+
         ['sysA', 'sysB'].forEach((sysName, idx) => {
             const sys = systems.hydraulics[sysName];
             let supply = false;
 
+            // System Failure Check
+            if ((sysName === 'sysA' && fails.hydSysA) || (sysName === 'sysB' && fails.hydSysB)) {
+                sys.pressure = 0;
+                return;
+            }
+
             // Engine Pump
             const engN2 = context.engineN2[idx];
-            if (sys.engPump && engN2 > 10) supply = true;
+            const pumpFail = (idx === 0 && fails.hydPumpEng1) || (idx === 1 && fails.hydPumpEng2);
+            if (sys.engPump && engN2 > 10 && !pumpFail) supply = true;
 
             // Electric Pump
             const elec = systems.electrical;
             // Simplified bus check - just generic AC available
             const acAvail = elec.acVolts > 100;
-            if (sys.elecPump && acAvail) supply = true;
+            const elecPumpFail = (idx === 0 && fails.hydPumpElec1) || (idx === 1 && fails.hydPumpElec2);
+            if (sys.elecPump && acAvail && !elecPumpFail) supply = true;
 
             // Pressure Logic
             const target = supply ? this.CONSTANTS.HYD_MAX_PRESSURE : 0;
@@ -325,8 +339,14 @@ class OverheadLogic {
                 sys.pressure -= this.CONSTANTS.HYD_DECAY_RATE * dt;
             }
             
-            // Quantity (Leak simulation placeholder)
+            // Quantity (Leak simulation)
             if (!sys.qty) sys.qty = 100;
+            
+            // Leak logic
+            // Assuming fails.leak might apply or leak could be specific
+            // If hydSysA failure is "total loss", we already zeroed pressure.
+            // But if it's a leak:
+            // Let's assume fails.hydSysA means catastrophic failure/leak
         });
     }
 
@@ -336,6 +356,7 @@ class OverheadLogic {
      */
     updateFuel(systems, context, dt) {
         const fuel = systems.fuel;
+        const fails = systems.failures || {};
         
         // Initialize if missing
         if (!fuel.tanks) {
@@ -347,15 +368,22 @@ class OverheadLogic {
         }
 
         // Pumps Output Pressure
-        fuel.pressL = (fuel.leftPumps && systems.electrical.acVolts > 100) ? 35 : 0;
-        fuel.pressR = (fuel.rightPumps && systems.electrical.acVolts > 100) ? 35 : 0;
-        fuel.pressC = (fuel.centerPumps && systems.electrical.acVolts > 100) ? 35 : 0;
+        fuel.pressL = (fuel.leftPumps && systems.electrical.acVolts > 100 && !fails.fuelPumpL) ? 35 : 0;
+        fuel.pressR = (fuel.rightPumps && systems.electrical.acVolts > 100 && !fails.fuelPumpR) ? 35 : 0;
+        fuel.pressC = (fuel.centerPumps && systems.electrical.acVolts > 100 && !fails.fuelPumpC) ? 35 : 0;
 
         // Consumption Logic (Drain from tanks based on pump config)
         // Engines consume ~1kg/s (simplified)
         const eng1Burn = (context.engineN2[0] > 10) ? 1.2 * dt : 0;
         const eng2Burn = (context.engineN2[1] > 10) ? 1.2 * dt : 0;
         const apuBurn = (systems.apu.running) ? 0.2 * dt : 0;
+        
+        // Leak Logic
+        if (fails.fuelLeak) {
+            // Assume left tank leak for generic "fuel leak" or distribute
+            if (fuel.tanks.left > 0) fuel.tanks.left -= 2.0 * dt; 
+            if (fuel.tanks.right > 0) fuel.tanks.right -= 2.0 * dt;
+        }
 
         // Engine 1 Feed
         // Priority: Center > Left (if crossfeed) > Left

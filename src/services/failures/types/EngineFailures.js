@@ -109,9 +109,9 @@ const EngineFailures = {
             active: {
                 description: (ctx) => `Fuel Imbalance Detected. Leak suspected.`,
                 effect: (sys, intensity, ctx) => {
-                    // Leak rate scales with intensity
-                    const rate = 2.0 + (intensity * 5.0); // kg/s
-                    sys.state.fuel -= rate * 0.016; // approx dt
+                    if (sys.systems.failures) {
+                        sys.systems.failures.fuelLeak = true;
+                    }
                 }
             }
         }
@@ -132,6 +132,13 @@ const EngineFailures = {
                         eng.setFailed(true);
                         eng.state.n1 = 0;
                         sys.systems.fire[`eng${ctx.engineIndex + 1}`] = Math.random() > 0.5;
+                        
+                        // Possible sensor damage
+                        if (Math.random() > 0.7 && sys.systems.failures) {
+                            sys.systems.failures.pitotBlocked = true; // Use sensor flag? Or sensors object.
+                            // Pitot blockage is usually in sensors object in Physics Service
+                            if (sys.sensors) sys.sensors.pitotBlocked = true;
+                        }
                     }
                 }
             }
@@ -152,7 +159,10 @@ const EngineFailures = {
                         eng.setFailed(true);
                         sys.systems.fire[`eng${ctx.engineIndex + 1}`] = true;
                         // Collateral Damage
-                        sys.systems.hydraulics.sysA.pressure = 0;
+                        if (sys.systems.failures) {
+                            sys.systems.failures.hydSysA = true;
+                            // sys.systems.failures.hydSysB = true; // Maybe?
+                        }
                         sys.systems.pressurization.breach = true;
                     }
                 }

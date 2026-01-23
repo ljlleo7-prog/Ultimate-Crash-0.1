@@ -153,7 +153,8 @@ const FlightPanelModular = ({ flightData, physicsState, weatherData, onActionReq
         autopilotTargets: flightData.autopilotTargets || prevState.autopilotTargets,
         frame: typeof flightData.frame === 'number' ? flightData.frame : prevState.frame,
         systems: flightData.systems || prevState.systems || {},
-        currentWaypointIndex: flightData.currentWaypointIndex !== undefined ? flightData.currentWaypointIndex : (prevState.currentWaypointIndex || 0)
+        currentWaypointIndex: flightData.currentWaypointIndex !== undefined ? flightData.currentWaypointIndex : (prevState.currentWaypointIndex || 0),
+        temperature: (flightData.environment && typeof flightData.environment.temperature === 'number') ? flightData.environment.temperature : (prevState.temperature || 15)
       }));
     }
   }, [flightData, weatherData]);

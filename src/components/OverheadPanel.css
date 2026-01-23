@@ -1,0 +1,312 @@
+
+/* OverheadPanel.css */
+
+.overhead-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(0, 0, 0, 0.85);
+  backdrop-filter: blur(5px);
+  z-index: 2000;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  font-family: 'Roboto Condensed', sans-serif;
+}
+
+.overhead-container {
+  width: 1100px;
+  height: 90vh;
+  background-color: #2b2b2b; /* Boeing Grey */
+  box-shadow: 0 0 50px rgba(0,0,0,0.8);
+  border-radius: 10px;
+  border: 4px solid #1a1a1a;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.overhead-header {
+  background: #1a1a1a;
+  padding: 10px 20px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 2px solid #000;
+}
+
+.overhead-header h2 {
+  color: #ddd;
+  margin: 0;
+  font-size: 1.2rem;
+  letter-spacing: 2px;
+}
+
+.close-btn {
+  background: #c0392b;
+  color: white;
+  border: none;
+  padding: 8px 24px;
+  border-radius: 4px;
+  font-weight: bold;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.close-btn:hover {
+  background: #e74c3c;
+}
+
+.overhead-content {
+  flex: 1;
+  overflow-y: auto;
+  padding: 20px;
+  display: grid;
+  grid-template-columns: 280px 280px 280px 1fr; /* 3 main cols + misc */
+  gap: 15px;
+  background: radial-gradient(circle at center, #333, #222);
+}
+
+/* Panel Sections */
+.panel-section {
+  background: #383838; /* Lighter grey for panels */
+  border: 2px solid #111;
+  border-radius: 4px;
+  padding: 15px;
+  margin-bottom: 15px;
+  position: relative;
+  box-shadow: inset 0 0 10px rgba(0,0,0,0.3);
+}
+
+.panel-title {
+  position: absolute;
+  top: -10px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: #383838;
+  padding: 0 10px;
+  color: #fff;
+  font-size: 0.8rem;
+  font-weight: bold;
+  letter-spacing: 1px;
+  white-space: nowrap;
+}
+
+/* Separator Lines */
+.panel-separator {
+  height: 2px;
+  background: #222;
+  margin: 10px 0;
+  border-bottom: 1px solid #444;
+}
+
+/* --- COMPONENTS --- */
+
+/* Annunciator Light */
+.annunciator {
+  background: #111;
+  border: 1px solid #444;
+  border-radius: 2px;
+  padding: 4px 8px;
+  min-width: 60px;
+  text-align: center;
+  margin-bottom: 5px;
+  transition: all 0.2s;
+}
+
+.annunciator-text {
+  font-size: 10px;
+  font-weight: 700;
+  color: #444; /* Off state */
+  text-transform: uppercase;
+}
+
+.annunciator.amber.active {
+  background: #ffaa00;
+  box-shadow: 0 0 10px #ffaa00;
+  border-color: #ffcc00;
+}
+.annunciator.amber.active .annunciator-text { color: #000; }
+
+.annunciator.blue.active {
+  background: #00ccff;
+  box-shadow: 0 0 10px #00ccff;
+  border-color: #00ffff;
+}
+.annunciator.blue.active .annunciator-text { color: #000; }
+
+.annunciator.red.active {
+  background: #ff3333;
+  box-shadow: 0 0 10px #ff0000;
+  border-color: #ff6666;
+}
+.annunciator.red.active .annunciator-text { color: #fff; }
+
+.annunciator.green.active {
+  background: #00ff00;
+  box-shadow: 0 0 10px #00ff00;
+  border-color: #66ff66;
+}
+.annunciator.green.active .annunciator-text { color: #000; }
+
+
+/* Toggle Switch (Boeing Style) */
+.toggle-switch-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin: 10px;
+}
+
+.toggle-switch {
+  width: 40px;
+  height: 60px;
+  background: #222;
+  border-radius: 4px;
+  position: relative;
+  cursor: pointer;
+  box-shadow: inset 0 0 5px #000;
+  border: 2px solid #555;
+}
+
+.toggle-handle {
+  width: 30px;
+  height: 25px;
+  background: linear-gradient(to bottom, #ddd, #999);
+  border-radius: 4px;
+  position: absolute;
+  left: 3px;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.5);
+  transition: top 0.15s ease-out;
+  border: 1px solid #666;
+}
+
+.toggle-handle::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 20px;
+  height: 2px;
+  background: #666;
+  box-shadow: 0 1px 0 #fff;
+}
+
+.toggle-switch.on .toggle-handle {
+  top: 4px; /* Up position */
+}
+
+.toggle-switch.off .toggle-handle {
+  top: 29px; /* Down position */
+}
+
+.switch-label {
+  color: #ddd;
+  font-size: 10px;
+  margin-top: 5px;
+  text-align: center;
+  font-weight: bold;
+}
+
+.sub-label {
+  color: #888;
+  font-size: 9px;
+  margin-top: 2px;
+}
+
+/* Push Button (Airbus Style / Korry) */
+.korry-switch-container {
+  margin: 10px;
+}
+
+.korry-switch {
+  width: 50px;
+  height: 50px;
+  background: #111;
+  border: 3px solid #444;
+  border-radius: 4px;
+  cursor: pointer;
+  position: relative;
+  box-shadow: inset 0 0 5px #000;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+}
+
+.korry-switch:active {
+  transform: scale(0.98);
+}
+
+.korry-label {
+  font-size: 9px;
+  color: #888;
+  text-align: center;
+  margin-bottom: 4px;
+}
+
+.korry-upper, .korry-lower {
+  width: 90%;
+  height: 40%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  font-size: 10px;
+  font-weight: bold;
+  color: #333; /* Off state */
+}
+
+.korry-upper.active {
+  color: #ffaa00; /* Fault/Amber */
+  text-shadow: 0 0 5px #ffaa00;
+}
+
+.korry-lower.active {
+  color: #00ccff; /* On/White/Blue */
+  text-shadow: 0 0 5px #00ccff;
+}
+.korry-lower.off-state {
+  color: #ddd;
+}
+
+
+/* Gauges */
+.digital-gauge {
+  background: #000;
+  border: 2px solid #444;
+  border-radius: 4px;
+  padding: 5px;
+  min-width: 70px;
+  text-align: center;
+  margin: 5px;
+}
+
+.gauge-label {
+  font-size: 10px;
+  color: #888;
+  margin-bottom: 2px;
+}
+
+.gauge-value {
+  font-family: 'Courier New', monospace;
+  font-size: 16px;
+  font-weight: bold;
+  color: #0f0;
+}
+.gauge-value.warn { color: #fa0; }
+.gauge-value.crit { color: #f00; }
+
+.gauge-unit {
+  font-size: 9px;
+  color: #666;
+}
+
+/* Layout Utilities */
+.row { display: flex; justify-content: center; flex-wrap: wrap; }
+.col-center { display: flex; flexDirection: column; alignItems: center; }
+.grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; }
+

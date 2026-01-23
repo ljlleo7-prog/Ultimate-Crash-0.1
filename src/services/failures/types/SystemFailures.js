@@ -13,9 +13,10 @@ const SystemFailures = {
                     sys.controls.aileron *= limit;
                     sys.controls.elevator *= limit;
                     sys.controls.rudder *= limit;
-                    if (sys.systems.hydraulics) {
-                        sys.systems.hydraulics.sysA.pressure = 0;
-                        sys.systems.hydraulics.sysB.pressure = 0;
+                    
+                    if (sys.systems.failures) {
+                        sys.systems.failures.hydSysA = true;
+                        sys.systems.failures.hydSysB = true;
                     }
                 }
             }
@@ -31,10 +32,9 @@ const SystemFailures = {
             active: {
                 description: (ctx) => `TOTAL HYDRAULIC LOSS.`,
                 effect: (sys) => {
-                    if (sys.systems.hydraulics) {
-                        sys.systems.hydraulics.sysA.pressure = 0;
-                        sys.systems.hydraulics.sysB.pressure = 0;
-                        if (sys.systems.hydraulics.sysC) sys.systems.hydraulics.sysC.pressure = 0;
+                    if (sys.systems.failures) {
+                        sys.systems.failures.hydSysA = true;
+                        sys.systems.failures.hydSysB = true;
                     }
 
                     const is737 = (sys.aircraft.id || '').toLowerCase().includes('737') || (sys.aircraft.name || '').toLowerCase().includes('737');
@@ -57,7 +57,6 @@ const SystemFailures = {
                     
                     // Gear stuck or extremely slow
                     sys.controlLag.gear = 20.0;
-                    // sys.controls.gear = sys.controls.gear; // Stuck logic handled by lag/inputs
                 }
             }
         }
@@ -72,9 +71,11 @@ const SystemFailures = {
             active: {
                 description: (ctx) => `Electrical Bus Failure. Main AC Bus Lost.`,
                 effect: (sys) => {
-                    sys.systems.electrical.gen1 = false;
-                    sys.systems.electrical.gen2 = false;
-                    sys.systems.electrical.dcVolts = 0;
+                    if (sys.systems.failures) {
+                        sys.systems.failures.gen1 = true;
+                        sys.systems.failures.gen2 = true;
+                        sys.systems.failures.apuGen = true;
+                    }
                 }
             }
         }
@@ -89,7 +90,9 @@ const SystemFailures = {
             active: {
                 description: (ctx) => `Utility Bus Off. Non-essential systems lost.`,
                 effect: (sys) => {
-                    // Just a flag or minor annoyance
+                    if (sys.systems.failures) {
+                        sys.systems.failures.gen2 = true; // Lose Gen 2
+                    }
                 }
             }
         }
@@ -191,81 +194,6 @@ const SystemFailures = {
         stages: {
             inactive: { next: 'active' },
             active: {
-                description: (ctx) => `Autobrake Fault. Manual Braking Required.`,
-                effect: (sys) => {
-                    // Disable autobrake logic if implemented
-                }
-            }
-        }
-    },
-
-    MINOR_INSTRUMENT: {
-        id: 'minor_instrument_failure',
-        name: 'Minor Instrument Failure',
-        category: 'systems',
-        stages: {
-            inactive: { next: 'active' },
-            active: {
-                description: (ctx) => `Instrument Display Flicker/Loss.`,
-                effect: (sys) => {
-                    // Cosmetic: flicker screens?
-                }
-            }
-        }
-    },
-
-    SENSOR_ANOMALY: {
-        id: 'non_critical_sensor_anomaly',
-        name: 'Sensor Anomaly',
-        category: 'systems',
-        stages: {
-            inactive: { next: 'active' },
-            active: {
-                description: (ctx) => `Sensor Reading Anomaly.`,
-                effect: (sys) => {
-                    // Minor jitter in readings
-                }
-            }
-        }
-    },
-
-    NAV_RADIO_GLITCH: {
-        id: 'navigation_radio_glitch',
-        name: 'Nav Radio Glitch',
-        category: 'systems',
-        stages: {
-            inactive: { next: 'active' },
-            active: {
-                description: (ctx) => `NAV Radio Signal Lost.`,
-                effect: (sys) => {
-                    // Disable NAV updates
-                }
-            }
-        }
-    },
-
-    COMM_RADIO_FAILURE: {
-        id: 'communication_radio_failure',
-        name: 'Comm Radio Failure',
-        category: 'systems',
-        stages: {
-            inactive: { next: 'active' },
-            active: {
-                description: (ctx) => `COMMS LOST.`,
-                effect: (sys) => {
-                    // Block ATC
-                }
-            }
-        }
-    },
-
-    BRAKE_FAILURE: {
-        id: 'brake_failure',
-        name: 'Brake Failure',
-        category: 'systems',
-        stages: {
-            inactive: { next: 'active' },
-            active: {
                 description: (ctx) => `Brake System Malfunction.`,
                 effect: (sys) => {
                     sys.controls.brakes = 0;
@@ -305,6 +233,8 @@ const SystemFailures = {
                     sys.systems.pressurization.breach = true;
                     // Fire
                     sys.systems.fire.cargo = true;
+                    // Kill Engines
+                    sys.engines.forEach(e => e.setFailed(true));
                 }
             }
         }
