@@ -1926,6 +1926,22 @@ class RealisticFlightPhysicsService {
             this.state.pos.z = -conditions.position.z; // NED uses Z-down
         }
 
+        // Controls
+        if (conditions.throttle !== undefined) {
+            this.controls.throttle = conditions.throttle;
+            // Apply to engines as well
+            if (this.controls.engineThrottles) {
+                this.controls.engineThrottles.fill(conditions.throttle);
+            }
+            this.engines.forEach(e => e.setThrottle(conditions.throttle));
+        }
+        if (conditions.brakes !== undefined) {
+            this.controls.brakes = conditions.brakes;
+        }
+        if (conditions.gear !== undefined) {
+            this.controls.gear = conditions.gear ? 1 : 0;
+        }
+
         // Reset velocities and rates for initial state
         this.state.vel = new Vector3(0, 0, 0);
         this.state.rates = new Vector3(0, 0, 0);

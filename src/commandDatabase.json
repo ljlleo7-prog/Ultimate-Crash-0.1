@@ -258,6 +258,18 @@
     "description": "Ask ATC for priority landing clearance"
   },
   {
+    "id": "atc-request-takeoff",
+    "abbr": "REQTO",
+    "template": "REQUEST TAKEOFF",
+    "description": "Request takeoff clearance"
+  },
+  {
+    "id": "atc-request-atis",
+    "abbr": "REQATIS",
+    "template": "REQUEST ATIS",
+    "description": "Request current ATIS information"
+  },
+  {
     "id": "atc-fuel-emergency",
     "abbr": "FULEM",
     "template": "NOTIFY MINIMUM FUEL",

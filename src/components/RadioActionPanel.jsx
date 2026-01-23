@@ -22,7 +22,13 @@ const RadioActionPanel = ({ onTransmit, currentStation = 'Unicom', callsign = 'C
     // Initialize params
     const initialParams = {};
     if (template.params) {
-      template.params.forEach(p => initialParams[p] = '');
+      template.params.forEach(p => {
+        initialParams[p] = '';
+        // Auto-fill runway from flight plan if available
+        if (p === 'runway' && !Array.isArray(flightPlan) && flightPlan?.departureRunway) {
+          initialParams[p] = flightPlan.departureRunway;
+        }
+      });
     }
     setParamValues(initialParams);
   };

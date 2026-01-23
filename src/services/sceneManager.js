@@ -8,6 +8,7 @@ export const FlightPhases = {
   DEPARTURE_CLEARANCE: 'departure_clearance',
   PUSHBACK: 'pushback',
   TAXIING: 'taxiing',
+  TAKEOFF_PREP: 'takeoff_prep',
   TAKEOFF: 'takeoff',
   CLIMB: 'climb',
   INITIAL_CLIMB: 'initial_climb',
@@ -77,6 +78,21 @@ const defaultScenario = {
       narrative: {
         title: 'Taxi to Runway ${departureRunway}',
         content: '"${callsign}, taxi to runway ${departureRunway} via Alpha, Bravo." You release the parking brake. The tires thump rhythmically over the concrete joints as you weave through the maze of taxiways. Sunlight glints off the tarmac.'
+      }
+    },
+    {
+      id: 'phase-takeoff-prep',
+      name: 'Takeoff Preparation',
+      type: FlightPhases.TAKEOFF_PREP,
+      durationSeconds: 3600, // 1 hour (effectively indefinite until user action)
+      physics: {
+        mode: 'continuous',
+        initialAltitude: 0,
+        initialSpeed: 0
+      },
+      narrative: {
+        title: 'Lined Up and Waiting',
+        content: 'Lined up on runway ${departureRunway}. Brakes set. Engines at idle. "Tower, ${callsign} holding in position ${departureRunway}, ready for takeoff." Check flaps, trim, and verify takeoff data.'
       }
     },
     {
@@ -446,6 +462,13 @@ class SceneManager {
       ) {
         isPhaseComplete = true;
       }
+    } else if (phase.type === FlightPhases.TAKEOFF_PREP) {
+      // Transition from TAKEOFF_PREP to TAKEOFF when throttle is advanced
+      // User must manually advance throttle to begin takeoff roll
+      const throttle = payload?.throttle || payload?.controls?.throttle || 0;
+      if (throttle > 0.4) { // 40% throttle threshold
+        isPhaseComplete = true;
+      }
     } else if (phase.type === FlightPhases.INITIAL_CLIMB) {
       const altitude_m = payload?.position?.z || 0;
       const altitude_ft = altitude_m * 3.28084;
@@ -731,10 +754,18 @@ class SceneManager {
 
     if (shouldSkipReset) {
       // Just update targets without resetting position/velocity
+      const minimalConditions = {};
+      
+      // Special case: Release brakes when transitioning to Takeoff from Prep
+      if (phase.type === FlightPhases.TAKEOFF) {
+        minimalConditions.brakes = 0;
+      }
+
        eventBus.publishWithMetadata(EventTypes.PHYSICS_INITIALIZE, {
         phaseId: phase.id,
         phaseType: phase.type,
-        // No initialConditions to prevent reset
+        // Pass minimal conditions if any (e.g. brake release)
+        initialConditions: Object.keys(minimalConditions).length > 0 ? minimalConditions : undefined,
         targetAltitude: physics.targetAltitude ? physics.targetAltitude * 0.3048 : undefined,
         targetSpeed: physics.targetSpeed ? physics.targetSpeed * 0.514444 : undefined,
         targetHeading: physics.targetHeading ? physics.targetHeading * Math.PI / 180 : undefined
@@ -767,9 +798,9 @@ class SceneManager {
       initialConditions.orientation.psi = physics.initialHeading * Math.PI / 180;
     }
 
-    // Handle takeoff specifically
-    if (phase.type === FlightPhases.TAKEOFF) {
-      // Always start on the ground with zero speed for takeoff
+    // Handle takeoff and takeoff prep
+    if (phase.type === FlightPhases.TAKEOFF || phase.type === FlightPhases.TAKEOFF_PREP) {
+      // Always start on the ground with zero speed for takeoff/prep
       initialConditions.position.z = 0;
       initialConditions.velocity.u = 0;
       initialConditions.velocity.v = 0;
@@ -786,8 +817,14 @@ class SceneManager {
       }
       initialConditions.orientation.psi = runwayHeading * Math.PI / 180;
       
-      // Apply takeoff configuration - set to idle for startup
-      initialConditions.throttle = 0.05; // 5% idle instead of 30%
+      // Apply takeoff configuration
+      if (phase.type === FlightPhases.TAKEOFF_PREP) {
+        initialConditions.throttle = 0.0; // Idle
+        initialConditions.brakes = 1.0; // Hold brakes
+      } else {
+        initialConditions.throttle = 0.4; // Initial power for takeoff (if starting directly)
+        initialConditions.brakes = 0; // Release brakes
+      }
     }
 
     // Publish initial conditions event
