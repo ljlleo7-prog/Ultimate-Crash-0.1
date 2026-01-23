@@ -105,14 +105,26 @@ const ThrustManager = ({ controlThrust, flightState }) => {
     isDraggingRef.current[index] = true;
     const target = e.currentTarget;
     const rect = target.getBoundingClientRect();
+    const startReverseState = reverse[index]; // Capture mode at start of drag
     
     const move = (evt) => {
       const y = (evt.touches ? evt.touches[0].clientY : evt.clientY) - rect.top;
       const pct = Math.max(0, Math.min(100, (1 - y / rect.height) * 100));
       const raw = pct / 100;
       
-      // No clamping, full range allowed
-      setLeverThrottle(index, raw);
+      // Clamp based on mode to prevent accidental crossover
+      // Forward Mode: Cannot go below 0.2 (Idle)
+      // Reverse Mode: Cannot go above 0.2 (Idle)
+      let clamped = raw;
+      if (!startReverseState) {
+        // In Forward Mode: Lock to [0.201, 1.0]
+        clamped = Math.max(0.201, raw);
+      } else {
+        // In Reverse Mode: Lock to [0.0, 0.2]
+        clamped = Math.min(0.2, raw);
+      }
+      
+      setLeverThrottle(index, clamped);
     };
     
     const up = () => {
@@ -130,17 +142,15 @@ const ThrustManager = ({ controlThrust, flightState }) => {
     move(e);
   };
   
-  // Toggle removed/deprecated or changed to simple reset? 
-  // User wants continuous mapping, so button is just indicator or quick set.
-  // Let's make it toggle between 0.2 (Idle) and 0.0 (Max Rev) for convenience?
-  // Or just remove it to clean up UI? 
-  // Code still renders it. Let's make it a "Quick Reverse" toggle.
+  // Toggle acts as the "Gate" between Forward and Reverse
   const toggleReverse = (index) => {
     const currentVal = throttles[index];
     const isInRev = currentVal <= 0.2;
     
-    // If in Rev, go to Idle (0.2). If not in Rev, go to Max Rev (0.0).
-    const newVal = isInRev ? 0.21 : 0.0; // 0.21 to be slightly forward
+    // Toggle Mode:
+    // Rev -> Fwd: Go to Idle Forward (0.21)
+    // Fwd -> Rev: Go to Idle Reverse (0.19) - Safe start, user can then drag to Max Rev
+    const newVal = isInRev ? 0.21 : 0.19;
     
     setLeverThrottle(index, newVal);
   };
