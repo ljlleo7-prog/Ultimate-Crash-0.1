@@ -34,17 +34,32 @@ class EnginePhysicsService {
             fuelFlow: 0, // kg/s
             oilPressure: 45, // psi
             running: true, // Default to running for immediate gameplay
-            failed: false
+            failed: false,
+            throttleCommand: 0, // Last commanded throttle
+            isReverse: false
         };
         
         this._prevFuelFlow = 0;
     }
 
-    update(dt, throttle, mach, altitude, airDensityRatio, ambientTemp) {
+    /**
+     * Set target throttle for this engine
+     * @param {number} val - Throttle value (-1.0 to 1.0)
+     */
+    setThrottle(val) {
+        this.state.throttleCommand = val;
+    }
+
+    update(dt, throttleInput, mach, altitude, airDensityRatio, ambientTemp) {
         if (this.state.failed) {
             this.spoolDown(dt);
             return this.getOutput();
         }
+
+        // Use passed throttle input if provided (legacy/direct drive), otherwise use internal state
+        // This supports both direct update(dt, throttle...) calls and setThrottle() -> update(dt...) patterns
+        const throttle = (throttleInput !== undefined) ? throttleInput : this.state.throttleCommand;
+        this.state.throttleCommand = throttle;
 
         // Target N1 based on throttle
         // Idle at 0 throttle is not 0 RPM if engine is running
@@ -58,11 +73,6 @@ class EnginePhysicsService {
             } else {
                 // Reverse Thrust: -0.7 (or less) to 0% Throttle
                 // User requirement: N1 20% to 75%
-                // Max Reverse Input assumed around -0.7 to -1.0. Let's Normalize.
-                // We'll treat anything negative as reverse range.
-                // Let's assume input -1.0 is MAX Reverse, but typically clamped to -0.7.
-                // We map -0.7 (input) -> 75% N1.
-                // Ratio = |throttle| / 0.7
                 isReverse = true;
                 const maxReverseN1 = 75;
                 const reverseRatio = Math.min(1, Math.abs(throttle) / 0.7); // Clamp ratio to 1
@@ -73,21 +83,27 @@ class EnginePhysicsService {
             this.state.running = true; 
         }
 
+        this.state.isReverse = isReverse;
+
         // N1 Dynamics (Lag)
         const n1Diff = targetN1 - this.state.n1;
         const rate = n1Diff > 0 ? this.config.spoolUpRate : this.config.spoolDownRate;
         
         // Acceleration decays near max N1 (inertia)
         // And acceleration is slower at low N1 (inertia)
-        // Simplified exponential approach
         // Apply responsiveness factor (uncertainty)
         this.state.n1 += n1Diff * rate * dt * 0.05 * this.config.responsiveness; 
 
         // Clamp N1
         if (this.state.n1 < 0) this.state.n1 = 0;
 
-        // N2 follows N1 roughly (2-spool)
-        this.state.n2 = this.state.n1 * 1.1; // Simplified relationship
+        // N2 Dynamics (Core Speed)
+        // Core responds slightly differently than fan
+        // N2 target is roughly N1 * 1.1 but with its own lag
+        const targetN2 = this.state.n1 * 1.1;
+        const n2Diff = targetN2 - this.state.n2;
+        // Core is lighter but follows N1 aerodynamics
+        this.state.n2 += n2Diff * dt * 2.0; // Simple lag towards target
 
         // Thrust Calculation
         // Thrust = MaxThrust * (N1_ratio)^2 * (Density_ratio)^0.7 * (1 - 0.2 * Mach)

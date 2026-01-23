@@ -155,6 +155,7 @@ class RealisticFlightPhysicsService {
         // Control State
         this.controls = {
             throttle: 0,
+            engineThrottles: Array(this.aircraft.engineCount).fill(0), // Individual throttles
             aileron: 0, // -1 to 1 (Roll)
             elevator: 0, // -1 to 1 (Pitch)
             rudder: 0,   // -1 to 1 (Yaw)
@@ -633,8 +634,22 @@ class RealisticFlightPhysicsService {
         // Smooth inputs to simulate actuator dynamics
         const rate = 5.0 * dt;
         
-        // Throttle
+        // Throttle (Master)
         this.controls.throttle += (input.throttle - this.controls.throttle) * rate;
+        
+        // Individual Throttles
+        if (input.throttles && Array.isArray(input.throttles)) {
+            // If individual inputs provided, smooth them independently
+            for (let i = 0; i < this.controls.engineThrottles.length; i++) {
+                const target = input.throttles[i] !== undefined ? input.throttles[i] : input.throttle;
+                this.controls.engineThrottles[i] += (target - this.controls.engineThrottles[i]) * rate;
+            }
+        } else {
+            // Sync to master if no individual inputs
+            for (let i = 0; i < this.controls.engineThrottles.length; i++) {
+                this.controls.engineThrottles[i] += (input.throttle - this.controls.engineThrottles[i]) * rate;
+            }
+        }
         
         // Flight Controls (Pitch, Roll, Yaw)
         this.controls.elevator += (input.pitch - this.controls.elevator) * rate * 2; // Faster response
@@ -739,18 +754,8 @@ class RealisticFlightPhysicsService {
         const airDensityRatio = env.density / this.CONSTANTS.SEA_LEVEL_DENSITY;
 
         this.engines.forEach((engine, index) => {
-             // Determine throttle for this engine
-             let engineThrottle = this.controls.throttle; // Default to master
-             
-             // Check for specific engine throttle inputs
-             // Support controls.throttles array
-             if (Array.isArray(this.controls.throttles) && typeof this.controls.throttles[index] === 'number') {
-                 engineThrottle = this.controls.throttles[index];
-             }
-             // Support controls.throttle1, controls.throttle2, etc.
-             else if (typeof this.controls[`throttle${index + 1}`] === 'number') {
-                 engineThrottle = this.controls[`throttle${index + 1}`];
-             }
+             // Use independent throttle state
+             const engineThrottle = this.controls.engineThrottles[index];
 
              engine.update(dt, engineThrottle, mach, -this.state.pos.z, airDensityRatio, env.temp);
              
@@ -761,6 +766,125 @@ class RealisticFlightPhysicsService {
             this.state.fuel = 0;
             this.engines.forEach(e => e.setFailed(true));
         }
+    }
+
+    calculateAerodynamicCoefficients(V_airspeed, alpha, beta, rates, q) {
+        // Flap Increments from Profile
+        const flapIncrements = this.getFlapIncrements();
+        const CL_flaps = flapIncrements.cl;
+        const CD_flaps_base = flapIncrements.cd;
+
+        // Airbrake Increments
+        const airbrakeIncrements = this.getAirbrakeIncrements();
+        const CL_brakes = airbrakeIncrements.cl;
+        const CD_brakes = airbrakeIncrements.cd;
+
+        // Lift (CL)
+        // CL = CL0 + CLa * alpha + CL_flaps + CL_elevator + CL_brakes
+        const CL_stall_drop = Math.abs(alpha) > 0.3 ? -0.5 * Math.sin((Math.abs(alpha) - 0.3) * 5) : 0; // Simple stall drop
+        let CL = this.aircraft.CL0 + this.aircraft.CLa * alpha + CL_flaps + CL_brakes + (this.controls.elevator * 0.3) + CL_stall_drop;
+
+        // Drag (CD)
+        // CD = CD0 + K * CL^2 + CD_flaps + CD_gear + CD_brakes
+        
+        // Ground Effect on Induced Drag
+        const h = -this.state.pos.z; // Altitude (CG)
+        const wingSpan = this.aircraft.wingSpan;
+        let groundEffectFactor = 1.0;
+        
+        if (h < wingSpan) {
+            const r = h / wingSpan;
+            // Torenbeek's approximation for induced drag reduction
+            groundEffectFactor = (16 * r * r) / (1 + 16 * r * r);
+            // Clamp to avoid unrealistic zero drag (min 10% of induced drag)
+            if (groundEffectFactor < 0.1) groundEffectFactor = 0.1; 
+        }
+
+        const CD_flaps = CD_flaps_base; 
+        const CD_gear = this.controls.gear * 0.015; 
+        const CD_elevator = Math.abs(this.controls.elevator) * 0.02; // Parasitic drag from elevator deflection
+        
+        // Clamp CL for induced drag to prevent runaway drag at high angles (stall region)
+        const CL_induced_calc = Math.min(Math.abs(CL), 1.35); // Cap effective CL for induced drag
+        const CD_induced = this.aircraft.K * CL_induced_calc * CL_induced_calc * groundEffectFactor;
+        
+        const CD = this.aircraft.CD0 + CD_induced + CD_flaps + CD_gear + CD_brakes + CD_elevator;
+
+        // Side Force (CY)
+        // CY = CYb * beta + CYdr * rudder
+        const CY = -0.5 * beta + (this.controls.rudder * 0.2);
+
+        // Moments
+        // Pitch (Cm)
+        // Cm = Cm0 + Cma * alpha + Cmq * (q * c / 2V) + Cde * elevator
+        const c = this.aircraft.chord;
+        const b = this.aircraft.wingSpan;
+        const pitch_damping = this.aircraft.Cmq * (rates.y * c) / (2 * (V_airspeed + 0.1));
+        
+        // Flaps Pitch Moment (Cm_flaps)
+        // Flaps typically cause a nose-down moment (negative Cm) due to aft shift of CP,
+        // though downwash on tail can counteract. User requested "slight downward pitch torque".
+        const Cm_flaps = this.controls.flaps * -0.01;
+        
+        const Cm = this.aircraft.Cm0 + (this.aircraft.Cma * alpha) + pitch_damping + (this.aircraft.Cde * (this.controls.elevator + this.controls.trim)) + Cm_flaps;
+
+        // Roll (Cl)
+        // Cl = Clb * beta + Clp * (p * b / 2V) + Cda * aileron
+        const roll_damping = this.aircraft.Clp * (rates.x * b) / (2 * (V_airspeed + 0.1));
+        let Cl = (this.aircraft.Clb * beta) + roll_damping + (this.aircraft.Cda * this.controls.aileron);
+
+        // Yaw (Cn)
+        // Cn = Cnb * beta + Cnr * (r * b / 2V) + Cdr * rudder
+        const yaw_damping = this.aircraft.Cnr * (rates.z * b) / (2 * (V_airspeed + 0.1));
+        const Cn = (this.aircraft.Cnb * beta) + yaw_damping + (this.aircraft.Cdr * this.controls.rudder);
+
+        // --- PHYSICAL YAW-ROLL COUPLING (Differential Lift) ---
+        // Calculate velocity difference due to yaw rate
+        if (V_airspeed > 5 && Math.abs(rates.z) > 0.001) {
+            const y_arm = b / 4; // Mid-point of semi-span
+            const r = rates.z; // Yaw rate
+            
+            // Tangential velocity difference
+            // Left Wing (Positive Roll Side): V_left = V + r * y_arm
+            // Right Wing (Negative Roll Side): V_right = V - r * y_arm
+            // We approximate the Lift difference based on V squared
+            
+            // Delta V ratio = (r * y_arm) / V
+            const dV_ratio = (r * y_arm) / V_airspeed;
+            
+            // Lift is proportional to V^2
+            // L_left ~ (1 + dV_ratio)^2 ~ 1 + 2*dV_ratio
+            // L_right ~ (1 - dV_ratio)^2 ~ 1 - 2*dV_ratio
+            // Delta L ~ 4 * dV_ratio * BaseLift
+            
+            // Roll Moment = Delta L * y_arm
+            // But we are working in Coefficients.
+            // Delta Cl = Delta Moment / (q * S * b)
+            // Delta Moment = (L_left - L_right) * y_arm
+            // L_base = q * (S/2) * CL (per wing)
+            // L_left = L_base * (1 + 2*dV_ratio)
+            // L_right = L_base * (1 - 2*dV_ratio)
+            // L_left - L_right = L_base * 4 * dV_ratio
+            // Delta Moment = (q * S/2 * CL * 4 * dV_ratio) * y_arm
+            //              = 2 * q * S * CL * dV_ratio * y_arm
+            // Delta Cl = (2 * q * S * CL * dV_ratio * y_arm) / (q * S * b)
+            //          = (2 * CL * dV_ratio * y_arm) / b
+            //          = (2 * CL * (r * y_arm / V) * y_arm) / b
+            // Substitute y_arm = b/4
+            //          = (2 * CL * (r * b/4 / V) * b/4) / b
+            //          = (2 * CL * r * b * b / 16 / V) / b
+            //          = (CL * r * b / 8 / V)
+            
+            // Let's check units and sign.
+            // Positive r (Nose Right) -> Left Wing Faster -> More Lift -> Right Roll (Positive Cl).
+            // So sign is +CL.
+            
+            const dCl_yaw = (CL * r * b) / (8 * V_airspeed);
+            
+            Cl += dCl_yaw;
+        }
+
+        return { CL, CD, CY, Cm, Cl, Cn };
     }
 
     calculateAerodynamicsAndGround(env) {
@@ -798,74 +922,7 @@ class RealisticFlightPhysicsService {
         }
 
         // --- Aerodynamic Coefficients ---
-        
-        // Flap Increments from Profile
-        const flapIncrements = this.getFlapIncrements();
-        const CL_flaps = flapIncrements.cl;
-        const CD_flaps_base = flapIncrements.cd;
-
-        // Airbrake Increments
-        const airbrakeIncrements = this.getAirbrakeIncrements();
-        const CL_brakes = airbrakeIncrements.cl;
-        const CD_brakes = airbrakeIncrements.cd;
-
-        // Lift (CL)
-        // CL = CL0 + CLa * alpha + CL_flaps + CL_elevator + CL_brakes
-        const CL_stall_drop = Math.abs(alpha) > 0.3 ? -0.5 * Math.sin((Math.abs(alpha) - 0.3) * 5) : 0; // Simple stall drop
-        let CL = this.aircraft.CL0 + this.aircraft.CLa * alpha + CL_flaps + CL_brakes + (this.controls.elevator * 0.3) + CL_stall_drop;
-
-        // Drag (CD)
-        // CD = CD0 + K * CL^2 + CD_flaps + CD_gear + CD_brakes
-        
-        // Ground Effect on Induced Drag
-        const h = -this.state.pos.z; // Altitude (CG)
-        const wingSpan = this.aircraft.wingSpan;
-        let groundEffectFactor = 1.0;
-        
-        if (h < wingSpan) {
-            const r = h / wingSpan;
-            // Torenbeek's approximation for induced drag reduction
-            groundEffectFactor = (16 * r * r) / (1 + 16 * r * r);
-            // Clamp to avoid unrealistic zero drag (min 10% of induced drag)
-            if (groundEffectFactor < 0.1) groundEffectFactor = 0.1; 
-        }
-
-        const CD_flaps = CD_flaps_base; 
-        const CD_gear = this.controls.gear * 0.015; 
-        
-        // Clamp CL for induced drag to prevent runaway drag at high angles (stall region)
-        const CL_induced_calc = Math.min(Math.abs(CL), 1.35); // Cap effective CL for induced drag
-        const CD_induced = this.aircraft.K * CL_induced_calc * CL_induced_calc * groundEffectFactor;
-        
-        const CD = this.aircraft.CD0 + CD_induced + CD_flaps + CD_gear + CD_brakes;
-
-        // Side Force (CY)
-        // CY = CYb * beta + CYdr * rudder
-        const CY = -0.5 * beta + (this.controls.rudder * 0.2);
-
-        // Moments
-        // Pitch (Cm)
-        // Cm = Cm0 + Cma * alpha + Cmq * (q * c / 2V) + Cde * elevator
-        const c = this.aircraft.chord;
-        const b = this.aircraft.wingSpan;
-        const pitch_damping = this.aircraft.Cmq * (this.state.rates.y * c) / (2 * (V_airspeed + 0.1));
-        
-        // Flaps Pitch Moment (Cm_flaps)
-        // Flaps typically cause a nose-down moment (negative Cm) due to aft shift of CP,
-        // though downwash on tail can counteract. User requested "slight downward pitch torque".
-        const Cm_flaps = this.controls.flaps * -0.01;
-        
-        const Cm = this.aircraft.Cm0 + (this.aircraft.Cma * alpha) + pitch_damping + (this.aircraft.Cde * (this.controls.elevator + this.controls.trim)) + Cm_flaps;
-
-        // Roll (Cl)
-        // Cl = Clb * beta + Clp * (p * b / 2V) + Cda * aileron
-        const roll_damping = this.aircraft.Clp * (this.state.rates.x * b) / (2 * (V_airspeed + 0.1));
-        const Cl = (this.aircraft.Clb * beta) + roll_damping + (this.aircraft.Cda * this.controls.aileron);
-
-        // Yaw (Cn)
-        // Cn = Cnb * beta + Cnr * (r * b / 2V) + Cdr * rudder
-        const yaw_damping = this.aircraft.Cnr * (this.state.rates.z * b) / (2 * (V_airspeed + 0.1));
-        const Cn = (this.aircraft.Cnb * beta) + yaw_damping + (this.aircraft.Cdr * this.controls.rudder);
+        const { CL, CD, CY, Cm, Cl, Cn } = this.calculateAerodynamicCoefficients(V_airspeed, alpha, beta, this.state.rates, q);
 
         // Dimensional Forces (Wind Axes -> Body Axes)
         // Lift acts perpendicular to relative wind, Drag parallel.
@@ -875,6 +932,9 @@ class RealisticFlightPhysicsService {
         // F_side = q * S * CY
         
         const S = this.aircraft.wingArea;
+        const b = this.aircraft.wingSpan;
+        const c = this.aircraft.chord;
+
         const F_lift = q * S * CL;
         const F_drag = q * S * CD;
         const F_side = q * S * CY;
@@ -1993,6 +2053,17 @@ class RealisticFlightPhysicsService {
             // Controls
             if (ps.controls) {
                 this.controls = { ...this.controls, ...ps.controls };
+                
+                // Ensure engineThrottles array exists and is populated
+                if (!this.controls.engineThrottles || this.controls.engineThrottles.length !== this.aircraft.engineCount) {
+                     this.controls.engineThrottles = Array(this.aircraft.engineCount).fill(this.controls.throttle);
+                     // If we have legacy throttles in ps.controls, try to recover
+                     if (ps.controls.throttles && Array.isArray(ps.controls.throttles)) {
+                         ps.controls.throttles.forEach((val, i) => {
+                             if (i < this.controls.engineThrottles.length) this.controls.engineThrottles[i] = val;
+                         });
+                     }
+                }
             }
 
             // Engines (Restore Internal State)
@@ -2005,12 +2076,14 @@ class RealisticFlightPhysicsService {
                     
                     // Ensure engine running state matches N2
                     e.running = e.state.n2 > 20;
+                    
+                    // Restore internal throttle command if available, otherwise sync from controls
+                    if (this.controls.engineThrottles[i] !== undefined) {
+                        e.setThrottle(this.controls.engineThrottles[i]);
+                    }
                 });
                 
-                // Set commanded throttle
-                if (ps.controls && ps.controls.throttle !== undefined) {
-                    this.engines.forEach(e => e.throttle = ps.controls.throttle);
-                }
+                // Set commanded throttle (Legacy Global Fallback removed, relying on loop above)
             }
             
             // Autopilot
@@ -2249,11 +2322,14 @@ class RealisticFlightPhysicsService {
         };
     }
 
-    setEngineThrottle() {  
-        // We simulate global throttle mostly, but can handle array if needed
-        // For now, update global target which updateEngines uses
-        // But if individual control is needed, updateEngines needs modification.
-        // Let's stick to global throttle for physics update inputs, but we can store it.
+    setEngineThrottle(index, value) {
+        if (this.controls.engineThrottles && index >= 0 && index < this.controls.engineThrottles.length) {
+            this.controls.engineThrottles[index] = value;
+            // Also update the engine directly if needed, but updateEngines loop handles it
+            if (this.engines[index]) {
+                this.engines[index].setThrottle(value);
+            }
+        }
     }
     reset() {
         const gearHeight = this.aircraft.gearHeight || 2;
@@ -2267,10 +2343,20 @@ class RealisticFlightPhysicsService {
         this.crashed = false;
         this.currentWaypointIndex = 0;
         
+        // Reset Controls
+        this.controls.throttle = 0;
+        this.controls.engineThrottles.fill(0);
+        this.controls.aileron = 0;
+        this.controls.elevator = 0;
+        this.controls.rudder = 0;
+        this.controls.brakes = 0;
+
         // Reset Engines
         this.engines.forEach(e => { 
-            e.n1 = 0; 
-            e.thrust = 0; 
+            e.state.n1 = 0; 
+            e.state.n2 = 0;
+            e.state.thrust = 0; 
+            e.setThrottle(0);
             e.setFailed(false); // Reset failure state
         });
 

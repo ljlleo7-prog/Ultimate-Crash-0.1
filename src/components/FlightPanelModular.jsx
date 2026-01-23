@@ -123,6 +123,7 @@ const FlightPanelModular = ({ flightData, physicsState, weatherData, onActionReq
         engineEGT: flightData.engineEGT || prevState.engineEGT,
         engineFuelFlow: flightData.engineFuelFlow || prevState.engineFuelFlow || [0, 0],
         fuel: flightData.fuel || prevState.fuel,
+        engineThrottles: flightData.engineThrottles || prevState.engineThrottles,
         
         // Systems
         hydraulicPressure: flightData.hydraulicPressure || prevState.hydraulicPressure,
@@ -229,7 +230,7 @@ const FlightPanelModular = ({ flightData, physicsState, weatherData, onActionReq
     });
     
     if (onActionRequest) {
-      onActionRequest('throttle', throttleValue); // Already in 0-1 range
+      onActionRequest('throttle', throttleValue, engineIndex); // Already in 0-1 range
     }
   };
 

@@ -11,20 +11,62 @@ const ThrustManager = ({ controlThrust, flightState }) => {
   const [sync, setSync] = useState(true);
   const displayThrottles = throttles.map(t => t * 100);
   
+  const isDraggingRef = React.useRef(Array(engineCount).fill(false));
+
   useEffect(() => {
+    // Only update from props if not dragging
+    if (isDraggingRef.current.some(d => d)) return;
+
     if (Array.isArray(flightState?.engineThrottles)) {
-      const values = flightState.engineThrottles.map(v => (typeof v === 'number' ? v/100 : 0.2));
+      // flightState.engineThrottles now contains commanded values (levers)
+      // We need to inverse map them to slider positions (0-1)
+      const values = flightState.engineThrottles.map(v => {
+        // v is in -1 to 1 range (approx)
+        const cmd = typeof v === 'number' ? v/100 : 0; // v is percent? 
+        // useAircraftPhysics returns values * 100. So v/100 gives -1..1.
+        
+        // Inverse Map:
+        // If cmd < 0: val = (cmd + 1) * 0.2
+        // If cmd >= 0: val = (cmd * 0.8) + 0.2
+        if (cmd < 0) return (cmd + 1) * 0.2;
+        return (cmd * 0.8) + 0.2;
+      });
       if (values.length === engineCount) {
         setThrottles(values);
+        setReverse(values.map(v => v <= 0.2));
       }
     } else if (typeof flightState?.throttle === 'number') {
-      const t = flightState.throttle / 100;
-      setThrottles(Array(engineCount).fill(t));
+      const cmd = flightState.throttle / 100;
+      let val;
+      if (cmd < 0) val = (cmd + 1) * 0.2;
+      else val = (cmd * 0.8) + 0.2;
+      setThrottles(Array(engineCount).fill(val));
+      setReverse(Array(engineCount).fill(val <= 0.2));
     }
   }, [flightState?.engineThrottles, flightState?.throttle, engineCount]);
   
+  const mapLeverToCommand = (lever) => {
+    const v = Math.max(0, Math.min(1, lever));
+    const reverseSection = 0.2;
+    
+    if (v <= reverseSection) {
+      // 0.0 -> -1.0 (Max Rev)
+      // 0.2 -> 0.0 (Idle)
+      // Formula: -1.0 + (v / 0.2)
+      // v=0 -> -1.
+      // v=0.2 -> 0.
+      return -1.0 + (v / reverseSection);
+    } else {
+      // 0.2 -> 0.0 (Idle)
+      // 1.0 -> 1.0 (TOGA)
+      // Formula: (v - 0.2) / 0.8
+      return (v - reverseSection) / (1 - reverseSection);
+    }
+  };
+
   const setLeverThrottle = useCallback((index, value) => {
     const val = Math.max(0, Math.min(1, value));
+    
     setThrottles(prev => {
       const next = [...prev];
       next[index] = val;
@@ -33,52 +75,54 @@ const ThrustManager = ({ controlThrust, flightState }) => {
       }
       return next;
     });
-    const mapLeverToCommand = (lever, isRev) => {
-      const v = Math.max(0, Math.min(1, lever));
-      const reverseSection = 0.2;
-      const forwardStart = reverseSection;
-      const forwardSpan = 1 - reverseSection;
-      if (!isRev) {
-        if (v <= reverseSection) return 0;
-        const norm = (v - forwardStart) / forwardSpan;
-        return norm;
+
+    // Update reverse state based on position
+    setReverse(prev => {
+      const next = [...prev];
+      const isRev = val <= 0.2;
+      next[index] = isRev;
+      if (sync) {
+        for (let i = 0; i < engineCount; i++) next[i] = isRev;
       }
-      if (v <= reverseSection) {
-        const frac = 1 - v / reverseSection;
-        return -0.7 * frac;
-      }
-      return 0;
-    };
-    const baseCommand = mapLeverToCommand(val, reverse[index]);
-    if (controlThrust) controlThrust(index, baseCommand);
+      return next;
+    });
+
+    const cmd = mapLeverToCommand(val);
+    if (controlThrust) controlThrust(index, cmd);
+    
     if (sync) {
       for (let i = 0; i < engineCount; i++) {
-        const cmd = mapLeverToCommand(val, reverse[i]);
-        if (controlThrust) controlThrust(i, cmd);
+        // For sync, we use the SAME lever value 'val'
+        if (i !== index) {
+            const cmdSync = mapLeverToCommand(val);
+            if (controlThrust) controlThrust(i, cmdSync);
+        }
       }
     }
-  }, [controlThrust, reverse, sync, engineCount]);
+  }, [controlThrust, sync, engineCount]);
   
   const onDrag = (index, e) => {
+    isDraggingRef.current[index] = true;
     const target = e.currentTarget;
     const rect = target.getBoundingClientRect();
+    
     const move = (evt) => {
       const y = (evt.touches ? evt.touches[0].clientY : evt.clientY) - rect.top;
       const pct = Math.max(0, Math.min(100, (1 - y / rect.height) * 100));
       const raw = pct / 100;
-      const reverseSection = 0.2;
-      const isRev = reverse[index];
-      const clamped = isRev
-        ? Math.max(0, Math.min(reverseSection, raw))
-        : Math.max(reverseSection, Math.min(1, raw));
-      setLeverThrottle(index, clamped);
+      
+      // No clamping, full range allowed
+      setLeverThrottle(index, raw);
     };
+    
     const up = () => {
+      isDraggingRef.current[index] = false;
       window.removeEventListener('mousemove', move);
       window.removeEventListener('mouseup', up);
       window.removeEventListener('touchmove', move);
       window.removeEventListener('touchend', up);
     };
+    
     window.addEventListener('mousemove', move);
     window.addEventListener('mouseup', up);
     window.addEventListener('touchmove', move, { passive: true });
@@ -86,47 +130,19 @@ const ThrustManager = ({ controlThrust, flightState }) => {
     move(e);
   };
   
+  // Toggle removed/deprecated or changed to simple reset? 
+  // User wants continuous mapping, so button is just indicator or quick set.
+  // Let's make it toggle between 0.2 (Idle) and 0.0 (Max Rev) for convenience?
+  // Or just remove it to clean up UI? 
+  // Code still renders it. Let's make it a "Quick Reverse" toggle.
   const toggleReverse = (index) => {
-    const wasRev = reverse[index];
-    const newValue = !wasRev;
-    const nextReverse = sync ? Array(engineCount).fill(newValue) : [...reverse];
-    if (!sync) {
-      nextReverse[index] = newValue;
-    }
-    const reverseSection = 0.2;
-    const nextThrottles = [...throttles];
-    for (let i = 0; i < engineCount; i++) {
-      const current = nextThrottles[i];
-      if (nextReverse[i]) {
-        nextThrottles[i] = Math.max(0, Math.min(reverseSection, current));
-      } else {
-        nextThrottles[i] = Math.max(reverseSection, Math.min(1, current));
-      }
-    }
-    setReverse(nextReverse);
-    setThrottles(nextThrottles);
-    const mapLeverToCommand = (lever, isRev) => {
-      const v = Math.max(0, Math.min(1, lever));
-      const reverseSection = 0.2;
-      const forwardStart = reverseSection;
-      const forwardSpan = 1 - reverseSection;
-      if (!isRev) {
-        if (v <= reverseSection) return 0;
-        const norm = (v - forwardStart) / forwardSpan;
-        return norm;
-      }
-      if (v <= reverseSection) {
-        const frac = 1 - v / reverseSection;
-        return -0.7 * frac;
-      }
-      return 0;
-    };
-    for (let i = 0; i < engineCount; i++) {
-      const lever = nextThrottles[i];
-      const isRev = nextReverse[i];
-      const cmd = mapLeverToCommand(lever, isRev);
-      if (controlThrust) controlThrust(i, cmd);
-    }
+    const currentVal = throttles[index];
+    const isInRev = currentVal <= 0.2;
+    
+    // If in Rev, go to Idle (0.2). If not in Rev, go to Max Rev (0.0).
+    const newVal = isInRev ? 0.21 : 0.0; // 0.21 to be slightly forward
+    
+    setLeverThrottle(index, newVal);
   };
   
   const lever = (index) => {

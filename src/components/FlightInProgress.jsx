@@ -131,7 +131,8 @@ const FlightInProgress = ({
     physicsService,
     setTimeScale,
     timeScale,
-    updateFlightPlan
+    updateFlightPlan,
+    setEngineThrottle
   } = useAircraftPhysics(aircraftConfig, false, physicsModel);
 
   // Control state for UI components
@@ -570,9 +571,9 @@ const FlightInProgress = ({
     };
   }, [isInitialized, updatePhysics]);
 
-  // ✅ CLEAN ARCHITECTURE: Single throttle control handler (reverted for responsiveness)
+  // ✅ CLEAN ARCHITECTURE: Throttle control handler
   const handleThrustControl = (engineIndex, throttleValue) => {
-    console.log('🎯 FlightInProgress: Single throttle control received:', {
+    console.log('🎯 FlightInProgress: Throttle control received:', {
       engineIndex,
       throttleValue,
       percentage: (throttleValue * 100).toFixed(1) + '%'
@@ -580,13 +581,17 @@ const FlightInProgress = ({
     
     const validatedThrottle = Math.max(-0.7, Math.min(1, throttleValue));
     
-    // Update local display state
+    // Update local display state (Legacy support)
     setThrottleControl(validatedThrottle * 100);
     
     // Send directly to physics engine
-    setThrottle(validatedThrottle);
-    
-    console.log('🚀 FlightInProgress: Single throttle sent to physics:', validatedThrottle);
+    if (setEngineThrottle) {
+        setEngineThrottle(engineIndex, validatedThrottle);
+        console.log(`🚀 FlightInProgress: Engine ${engineIndex} throttle set to:`, validatedThrottle);
+    } else {
+        setThrottle(validatedThrottle);
+        console.log('🚀 FlightInProgress: Global throttle set to:', validatedThrottle);
+    }
   };
 
   // Handle surface control changes
@@ -824,14 +829,14 @@ const FlightInProgress = ({
             timeScale={timeScale}
             setTimeScale={setTimeScale}
             onUpdateFlightPlan={handleUpdateFlightPlan}
-            onActionRequest={(action, payload) => {
+            onActionRequest={(action, payload, extra) => {
               const payloadStr = typeof payload === 'number' ? payload.toFixed(5) : JSON.stringify(payload);
-              console.log(`📡 UI Action: ${action} = ${payloadStr}`);
+              console.log(`📡 UI Action: ${action} = ${payloadStr}, Extra: ${extra}`);
 
               switch (action) {
                 case 'throttle':
-                  handleThrustControl(0, payload);
-                  console.log(`📡 FlightPanel Action: ${action} = ${payload}`);
+                  handleThrustControl(extra !== undefined ? extra : 0, payload);
+                  console.log(`📡 FlightPanel Action: ${action} = ${payload}, Engine: ${extra}`);
                   break;
                 case 'flaps':
                   handleFlapsControl(payload);

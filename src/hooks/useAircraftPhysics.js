@@ -320,6 +320,7 @@ export function useAircraftPhysics(config = {}, autoStart = true, model = 'reali
       for (let i = 0; i < iterations; i++) {
         newState = physicsService.update({
             throttle: isNaN(throttleValue) ? 0 : throttleValue,
+            throttles: currentControlsRef.current.engineThrottles, // Pass individual throttles
             pitch: currentControlsRef.current.pitch,
             roll: currentControlsRef.current.roll,
             yaw: currentControlsRef.current.yaw,
@@ -357,7 +358,8 @@ export function useAircraftPhysics(config = {}, autoStart = true, model = 'reali
       if (autopilotEngaged) {
         currentControlsRef.current = {
           ...currentControlsRef.current,
-          throttle: actualThrottle
+          throttle: actualThrottle,
+          engineThrottles: null // Force sync to autopilot master throttle
         };
       }
       
@@ -396,7 +398,8 @@ export function useAircraftPhysics(config = {}, autoStart = true, model = 'reali
         roll: newState.orientation.phi * 180 / Math.PI,
         heading: typeof newState.heading === 'number' ? newState.heading : (newState.orientation.psi * 180 / Math.PI + 360) % 360,
         throttle: actualThrottle * 100,
-        elevator: currentControlsRef.current.pitch * 180 / Math.PI,
+    engineThrottles: currentControlsRef.current.engineThrottles ? currentControlsRef.current.engineThrottles.map(t => t * 100) : [actualThrottle * 100, actualThrottle * 100],
+    elevator: currentControlsRef.current.pitch * 180 / Math.PI,
         aileron: currentControlsRef.current.roll * 180 / Math.PI,
         rudder: currentControlsRef.current.yaw * 180 / Math.PI,
         lift: physicsService.aeroForces?.z || 0,
@@ -461,9 +464,11 @@ export function useAircraftPhysics(config = {}, autoStart = true, model = 'reali
       percentage: (normalizedThrottle * 100).toFixed(1) + '%'
     });
     // Single throttle control for backward compatibility
+    // We clear engineThrottles to force sync to master throttle in physics service
     currentControlsRef.current = { 
       ...currentControlsRef.current, 
-      throttle: normalizedThrottle
+      throttle: normalizedThrottle,
+      engineThrottles: null 
     };
   }, []);
 
@@ -494,16 +499,27 @@ export function useAircraftPhysics(config = {}, autoStart = true, model = 'reali
     if (physicsServiceRef.current && typeof physicsServiceRef.current.setEngineThrottle === 'function') {
       physicsServiceRef.current.setEngineThrottle(engineIndex, normalizedThrottle);
     }
+    
+    // Get engine count from service or default to 2
+    const engineCount = physicsServiceRef.current?.engines?.length || 2;
+    const oldMaster = currentControlsRef.current.throttle !== undefined ? currentControlsRef.current.throttle : 0;
+    
     const throttles = Array.isArray(currentControlsRef.current.engineThrottles)
       ? [...currentControlsRef.current.engineThrottles]
-      : [normalizedThrottle, normalizedThrottle];
-    if (engineIndex >= 0 && engineIndex < throttles.length) {
-      throttles[engineIndex] = normalizedThrottle;
+      : Array(engineCount).fill(oldMaster);
+      
+    if (engineIndex >= 0) {
+       // Ensure array is long enough
+       while (throttles.length <= engineIndex) {
+           throttles.push(oldMaster);
+       }
+       throttles[engineIndex] = normalizedThrottle;
     }
+    
     currentControlsRef.current = {
       ...currentControlsRef.current,
       engineThrottles: throttles,
-      throttle: normalizedThrottle
+      throttle: normalizedThrottle // Update master to match latest input (mostly for UI consistency)
     };
   }, []);
   // Control surface setters
