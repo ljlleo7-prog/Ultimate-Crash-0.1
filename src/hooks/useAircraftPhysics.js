@@ -557,6 +557,13 @@ export function useAircraftPhysics(config = {}, autoStart = true, model = 'reali
   const performSystemAction = useCallback((system, action, value) => {
     if (physicsServiceRef.current && typeof physicsServiceRef.current.performSystemAction === 'function') {
       physicsServiceRef.current.performSystemAction(system, action, value);
+      
+      // Force UI update even if physics loop is paused (Narrative Mode)
+      // We create a shallow copy of systems to trigger React re-render
+      setFlightData(prev => ({
+        ...prev,
+        systems: JSON.parse(JSON.stringify(physicsServiceRef.current.systems))
+      }));
     }
   }, []);
 

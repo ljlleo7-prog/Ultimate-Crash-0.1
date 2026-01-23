@@ -312,7 +312,10 @@ const FlightPanelModular = ({ flightData, physicsState, weatherData, onActionReq
   // Main render function
   const renderContent = () => {
     // PHY-OFF INTERFACE (Immersive Narrative Mode)
-    if (!flightState.physicsActive) {
+    // Show this mode if physics is off OR if we are in a narrative-heavy phase (like Boarding)
+    const isNarrativePhase = ['BOARDING', 'DEPARTURE_CLEARANCE', 'PUSHBACK'].includes(flightState.flightPhase);
+    
+    if (!flightState.physicsActive || isNarrativePhase) {
       return React.createElement('div', { 
         className: 'immersive-mode',
         style: {
@@ -325,7 +328,8 @@ const FlightPanelModular = ({ flightData, physicsState, weatherData, onActionReq
           background: 'radial-gradient(circle at center, #1a1a2e 0%, #000000 100%)',
           color: '#e6e6e6',
           padding: '40px',
-          boxSizing: 'border-box'
+          boxSizing: 'border-box',
+          position: 'relative' // For absolute positioning of buttons
         }
       },
         // Animation Styles
@@ -335,6 +339,27 @@ const FlightPanelModular = ({ flightData, physicsState, weatherData, onActionReq
             to { opacity: 1; transform: translateY(0); }
           }
         `),
+
+        // Systems Access Button (OH PNL)
+        React.createElement('button', {
+          onClick: () => setShowOverhead(true),
+          style: {
+            position: 'absolute',
+            top: '20px',
+            right: '20px',
+            padding: '10px 20px',
+            background: 'rgba(0, 0, 0, 0.6)',
+            border: '1px solid #4ade80',
+            color: '#4ade80',
+            borderRadius: '4px',
+            cursor: 'pointer',
+            fontSize: '14px',
+            zIndex: 1000,
+            transition: 'all 0.2s'
+          },
+          onMouseEnter: (e) => { e.target.style.background = 'rgba(74, 222, 128, 0.2)'; },
+          onMouseLeave: (e) => { e.target.style.background = 'rgba(0, 0, 0, 0.6)'; }
+        }, "SYSTEMS [OH PNL]"),
         
         // Narrative Container
         React.createElement('div', {

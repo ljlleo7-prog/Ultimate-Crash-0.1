@@ -1915,6 +1915,98 @@ class RealisticFlightPhysicsService {
     }
 
     /**
+     * Set systems to Cold & Dark state
+     */
+    setColdStart() {
+        console.log("❄️ Physics Service: Applying Cold & Dark Configuration");
+        
+        // Electrical
+        this.systems.electrical = {
+            ...this.systems.electrical,
+            battery: false,
+            stbyPower: false,
+            gen1: false,
+            gen2: false,
+            apuGen: false,
+            busTie: true,
+            dcVolts: 0,
+            acVolts: 0,
+            acFreq: 0,
+            acAmps: 0,
+            sourceOff1: true,
+            sourceOff2: true,
+            apuGenOff: true
+        };
+
+        // Fuel (Pumps Off)
+        this.systems.fuel = {
+            ...this.systems.fuel,
+            leftPumps: false,
+            rightPumps: false,
+            centerPumps: false,
+            crossfeed: false,
+            pressL: 0,
+            pressR: 0,
+            pressC: 0
+        };
+
+        // APU Off
+        this.systems.apu = {
+            ...this.systems.apu,
+            master: false,
+            start: false,
+            running: false,
+            starting: false,
+            bleed: false,
+            egt: 0,
+            n2: 0,
+            state: 'OFF'
+        };
+
+        // Hydraulics Off
+        this.systems.hydraulics.sysA.engPump = true; // Switches usually stay ON but no pressure
+        this.systems.hydraulics.sysA.elecPump = false;
+        this.systems.hydraulics.sysB.engPump = true;
+        this.systems.hydraulics.sysB.elecPump = false;
+        this.systems.hydraulics.sysA.pressure = 0;
+        this.systems.hydraulics.sysB.pressure = 0;
+
+        // Pressurization / Packs Off
+        this.systems.pressurization = {
+            ...this.systems.pressurization,
+            packL: false,
+            packR: false,
+            bleed1: false,
+            bleed2: false,
+            isolationValve: true,
+            ductPressL: 0,
+            ductPressR: 0
+        };
+
+        // Lighting Off
+        this.systems.lighting = {
+            landing: false,
+            taxi: false,
+            nav: false,
+            beacon: false,
+            strobe: false,
+            logo: false,
+            wing: false,
+            powered: false
+        };
+        
+        // Reset Engines
+        this.engines.forEach(e => {
+            e.state.n1 = 0;
+            e.state.n2 = 0;
+            e.state.egt = 0; // Cold EGT
+            e.state.fuelFlow = 0;
+            e.state.oilPressure = 0;
+            e.state.running = false;
+        });
+    }
+
+    /**
      * Set initial flight conditions
      */
     setInitialConditions(conditions) {
@@ -1934,6 +2026,14 @@ class RealisticFlightPhysicsService {
             this.difficulty = conditions.difficulty;
         } else {
             this.difficulty = 'rookie'; // Default
+        }
+
+        // Apply Cold Start if Professional or higher
+        if (['professional', 'survival', 'devil'].includes(this.difficulty)) {
+            this.setColdStart();
+        } else if (conditions.coldStart) {
+            // Explicit override
+            this.setColdStart();
         }
 
         // Flight Plan
