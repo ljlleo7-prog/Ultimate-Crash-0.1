@@ -29,18 +29,35 @@ const SystemFailures = {
         stages: {
             inactive: { next: 'active' },
             active: {
-                description: (ctx) => `TOTAL HYDRAULIC LOSS. Controls stiff.`,
+                description: (ctx) => `TOTAL HYDRAULIC LOSS.`,
                 effect: (sys) => {
-                    // Severe control restriction
-                    sys.controls.aileron *= 0.1;
-                    sys.controls.elevator *= 0.1;
-                    sys.controls.rudder *= 0.1;
-                    sys.controls.gear = sys.controls.gear; // Stuck
                     if (sys.systems.hydraulics) {
                         sys.systems.hydraulics.sysA.pressure = 0;
                         sys.systems.hydraulics.sysB.pressure = 0;
-                        sys.systems.hydraulics.sysC.pressure = 0; // If modeled
+                        if (sys.systems.hydraulics.sysC) sys.systems.hydraulics.sysC.pressure = 0;
                     }
+
+                    const is737 = (sys.aircraft.id || '').toLowerCase().includes('737') || (sys.aircraft.name || '').toLowerCase().includes('737');
+
+                    if (is737) {
+                        // 737 Manual Reversion: Extreme Lag
+                        sys.controlLag.aileron = 10.0;
+                        sys.controlLag.elevator = 10.0;
+                        sys.controlLag.rudder = 10.0;
+                        
+                        sys.controlEffectiveness.aileron = 0.3; // Barely controllable
+                        sys.controlEffectiveness.elevator = 0.3;
+                        sys.controlEffectiveness.rudder = 0.3;
+                    } else {
+                        // Modern FBW: Total Loss (Inoperative)
+                        sys.controlEffectiveness.aileron = 0.0;
+                        sys.controlEffectiveness.elevator = 0.0;
+                        sys.controlEffectiveness.rudder = 0.0;
+                    }
+                    
+                    // Gear stuck or extremely slow
+                    sys.controlLag.gear = 20.0;
+                    // sys.controls.gear = sys.controls.gear; // Stuck logic handled by lag/inputs
                 }
             }
         }

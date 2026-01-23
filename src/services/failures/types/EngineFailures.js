@@ -87,8 +87,9 @@ const EngineFailures = {
                     const eng = sys.engines[ctx.engineIndex];
                     if (eng) {
                         // Pop noise (thrust cut and spike)
-                        if (Math.random() > 0.7) eng.thrust *= 0.2;
+                        if (Math.random() > 0.7) eng.state.thrust *= 0.2; // Use state.thrust directly if needed, or rely on update loop
                         eng.state.egt += 10;
+                        eng.setVibration(8.0 * intensity);
                     }
                 }
             },

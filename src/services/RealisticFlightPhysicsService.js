@@ -165,6 +165,11 @@ class RealisticFlightPhysicsService {
             trim: 0      // Pitch trim
         };
 
+        // Failure Simulation State
+        this.controlLag = { aileron: 1.0, elevator: 1.0, rudder: 1.0, gear: 1.0 }; // 1.0 = normal, >1.0 = slower
+        this.controlEffectiveness = { aileron: 1.0, elevator: 1.0, rudder: 1.0, gear: 1.0 }; // 0.0 to 1.0
+        this.vibrationLevel = 0; // Global vibration level
+
         // Engine State
         this.engines = Array(this.aircraft.engineCount).fill(0).map(() => {
             // Introduce ~5% uncertainty in engine responsiveness
@@ -774,6 +779,11 @@ class RealisticFlightPhysicsService {
         const CL_flaps = flapIncrements.cl;
         const CD_flaps_base = flapIncrements.cd;
 
+        // Apply Control Effectiveness (Failures)
+        const effAileron = this.controls.aileron * (this.controlEffectiveness.aileron !== undefined ? this.controlEffectiveness.aileron : 1.0);
+        const effElevator = this.controls.elevator * (this.controlEffectiveness.elevator !== undefined ? this.controlEffectiveness.elevator : 1.0);
+        const effRudder = this.controls.rudder * (this.controlEffectiveness.rudder !== undefined ? this.controlEffectiveness.rudder : 1.0);
+
         // Airbrake Increments
         const airbrakeIncrements = this.getAirbrakeIncrements();
         const CL_brakes = airbrakeIncrements.cl;
@@ -782,7 +792,7 @@ class RealisticFlightPhysicsService {
         // Lift (CL)
         // CL = CL0 + CLa * alpha + CL_flaps + CL_elevator + CL_brakes
         const CL_stall_drop = Math.abs(alpha) > 0.3 ? -0.5 * Math.sin((Math.abs(alpha) - 0.3) * 5) : 0; // Simple stall drop
-        let CL = this.aircraft.CL0 + this.aircraft.CLa * alpha + CL_flaps + CL_brakes + (this.controls.elevator * 0.3) + CL_stall_drop;
+        let CL = this.aircraft.CL0 + this.aircraft.CLa * alpha + CL_flaps + CL_brakes + (effElevator * 0.3) + CL_stall_drop;
 
         // Drag (CD)
         // CD = CD0 + K * CL^2 + CD_flaps + CD_gear + CD_brakes
@@ -802,7 +812,7 @@ class RealisticFlightPhysicsService {
 
         const CD_flaps = CD_flaps_base; 
         const CD_gear = this.controls.gear * 0.015; 
-        const CD_elevator = Math.abs(this.controls.elevator) * 0.02; // Parasitic drag from elevator deflection
+        const CD_elevator = Math.abs(effElevator) * 0.02; // Parasitic drag from elevator deflection
         
         // Clamp CL for induced drag to prevent runaway drag at high angles (stall region)
         const CL_induced_calc = Math.min(Math.abs(CL), 1.35); // Cap effective CL for induced drag
@@ -812,7 +822,7 @@ class RealisticFlightPhysicsService {
 
         // Side Force (CY)
         // CY = CYb * beta + CYdr * rudder
-        const CY = -0.5 * beta + (this.controls.rudder * 0.2);
+        const CY = -0.5 * beta + (effRudder * 0.2);
 
         // Moments
         // Pitch (Cm)
@@ -826,17 +836,17 @@ class RealisticFlightPhysicsService {
         // though downwash on tail can counteract. User requested "slight downward pitch torque".
         const Cm_flaps = this.controls.flaps * -0.01;
         
-        const Cm = this.aircraft.Cm0 + (this.aircraft.Cma * alpha) + pitch_damping + (this.aircraft.Cde * (this.controls.elevator + this.controls.trim)) + Cm_flaps;
+        const Cm = this.aircraft.Cm0 + (this.aircraft.Cma * alpha) + pitch_damping + (this.aircraft.Cde * (effElevator + this.controls.trim)) + Cm_flaps;
 
         // Roll (Cl)
         // Cl = Clb * beta + Clp * (p * b / 2V) + Cda * aileron
         const roll_damping = this.aircraft.Clp * (rates.x * b) / (2 * (V_airspeed + 0.1));
-        let Cl = (this.aircraft.Clb * beta) + roll_damping + (this.aircraft.Cda * this.controls.aileron);
+        let Cl = (this.aircraft.Clb * beta) + roll_damping + (this.aircraft.Cda * effAileron);
 
         // Yaw (Cn)
         // Cn = Cnb * beta + Cnr * (r * b / 2V) + Cdr * rudder
         const yaw_damping = this.aircraft.Cnr * (rates.z * b) / (2 * (V_airspeed + 0.1));
-        const Cn = (this.aircraft.Cnb * beta) + yaw_damping + (this.aircraft.Cdr * this.controls.rudder);
+        const Cn = (this.aircraft.Cnb * beta) + yaw_damping + (this.aircraft.Cdr * effRudder);
 
         // --- PHYSICAL YAW-ROLL COUPLING (Differential Lift) ---
         // Calculate velocity difference due to yaw rate
@@ -2403,6 +2413,15 @@ class RealisticFlightPhysicsService {
             this.failureSystem.reset();
         }
     }
+    resetFailureState() {
+        this.controlLag = { aileron: 1.0, elevator: 1.0, rudder: 1.0, gear: 1.0 };
+        this.controlEffectiveness = { aileron: 1.0, elevator: 1.0, rudder: 1.0, gear: 1.0 };
+        this.vibrationLevel = 0;
+        // Note: We do NOT reset engine failure flags or system states (pressure, generators) here.
+        // Those are persistent state changes managed by the failure instances or system logic.
+        // We only reset the *modifiers* that are re-applied every frame by active failures.
+    }
+
     calculateAirspeeds() {
         const wind = this.environment?.wind || new Vector3(0, 0, 0);
         

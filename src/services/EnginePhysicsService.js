@@ -33,6 +33,7 @@ class EnginePhysicsService {
             thrust: 0, // Newtons
             fuelFlow: 0, // kg/s
             oilPressure: 45, // psi
+            vibration: 0, // 0 to 10 scale
             running: true, // Default to running for immediate gameplay
             failed: false,
             throttleCommand: 0, // Last commanded throttle
