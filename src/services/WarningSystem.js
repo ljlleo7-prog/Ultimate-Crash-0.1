@@ -84,10 +84,10 @@ class WarningSystem {
         this.checkGPWS(altitudeAGL, verticalSpeed, gear, flaps, airspeed, groundStatus);
 
         // --- Flight Envelope Checks ---
-        this.checkEnvelope(alpha, airspeed, rollDeg, pitchDeg, flaps, gear);
+        this.checkEnvelope(alpha, airspeed, rollDeg, pitchDeg, flaps, gear, groundStatus);
 
         // --- Configuration Checks ---
-        this.checkConfiguration(flaps, gear, airBrakes, throttle, groundStatus, pitchDeg, brakes);
+        this.checkConfiguration(flaps, gear, airBrakes, throttle, groundStatus, pitchDeg, brakes, altitudeAGL);
 
         // --- System Checks ---
         this.checkSystems(systems, fuel, engineParams, altitudeAGL);
@@ -149,9 +149,11 @@ class WarningSystem {
         }
     }
 
-    checkEnvelope(alpha, airspeed, roll, pitch) {
-        // Stall Warning
-        if (alpha > this.thresholds.stallAlpha) {
+    checkEnvelope(alpha, airspeed, roll, pitch, flaps, gear, groundStatus) {
+        const onGround = groundStatus && (groundStatus.status === 'RUNWAY' || groundStatus.status === 'GRASS');
+
+        // Stall Warning (Disabled on Ground)
+        if (!onGround && alpha > this.thresholds.stallAlpha) {
             this.addWarning('STALL', 'STALL', 'CRITICAL', true);
         }
 
@@ -214,7 +216,7 @@ class WarningSystem {
         }
     }
 
-    checkConfiguration(flaps, gear, airBrakes, throttle, groundStatus, pitch, brakes) {
+    checkConfiguration(flaps, gear, airBrakes, throttle, groundStatus, pitch, brakes, altitudeAGL) {
         // 1. Takeoff Configuration
         // If on ground, high throttle, and flaps not set or brakes on
         const onGround = groundStatus && (groundStatus.status === 'RUNWAY' || groundStatus.status === 'GRASS');
@@ -235,7 +237,7 @@ class WarningSystem {
         // (Covered partially by GPWS, but specific config warning here)
 
         // 3. Tail Strike Risk
-        if (onGround && pitch > this.thresholds.tailStrikePitch) {
+        if (altitudeAGL <= 50 && pitch > this.thresholds.tailStrikePitch) {
             this.addWarning('TAIL_STRIKE', 'TAIL STRIKE RISK', 'CRITICAL', true);
         }
     }

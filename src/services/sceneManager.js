@@ -255,6 +255,13 @@ class SceneManager {
     this.completedPhases = new Set(); // Track completed phases
     this.currentPhaseData = null; // Additional phase-specific data
     this.narrativeHistory = []; // Track narrative messages
+    this.takeoffClearanceReceived = false;
+    
+    // Subscribe to clearance
+    this.unsubscribeClearance = eventBus.subscribe('atc.clearance.takeoff', () => {
+        console.log('✅ SceneManager: Takeoff Clearance Received');
+        this.takeoffClearanceReceived = true;
+    });
     
     // Set up command handling
     this.unsubscribeCommand = eventBus.subscribe('command.input', payload => {
@@ -276,6 +283,44 @@ class SceneManager {
     return this.scenario.phases[this.currentIndex] || null;
   }
   
+  // Get narrative based on difficulty
+  getPhaseNarrative(phase) {
+    if (this.scenario.difficulty === 'rookie') {
+        if (phase.type === FlightPhases.TAKEOFF_PREP) {
+             return {
+                 title: 'Pre-Flight Checklist',
+                 content: 'Set flaps 10/15. Receive ATIS and set altimeter. Engage takeoff lights. Set AP (VS+2500, 200kts). Request Takeoff Clearance.'
+             };
+         }
+        if (phase.type === FlightPhases.TAKEOFF) {
+            return {
+                title: 'Takeoff Roll',
+                content: 'Push throttle to MAX. Rotate smoothly at 140-150 knots.'
+            };
+        }
+        if (phase.type === FlightPhases.INITIAL_CLIMB) {
+            return {
+                title: 'Positive Rate',
+                content: 'Retract landing gear. Engage Autopilot. Retract flaps.'
+            };
+        }
+    }
+    return phase.narrative;
+  }
+  
+  // Apply random template (unless rookie mode operational phase)
+  applyNarrativeTemplate(narrative, phaseType) {
+    if (this.scenario.difficulty === 'rookie' && 
+        [FlightPhases.TAKEOFF_PREP, FlightPhases.TAKEOFF, FlightPhases.INITIAL_CLIMB].includes(phaseType)) {
+        return narrative;
+    }
+    const template = getRandomTemplate(phaseType);
+    if (template) {
+        return { ...narrative, ...template };
+    }
+    return narrative;
+  }
+
   // Skip the current phase (User Requested)
   skipPhase() {
     const phase = this.currentPhase();
@@ -297,6 +342,7 @@ class SceneManager {
     this.completedPhases.clear();
     this.narrativeHistory = [];
     this.currentPhaseData = null;
+    this.takeoffClearanceReceived = false;
     
     const initialPhase = this.currentPhase();
     
@@ -308,15 +354,14 @@ class SceneManager {
     });
     
     // Publish initial narrative
-    if (initialPhase.narrative) {
-      let activeNarrative = initialPhase.narrative;
-      const template = getRandomTemplate(initialPhase.type);
-      if (template) {
-        activeNarrative = { ...activeNarrative, ...template };
-      }
+    const initialNarrative = this.getPhaseNarrative(initialPhase);
+    if (initialNarrative) {
+      let activeNarrative = this.applyNarrativeTemplate(initialNarrative, initialPhase.type);
       
-      // Store active narrative for updates
-      this.currentPhaseData = { ...this.currentPhaseData, activeNarrative };
+      this.currentPhaseData = {
+        startTime: Date.now(),
+        activeNarrative
+      };
       
       this.publishNarrative(activeNarrative);
     }
@@ -339,6 +384,7 @@ class SceneManager {
     this.currentIndex += 1;
     this.elapsedInPhase = 0;
     this.currentPhaseData = null;
+    this.takeoffClearanceReceived = false;
     
     const nextPhase = this.currentPhase();
     if (!nextPhase) {
@@ -364,12 +410,9 @@ class SceneManager {
     });
     
     // Publish narrative for new phase
-    if (nextPhase.narrative) {
-      let activeNarrative = nextPhase.narrative;
-      const template = getRandomTemplate(nextPhase.type);
-      if (template) {
-        activeNarrative = { ...activeNarrative, ...template };
-      }
+    const nextNarrative = this.getPhaseNarrative(nextPhase);
+    if (nextNarrative) {
+      let activeNarrative = this.applyNarrativeTemplate(nextNarrative, nextPhase.type);
       
       // Store active narrative for updates
       this.currentPhaseData = { ...this.currentPhaseData, activeNarrative };
@@ -390,8 +433,9 @@ class SceneManager {
       this.publishNarrative(this.currentPhaseData.activeNarrative);
     } else {
       const currentPhase = this.currentPhase();
-      if (currentPhase && currentPhase.narrative) {
-        this.publishNarrative(currentPhase.narrative);
+      const currentNarrative = currentPhase ? this.getPhaseNarrative(currentPhase) : null;
+      if (currentNarrative) {
+        this.publishNarrative(currentNarrative);
       }
     }
     
@@ -463,10 +507,9 @@ class SceneManager {
         isPhaseComplete = true;
       }
     } else if (phase.type === FlightPhases.TAKEOFF_PREP) {
-      // Transition from TAKEOFF_PREP to TAKEOFF when throttle is advanced
-      // User must manually advance throttle to begin takeoff roll
-      const throttle = payload?.throttle || payload?.controls?.throttle || 0;
-      if (throttle > 0.4) { // 40% throttle threshold
+      // Transition ONLY on ATC Clearance (for all difficulties)
+      // This ensures the player must request and receive takeoff clearance
+      if (this.takeoffClearanceReceived) {
         isPhaseComplete = true;
       }
     } else if (phase.type === FlightPhases.INITIAL_CLIMB) {

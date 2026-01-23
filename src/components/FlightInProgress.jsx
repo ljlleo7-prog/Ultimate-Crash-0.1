@@ -136,7 +136,7 @@ const FlightInProgress = ({
   } = useAircraftPhysics(aircraftConfig, false, physicsModel);
 
   // Control state for UI components
-  const [throttleControl, setThrottleControl] = useState(47);
+  const [throttleControl, setThrottleControl] = useState(0); // Initialize at IDLE
   const [commandInput, setCommandInput] = useState('');
   const [radioMessages, setRadioMessages] = useState([]);
   const [currentFreq, setCurrentFreq] = useState(121.500);
@@ -198,6 +198,15 @@ const FlightInProgress = ({
         context,
         (response) => {
             setRadioMessages(prev => [...prev, { ...response, frequency: freqType }]);
+            
+            // Event Bus Trigger for Takeoff Clearance
+            if (messageTemplateId === 'req_takeoff') {
+                console.log('🛫 Takeoff Clearance Received - Triggering Event');
+                eventBus.publish('atc.clearance.takeoff', {
+                    timestamp: Date.now(),
+                    runway: messageParams?.runway
+                });
+            }
         }
     );
   };
