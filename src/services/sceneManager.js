@@ -1,6 +1,7 @@
 import eventBus, { EventTypes } from './eventBus.js';
 import { getRunwayHeading } from '../utils/routeGenerator';
 import { getRandomTemplate } from './narrativeTemplates.js';
+import narrativeData from '../data/narrativeDatabase.json';
 
 // Flight phases with typical parameters
 export const FlightPhases = {
@@ -24,6 +25,8 @@ export const FlightPhases = {
 };
 
 // Default comprehensive scenario with realistic flight phases
+// Note: Narrative text is now loaded from src/data/narrativeDatabase.json
+// The 'narrative' properties in this object are legacy/fallback and overridden by the JSON database.
 const defaultScenario = {
   id: 'realistic-flight-1',
   name: 'Realistic Transcontinental Flight',
@@ -285,26 +288,30 @@ class SceneManager {
   
   // Get narrative based on difficulty
   getPhaseNarrative(phase) {
-    if (this.scenario.difficulty === 'rookie') {
-        if (phase.type === FlightPhases.TAKEOFF_PREP) {
-             return {
-                 title: 'Pre-Flight Checklist',
-                 content: 'Set flaps 10/15. Receive ATIS and set altimeter. Engage takeoff lights. Set AP (VS+2500, 200kts). Request Takeoff Clearance.'
-             };
-         }
-        if (phase.type === FlightPhases.TAKEOFF) {
-            return {
-                title: 'Takeoff Roll',
-                content: 'Push throttle to MAX. Rotate smoothly at 140-150 knots.'
-            };
+    const phaseData = narrativeData.phases[phase.type];
+    
+    if (phaseData) {
+        let selectedData = null;
+        
+        // Try to get difficulty-specific narrative
+        if (phaseData[this.scenario.difficulty]) {
+            selectedData = phaseData[this.scenario.difficulty];
         }
-        if (phase.type === FlightPhases.INITIAL_CLIMB) {
-            return {
-                title: 'Positive Rate',
-                content: 'Retract landing gear. Engage Autopilot. Retract flaps.'
-            };
+        // Fallback to default in JSON
+        else if (phaseData.default) {
+            selectedData = phaseData.default;
+        }
+
+        if (selectedData) {
+            // If it's an array, pick one randomly
+            if (Array.isArray(selectedData)) {
+                return selectedData[Math.floor(Math.random() * selectedData.length)];
+            }
+            return selectedData;
         }
     }
+    
+    // Fallback to legacy/scenario defined narrative
     return phase.narrative;
   }
   
@@ -705,40 +712,22 @@ class SceneManager {
 
   // Generate narrative text for failures
   getFailureNarrative(failure) {
-    const templates = {
-      engine: { minor: 'Engine ${engineIndex + 1} showing abnormal vibrations. Monitor closely.' },
-      hydraulic: { minor: 'Primary hydraulic pressure dropping. Check systems.' },
-      electrical: { minor: 'Electrical bus ${bus} experiencing intermittent power loss.' },
-      fuel: { minor: 'Fuel imbalance detected. Crossfeed engaged automatically.' }
-    };
-    
-    const template = templates[failure.type]?.minor || 'System ${type} failure detected.';
+    const failureData = narrativeData.failures[failure.type] || narrativeData.defaults.failure;
+    const template = failureData.minor;
     return this.parseTemplate(template, failure.data);
   }
   
   // Generate critical failure narrative
   getCriticalFailureNarrative(failure) {
-    const templates = {
-      engine: { critical: 'Engine ${engineIndex + 1} FAILED! Immediate action required!' },
-      hydraulic: { critical: 'Primary hydraulic system FAILURE! Manual reversion required!' },
-      electrical: { critical: 'Main electrical bus FAILURE! Emergency power engaged!' },
-      fuel: { critical: 'Fuel leak detected! Rapid fuel loss occurring!' }
-    };
-    
-    const template = templates[failure.type]?.critical || 'System ${type} CRITICAL FAILURE!';
+    const failureData = narrativeData.failures[failure.type] || narrativeData.defaults.failure;
+    const template = failureData.critical;
     return this.parseTemplate(template, failure.data);
   }
   
   // Generate resolution narrative
   getResolutionNarrative(failure) {
-    const templates = {
-      engine: { resolved: 'Engine ${engineIndex + 1} restored to normal operation.' },
-      hydraulic: { resolved: 'Hydraulic pressure stabilized. System restored.' },
-      electrical: { resolved: 'Electrical bus power restored to normal levels.' },
-      fuel: { resolved: 'Fuel imbalance resolved.' }
-    };
-    
-    const template = templates[failure.type]?.resolved || 'System ${type} restored.';
+    const failureData = narrativeData.failures[failure.type] || narrativeData.defaults.failure;
+    const template = failureData.resolved;
     return this.parseTemplate(template, failure.data);
   }
 

@@ -1,0 +1,425 @@
+{
+  "phases": {
+    "boarding": {
+      "default": [
+        {
+          "title": "Boarding at ${departure}",
+          "content": "The smell of jet fuel and coffee fills the cabin as passengers stow their luggage. Outside, the ground crew is prepping for our departure. \"Welcome aboard ${callsign},\" the flight attendant announces over the PA. The ${aircraft} is ready for the journey to ${arrival}."
+        },
+        {
+          "title": "Cabin Preparation",
+          "content": "The final passengers find their seats. The cabin crew seals the doors. \"Cabin crew, arm slides and cross check.\" The ${aircraft} comes alive with the hum of the APU."
+        },
+        {
+          "title": "Pre-Departure",
+          "content": "The Captain's voice comes over the intercom: \"Welcome aboard flight ${callsign} to ${arrival}. Flight time today will be smooth.\" Ground power is disconnected."
+        }
+      ],
+      "sunny": [
+        {
+          "title": "Sunlit Departure",
+          "content": "Sunlight floods the cabin through the viewports. The tarmac shimmers in the heat. A perfect day for flying."
+        }
+      ],
+      "rainy": [
+        {
+          "title": "Rainy Boarding",
+          "content": "Rain streaks the windows at ${departure}. Passengers shake off umbrellas as they step aboard. The gray sky promises a bumpy ascent."
+        }
+      ],
+      "shakespearean": [
+        {
+          "title": "The Iron Bird Awaits",
+          "content": "Hark! The beast of metal rests upon the earth, its belly filling with souls bound for ${arrival}. The air is thick with anticipation."
+        }
+      ]
+    },
+    "departure_clearance": {
+      "default": [
+        {
+          "title": "IFR Clearance",
+          "content": "The radio crackles. \"${callsign}, cleared to ${arrival} via flight plan route. Climb and maintain FL350. Departure frequency 124.7. Squawk 4211.\" You read back the clearance as the systems come online."
+        },
+        {
+          "title": "Clearance Received",
+          "content": "Clearance Delivery reads back your route. \"${callsign}, cleared to destination ${arrival}, maintain 5000, expect FL350 ten minutes after departure.\" The FMS is programmed and verified."
+        },
+        {
+          "title": "Route Confirmation",
+          "content": "Copying clearance. \"${callsign}, you are cleared to ${arrival}, squawk 4722.\" The flight plan is locked in. Altimeters set. Transponder code entered."
+        }
+      ],
+      "shakespearean": [
+        {
+          "title": "The Writ of Passage",
+          "content": "The voice from the ether grants us passage! \"Fly true to ${arrival},\" it commands. Our course is set by the stars and the scribes."
+        }
+      ]
+    },
+    "pushback": {
+      "default": [
+        {
+          "title": "Pushback Approved",
+          "content": "A gentle jolt as the tug connects. \"Ground to Cockpit, brakes released.\" The terminal building slowly drifts away as you start the engines. The hum of the APU is replaced by the roar of the main turbines."
+        },
+        {
+          "title": "Starting Engines",
+          "content": "Pushback commencing. \"Starting number two.\" The high-pitched whine of the engine start sequence begins. Oil pressure rising, N1 rotation confirmed. \"Starting number one.\""
+        },
+        {
+          "title": "Leaving the Gate",
+          "content": "The tug pushes the heavy ${aircraft} back onto the taxiway. Ground crew signals all clear on the left and right. Parking brake set. \"Tow bar disconnected. Have a safe flight.\""
+        }
+      ],
+      "rainy": [
+        {
+          "title": "Wet Pushback",
+          "content": "The tug's wheels splash through puddles on the apron. Rain blurs the view of the terminal as we push back into the gray."
+        }
+      ],
+      "shakespearean": [
+        {
+          "title": "The Beast Awakens",
+          "content": "The tether is severed! The great engines roar to life like dragons roused from slumber. We back away from the safety of the keep."
+        }
+      ]
+    },
+    "taxiing": {
+      "default": [
+        {
+          "title": "Taxi to Runway ${departureRunway}",
+          "content": "\"${callsign}, taxi to runway ${departureRunway} via Alpha, Bravo.\" You release the parking brake. The tires thump rhythmically over the concrete joints as you weave through the maze of taxiways."
+        },
+        {
+          "title": "Ground Movement",
+          "content": "Navigating the busy apron. \"Give way to the 747 on your right.\" The long taxi to runway ${departureRunway} begins. Flight controls check: full left, full right, full up, full down. All systems green."
+        },
+        {
+          "title": "Holding Short",
+          "content": "Approaching the hold short line for runway ${departureRunway}. Pre-takeoff briefing complete. Cabin secure. \"${callsign}, hold short of runway ${departureRunway}.\""
+        }
+      ],
+      "sunny": [
+        {
+          "title": "Heat Haze",
+          "content": "Heat haze shimmers off the asphalt as we taxi. The sun glints blindingly off the wings of other aircraft."
+        }
+      ],
+      "rainy": [
+        {
+          "title": "Wipers On",
+          "content": "Wipers sweep back and forth, clearing the deluge. The taxiway lights reflect on the wet pavement like scattered gems."
+        }
+      ],
+      "shakespearean": [
+        {
+          "title": "The March to the Precipice",
+          "content": "We march towards the edge of the world! The runway lies ahead, a ribbon of destiny calling our names."
+        }
+      ]
+    },
+    "takeoff_prep": {
+      "default": [
+        {
+          "title": "Lined Up and Waiting",
+          "content": "Lined up on runway ${departureRunway}. Brakes set. Engines at idle. \"Tower, ${callsign} holding in position ${departureRunway}, ready for takeoff.\" Check flaps, trim, and verify takeoff data."
+        },
+        {
+          "title": "Position and Hold",
+          "content": "Entered runway ${departureRunway}. The long strip of concrete stretches out ahead. \"${callsign}, line up and wait.\" Landing lights on. Transponder TA/RA. Heart rate increases slightly."
+        },
+        {
+          "title": "Final Checks",
+          "content": "Holding on the threshold of ${departureRunway}. Engines stable. Flaps set for takeoff. The tower controller is coordinating separation. \"Be ready for immediate takeoff.\""
+        }
+      ],
+      "rookie": {
+        "title": "Pre-Flight Checklist",
+        "content": "Set flaps 10/15. Receive ATIS and set altimeter. Engage takeoff lights. Set AP (VS+2500, 200kts). Request Takeoff Clearance."
+      },
+      "shakespearean": [
+        {
+          "title": "Steadfast at the Threshold",
+          "content": "We stand at the gates of the sky! The engines hum a low war-cry. We await the signal to unleash the fury."
+        }
+      ]
+    },
+    "takeoff": {
+      "default": [
+        {
+          "title": "Takeoff Clearance",
+          "content": "Lined up on runway ${departureRunway}. \"Wind 130 at 8, runway ${departureRunway} cleared for takeoff.\" Throttles forward. The engines roar to life, pressing you back into the seat. Rotate at Vr."
+        },
+        {
+          "title": "Rolling",
+          "content": "\"${callsign}, wind calm, runway ${departureRunway} cleared for takeoff.\" TOGA button pressed. Engines spool up to takeoff power. Airspeed alive. 80 knots. V1... Rotate."
+        },
+        {
+          "title": "Departure",
+          "content": "Maximum thrust set. The centerline blurs beneath the nose. The ${aircraft} accelerates rapidly. \"Rotate.\" The nose lifts, and the wheels leave the ground. Positive rate."
+        }
+      ],
+      "rookie": {
+        "title": "Takeoff Roll",
+        "content": "Push throttle to MAX. Rotate smoothly at 140-150 knots."
+      },
+      "rainy": [
+        {
+          "title": "Spray and Speed",
+          "content": "Throttles max! Great plumes of spray trail behind the wheels. The ${aircraft} fights the wind as it claws into the gray sky."
+        }
+      ],
+      "shakespearean": [
+        {
+          "title": "Defying the Earth",
+          "content": "With a roar of thunder, we defy the earth's grasp! The ground falls away, vanquished by speed and fire! Ascend!"
+        }
+      ]
+    },
+    "initial_climb": {
+      "default": [
+        {
+          "title": "Positive Rate",
+          "content": "The ground falls away beneath you. \"Gear up.\" Punching through the lower cloud layer. The city of ${departure} shrinks into a miniature grid below. Speed increasing to 250 knots."
+        },
+        {
+          "title": "Climbing Out",
+          "content": "\"Positive rate, gear up.\" The landing gear retracts with a heavy thud. Cleaning up the flaps. \"${callsign}, contact Departure.\" Banking towards the first waypoint."
+        },
+        {
+          "title": "Departure Turn",
+          "content": "Leaving the airport environment. Flaps retracted. Speed checking 250 knots. The view from the cockpit is spectacular as the ${aircraft} climbs powerfully into the sky."
+        }
+      ],
+      "rookie": {
+        "title": "Positive Rate",
+        "content": "Retract landing gear. Engage Autopilot. Retract flaps."
+      },
+      "sunny": [
+        {
+          "title": "Into the Blue",
+          "content": "We punch through the haze into brilliant sunshine. The world below is a map of green and brown."
+        }
+      ],
+      "rainy": [
+        {
+          "title": "Piercing the Clouds",
+          "content": "We vanish into the cloud deck. Turbulence shakes the frame as we climb blind through the storm."
+        }
+      ],
+      "shakespearean": [
+        {
+          "title": "Where Eagles Dare Not Tread",
+          "content": "Higher! We soar where eagles dare not tread. The mortal world shrinks to insignificance beneath our wings."
+        }
+      ]
+    },
+    "main_climb": {
+      "default": [
+        {
+          "title": "Climb to Cruise",
+          "content": "Passing 10,000 feet. \"Accelerate to cruise speed.\" The sky darkens to a deeper blue as we ascend. The air is smooth. Climbing steadily to Flight Level 350."
+        },
+        {
+          "title": "Ascent",
+          "content": "Breaking through the cloud tops. The seatbelt sign is switched off. \"${callsign}, climb and maintain flight level 350.\" Vertical speed stable. Engines humming efficiently."
+        },
+        {
+          "title": "High Altitude",
+          "content": "Crossing 20,000 feet. The air is thin and cold outside. Monitoring engine parameters. The horizon curvature becomes visible. Smooth air all the way up."
+        }
+      ],
+      "shakespearean": [
+        {
+          "title": "Scaling the Heavens",
+          "content": "We scale the very walls of heaven! The air grows thin, but our spirit remains strong. Onward to the stars!"
+        }
+      ]
+    },
+    "cruise": {
+      "default": [
+        {
+          "title": "Cruising at FL350",
+          "content": "Level at 35,000 feet. The horizon is a curved line of haze. \"Maintain Mach 0.78.\" The engines hum with a steady, reassuring rhythm. Passengers are settling in for the flight to ${arrival}."
+        },
+        {
+          "title": "En Route",
+          "content": "Cruising altitude reached. Autopilot tracking the route perfectly. Outside air temperature is -50°C. A peaceful calm settles over the flight deck. Waypoints passing by."
+        },
+        {
+          "title": "Long Haul",
+          "content": "Steady cruise. Fuel flow is nominal. Checking progress against the flight plan. \"${callsign}, contact Center on 135.4.\" The journey is smooth."
+        }
+      ],
+      "sunny": [
+        {
+          "title": "Sunset Cruise",
+          "content": "The sun paints the sky in brilliant colors of orange and purple. A peaceful calm settles over the flight deck."
+        }
+      ],
+      "shakespearean": [
+        {
+          "title": "The Void Between Worlds",
+          "content": "We sail the endless ocean of the sky. Time stands still in this void between worlds. We are masters of the horizon."
+        }
+      ]
+    },
+    "descent": {
+      "default": [
+        {
+          "title": "Top of Descent",
+          "content": "Throttles back. The pitch drops slightly as we begin our descent. \"Descend and maintain 10,000 feet.\" The destination ${arrival} lies ahead."
+        },
+        {
+          "title": "Descending",
+          "content": "Leaving cruising altitude. \"${callsign}, cross WPT at 12,000.\" Speedbrakes extended slightly to manage speed. The ground features become distinct again."
+        },
+        {
+          "title": "Arrival Path",
+          "content": "Descent checklist complete. Altimeters reset to local pressure. \"Expect the ILS approach runway ${landingRunway}.\""
+        }
+      ],
+      "rainy": [
+        {
+          "title": "Descent into Gray",
+          "content": "We descend back into the murk. Clouds rush past the windshield like ghosts. Rain begins to pelt the glass."
+        }
+      ],
+      "shakespearean": [
+        {
+          "title": "The Fall from Grace",
+          "content": "We leave the sanctuary of the heavens and return to the mortal coil. Gravity reclaims its due."
+        }
+      ]
+    },
+    "approach": {
+      "default": [
+        {
+          "title": "Approach to ${arrival}",
+          "content": "Lined up for runway ${landingRunway}. \"Gear down, flaps 30.\" The runway threshold looms ahead. Speed checked, localized captured."
+        },
+        {
+          "title": "Final Approach",
+          "content": "Intercepting the glideslope. \"Gear down, three green.\" Flaps set for landing. The runway lights of ${landingRunway} pierce through the mist. Concentrating on the numbers."
+        },
+        {
+          "title": "Short Final",
+          "content": "Five miles out. \"${callsign}, cleared to land runway ${landingRunway}.\" Disengaging autopilot. Hand flying the final segment. Speed Vref + 5. Stable approach."
+        }
+      ],
+      "rainy": [
+        {
+          "title": "Stormy Approach",
+          "content": "The runway is a blur of lights in the rain. Wipers fighting the deluge. Crosswind buffeting the wings. Steady..."
+        }
+      ],
+      "shakespearean": [
+        {
+          "title": "The Final Gauntlet",
+          "content": "The earth rushes up to meet us! We thread the needle of fate. Steady hand, brave heart! The ground awaits."
+        }
+      ]
+    },
+    "landing": {
+      "default": [
+        {
+          "title": "Touchdown",
+          "content": "Flare... Touchdown. Spoilers deployed. Reverse thrust roaring. \"${callsign}, welcome to ${arrival}.\" Braking to taxi speed."
+        },
+        {
+          "title": "On the Ground",
+          "content": "Over the threshold. Power to idle. The main wheels kiss the pavement. Nose gear down. Manual braking. \"Turn off at the next taxiway.\""
+        },
+        {
+          "title": "Rollout",
+          "content": "Firm landing. Speedbrakes up. Reversers green. Decelerating through 80 knots. \"Welcome to ${arrival}, please keep your seatbelts fastened.\" Vacating the runway."
+        }
+      ],
+      "rainy": [
+        {
+          "title": "Hydroplaning Risk",
+          "content": "Splashdown! Water sprays from the reversers. Braking carefully on the slick runway. We slide slightly before gripping the tarmac."
+        }
+      ],
+      "shakespearean": [
+        {
+          "title": "The Return to Earth",
+          "content": "Contact! The earth shakes as we reunite with the ground. The beast is tamed! We have cheated death once more."
+        }
+      ]
+    },
+    "after_land_taxiing": {
+      "default": [
+        {
+          "title": "Taxi to Gate",
+          "content": "\"Turn left next taxiway, contact Ground.\" The flight is over. Taxing past other aircraft to our assigned gate."
+        },
+        {
+          "title": "Arrival Taxi",
+          "content": "Cleaning up the aircraft. Flaps up, transponder standby. Following the follow-me car to the stand. \"Welcome to ${arrival}.\""
+        },
+        {
+          "title": "Parking",
+          "content": "Approaching the terminal. The marshaller waves the wands. Slowly inching forward to the stop mark. \"Set parking brake.\""
+        }
+      ],
+      "shakespearean": [
+        {
+          "title": "The Victor's Parade",
+          "content": "We parade past the lesser vessels. The journey is done, the saga complete. We rest our weary wings."
+        }
+      ]
+    },
+    "shutoff": {
+      "default": [
+        {
+          "title": "Engine Shutdown",
+          "content": "Parking brake set. Fuel cutoff. The engines spin down into silence. APU off. \"Thank you for flying with us.\" Flight complete."
+        },
+        {
+          "title": "Power Down",
+          "content": "Engines off. Beacon light off. Seatbelt sign off. The sound of passengers disembarking. Completing the shutdown checklist. A successful journey."
+        },
+        {
+          "title": "Flight Complete",
+          "content": "External power connected. Systems powering down. The cockpit goes dark. Logbook updated. \"Good flight, everyone.\" The ${aircraft} sleeps until next time."
+        }
+      ],
+      "shakespearean": [
+        {
+          "title": "The Long Sleep",
+          "content": "The fires die. The heartbeat stops. The iron bird sleeps, dreaming of the sky. Until we meet again, noble steed."
+        }
+      ]
+    }
+  },
+  "failures": {
+    "engine": {
+      "minor": "Engine ${engineIndex + 1} showing abnormal vibrations. Monitor closely.",
+      "critical": "Engine ${engineIndex + 1} FAILED! Immediate action required!",
+      "resolved": "Engine ${engineIndex + 1} restored to normal operation."
+    },
+    "hydraulic": {
+      "minor": "Primary hydraulic pressure dropping. Check systems.",
+      "critical": "Primary hydraulic system FAILURE! Manual reversion required!",
+      "resolved": "Hydraulic pressure stabilized. System restored."
+    },
+    "electrical": {
+      "minor": "Electrical bus ${bus} experiencing intermittent power loss.",
+      "critical": "Main electrical bus FAILURE! Emergency power engaged!",
+      "resolved": "Electrical bus power restored to normal levels."
+    },
+    "fuel": {
+      "minor": "Fuel imbalance detected. Crossfeed engaged automatically.",
+      "critical": "Fuel leak detected! Rapid fuel loss occurring!",
+      "resolved": "Fuel imbalance resolved."
+    }
+  },
+  "defaults": {
+     "failure": {
+         "minor": "System ${type} failure detected.",
+         "critical": "System ${type} CRITICAL FAILURE!",
+         "resolved": "System ${type} restored."
+     }
+  }
+}
