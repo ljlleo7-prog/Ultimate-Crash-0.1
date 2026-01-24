@@ -518,10 +518,26 @@ class SceneManager {
         isPhaseComplete = true;
       }
     } else if (phase.type === FlightPhases.TAKEOFF_PREP) {
-      // Transition ONLY on ATC Clearance (for all difficulties)
-      // This ensures the player must request and receive takeoff clearance
+      // Transition ONLY on ATC Clearance
       if (this.takeoffClearanceReceived) {
-        isPhaseComplete = true;
+        const isHardcore = ['pro', 'devil'].includes(this.scenario.difficulty.toLowerCase());
+        
+        if (isHardcore) {
+            // In Pro mode, wait for user to apply power for takeoff OR click Continue
+             // This prevents jarring transition immediately upon clearance
+             // Check throttle input (0-1) or engine N1 if available
+             const throttleInput = payload?.controls?.throttle || payload?.throttle || 0;
+             // Try to get N1 from systems (OverheadLogic sync) or engineParams (Physics output)
+             const engineN1 = payload?.engineParams?.n1?.[0] || payload?.systems?.engines?.eng1?.n1 || 0;
+             
+             // Trigger if throttle is advanced (> 40%) or user clicked continue
+             if (this.userSkipped || throttleInput > 0.4 || engineN1 > 40) {
+                 isPhaseComplete = true;
+             }
+        } else {
+            // Normal mode: Auto-advance on clearance
+            isPhaseComplete = true;
+        }
       }
     } else if (phase.type === FlightPhases.INITIAL_CLIMB) {
       const altitude_m = payload?.position?.z || 0;

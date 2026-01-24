@@ -74,80 +74,48 @@ export const checkStartupRequirements = (phase, systems, engines = []) => {
         }
 
     } else if (phase === StartupPhases.ENGINE_START) {
-        // SCENE 2: ENGINE START
-        // Goal: Engines Running, Gens ON, APU OFF, Fuel Pumps ON, Hydraulics
-        
-        // 1. All Engines Started
-        // Check N2 > 50% for all engines
-        let allEnginesRunning = true;
-        const engineCount = engines.length > 0 ? engines.length : 2; // Default to 2 if not provided (should be provided)
+        const engineEntries = [];
 
-        for (let i = 0; i < engineCount; i++) {
-            const eng = engines[i];
-            const engRunning = eng && (eng.n2 > 50 || (eng.state && eng.state.n2 > 50));
+        if (Array.isArray(engines)) {
+            engines.forEach(e => engineEntries.push(e));
+        } else if (engines && typeof engines === 'object') {
+            Object.keys(engines)
+                .sort((a, b) => {
+                    const ia = parseInt(String(a).replace('eng', ''), 10) || 0;
+                    const ib = parseInt(String(b).replace('eng', ''), 10) || 0;
+                    return ia - ib;
+                })
+                .forEach(key => {
+                    engineEntries.push(engines[key]);
+                });
+        }
+
+        const engineCount = engineEntries.length || 2;
+        const requiredEngines = Math.min(2, engineCount);
+
+        for (let i = 0; i < requiredEngines; i++) {
+            const eng = engineEntries[i];
+            const n2 = eng ? (typeof eng.n2 === 'number' ? eng.n2 : eng.state && eng.state.n2) : null;
+            const engRunning = typeof n2 === 'number' && n2 > 50;
             if (!engRunning) {
-                allEnginesRunning = false;
                 missingItems.push(`Engine ${i + 1} Running (N2 > 50%)`);
             }
         }
-        
-        // 2. Generators ON
-        // Check corresponding generators for each engine
-        for (let i = 0; i < engineCount; i++) {
+
+        for (let i = 0; i < requiredEngines; i++) {
             const genKey = `gen${i + 1}`;
             if (!systems.electrical?.[genKey]) {
                 missingItems.push(`Generator ${i + 1} ON`);
             }
         }
 
-        // 3. APU OFF
         if (systems.apu?.running || systems.electrical?.apuGen) {
             missingItems.push('APU Shutdown & APU Gen OFF');
         }
 
-        // 4. Fuel Pumps ON
-        // User: "fuel pump starts to pump fuel"
-        // Check at least one pump per side or appropriate config
-        const fuel = systems.fuel || {};
-        const pumpsOn = (fuel.leftPumps || fuel.centerPumps) && (fuel.rightPumps || fuel.centerPumps);
-        if (!pumpsOn) {
-            missingItems.push('Fuel Pumps ON');
+        if (systems.adirs && !systems.adirs.aligned) {
+            missingItems.push('ADIRS Alignment Complete');
         }
-
-        // 5. Hydraulics
-        // User: "engines starts to power hydraulics"
-        // Check ALL available hydraulic systems based on config
-        const hyd = systems.hydraulics || {};
-        const hydKeys = Object.keys(hyd);
-        
-        if (hydKeys.length > 0) {
-            hydKeys.forEach(key => {
-                // Check pump status
-                if (!hyd[key].engPump) {
-                    // Format key nicely (sysA -> SYS A, sys1 -> SYS 1)
-                    const label = key.replace('sys', 'SYS ').toUpperCase();
-                    missingItems.push(`Hydraulic Pump ${label} ON`);
-                }
-                // Check pressure
-                if ((hyd[key].pressure || 0) < 2000) {
-                    const label = key.replace('sys', 'SYS ').toUpperCase();
-                    missingItems.push(`Hydraulic ${label} Pressure Low`);
-                }
-            });
-        } else {
-             // Fallback for missing hydraulics object
-             missingItems.push('Hydraulics Not Initialized');
-        }
-        // 6. Window Heat & Probe Heat
-        if (systems.ice?.windowHeat === false) missingItems.push('Window Heat ON');
-        if (systems.ice?.probeHeat === false) missingItems.push('Probe Heat ON');
-        
-        // 7. Yaw Damper
-        if (systems.flightControls?.yawDamper === false) missingItems.push('Yaw Damper ON');
-
-        // 8. Emergency Lights (Armed)
-        if (systems.lighting?.emergencyExit !== 'ARMED') missingItems.push('Emergency Lights ARMED');
-
     }
 
     return {

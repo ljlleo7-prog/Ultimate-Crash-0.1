@@ -20,7 +20,7 @@ class OverheadLogic {
 
             // APU
             APU_START_TIME: 25.0,
-            APU_COOLDOWN_TIME: 60.0,
+            APU_COOLDOWN_TIME: 15.0,
             
             // Hydraulics
             HYD_MAX_PRESSURE: 3000,
@@ -83,6 +83,22 @@ class OverheadLogic {
                 logo: false,
                 wing: false,
                 emergencyLights: true // Armed
+            };
+        }
+
+        // Initialize Comms & Transponder
+        if (!systems.comms) {
+            systems.comms = {
+                vhf1: { active: '118.500', stby: '121.500' },
+                vhf2: { active: '121.900', stby: '119.100' },
+                hf1: { active: '8888', stby: '2992' }
+            };
+        }
+        if (!systems.transponder) {
+            systems.transponder = {
+                code: '1200',
+                mode: 'STBY', // STBY, ALT, TA, RA
+                ident: false
             };
         }
 
@@ -420,14 +436,9 @@ class OverheadLogic {
         pneu.ductPressR = maxBleedPressureR;
         
         // Isolation Valve Logic (Connects Left and Right)
-        // If Isolation Valve is OPEN, pressure equalizes
-        // If APU is ON and Bleed is ON, it pressurizes the manifold.
-        // On 737: APU feeds Left side of Iso Valve.
-        // On 747/Widebodies: APU usually feeds Center or can feed both via Iso.
-        // Simplified Logic: If Iso Valve Open, take Max.
-        // If Iso Valve Closed, APU feeds Left (Standard 737) OR Both if configured (Widebody).
-        
-        // Fix for 4-engine start: Ensure APU bleed reaches Right Duct if Iso Valve is Open OR if widebody logic applies
+        // Default to OPEN if undefined to assist with engine starts
+        if (pneu.isolationValve === undefined) pneu.isolationValve = true;
+
         const isWidebody = engineCount > 2;
 
         if (pneu.isolationValve) {
@@ -436,13 +447,10 @@ class OverheadLogic {
             pneu.ductPressL = maxP;
             pneu.ductPressR = maxP;
         } else if (isWidebody) {
-             // For widebodies (e.g. 747), APU feeds a central manifold that distributes to both sides
-             // UNLESS specific isolation logic prevents it. 
-             // Let's assume APU can feed Right side too if enabled, or at least if Iso is open (handled above).
-             // If Iso is CLOSED on 747, APU feeds L and R usually has its own APU logic or crossfeed.
-             // But simpler fix: If APU bleed is high, allow it to pressurize R if L is pressurized?
-             // Actually, 747 APU feeds the manifold. Let's just say if Iso is closed, APU -> Left.
-             // User needs to OPEN Isolation Valve to start Right Engines (3 & 4) with APU!
+             // For widebodies (e.g. 747), APU feeds a central manifold.
+             // Simplification: If APU is running and valve is closed, maybe it feeds both?
+             // But usually Isolation Valve is required.
+             // We will leave it strictly controlled by valve to encourage proper procedure.
         }
 
         // 3. Packs

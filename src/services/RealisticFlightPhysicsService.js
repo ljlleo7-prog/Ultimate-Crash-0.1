@@ -335,7 +335,8 @@ class RealisticFlightPhysicsService {
         // Generate Hydraulic States dynamically
         const hydraulicState = {};
         const sysNames = ['A', 'B', 'C', 'D'];
-        const hydraulicCount = this.aircraft.hydraulicCount || 2;
+        // Default: 4 systems for 4-engine planes, 2 for others (unless specified)
+        const hydraulicCount = this.aircraft.hydraulicCount || (engineCount > 2 ? 4 : 2);
         
         for (let i = 0; i < hydraulicCount; i++) {
             const name = i < sysNames.length ? `sys${sysNames[i]}` : `sys${i+1}`;
@@ -1920,6 +1921,27 @@ class RealisticFlightPhysicsService {
             if (action === 'code') this.systems.transponder.code = value;
             else if (action === 'mode') this.systems.transponder.mode = value;
             else if (action === 'ident') this.systems.transponder.ident = value;
+        }
+        else if (system === 'comms') {
+            // VHF Logic
+            if (action.startsWith('swap_')) {
+                const radio = action.replace('swap_', ''); // vhf1, vhf2
+                if (this.systems.comms[radio]) {
+                    const temp = this.systems.comms[radio].active;
+                    this.systems.comms[radio].active = this.systems.comms[radio].stby;
+                    this.systems.comms[radio].stby = temp;
+                }
+            } else if (action.startsWith('set_stby_')) {
+                const radio = action.replace('set_stby_', '');
+                if (this.systems.comms[radio]) {
+                    this.systems.comms[radio].stby = value;
+                }
+            } else if (action.startsWith('set_code_')) { // Direct code set (if we use numpad)
+                const radio = action.replace('set_code_', '');
+                 if (this.systems.comms[radio]) {
+                    this.systems.comms[radio].stby = value;
+                }
+            }
         }
         else {
             // Generic Handling
