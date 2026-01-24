@@ -1560,20 +1560,30 @@ class RealisticFlightPhysicsService {
             Mz_aero *= stabilityFactor;
         }
 
-        // --- Ground Stabilizer (Inertia-Based Damping) ---
+        // --- Ground Stabilizer (Inertia-Based Damping & Roll Clamp) ---
         // Uses Inertia Tensor to provide consistent damping regardless of aircraft mass
         if (this.onGround) {
              const Ix = this.aircraft.Ix || 1000000;
              const Iy = this.aircraft.Iy || 2000000;
              const Iz = this.aircraft.Iz || 3000000;
              
-             // Damping Factor (1/s) - Controls how fast rotation decays
-             // INCREASED: 1.0 -> 5.0 for solid ground feel, prevents twitchiness at low speed
-             const dampingFactor = 5.0; 
+             // Pitch/Yaw Damping (Keep existing logic)
+             const pitchYawDamping = 5.0; 
+             M_ground.y -= this.state.rates.y * (Iy * pitchYawDamping);
+             M_ground.z -= this.state.rates.z * (Iz * pitchYawDamping);
 
-             M_ground.x -= this.state.rates.x * (Ix * dampingFactor);
-             M_ground.y -= this.state.rates.y * (Iy * dampingFactor);
-             M_ground.z -= this.state.rates.z * (Iz * dampingFactor);
+             // Roll Control: Clamp roll using gear height logic
+             // User Request: "Use ground/air logic and gear height to clamp roll instead of adding a massive damp"
+             
+             const euler = this.state.quat.toEuler();
+             const phi = euler.phi;
+
+             // Spring force to keep wings level (phi -> 0)
+             // Reduced damping to avoid overshoot, added spring stiffness
+             const rollStiffness = 4000000; 
+             const rollDamping = 1000000; // Reduced from ~5M (Ix * 5)
+             
+             M_ground.x -= (phi * rollStiffness) + (this.state.rates.x * rollDamping);
              
              // Vertical Damping (Mass-based)
              // Global damper to stop bouncing/jitter at low speeds
@@ -1900,10 +1910,14 @@ class RealisticFlightPhysicsService {
 
              if (action === 'eng1_start_toggle') this.systems.engines.eng1.startSwitch = cycleStartSwitch(this.systems.engines.eng1.startSwitch);
              else if (action === 'eng2_start_toggle') this.systems.engines.eng2.startSwitch = cycleStartSwitch(this.systems.engines.eng2.startSwitch);
+             else if (action === 'eng3_start_toggle' && this.systems.engines.eng3) this.systems.engines.eng3.startSwitch = cycleStartSwitch(this.systems.engines.eng3.startSwitch);
+             else if (action === 'eng4_start_toggle' && this.systems.engines.eng4) this.systems.engines.eng4.startSwitch = cycleStartSwitch(this.systems.engines.eng4.startSwitch);
              
              // Fuel Control
              else if (action === 'eng1_fuel') this.systems.engines.eng1.fuelControl = toggle(this.systems.engines.eng1.fuelControl);
              else if (action === 'eng2_fuel') this.systems.engines.eng2.fuelControl = toggle(this.systems.engines.eng2.fuelControl);
+             else if (action === 'eng3_fuel' && this.systems.engines.eng3) this.systems.engines.eng3.fuelControl = toggle(this.systems.engines.eng3.fuelControl);
+             else if (action === 'eng4_fuel' && this.systems.engines.eng4) this.systems.engines.eng4.fuelControl = toggle(this.systems.engines.eng4.fuelControl);
         }
         else if (system === 'fire') {
             // Fire Handles
