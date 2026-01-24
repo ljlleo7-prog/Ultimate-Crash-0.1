@@ -219,26 +219,33 @@ class RealisticFlightPhysicsService {
         this.sensors = { pitotBlocked: false };
 
         // Aircraft Systems State
+        this.initializeSystems(this.difficulty);
+    }
+
+    initializeSystems(difficulty) {
+        // Cold & Dark for Pro/Devil
+        const isColdDark = difficulty === 'pro' || difficulty === 'devil';
+        
         this.systems = {
             electrical: {
-                battery: true,
+                battery: !isColdDark,
                 batteryCharge: 100, // %
-                stbyPower: true,
-                gen1: true,
-                gen2: true,
+                stbyPower: !isColdDark,
+                gen1: !isColdDark,
+                gen2: !isColdDark,
                 apuGen: false,
                 busTie: true, // Auto
-                dcVolts: 28.0,
-                acVolts: 115,
-                acFreq: 400,
-                acAmps: 50,
-                sourceOff1: false,
-                sourceOff2: false,
+                dcVolts: isColdDark ? 0 : 28.0,
+                acVolts: isColdDark ? 0 : 115,
+                acFreq: isColdDark ? 0 : 400,
+                acAmps: isColdDark ? 0 : 50,
+                sourceOff1: isColdDark,
+                sourceOff2: isColdDark,
                 apuGenOff: true
             },
             fuel: {
-                leftPumps: true,
-                rightPumps: true,
+                leftPumps: !isColdDark,
+                rightPumps: !isColdDark,
                 centerPumps: false,
                 crossfeed: false,
                 tanks: {
@@ -246,8 +253,8 @@ class RealisticFlightPhysicsService {
                     right: 5000,
                     center: 2000
                 },
-                pressL: 35,
-                pressR: 35,
+                pressL: isColdDark ? 0 : 35,
+                pressR: isColdDark ? 0 : 35,
                 pressC: 0
             },
             apu: {
@@ -261,8 +268,8 @@ class RealisticFlightPhysicsService {
                 state: 'OFF'
             },
             hydraulics: {
-                sysA: { pressure: 3000, engPump: true, elecPump: false, qty: 100 },
-                sysB: { pressure: 3000, engPump: true, elecPump: false, qty: 100 }
+                sysA: { pressure: isColdDark ? 0 : 3000, engPump: true, elecPump: !isColdDark, qty: 100 },
+                sysB: { pressure: isColdDark ? 0 : 3000, engPump: true, elecPump: !isColdDark, qty: 100 }
             },
             transponder: {
                 code: 2000,
@@ -270,16 +277,16 @@ class RealisticFlightPhysicsService {
                 ident: false
             },
             pressurization: {
-                packL: true,
-                packR: true,
-                bleed1: true,
-                bleed2: true,
+                packL: !isColdDark,
+                packR: !isColdDark,
+                bleed1: !isColdDark,
+                bleed2: !isColdDark,
                 isolationValve: true, // Auto/Open
                 cabinAlt: 0,
                 diffPressure: 0,
                 targetAlt: 35000,
-                ductPressL: 30,
-                ductPressR: 30,
+                ductPressL: isColdDark ? 0 : 30,
+                ductPressR: isColdDark ? 0 : 30,
                 mode: 'AUTO'
             },
             oxygen: {
@@ -290,16 +297,16 @@ class RealisticFlightPhysicsService {
             lighting: {
                 landing: false,
                 taxi: false,
-                nav: true,
-                beacon: true,
-                strobe: true,
+                nav: !isColdDark,
+                beacon: !isColdDark,
+                strobe: !isColdDark,
                 logo: false,
                 wing: false,
-                powered: true
+                powered: !isColdDark
             },
             nav: {
-                irsL: true,
-                irsR: true
+                irsL: !isColdDark,
+                irsR: !isColdDark
             },
             fire: {
                 eng1: false,
@@ -312,15 +319,32 @@ class RealisticFlightPhysicsService {
                 engine2: false
             },
             signs: {
-                seatBelts: true,
-                noSmoking: true
+                seatBelts: !isColdDark,
+                noSmoking: !isColdDark
             },
             wipers: {
                 left: false,
                 right: false
+            },
+            brakes: {
+                parkingBrake: isColdDark, // On if cold & dark
+                autobrake: 'OFF', // RTO, OFF, 1, 2, 3, MAX
+                temp: [20, 20, 20, 20] // Brake temps
             }
         };
+
+        // If cold & dark, ensure engines are off too
+        if (isColdDark) {
+            this.engines.forEach(eng => {
+                eng.running = false;
+                eng.state.n1 = 0;
+                eng.state.n2 = 0;
+                eng.state.egt = 15; // Ambient
+                eng.state.ff = 0;
+            });
+        }
     }
+
 
     validateAndParseAircraft(data) {
         const wingArea = data.wingArea || 125;
@@ -2502,21 +2526,7 @@ class RealisticFlightPhysicsService {
 
         // Reset Critical System States (Flags that might be stuck)
         if (this.systems) {
-            if (this.systems.pressurization) this.systems.pressurization.breach = false;
-            
-            // Restore Electrical
-            if (this.systems.electrical) {
-                this.systems.electrical.gen1 = true;
-                this.systems.electrical.gen2 = true;
-                this.systems.electrical.stbyPower = true;
-            }
-            
-            // Reset APU
-            if (this.systems.apu) {
-                this.systems.apu.running = false;
-                this.systems.apu.starting = false;
-                this.systems.apu.egt = 0;
-            }
+            this.initializeSystems(this.difficulty);
         }
 
         // Reset Failure System

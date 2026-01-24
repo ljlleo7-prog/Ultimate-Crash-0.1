@@ -347,9 +347,10 @@ class OverheadLogic {
         }
 
         // Pumps Output Pressure
-        fuel.pressL = (fuel.leftPumps && systems.electrical.acVolts > 100) ? 35 : 0;
-        fuel.pressR = (fuel.rightPumps && systems.electrical.acVolts > 100) ? 35 : 0;
-        fuel.pressC = (fuel.centerPumps && systems.electrical.acVolts > 100) ? 35 : 0;
+        // Pressure drops if tank is empty (cavitation/air)
+        fuel.pressL = (fuel.leftPumps && systems.electrical.acVolts > 100 && fuel.tanks.left > 0) ? 35 : 0;
+        fuel.pressR = (fuel.rightPumps && systems.electrical.acVolts > 100 && fuel.tanks.right > 0) ? 35 : 0;
+        fuel.pressC = (fuel.centerPumps && systems.electrical.acVolts > 100 && fuel.tanks.center > 0) ? 35 : 0;
 
         // Consumption Logic (Drain from tanks based on pump config)
         // Engines consume ~1kg/s (simplified)

@@ -17,9 +17,10 @@ import Sidebar from './Sidebar';
 import SaveLoadPanel from './SaveLoadPanel';
 import TimerPanel from './TimerPanel';
 import FlightComputerPanel from './FlightComputerPanel';
+import ChecklistPanel from './ChecklistPanel';
 import './FlightPanel.css';
 
-const FlightPanelModular = ({ flightData, physicsState, weatherData, onActionRequest, aircraftModel, selectedArrival, flightPlan, radioMessages, onRadioFreqChange, npcs, frequencyContext, currentRegion, timeScale, setTimeScale, onUpdateFlightPlan, availableRunways }) => {
+const FlightPanelModular = ({ flightData, physicsState, weatherData, onActionRequest, aircraftModel, selectedArrival, flightPlan, radioMessages, onRadioFreqChange, npcs, frequencyContext, currentRegion, timeScale, setTimeScale, onUpdateFlightPlan, availableRunways, startupStatus }) => {
   // Use flightData from parent component instead of creating own physics service
   const [showOverhead, setShowOverhead] = useState(false);
   const [activeSidebarPanel, setActiveSidebarPanel] = useState(null);
@@ -414,32 +415,66 @@ const FlightPanelModular = ({ flightData, physicsState, weatherData, onActionReq
         ),
         
         // Skip/Continue Button
-        React.createElement('button', {
-          onClick: () => onActionRequest && onActionRequest('skip-phase'),
-          style: {
-            padding: '12px 30px',
-            background: 'transparent',
-            border: '1px solid #4ade80',
-            color: '#4ade80',
-            borderRadius: '4px',
-            cursor: 'pointer',
-            fontSize: '1rem',
-            letterSpacing: '2px',
-            transition: 'all 0.3s ease',
-            opacity: 0.8,
-            textTransform: 'uppercase'
+        React.createElement('div', { style: { position: 'relative' } },
+          React.createElement('button', {
+            onClick: () => {
+              const canContinue = startupStatus ? startupStatus.canContinue : true;
+              if (canContinue && onActionRequest) onActionRequest('skip-phase');
+            },
+            disabled: startupStatus && !startupStatus.canContinue,
+            style: {
+              padding: '12px 30px',
+              background: 'transparent',
+              border: `1px solid ${(startupStatus && !startupStatus.canContinue) ? '#6b7280' : '#4ade80'}`,
+              color: (startupStatus && !startupStatus.canContinue) ? '#6b7280' : '#4ade80',
+              borderRadius: '4px',
+              cursor: (startupStatus && !startupStatus.canContinue) ? 'not-allowed' : 'pointer',
+              fontSize: '1rem',
+              letterSpacing: '2px',
+              transition: 'all 0.3s ease',
+              opacity: (startupStatus && !startupStatus.canContinue) ? 0.5 : 0.8,
+              textTransform: 'uppercase'
+            },
+            onMouseEnter: (e) => {
+              if (startupStatus && !startupStatus.canContinue) return;
+              e.target.style.background = 'rgba(74, 222, 128, 0.1)';
+              e.target.style.opacity = 1;
+              e.target.style.boxShadow = '0 0 15px rgba(74, 222, 128, 0.2)';
+            },
+            onMouseLeave: (e) => {
+              if (startupStatus && !startupStatus.canContinue) return;
+              e.target.style.background = 'transparent';
+              e.target.style.opacity = 0.8;
+              e.target.style.boxShadow = 'none';
+            }
+          }, 'CONTINUE ►'),
+          
+          // Startup Requirements Tooltip
+          startupStatus && !startupStatus.canContinue && startupStatus.missingItems && startupStatus.missingItems.length > 0 &&
+          React.createElement('div', {
+            style: {
+              position: 'absolute',
+              top: 'calc(100% + 10px)',
+              right: '0',
+              background: 'rgba(17, 24, 39, 0.95)',
+              border: '1px solid #ef4444',
+              padding: '12px',
+              borderRadius: '6px',
+              fontSize: '12px',
+              color: '#d1d5db',
+              whiteSpace: 'nowrap',
+              zIndex: 100,
+              boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.5)',
+              minWidth: '200px'
+            }
           },
-          onMouseEnter: (e) => {
-            e.target.style.background = 'rgba(74, 222, 128, 0.1)';
-            e.target.style.opacity = 1;
-            e.target.style.boxShadow = '0 0 15px rgba(74, 222, 128, 0.2)';
-          },
-          onMouseLeave: (e) => {
-            e.target.style.background = 'transparent';
-            e.target.style.opacity = 0.8;
-            e.target.style.boxShadow = 'none';
-          }
-        }, 'CONTINUE ►')
+            React.createElement('div', { style: { fontWeight: 'bold', marginBottom: '6px', color: '#ef4444', borderBottom: '1px solid rgba(239, 68, 68, 0.3)', paddingBottom: '4px' } }, '⚠️ STARTUP REQUIRED'),
+            startupStatus.missingItems.map(item => React.createElement('div', { key: item, style: { marginBottom: '2px', display: 'flex', alignItems: 'center' } }, 
+               React.createElement('span', { style: { color: '#ef4444', marginRight: '6px' } }, '×'),
+               item
+            ))
+          )
+        )
       );
     }
 
@@ -541,6 +576,13 @@ const FlightPanelModular = ({ flightData, physicsState, weatherData, onActionReq
         flightData,
         flightPlan,
         onClose: () => setActiveSidebarPanel(null)
+    }),
+
+    // Checklist Panel Overlay
+    activeSidebarPanel === 'checklist' && React.createElement(ChecklistPanel, {
+        onClose: () => setActiveSidebarPanel(null),
+        physicsState: physicsState,
+        flightState: flightState
     }),
     
     // Save & Load Panel Overlay

@@ -16,6 +16,7 @@ import RadioActionPanel from './RadioActionPanel';
 import { atcManager } from '../services/ATCLogic';
 import { npcService } from '../services/NPCService';
 import { regionControlService } from '../services/RegionControlService';
+import { checkStartupRequirements, StartupPhases } from '../services/StartupChecklist';
 
 const FlightInProgress = ({ 
   callsign, 
@@ -133,7 +134,7 @@ const FlightInProgress = ({
     timeScale,
     updateFlightPlan,
     setEngineThrottle
-  } = useAircraftPhysics(aircraftConfig, false, physicsModel);
+  } = useAircraftPhysics(aircraftConfig, true, physicsModel);
 
   // Control state for UI components
   const [throttleControl, setThrottleControl] = useState(0); // Initialize at IDLE
@@ -220,6 +221,50 @@ const FlightInProgress = ({
   
   // Dynamic Flight Plan State
   const [activeFlightPlan, setActiveFlightPlan] = useState(flightPlan);
+
+  // Startup Checklist Logic (Pro/Devil)
+  const [startupStatus, setStartupStatus] = useState({ canContinue: true, missingItems: [] });
+
+  useEffect(() => {
+    if (!physicsState || !physicsState.systems) return;
+
+    // Only enforce for Pro/Devil modes
+    if (difficulty !== 'pro' && difficulty !== 'devil') {
+        if (!startupStatus.canContinue) {
+            setStartupStatus({ canContinue: true, missingItems: [] });
+        }
+        return;
+    }
+
+    let phaseToCheck = null;
+    const currentPhaseType = sceneState.currentPhase?.type;
+
+    // Map phases to checklist requirements
+    // Scene 1: Boarding/Pre-flight -> Power Up
+    if (currentPhaseType === 'boarding' || currentPhaseType === 'takeoff_prep') {
+        // Note: takeoff_prep is usually just before takeoff, but if we start cold & dark,
+        // we might be in boarding.
+        phaseToCheck = StartupPhases.POWER_UP;
+    } 
+    // Scene 2: Pushback -> Engine Start
+    else if (currentPhaseType === 'pushback') {
+        phaseToCheck = StartupPhases.ENGINE_START;
+    }
+
+    if (phaseToCheck) {
+        const result = checkStartupRequirements(phaseToCheck, physicsState.systems, physicsState.engines);
+        
+        // Only update state if changed to avoid render loops
+        if (result.canContinue !== startupStatus.canContinue || 
+            JSON.stringify(result.missingItems) !== JSON.stringify(startupStatus.missingItems)) {
+            setStartupStatus(result);
+        }
+    } else {
+        if (!startupStatus.canContinue) {
+            setStartupStatus({ canContinue: true, missingItems: [] });
+        }
+    }
+  }, [physicsState, sceneState.currentPhase, difficulty]);
 
   // Sync prop flightPlan to state if it changes (e.g. reset)
   useEffect(() => {
@@ -838,6 +883,7 @@ const FlightInProgress = ({
             timeScale={timeScale}
             setTimeScale={setTimeScale}
             onUpdateFlightPlan={handleUpdateFlightPlan}
+            startupStatus={startupStatus}
             onActionRequest={(action, payload, extra) => {
               const payloadStr = typeof payload === 'number' ? payload.toFixed(5) : JSON.stringify(payload);
               console.log(`📡 UI Action: ${action} = ${payloadStr}, Extra: ${extra}`);

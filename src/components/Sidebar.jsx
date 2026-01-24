@@ -3,7 +3,7 @@ import './Sidebar.css';
 
 const Sidebar = ({ activePanel, onTogglePanel }) => {
   const buttons = [
-    { id: 'checklist', label: 'Checklist', icon: '📋', disabled: true },
+    { id: 'checklist', label: 'Checklist', icon: '📋', disabled: false },
     { id: 'flight_computer', label: 'F-Comp', icon: '💻', disabled: false },
     { id: 'timer', label: 'Timer', icon: '⏱️', disabled: false },
     { id: 'save_load', label: 'Save/Load', icon: '💾', disabled: false },
