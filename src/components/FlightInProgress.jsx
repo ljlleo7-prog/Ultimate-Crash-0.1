@@ -769,8 +769,9 @@ const FlightInProgress = ({
           </div>
           
           {/* Conditional Rendering: Only show narrative in Header if Physics is ACTIVE (PHY-ON) 
-              In PHY-OFF mode, narrative is shown in the immersive full-screen view. */}
-          {sceneState.physicsActive && (
+              In PHY-OFF mode, narrative is shown in the immersive full-screen view.
+              Also show if there is a warning/critical message (e.g. checklist blocked) */}
+          {(sceneState.physicsActive || narrative?.severity === 'warning' || narrative?.severity === 'critical') && (
             <>
               <div
                 style={{
@@ -793,6 +794,44 @@ const FlightInProgress = ({
                 {narrative?.content || 'Prepare for takeoff.'}
               </div>
             </>
+          )}
+
+          {/* Live Startup Checklist Status (Pro/Devil Mode) */}
+          {!startupStatus.canContinue && (difficulty === 'pro' || difficulty === 'devil') && (
+            <div style={{ marginTop: '8px', marginBottom: '8px' }}>
+              <div style={{
+                fontSize: '11px',
+                textTransform: 'uppercase',
+                color: '#f59e0b',
+                marginBottom: '4px',
+                fontWeight: 'bold',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px'
+              }}>
+                <span>⚠️ Checklist Incomplete</span>
+              </div>
+              <div style={{
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '4px'
+              }}>
+                {startupStatus.missingItems.map((item, index) => (
+                  <div key={index} style={{
+                    fontSize: '11px',
+                    color: '#fbbf24',
+                    padding: '6px 8px',
+                    background: 'rgba(69, 26, 3, 0.6)',
+                    borderRadius: '4px',
+                    borderLeft: '3px solid #f59e0b',
+                    display: 'flex',
+                    alignItems: 'center'
+                  }}>
+                    <span style={{ marginRight: '6px' }}>☐</span> {item}
+                  </div>
+                ))}
+              </div>
+            </div>
           )}
           
           {/* Active Failures Display - Always visible if failures exist */}

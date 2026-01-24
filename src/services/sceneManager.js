@@ -2,6 +2,7 @@ import eventBus, { EventTypes } from './eventBus.js';
 import { getRunwayHeading } from '../utils/routeGenerator';
 import { getRandomTemplate } from './narrativeTemplates.js';
 import narrativeData from '../data/narrativeDatabase.json';
+import { checkStartupRequirements, StartupPhases } from './StartupChecklist.js';
 
 // Flight phases with typical parameters
 export const FlightPhases = {
@@ -543,7 +544,50 @@ class SceneManager {
       const isStartupPhase = [FlightPhases.BOARDING, FlightPhases.DEPARTURE_CLEARANCE, FlightPhases.PUSHBACK].includes(phase.type);
       
       if (isHardcore && isStartupPhase) {
-          isPhaseComplete = false; // Only manual skip allowed via 'Continue' button
+          // Map FlightPhase to StartupPhase
+          let startupPhase = null;
+          if (phase.type === FlightPhases.BOARDING || phase.type === FlightPhases.DEPARTURE_CLEARANCE) {
+              startupPhase = StartupPhases.POWER_UP;
+          } else if (phase.type === FlightPhases.PUSHBACK) {
+              startupPhase = StartupPhases.ENGINE_START;
+          }
+
+          if (startupPhase && payload && payload.systems) {
+              const checklistResult = checkStartupRequirements(startupPhase, payload.systems, payload.engines || []);
+              
+              if (checklistResult.canContinue) {
+                  // If checklist is complete, allow completion after minimum duration
+                  isPhaseComplete = this.elapsedInPhase >= phase.durationSeconds;
+              } else {
+                  isPhaseComplete = false;
+                  
+                  // If we have exceeded the phase duration but are blocked by checklist, warn the user
+                  if (this.elapsedInPhase >= phase.durationSeconds) {
+                      // Check if we should emit a warning (throttle to every 10 seconds)
+                      // We use a simple modulo check on the integer seconds
+                      const timeOver = Math.floor(this.elapsedInPhase - phase.durationSeconds);
+                      
+                      // Warn at 5s, 15s, 25s... (every 10s starting 5s after deadline)
+                      // We use a dedicated property to track last warning to avoid multiple emits in the same second
+                      if (timeOver > 0 && timeOver % 15 === 5) {
+                          const lastWarnTime = this.lastChecklistWarningTime || 0;
+                          const now = Date.now();
+                          
+                          if (now - lastWarnTime > 2000) { // Ensure at least 2s between warnings
+                              this.publishNarrative({
+                                  title: 'Startup Checklist Incomplete',
+                                  content: `Cannot proceed to next phase. Missing: ${checklistResult.missingItems.join(', ')}`,
+                                  severity: 'warning'
+                              });
+                              this.lastChecklistWarningTime = now;
+                          }
+                      }
+                  }
+              }
+          } else {
+              // If no systems data available (shouldn't happen in realistic mode), block or fallback
+              isPhaseComplete = false; 
+          }
       } else {
           isPhaseComplete = this.elapsedInPhase >= phase.durationSeconds;
       }

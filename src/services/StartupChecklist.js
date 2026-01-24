@@ -61,18 +61,28 @@ export const checkStartupRequirements = (phase, systems, engines = []) => {
         // SCENE 2: ENGINE START
         // Goal: Engines Running, Gens ON, APU OFF, Fuel Pumps ON, Hydraulics
         
-        // 1. Two Engines Started
-        // Check N2 > 50% for both engines
-        const eng1Running = engines[0] && (engines[0].n2 > 50 || (engines[0].state && engines[0].state.n2 > 50));
-        const eng2Running = engines[1] && (engines[1].n2 > 50 || (engines[1].state && engines[1].state.n2 > 50));
-        
-        if (!eng1Running || !eng2Running) {
-            missingItems.push('Both Engines Running (N2 > 50%)');
+        // 1. All Engines Started
+        // Check N2 > 50% for all engines
+        let allEnginesRunning = true;
+        const engineCount = engines.length > 0 ? engines.length : 2; // Default to 2 if not provided (should be provided)
+
+        for (let i = 0; i < engineCount; i++) {
+            const eng = engines[i];
+            const engRunning = eng && (eng.n2 > 50 || (eng.state && eng.state.n2 > 50));
+            if (!engRunning) {
+                allEnginesRunning = false;
+                missingItems.push(`Engine ${i + 1} Running (N2 > 50%)`);
+            }
         }
         
         // 2. Generators ON
-        if (!systems.electrical?.gen1) missingItems.push('Generator 1 ON');
-        if (!systems.electrical?.gen2) missingItems.push('Generator 2 ON');
+        // Check corresponding generators for each engine
+        for (let i = 0; i < engineCount; i++) {
+            const genKey = `gen${i + 1}`;
+            if (!systems.electrical?.[genKey]) {
+                missingItems.push(`Generator ${i + 1} ON`);
+            }
+        }
 
         // 3. APU OFF
         if (systems.apu?.running || systems.electrical?.apuGen) {
@@ -91,9 +101,24 @@ export const checkStartupRequirements = (phase, systems, engines = []) => {
         // 5. Hydraulics
         // User: "engines starts to power hydraulics"
         // System A and B engine pumps must be ON
+        // For 4 engines, we might map eng1/2 to Sys A and eng3/4 to Sys B or similar.
+        // Simplified: Check if *any* engine pump is ON for Sys A and Sys B
         const hyd = systems.hydraulics || {};
-        if (!hyd.sysA?.engPump) missingItems.push('Hydraulic Pump ENG 1 ON');
-        if (!hyd.sysB?.engPump) missingItems.push('Hydraulic Pump ENG 2 ON');
+        
+        // Dynamic check based on available pumps. 
+        // Usually Sys A is powered by Eng 1 (and 2 in some planes), Sys B by Eng 2 (and 3/4).
+        // Let's enforce standard 737-style for 2 engines, and generic for 4.
+        
+        if (engineCount <= 2) {
+            if (!hyd.sysA?.engPump) missingItems.push('Hydraulic Pump ENG 1 ON');
+            if (!hyd.sysB?.engPump) missingItems.push('Hydraulic Pump ENG 2 ON');
+        } else {
+            // For 4 engines (e.g. 747), typically Sys 1/2/3/4. 
+            // But our hydraulics model might be limited to Sys A/B.
+            // If Sys A/B is all we have, just check if they are powered.
+             if (!hyd.sysA?.engPump) missingItems.push('Hydraulic Pump SYS A ON');
+             if (!hyd.sysB?.engPump) missingItems.push('Hydraulic Pump SYS B ON');
+        }
         
         // Check pressure (if simulated in systems object)
         if ((hyd.sysA?.pressure || 0) < 2000) missingItems.push('Hydraulic Sys A Pressure Low');

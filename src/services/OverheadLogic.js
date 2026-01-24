@@ -80,9 +80,45 @@ class OverheadLogic {
         
         // --- Sources ---
         // Battery
+        let generatorsOn = false;
+        
+        // Generators (Engine Driven)
+        // Check all potential generators (1-4)
+        let genPowerAvailable = false;
+        let activeGens = 0;
+
+        // Iterate through all keys in electrical that start with 'gen' and end with a number
+        Object.keys(elec).forEach(key => {
+            if (key.match(/^gen\d+$/)) {
+                const index = parseInt(key.replace('gen', '')) - 1; // 0-based index
+                const genOn = elec[key];
+                const n2 = context.engineN2[index] || 0;
+                const genReady = n2 > 55;
+                
+                if (genOn && genReady) {
+                    genPowerAvailable = true;
+                    activeGens++;
+                    elec[`sourceOff${index + 1}`] = false;
+                    generatorsOn = true;
+                } else {
+                    elec[`sourceOff${index + 1}`] = true;
+                }
+            }
+        });
+
+        const apuGenReady = systems.apu.running && systems.apu.n2 > 95;
+        if (elec.apuGen && apuGenReady) {
+            genPowerAvailable = true;
+            elec.apuGenOff = false;
+            generatorsOn = true;
+        } else {
+            elec.apuGenOff = true;
+        }
+
+        // Battery Logic
         if (elec.battery) {
             // Simple drain simulation
-            if (!elec.gen1On && !elec.gen2On && !elec.apuGenOn) {
+            if (!generatorsOn) {
                 elec.batteryCharge = Math.max(0, (elec.batteryCharge || 100) - (0.05 * dt));
             } else {
                 elec.batteryCharge = Math.min(100, (elec.batteryCharge || 100) + (0.1 * dt));
@@ -92,51 +128,23 @@ class OverheadLogic {
             elec.dcVolts = 0;
         }
 
-        // Generators (Engine Driven)
-        // Require Engine N2 > 55% and IDG Connected (Assumed connected)
-        const gen1Ready = context.engineN2[0] > 55;
-        const gen2Ready = context.engineN2[1] > 55;
-        const apuGenReady = systems.apu.running && systems.apu.n2 > 95;
-
         // --- Buses ---
-        // Transfer Buses (The main AC arteries)
-        let acBus1Powered = false;
-        let acBus2Powered = false;
+        // Simplified Bus Logic for Multi-Engine:
+        // If ANY generator is online, we assume buses are powered (with Bus Tie)
+        // In a deeper sim, we would model split/isolated buses.
+        let mainBusPowered = false;
 
-        // Gen 1 Logic
-        if (elec.gen1 && gen1Ready) {
-            acBus1Powered = true;
-            elec.sourceOff1 = false;
-        } else {
-            elec.sourceOff1 = true;
-        }
-
-        // Gen 2 Logic
-        if (elec.gen2 && gen2Ready) {
-            acBus2Powered = true;
-            elec.sourceOff2 = false;
-        } else {
-            elec.sourceOff2 = true;
-        }
-
-        // APU Gen Logic (Can power both if Bus Tie is closed - simplified to auto-tie)
-        if (elec.apuGen && apuGenReady) {
-            if (!acBus1Powered) acBus1Powered = true;
-            if (!acBus2Powered) acBus2Powered = true;
-            elec.apuGenOff = false;
-        } else {
-            elec.apuGenOff = true;
-        }
-
-        // Bus Transfer (If one gen fails, other picks up - simplified)
-        if (elec.busTie) {
-            if (acBus1Powered && !acBus2Powered) acBus2Powered = true;
-            if (!acBus1Powered && acBus2Powered) acBus1Powered = true;
+        if (genPowerAvailable && elec.busTie) {
+            mainBusPowered = true;
+        } else if (activeGens > 0) {
+            // Even without bus tie, if we have gens, some bus is powered.
+            // For simplicity, we'll say yes.
+            mainBusPowered = true;
         }
 
         // --- Outputs ---
         // AC Volts / Freq
-        if (acBus1Powered || acBus2Powered) {
+        if (mainBusPowered) {
             elec.acVolts = 115 + (Math.random() * 2 - 1);
             elec.acFreq = 400 + (Math.random() * 4 - 2);
             
@@ -163,7 +171,7 @@ class OverheadLogic {
         if (systems.lighting.landing) load += 40;
         if (systems.pressurization.packL) load += 20;
         
-        elec.acAmps = (acBus1Powered || acBus2Powered) ? load : 0;
+        elec.acAmps = mainBusPowered ? load : 0;
     }
 
     /**
@@ -271,23 +279,47 @@ class OverheadLogic {
         const apu = systems.apu;
         
         // 1. Bleed Sources
-        // Engines
-        const eng1N2 = context.engineN2[0];
-        const eng2N2 = context.engineN2[1];
+        // Engines - Iterate dynamic bleeds
+        let maxBleedPressureL = 0;
+        let maxBleedPressureR = 0;
         
-        const bleed1Pressure = (pneu.bleed1 && eng1N2 > 15) ? (30 + (eng1N2/100)*15) : 0;
-        const bleed2Pressure = (pneu.bleed2 && eng2N2 > 15) ? (30 + (eng2N2/100)*15) : 0;
+        // Count engines
+        const engineCount = context.engineN2.length;
+        
+        // Assign engines to ducts (Left: 1, 2... Right: 3, 4...) or Split (1->L, 2->R)
+        // Standard logic:
+        // 2 Engines: 1->L, 2->R
+        // 4 Engines: 1,2->L, 3,4->R
+        
+        const splitPoint = Math.ceil(engineCount / 2);
+
+        for (let i = 0; i < engineCount; i++) {
+            const bleedSw = pneu[`bleed${i+1}`];
+            const n2 = context.engineN2[i];
+            
+            if (bleedSw && n2 > 15) {
+                const pressure = 30 + (n2/100)*15;
+                
+                if (i < splitPoint) {
+                    // Left Side
+                    if (pressure > maxBleedPressureL) maxBleedPressureL = pressure;
+                } else {
+                    // Right Side
+                    if (pressure > maxBleedPressureR) maxBleedPressureR = pressure;
+                }
+            }
+        }
         
         // APU
         const apuBleedPressure = (apu.bleed && apu.running) ? 40 : 0;
         
         // 2. Duct Pressure
         // Left Duct
-        pneu.ductPressL = bleed1Pressure;
+        pneu.ductPressL = maxBleedPressureL;
         if (apuBleedPressure > pneu.ductPressL) pneu.ductPressL = apuBleedPressure; // APU check valve logic simplified
         
         // Right Duct
-        pneu.ductPressR = bleed2Pressure;
+        pneu.ductPressR = maxBleedPressureR;
         
         // Isolation Valve
         if (pneu.isolationValve) {
@@ -308,13 +340,30 @@ class OverheadLogic {
      * Sys A/B, Standby, Pressure building
      */
     updateHydraulics(systems, context, dt) {
-        ['sysA', 'sysB'].forEach((sysName, idx) => {
+        ['sysA', 'sysB'].forEach((sysName, sysIdx) => {
             const sys = systems.hydraulics[sysName];
             let supply = false;
 
-            // Engine Pump
-            const engN2 = context.engineN2[idx];
-            if (sys.engPump && engN2 > 10) supply = true;
+            // Engine Pumps (Dynamic Mapping for 2-4 Engines)
+            // Sys A (idx 0) <- Eng 1 (idx 0) + Eng 3 (idx 2)
+            // Sys B (idx 1) <- Eng 2 (idx 1) + Eng 4 (idx 3)
+            const engineCount = context.engineN2.length;
+            
+            for (let i = 0; i < engineCount; i++) {
+                // Determine if this engine feeds this system
+                // Sys A (0): Engines 0, 2
+                // Sys B (1): Engines 1, 3
+                const feedsThisSystem = (sysIdx === 0 && (i === 0 || i === 2)) || 
+                                      (sysIdx === 1 && (i === 1 || i === 3));
+                
+                if (feedsThisSystem) {
+                    const engN2 = context.engineN2[i];
+                    // Note: shared pump switch for the system in this simplified model
+                    if (sys.engPump && engN2 > 10) {
+                        supply = true;
+                    }
+                }
+            }
 
             // Electric Pump
             const elec = systems.electrical;
@@ -359,38 +408,43 @@ class OverheadLogic {
         fuel.pressC = (fuel.centerPumps && systems.electrical.acVolts > 100 && fuel.tanks.center > 0) ? 35 : 0;
 
         // Consumption Logic (Drain from tanks based on pump config)
-        // Engines consume ~1kg/s (simplified)
-        const eng1Burn = (context.engineN2[0] > 10) ? 1.2 * dt : 0;
-        const eng2Burn = (context.engineN2[1] > 10) ? 1.2 * dt : 0;
         const apuBurn = (systems.apu.running) ? 0.2 * dt : 0;
+        
+        // Engine Count
+        const engineCount = context.engineN2.length;
+        const splitPoint = Math.ceil(engineCount / 2);
 
-        // Engine 1 Feed
-        // Priority: Center > Left (if crossfeed) > Left
-        if (fuel.pressC > 10 && fuel.tanks.center > 0) {
-            fuel.tanks.center -= eng1Burn;
-        } else if (fuel.pressL > 10 && fuel.tanks.left > 0) {
-            fuel.tanks.left -= eng1Burn;
-        } else if (fuel.crossfeed && fuel.pressR > 10 && fuel.tanks.right > 0) {
-            fuel.tanks.right -= eng1Burn; // Crossfeed from Right
-        } else {
-            // Starvation Logic could trigger here (Engine flameout)
-            if (context.engineN2[0] > 50) {
-                // Inform context of starvation? 
-                // Currently context is input-only, so we'd need to set a flag in systems
-                systems.starvation1 = true;
-            }
-        }
-
-        // Engine 2 Feed
-        if (fuel.pressC > 10 && fuel.tanks.center > 0) {
-            fuel.tanks.center -= eng2Burn;
-        } else if (fuel.pressR > 10 && fuel.tanks.right > 0) {
-            fuel.tanks.right -= eng2Burn;
-        } else if (fuel.crossfeed && fuel.pressL > 10 && fuel.tanks.left > 0) {
-            fuel.tanks.left -= eng2Burn; // Crossfeed from Left
-        } else {
-             if (context.engineN2[1] > 50) {
-                systems.starvation2 = true;
+        for (let i = 0; i < engineCount; i++) {
+            const n2 = context.engineN2[i];
+            const burn = (n2 > 10) ? 1.2 * dt : 0;
+            
+            if (burn > 0) {
+                // Determine feed logic
+                // Left engines (0 to splitPoint-1) feed from Left/Center
+                // Right engines (splitPoint to end) feed from Right/Center
+                const isLeft = i < splitPoint;
+                
+                if (fuel.pressC > 10 && fuel.tanks.center > 0) {
+                    fuel.tanks.center -= burn;
+                } else if (isLeft) {
+                    if (fuel.pressL > 10 && fuel.tanks.left > 0) {
+                        fuel.tanks.left -= burn;
+                    } else if (fuel.crossfeed && fuel.pressR > 10 && fuel.tanks.right > 0) {
+                        fuel.tanks.right -= burn; // Crossfeed
+                    } else if (n2 > 50) {
+                         // Starvation
+                         // In future, set a starvation flag per engine
+                    }
+                } else {
+                    // Right Side
+                    if (fuel.pressR > 10 && fuel.tanks.right > 0) {
+                        fuel.tanks.right -= burn;
+                    } else if (fuel.crossfeed && fuel.pressL > 10 && fuel.tanks.left > 0) {
+                        fuel.tanks.left -= burn; // Crossfeed
+                    } else if (n2 > 50) {
+                         // Starvation
+                    }
+                }
             }
         }
         
@@ -457,14 +511,21 @@ class OverheadLogic {
     updateEngines(systems, context, dt) {
         if (!systems.engines) return;
 
-        ['eng1', 'eng2'].forEach((engId, index) => {
+        Object.keys(systems.engines).forEach((engId) => {
+            // Extract index from 'eng1', 'eng2', etc.
+            const index = parseInt(engId.replace('eng', '')) - 1;
             const eng = systems.engines[engId];
             const pneu = systems.pressurization;
             
             // Pneumatic pressure available for start?
             // Need > 30 PSI (approx)
-            // If APU bleed is on, we likely have pressure.
-            const pressureAvailable = (index === 0 ? pneu.ductPressL : pneu.ductPressR) > 20;
+            // Left side engines (1,2) need ductL, Right side (3,4) need ductR
+            // Split based on engine count
+            const engineCount = Object.keys(systems.engines).length;
+            const splitPoint = Math.ceil(engineCount / 2);
+            
+            const ductPress = (index < splitPoint) ? pneu.ductPressL : pneu.ductPressR;
+            const pressureAvailable = ductPress > 20;
 
             // State Machine for Start
             if (eng.startSwitch === 'GRD') {
@@ -482,27 +543,14 @@ class OverheadLogic {
                 }
             } else if (eng.startSwitch === 'CONT' || eng.startSwitch === 'FLT') {
                  // Ignition always on
-                 // In a deeper sim, this prevents flameout in heavy rain/turbulence
             }
 
             // Running Logic
-            // Once N2 > 50, we hand over control to the Physics Engine (RealisticFlightPhysicsService).
-            // We only monitor for shutdown conditions here.
             if (eng.n2 > 50) {
                 // Starter Cutout
                 if (eng.startSwitch === 'GRD') eng.startSwitch = 'OFF';
-                
-                // We do NOT update N2/EGT here anymore. 
-                // The Physics Service will update systems.engines.n2 based on throttle and aerodynamics.
-                
             } else if (eng.startSwitch === 'OFF' && eng.n2 > 0) {
                 // Spool down
-                // If fuel control is ON but switch is OFF, engine still runs! 
-                // Wait, Start Switch is for Starter/Ignition. Fuel Control is for Fuel.
-                // If N2 > 50 and Fuel Control ON, it runs regardless of Start Switch (unless in OFF, but usually it's Auto/Off/Cont/Flt).
-                // Actually, in 737, if Start Switch is OFF, ignition is off (unless auto-ignite logic).
-                // But combustion sustains itself.
-                
                 if (eng.fuelControl && eng.n2 > 40) {
                      // Engine is running self-sustaining
                      const targetN2 = 60;
@@ -518,9 +566,6 @@ class OverheadLogic {
                 if (eng.n2 < 0) eng.n2 = 0;
                 if (eng.egt < 20) eng.egt = 20;
             }
-
-            // Sync with Physics Context if needed (Optional, usually one-way)
-            // context.engineN2[index] = eng.n2; 
         });
     }
 
@@ -531,22 +576,28 @@ class OverheadLogic {
     updateFireProtection(systems, context, dt) {
         if (!systems.fire) return;
 
-        // Engine 1
-        if (systems.fire.eng1Handle) {
-            // Cutoff Systems
-            systems.fuel.leftPumps = false;
-            systems.hydraulics.sysA.engPump = false;
-            systems.electrical.gen1 = false;
-            systems.engines.eng1.fuelControl = false;
-        }
-
-        // Engine 2
-        if (systems.fire.eng2Handle) {
-            systems.fuel.rightPumps = false;
-            systems.hydraulics.sysB.engPump = false;
-            systems.electrical.gen2 = false;
-            systems.engines.eng2.fuelControl = false;
-        }
+        // Iterate through fire handles
+        Object.keys(systems.fire).forEach(key => {
+            if (key.match(/^eng\d+Handle$/)) {
+                if (systems.fire[key]) {
+                    // Handle Pulled
+                    const engId = key.replace('Handle', ''); // eng1, eng2...
+                    const index = parseInt(engId.replace('eng', '')) - 1;
+                    
+                    // Cutoff Systems
+                    systems.engines[engId].fuelControl = false;
+                    systems.electrical[`gen${index+1}`] = false;
+                    
+                    // Cutoff Hydraulics?
+                    // Map engines to hydraulic systems roughly
+                    if (index === 0) systems.hydraulics.sysA.engPump = false;
+                    if (index === 1) systems.hydraulics.sysB.engPump = false;
+                    // For 4 engines (simplified mapping):
+                    if (index === 2) systems.hydraulics.sysA.engPump = false; // Backup/redundant mapping
+                    if (index === 3) systems.hydraulics.sysB.engPump = false;
+                }
+            }
+        });
 
         // APU
         if (systems.fire.apuHandle) {
@@ -555,19 +606,22 @@ class OverheadLogic {
             systems.electrical.apuGen = false;
         }
 
-        // Bottles Discharge Logic
-        // We assume 2 bottles shared for engines, or 1 per engine? 737 has 2 bottles that can be fired into either engine.
-        // For simplicity, let's say bottle1 can go to eng1/eng2, bottle2 can go to eng1/eng2.
-        // But here we just check generic discharge flags.
-        
         const dischargeRate = 50 * dt; // Empty in 2 seconds
+        
+        // Helper to extinguish fires if handle is pulled
+        const extinguishEngines = () => {
+             Object.keys(systems.fire).forEach(key => {
+                if (key.match(/^eng\d+Handle$/) && systems.fire[key]) {
+                    const engId = key.replace('Handle', '');
+                    systems.fire[engId] = false;
+                }
+             });
+        };
 
         if (systems.fire.bottle1_discharge) {
             if (systems.fire.bottle1 > 0) {
                 systems.fire.bottle1 -= dischargeRate;
-                // If discharging into an engine with handle pulled, extinguish fire
-                if (systems.fire.eng1Handle) systems.fire.eng1 = false;
-                if (systems.fire.eng2Handle) systems.fire.eng2 = false;
+                extinguishEngines();
             } else {
                 systems.fire.bottle1 = 0;
                 systems.fire.bottle1_discharge = false; // Reset trigger
@@ -577,18 +631,14 @@ class OverheadLogic {
         if (systems.fire.bottle2_discharge) {
             if (systems.fire.bottle2 > 0) {
                 systems.fire.bottle2 -= dischargeRate;
-                 if (systems.fire.eng1Handle) systems.fire.eng1 = false;
-                 if (systems.fire.eng2Handle) systems.fire.eng2 = false;
+                extinguishEngines();
             } else {
                 systems.fire.bottle2 = 0;
                 systems.fire.bottle2_discharge = false;
             }
         }
         
-        // APU Bottle (Separate usually)
-        // If we reuse bottle1 for APU (common in some sims for simplicity, but 737 has dedicated APU bottle)
-        // Let's assume APU has its own auto-fire or we use bottle1.
-        // For this sim, if APU handle pulled and any discharge, extinguish APU.
+        // APU Bottle
         if (systems.fire.apuHandle && (systems.fire.bottle1_discharge || systems.fire.bottle2_discharge)) {
              systems.fire.apu = false;
         }

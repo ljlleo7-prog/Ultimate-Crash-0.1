@@ -134,6 +134,10 @@ const OverheadPanel = ({ onClose, flightState, onSystemAction, aircraftModel }) 
     const acFreq = getSys('electrical.acFreq', 0);
     const acAmps = getSys('electrical.acAmps', 0);
     
+    // Dynamic Generators
+    const elecSys = getSys('electrical', {});
+    const genKeys = Object.keys(elecSys).filter(k => k.match(/^gen\d+$/)).sort();
+
     return (
       <div className="panel-section">
         <h4 className="panel-title">ELECTRICAL</h4>
@@ -158,12 +162,14 @@ const OverheadPanel = ({ onClose, flightState, onSystemAction, aircraftModel }) 
           
           <div style={{ width: '10px' }} /> {/* Spacer */}
 
-          <Switch label="GEN 1" active={getSys('electrical.gen1')} onClick={() => onSystemAction('electrical', 'gen1')}
-             annunciator={{ label: 'OFF BUS', active: getSys('electrical.sourceOff1'), color: 'blue' }}
-          />
-          <Switch label="GEN 2" active={getSys('electrical.gen2')} onClick={() => onSystemAction('electrical', 'gen2')}
-             annunciator={{ label: 'OFF BUS', active: getSys('electrical.sourceOff2'), color: 'blue' }}
-          />
+          {genKeys.map((key, i) => {
+              const index = i + 1;
+              return (
+                  <Switch key={key} label={`GEN ${index}`} active={elecSys[key]} onClick={() => onSystemAction('electrical', key)}
+                     annunciator={{ label: 'OFF BUS', active: getSys(`electrical.sourceOff${index}`), color: 'blue' }}
+                  />
+              );
+          })}
           
           <Switch label="APU GEN" active={getSys('electrical.apuGen')} onClick={() => onSystemAction('electrical', 'apuGen')}
              annunciator={{ label: 'OFF BUS', active: getSys('electrical.apuGenOff'), color: 'blue' }}
@@ -275,6 +281,10 @@ const OverheadPanel = ({ onClose, flightState, onSystemAction, aircraftModel }) 
     const ductR = getSys('pressurization.ductPressR', 0);
     const cabAlt = getSys('pressurization.cabinAlt', 0);
     const diff = getSys('pressurization.diffPressure', 0);
+    
+    // Dynamic Bleeds
+    const pneuSys = getSys('pressurization', {});
+    const bleedKeys = Object.keys(pneuSys).filter(k => k.match(/^bleed\d+$/)).sort();
 
     return (
       <div className="panel-section">
@@ -288,14 +298,14 @@ const OverheadPanel = ({ onClose, flightState, onSystemAction, aircraftModel }) 
 
         {/* Bleed Switches */}
         <div style={{ display: 'flex', justifyContent: 'center', gap: '10px', flexWrap: 'wrap' }}>
-            <Switch label="BLEED 1" active={getSys('pressurization.bleed1')} onClick={() => onSystemAction('pressurization', 'bleed1')} 
-                annunciator={{ label: 'OFF', active: !getSys('pressurization.bleed1'), color: 'amber' }}
-            />
+            {bleedKeys.map((key, i) => (
+                <Switch key={key} label={`BLEED ${i+1}`} active={pneuSys[key]} onClick={() => onSystemAction('pressurization', key)} 
+                    annunciator={{ label: 'OFF', active: !pneuSys[key], color: 'amber' }}
+                />
+            ))}
+            
             <Switch label="APU BLEED" active={getSys('apu.bleed')} onClick={() => onSystemAction('apu', 'bleed')} 
                 annunciator={{ label: 'VALVE OPEN', active: getSys('apu.bleed') && getSys('apu.running'), color: 'blue' }}
-            />
-            <Switch label="BLEED 2" active={getSys('pressurization.bleed2')} onClick={() => onSystemAction('pressurization', 'bleed2')} 
-                annunciator={{ label: 'OFF', active: !getSys('pressurization.bleed2'), color: 'amber' }}
             />
         </div>
         
@@ -320,8 +330,8 @@ const OverheadPanel = ({ onClose, flightState, onSystemAction, aircraftModel }) 
   };
 
   const EnginePanel = () => {
-    const eng1 = getSys('engines.eng1', {});
-    const eng2 = getSys('engines.eng2', {});
+    const engines = getSys('engines', {});
+    const engineKeys = Object.keys(engines).filter(k => k.startsWith('eng')).sort();
     
     // Helper for Multi-State Switch (GRD/OFF/CONT/FLT)
     const StartSwitch = ({ label, value, onClick }) => (
@@ -355,30 +365,37 @@ const OverheadPanel = ({ onClose, flightState, onSystemAction, aircraftModel }) 
             
             {/* Gauges */}
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '10px' }}>
-                <div style={{ display: 'flex', gap: '5px' }}>
-                    <Gauge label="N2" value={Math.round(eng1.n2 || 0)} unit="%" max={105} />
-                    <Gauge label="EGT" value={Math.round(eng1.egt || 0)} unit="°C" max={900} color={(eng1.egt || 0) > 800 ? '#f00' : '#0f0'} />
-                </div>
-                <div style={{ display: 'flex', gap: '5px' }}>
-                    <Gauge label="N2" value={Math.round(eng2.n2 || 0)} unit="%" max={105} />
-                    <Gauge label="EGT" value={Math.round(eng2.egt || 0)} unit="°C" max={900} color={(eng2.egt || 0) > 800 ? '#f00' : '#0f0'} />
-                </div>
+                {engineKeys.map((key, i) => {
+                    const eng = engines[key];
+                    return (
+                        <div key={key} style={{ display: 'flex', gap: '5px' }}>
+                            <Gauge label={`N2 ${i+1}`} value={Math.round(eng.n2 || 0)} unit="%" max={105} />
+                            <Gauge label={`EGT ${i+1}`} value={Math.round(eng.egt || 0)} unit="°C" max={900} color={(eng.egt || 0) > 800 ? '#f00' : '#0f0'} />
+                        </div>
+                    );
+                })}
             </div>
 
             {/* Start Switches */}
-            <div style={{ display: 'flex', justifyContent: 'space-around', borderTop: '1px solid #444', paddingTop: '10px' }}>
-                <StartSwitch label="ENG 1 START" value={eng1.startSwitch || 'OFF'} onClick={() => onSystemAction('engines', 'eng1_start_toggle')} />
-                <StartSwitch label="ENG 2 START" value={eng2.startSwitch || 'OFF'} onClick={() => onSystemAction('engines', 'eng2_start_toggle')} />
+            <div style={{ display: 'flex', justifyContent: 'space-around', borderTop: '1px solid #444', paddingTop: '10px', flexWrap: 'wrap' }}>
+                {engineKeys.map((key, i) => {
+                     const eng = engines[key];
+                     return (
+                        <StartSwitch key={key} label={`ENG ${i+1} START`} value={eng.startSwitch || 'OFF'} onClick={() => onSystemAction('engines', `${key}_start_toggle`)} />
+                     );
+                })}
             </div>
 
             {/* Fuel Control */}
-            <div style={{ display: 'flex', justifyContent: 'space-around', marginTop: '10px' }}>
-                <Switch label="ENG 1" active={eng1.fuelControl} onClick={() => onSystemAction('engines', 'eng1_fuel')} subLabel="CUTOFF" 
-                    annunciator={{ label: 'RUN', active: eng1.fuelControl, color: 'green' }}
-                />
-                <Switch label="ENG 2" active={eng2.fuelControl} onClick={() => onSystemAction('engines', 'eng2_fuel')} subLabel="CUTOFF"
-                    annunciator={{ label: 'RUN', active: eng2.fuelControl, color: 'green' }}
-                />
+            <div style={{ display: 'flex', justifyContent: 'space-around', marginTop: '10px', flexWrap: 'wrap' }}>
+                {engineKeys.map((key, i) => {
+                     const eng = engines[key];
+                     return (
+                        <Switch key={key} label={`ENG ${i+1}`} active={eng.fuelControl} onClick={() => onSystemAction('engines', `${key}_fuel`)} subLabel="CUTOFF" 
+                            annunciator={{ label: 'RUN', active: eng.fuelControl, color: 'green' }}
+                        />
+                     );
+                })}
             </div>
         </div>
     );
@@ -386,6 +403,7 @@ const OverheadPanel = ({ onClose, flightState, onSystemAction, aircraftModel }) 
 
   const FirePanel = () => {
       const fire = getSys('fire', {});
+      const fireHandles = Object.keys(fire).filter(k => k.match(/^eng\d+Handle$/)).sort();
       
       const Handle = ({ label, active, pulled, onClick, onDischarge }) => (
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', margin: '5px' }}>
@@ -425,20 +443,29 @@ const OverheadPanel = ({ onClose, flightState, onSystemAction, aircraftModel }) 
       );
 
       return (
-          <div className="panel-section" style={{ borderColor: '#f00' }}>
-              <h4 className="panel-title" style={{ color: '#f00' }}>FIRE PROTECTION</h4>
-              <div style={{ display: 'flex', justifyContent: 'center' }}>
-                  <Handle label="ENG 1" active={fire.eng1} pulled={fire.eng1Handle} 
-                    onClick={() => onSystemAction('fire', 'eng1_handle')} 
-                    onDischarge={(btl) => onSystemAction('fire', `eng1_bottle${btl}`)}
-                  />
-                  <Handle label="APU" active={fire.apu} pulled={fire.apuHandle} 
-                    onClick={() => onSystemAction('fire', 'apu_handle')} 
-                    onDischarge={(btl) => onSystemAction('fire', `apu_bottle${btl}`)} // Usually APU has only 1 bottle, but simplifying
-                  />
-                  <Handle label="ENG 2" active={fire.eng2} pulled={fire.eng2Handle} 
-                    onClick={() => onSystemAction('fire', 'eng2_handle')} 
-                    onDischarge={(btl) => onSystemAction('fire', `eng2_bottle${btl}`)}
+          <div className="panel-section">
+              <h4 className="panel-title">FIRE PROTECTION</h4>
+              <div style={{ display: 'flex', justifyContent: 'center', gap: '20px', flexWrap: 'wrap' }}>
+                  {fireHandles.map((key, i) => {
+                      const engId = key.replace('Handle', ''); // eng1, eng2
+                      return (
+                        <Handle 
+                            key={key}
+                            label={`ENG ${i+1}`} 
+                            active={fire[engId]} // Detect
+                            pulled={fire[key]} // Handle state
+                            onClick={() => onSystemAction('fire', key)}
+                            onDischarge={(btl) => onSystemAction('fire', `bottle${btl}_discharge`)}
+                        />
+                      );
+                  })}
+                  
+                  <Handle 
+                    label="APU" 
+                    active={fire.apu} 
+                    pulled={fire.apuHandle} 
+                    onClick={() => onSystemAction('fire', 'apuHandle')}
+                    onDischarge={(btl) => onSystemAction('fire', `bottle${btl}_discharge`)}
                   />
               </div>
           </div>

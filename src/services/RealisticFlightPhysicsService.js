@@ -225,24 +225,73 @@ class RealisticFlightPhysicsService {
     initializeSystems(difficulty) {
         // Cold & Dark for Pro/Devil
         const isColdDark = difficulty === 'pro' || difficulty === 'devil';
+        const engineCount = this.aircraft.engineCount || 2;
         
+        // Generate Engine States dynamically
+        const enginesState = {};
+        for (let i = 1; i <= engineCount; i++) {
+            enginesState[`eng${i}`] = { 
+                startSwitch: 'OFF', 
+                fuelControl: !isColdDark, 
+                n2: isColdDark ? 0 : 60, 
+                egt: isColdDark ? 20 : 400 
+            };
+        }
+
+        // Generate Electrical Generator States
+        const elecState = {
+            battery: !isColdDark,
+            batteryCharge: 100, // %
+            stbyPower: !isColdDark,
+            apuGen: false,
+            busTie: true, // Auto
+            dcVolts: isColdDark ? 0 : 28.0,
+            acVolts: isColdDark ? 0 : 115,
+            acFreq: isColdDark ? 0 : 400,
+            acAmps: isColdDark ? 0 : 50,
+            apuGenOff: true
+        };
+        
+        // Add generators for each engine
+        for (let i = 1; i <= engineCount; i++) {
+            elecState[`gen${i}`] = !isColdDark;
+            elecState[`sourceOff${i}`] = isColdDark;
+        }
+
+        // Generate Pneumatic Bleed States
+        const pneuState = {
+            packL: !isColdDark,
+            packR: !isColdDark,
+            isolationValve: true, // Auto/Open
+            cabinAlt: 0,
+            diffPressure: 0,
+            targetAlt: 35000,
+            ductPressL: isColdDark ? 0 : 30,
+            ductPressR: isColdDark ? 0 : 30,
+            mode: 'AUTO'
+        };
+        
+        // Add bleeds for each engine
+        for (let i = 1; i <= engineCount; i++) {
+            pneuState[`bleed${i}`] = !isColdDark;
+        }
+
+        // Fire Detection/Protection
+        const fireState = {
+            apu: false,
+            cargo: false,
+            apuHandle: false,
+            bottle1: 100,
+            bottle2: 100
+        };
+        
+        for (let i = 1; i <= engineCount; i++) {
+            fireState[`eng${i}`] = false;       // Detection
+            fireState[`eng${i}Handle`] = false; // Handle
+        }
+
         this.systems = {
-            electrical: {
-                battery: !isColdDark,
-                batteryCharge: 100, // %
-                stbyPower: !isColdDark,
-                gen1: !isColdDark,
-                gen2: !isColdDark,
-                apuGen: false,
-                busTie: true, // Auto
-                dcVolts: isColdDark ? 0 : 28.0,
-                acVolts: isColdDark ? 0 : 115,
-                acFreq: isColdDark ? 0 : 400,
-                acAmps: isColdDark ? 0 : 50,
-                sourceOff1: isColdDark,
-                sourceOff2: isColdDark,
-                apuGenOff: true
-            },
+            electrical: elecState,
             fuel: {
                 leftPumps: !isColdDark,
                 rightPumps: !isColdDark,
@@ -276,19 +325,7 @@ class RealisticFlightPhysicsService {
                 mode: 'STBY', // STBY, ALT, TA/RA
                 ident: false
             },
-            pressurization: {
-                packL: !isColdDark,
-                packR: !isColdDark,
-                bleed1: !isColdDark,
-                bleed2: !isColdDark,
-                isolationValve: true, // Auto/Open
-                cabinAlt: 0,
-                diffPressure: 0,
-                targetAlt: 35000,
-                ductPressL: isColdDark ? 0 : 30,
-                ductPressR: isColdDark ? 0 : 30,
-                mode: 'AUTO'
-            },
+            pressurization: pneuState,
             oxygen: {
                 masks: false,
                 crewPressure: 1800,
@@ -308,23 +345,8 @@ class RealisticFlightPhysicsService {
                 irsL: !isColdDark,
                 irsR: !isColdDark
             },
-            engines: {
-                eng1: { startSwitch: 'OFF', fuelControl: !isColdDark, n2: isColdDark ? 0 : 20, egt: isColdDark ? 20 : 400 },
-                eng2: { startSwitch: 'OFF', fuelControl: !isColdDark, n2: isColdDark ? 0 : 20, egt: isColdDark ? 20 : 400 }
-            },
-            fire: {
-                // Detection
-                eng1: false,
-                eng2: false,
-                apu: false,
-                cargo: false,
-                // Protection
-                eng1Handle: false,
-                eng2Handle: false,
-                apuHandle: false,
-                bottle1: 100,
-                bottle2: 100
-            },
+            engines: enginesState,
+            fire: fireState,
             // starters removed in favor of engines
             signs: {
                 seatBelts: !isColdDark,
@@ -821,8 +843,8 @@ class RealisticFlightPhysicsService {
              // OverheadLogic simulates the starter motor and initial lightoff.
              // It updates this.systems.engines[id].n2.
              // If the system N2 is higher than our physics N2 (and < 55%), we assume the starter is driving the engine.
-             const sysEng = this.systems.engines[index === 0 ? 'eng1' : 'eng2'];
-             const isBeingStarted = sysEng.startSwitch === 'GRD' || (sysEng.n2 > engine.state.n2 && sysEng.n2 < 55);
+             const sysEng = this.systems.engines[`eng${index + 1}`];
+             const isBeingStarted = sysEng && (sysEng.startSwitch === 'GRD' || (sysEng.n2 > engine.state.n2 && sysEng.n2 < 55));
              
              if (isBeingStarted) {
                  // Force physics engine to match starter state if starter is faster
