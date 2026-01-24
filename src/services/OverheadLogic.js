@@ -54,6 +54,38 @@ class OverheadLogic {
             };
         }
 
+        // Initialize Ice & Rain
+        if (!systems.ice) {
+            systems.ice = {
+                wingAntiIce: false,
+                eng1AntiIce: false,
+                eng2AntiIce: false,
+                probeHeat: true // Default Auto/On
+            };
+        }
+
+        // Initialize Signs
+        if (!systems.signs) {
+            systems.signs = {
+                seatBelts: true,
+                noSmoking: true
+            };
+        }
+
+        // Initialize Lighting if missing
+        if (!systems.lighting) {
+            systems.lighting = {
+                landing: false,
+                taxi: false,
+                strobe: false,
+                beacon: false,
+                nav: false,
+                logo: false,
+                wing: false,
+                emergencyLights: true // Armed
+            };
+        }
+
         // 1. Electrical System (Power distribution foundation)
         this.updateElectrical(systems, context, dt);
 

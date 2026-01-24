@@ -1861,12 +1861,34 @@ class RealisticFlightPhysicsService {
 
         // Special System Handling
         if (system === 'hydraulics') {
-            if (action === 'eng1Pump') this.systems.hydraulics.sysA.engPump = toggle(this.systems.hydraulics.sysA.engPump);
-            else if (action === 'elec1Pump') this.systems.hydraulics.sysA.elecPump = toggle(this.systems.hydraulics.sysA.elecPump);
-            else if (action === 'eng2Pump') this.systems.hydraulics.sysB.engPump = toggle(this.systems.hydraulics.sysB.engPump);
-            else if (action === 'elec2Pump') this.systems.hydraulics.sysB.elecPump = toggle(this.systems.hydraulics.sysB.elecPump);
-            else console.warn(`Hydraulics action ${action} not found`);
+            if (action.includes('.')) {
+                const [sysName, field] = action.split('.');
+                const sys = this.systems.hydraulics[sysName];
+                if (sys && Object.prototype.hasOwnProperty.call(sys, field)) {
+                    sys[field] = toggle(sys[field]);
+                } else {
+                    console.warn(`Hydraulics nested action ${action} not found`);
+                }
+            } else {
+                if (action === 'eng1Pump' && this.systems.hydraulics.sysA) this.systems.hydraulics.sysA.engPump = toggle(this.systems.hydraulics.sysA.engPump);
+                else if (action === 'elec1Pump' && this.systems.hydraulics.sysA) this.systems.hydraulics.sysA.elecPump = toggle(this.systems.hydraulics.sysA.elecPump);
+                else if (action === 'eng2Pump' && this.systems.hydraulics.sysB) this.systems.hydraulics.sysB.engPump = toggle(this.systems.hydraulics.sysB.engPump);
+                else if (action === 'elec2Pump' && this.systems.hydraulics.sysB) this.systems.hydraulics.sysB.elecPump = toggle(this.systems.hydraulics.sysB.elecPump);
+                else console.warn(`Hydraulics action ${action} not found`);
+            }
         } 
+        else if (system === 'apu') {
+            if (action === 'bleed') {
+                if (!this.systems.apu.running) {
+                    return;
+                }
+                this.systems.apu.bleed = toggle(this.systems.apu.bleed);
+            } else if (this.systems.apu[action] !== undefined) {
+                this.systems.apu[action] = toggle(this.systems.apu[action]);
+            } else {
+                console.warn(`APU action ${action} not found`);
+            }
+        }
         else if (system === 'engines') {
              // Engine Start Switches (Multi-state: OFF -> GRD -> CONT -> FLT -> OFF)
              const cycleStartSwitch = (current) => {
