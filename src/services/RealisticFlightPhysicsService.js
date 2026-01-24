@@ -115,7 +115,7 @@ class Quaternion {
 // ==========================================
 
 class RealisticFlightPhysicsService {
-    constructor(aircraftData, initialLat = 0, initialLon = 0) {
+    constructor(aircraftData, initialLat = 0, initialLon = 0, difficulty = 'rookie') {
         this.aircraft = this.validateAndParseAircraft(aircraftData);
         
         // Physical Constants
@@ -190,7 +190,7 @@ class RealisticFlightPhysicsService {
         this.time = 0;
         this.runwayGeometry = null;
         this.groundStatus = { status: 'UNKNOWN', remainingLength: 0 };
-        this.difficulty = 'rookie'; // Default
+        this.difficulty = difficulty; // Set from constructor
         // Initialize airport elevation from config (converted from feet to meters if provided)
         this.airportElevation = (aircraftData.airportElevation || 0) * 0.3048; 
         this.terrainElevation = null; // AMSL in meters
@@ -268,8 +268,8 @@ class RealisticFlightPhysicsService {
                 state: 'OFF'
             },
             hydraulics: {
-                sysA: { pressure: isColdDark ? 0 : 3000, engPump: true, elecPump: !isColdDark, qty: 100 },
-                sysB: { pressure: isColdDark ? 0 : 3000, engPump: true, elecPump: !isColdDark, qty: 100 }
+                sysA: { pressure: isColdDark ? 0 : 3000, engPump: !isColdDark, elecPump: !isColdDark, qty: 100 },
+                sysB: { pressure: isColdDark ? 0 : 3000, engPump: !isColdDark, elecPump: !isColdDark, qty: 100 }
             },
             transponder: {
                 code: 2000,
@@ -308,16 +308,24 @@ class RealisticFlightPhysicsService {
                 irsL: !isColdDark,
                 irsR: !isColdDark
             },
+            engines: {
+                eng1: { startSwitch: 'OFF', fuelControl: !isColdDark, n2: isColdDark ? 0 : 20, egt: isColdDark ? 20 : 400 },
+                eng2: { startSwitch: 'OFF', fuelControl: !isColdDark, n2: isColdDark ? 0 : 20, egt: isColdDark ? 20 : 400 }
+            },
             fire: {
+                // Detection
                 eng1: false,
                 eng2: false,
                 apu: false,
-                cargo: false
+                cargo: false,
+                // Protection
+                eng1Handle: false,
+                eng2Handle: false,
+                apuHandle: false,
+                bottle1: 100,
+                bottle2: 100
             },
-            starters: {
-                engine1: false,
-                engine2: false
-            },
+            // starters removed in favor of engines
             signs: {
                 seatBelts: !isColdDark,
                 noSmoking: !isColdDark
@@ -732,7 +740,8 @@ class RealisticFlightPhysicsService {
             engineN2: this.engines.map(e => e.state.n2 || 0),
             altitude: -this.state.pos.z * 3.28084, // ft
             onGround: this.onGround,
-            airspeed: this.state.vel.magnitude() * 1.94384 // kts
+            airspeed: this.state.vel.magnitude() * 1.94384, // kts
+            difficulty: this.difficulty // Pass difficulty to logic
         };
 
         // Delegate logic to OverheadLogic service
@@ -794,10 +803,6 @@ class RealisticFlightPhysicsService {
     updateEngines(env, dt) {
         // Mach number approx
         const speedOfSound = env.speedOfSound || 340;
-        // Mach should be based on Airspeed, not Ground Speed
-        // We need V_air_body magnitude.
-        // Re-calculate local airspeed if needed, or pass it in.
-        // For simplicity, we'll re-calculate V_air here or approximate.
         
         // Transform Wind to Body Frame for Airspeed Calculation
         const q_inv = new Quaternion(this.state.quat.w, -this.state.quat.x, -this.state.quat.y, -this.state.quat.z);
@@ -809,12 +814,46 @@ class RealisticFlightPhysicsService {
         const airDensityRatio = env.density / this.CONSTANTS.SEA_LEVEL_DENSITY;
 
         this.engines.forEach((engine, index) => {
-             // Use independent throttle state
+             // 1. Get Control Inputs
              const engineThrottle = this.controls.engineThrottles[index];
+             
+             // 2. Check for Starter Drive (from OverheadLogic)
+             // OverheadLogic simulates the starter motor and initial lightoff.
+             // It updates this.systems.engines[id].n2.
+             // If the system N2 is higher than our physics N2 (and < 55%), we assume the starter is driving the engine.
+             const sysEng = this.systems.engines[index === 0 ? 'eng1' : 'eng2'];
+             const isBeingStarted = sysEng.startSwitch === 'GRD' || (sysEng.n2 > engine.state.n2 && sysEng.n2 < 55);
+             
+             if (isBeingStarted) {
+                 // Force physics engine to match starter state if starter is faster
+                 if (sysEng.n2 > engine.state.n2) {
+                     engine.state.n2 = sysEng.n2;
+                     engine.state.n1 = engine.state.n2 * 0.9; // Approximate N1 from N2 during start
+                     
+                     // If OverheadLogic says we have lightoff (EGT rising), sync EGT too
+                     if (sysEng.egt > engine.state.egt) {
+                         engine.state.egt = sysEng.egt;
+                     }
+                     
+                     // If fuel introduced, tell physics engine it's running
+                     if (sysEng.fuelControl && sysEng.n2 > 20) {
+                         engine.state.running = true;
+                     }
+                 }
+             }
 
+             // 3. Update Physics
              engine.update(dt, engineThrottle, mach, -this.state.pos.z, airDensityRatio, env.temp);
              
-             // Fuel consumption is handled in the main update loop via totalFuelFlow to avoid double counting
+             // 4. Sync Back to Systems (for UI and Logic)
+             // We are the source of truth for running engines
+             sysEng.n1 = engine.state.n1;
+             sysEng.n2 = engine.state.n2;
+             sysEng.egt = engine.state.egt;
+             sysEng.ff = engine.state.fuelFlow;
+             
+             // 5. Detect Engine Stall/Failure conditions?
+             // (Already handled in engine.update mostly)
         });
         
         if (this.state.fuel < 0) {
@@ -1629,6 +1668,32 @@ class RealisticFlightPhysicsService {
             else if (action === 'elec2Pump') this.systems.hydraulics.sysB.elecPump = toggle(this.systems.hydraulics.sysB.elecPump);
             else console.warn(`Hydraulics action ${action} not found`);
         } 
+        else if (system === 'engines') {
+             // Engine Start Switches (Multi-state: OFF -> GRD -> CONT -> FLT -> OFF)
+             const cycleStartSwitch = (current) => {
+                 const states = ['OFF', 'GRD', 'CONT', 'FLT'];
+                 const idx = states.indexOf(current);
+                 return states[(idx + 1) % states.length];
+             };
+
+             if (action === 'eng1_start_toggle') this.systems.engines.eng1.startSwitch = cycleStartSwitch(this.systems.engines.eng1.startSwitch);
+             else if (action === 'eng2_start_toggle') this.systems.engines.eng2.startSwitch = cycleStartSwitch(this.systems.engines.eng2.startSwitch);
+             
+             // Fuel Control
+             else if (action === 'eng1_fuel') this.systems.engines.eng1.fuelControl = toggle(this.systems.engines.eng1.fuelControl);
+             else if (action === 'eng2_fuel') this.systems.engines.eng2.fuelControl = toggle(this.systems.engines.eng2.fuelControl);
+        }
+        else if (system === 'fire') {
+            // Fire Handles
+            if (action === 'eng1_handle') this.systems.fire.eng1Handle = toggle(this.systems.fire.eng1Handle);
+            else if (action === 'eng2_handle') this.systems.fire.eng2Handle = toggle(this.systems.fire.eng2Handle);
+            else if (action === 'apu_handle') this.systems.fire.apuHandle = toggle(this.systems.fire.apuHandle);
+            
+            // Bottle Discharge (Requires handle pulled usually, but we check in logic)
+            else if (action === 'eng1_bottle1') this.systems.fire.bottle1_discharge = true; // Momentary
+            else if (action === 'eng1_bottle2') this.systems.fire.bottle2_discharge = true;
+            // ... add more if needed
+        }
         else if (system === 'transponder') {
             // Transponder has specific fields
             if (action === 'code') this.systems.transponder.code = value;
@@ -1647,8 +1712,8 @@ class RealisticFlightPhysicsService {
         console.log(`Physics Service: System Action ${system}.${action} -> ${value === undefined ? 'TOGGLE' : value}`);
 
         // Side effects
-        const newValue = this.systems[system][action]; // Get the actual new value
-        this.updateSystemLogic(system, action, newValue);
+        // const newValue = this.systems[system][action]; 
+        // this.updateSystemLogic(system, action, newValue);
     }
 
     updateSystemLogic(system, action, value) {
@@ -1988,9 +2053,9 @@ class RealisticFlightPhysicsService {
         };
 
         // Hydraulics Off
-        this.systems.hydraulics.sysA.engPump = true; // Switches usually stay ON but no pressure
+        this.systems.hydraulics.sysA.engPump = false; 
         this.systems.hydraulics.sysA.elecPump = false;
-        this.systems.hydraulics.sysB.engPump = true;
+        this.systems.hydraulics.sysB.engPump = false;
         this.systems.hydraulics.sysB.elecPump = false;
         this.systems.hydraulics.sysA.pressure = 0;
         this.systems.hydraulics.sysB.pressure = 0;
@@ -2019,11 +2084,24 @@ class RealisticFlightPhysicsService {
             powered: false
         };
         
-        // Reset Engines
+        // Reset Engines (Systems & Physics)
+        if (this.systems.engines) {
+            this.systems.engines.eng1.startSwitch = 'OFF';
+            this.systems.engines.eng1.fuelControl = false;
+            this.systems.engines.eng1.n2 = 0;
+            this.systems.engines.eng1.egt = 20;
+            
+            this.systems.engines.eng2.startSwitch = 'OFF';
+            this.systems.engines.eng2.fuelControl = false;
+            this.systems.engines.eng2.n2 = 0;
+            this.systems.engines.eng2.egt = 20;
+        }
+
+        // Reset Engines (Physics Models)
         this.engines.forEach(e => {
             e.state.n1 = 0;
             e.state.n2 = 0;
-            e.state.egt = 0; // Cold EGT
+            e.state.egt = 20; // Cold EGT
             e.state.fuelFlow = 0;
             e.state.oilPressure = 0;
             e.state.running = false;
@@ -2053,7 +2131,7 @@ class RealisticFlightPhysicsService {
         }
 
         // Apply Cold Start if Professional or higher
-        if (['professional', 'survival', 'devil'].includes(this.difficulty)) {
+        if (['pro', 'professional', 'survival', 'devil'].includes(this.difficulty)) {
             this.setColdStart();
         } else if (conditions.coldStart) {
             // Explicit override

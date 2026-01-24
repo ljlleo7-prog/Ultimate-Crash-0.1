@@ -8,17 +8,18 @@
  */
 
 export const ChecklistCategories = {
-    STARTUP: 'START-UP',
+    PREFLIGHT: 'PREFLIGHT',
+    ENGINE_START: 'ENG START',
     TAKEOFF: 'TAKEOFF',
     DESCENT: 'DESCENT',
     LANDING: 'LANDING'
 };
 
 export const Checklists = {
-    [ChecklistCategories.STARTUP]: [
+    [ChecklistCategories.PREFLIGHT]: [
         { 
             id: 'bat', 
-            label: 'Battery Switch', 
+            label: 'Battery Switch ON', 
             validate: (systems) => systems?.electrical?.battery === true 
         },
         { 
@@ -28,38 +29,63 @@ export const Checklists = {
         },
         { 
             id: 'apu_gen', 
-            label: 'APU Generator', 
+            label: 'APU Generator ON', 
             validate: (systems) => systems?.electrical?.apuGen === true 
         },
         { 
             id: 'apu_bleed', 
-            label: 'APU Bleed', 
+            label: 'APU Bleed ON', 
             validate: (systems) => systems?.apu?.bleed === true 
         },
         { 
-            id: 'hyd_pumps', 
-            label: 'Hydraulic Pumps', 
-            validate: (systems) => systems?.hydraulics?.sysA?.engPump === true && systems?.hydraulics?.sysB?.engPump === true
+            id: 'nav_lights', 
+            label: 'Position Lights ON', 
+            validate: (systems) => systems?.lighting?.nav === true 
+        },
+        { 
+            id: 'logo_lights', 
+            label: 'Logo Lights ON', 
+            validate: (systems) => systems?.lighting?.logo === true 
+        }
+    ],
+    [ChecklistCategories.ENGINE_START]: [
+        { 
+            id: 'beacon', 
+            label: 'Anti-Collision Light ON', 
+            validate: (systems) => systems?.lighting?.beacon === true 
         },
         { 
             id: 'fuel_pumps', 
-            label: 'Fuel Pumps', 
+            label: 'Fuel Pumps ON', 
             validate: (systems) => {
                 const f = systems?.fuel;
                 return f && ((f.leftPumps || f.centerPumps) && (f.rightPumps || f.centerPumps));
             }
         },
         { 
-            id: 'beacon', 
-            label: 'Anti-Collision Light', 
-            validate: (systems) => systems?.lighting?.beacon === true 
+            id: 'hyd_pumps', 
+            label: 'Hydraulic Pumps ON', 
+            validate: (systems) => systems?.hydraulics?.sysA?.engPump === true && systems?.hydraulics?.sysB?.engPump === true
         },
         { 
-            id: 'trim', 
-            label: 'Trim Set (4-5 Units)', 
-            // Often trim is in flightState, not systems. We might need a separate context object.
-            // For now, assume we can access it if passed, or user manual check.
-            validate: (systems, flightState) => flightState?.trimValue >= 0.1 && flightState?.trimValue <= 0.3 // approx 10-30%
+            id: 'engines_stab', 
+            label: 'Engines Stabilized', 
+            validate: (systems, flightState) => flightState?.engineN2?.[0] > 50 && flightState?.engineN2?.[1] > 50 
+        },
+        { 
+            id: 'gen_on', 
+            label: 'Engine Generators ON', 
+            validate: (systems) => systems?.electrical?.gen1 === true && systems?.electrical?.gen2 === true 
+        },
+        { 
+            id: 'apu_off', 
+            label: 'APU Shutdown & Gen OFF', 
+            validate: (systems) => !systems?.apu?.running && !systems?.electrical?.apuGen
+        },
+        { 
+            id: 'packs', 
+            label: 'Air Conditioning Packs AUTO', 
+            validate: (systems) => systems?.pneumatics?.packL && systems?.pneumatics?.packR 
         }
     ],
     [ChecklistCategories.TAKEOFF]: [

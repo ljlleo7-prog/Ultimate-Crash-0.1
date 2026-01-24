@@ -298,10 +298,10 @@ const OverheadPanel = ({ onClose, flightState, onSystemAction, aircraftModel }) 
                 annunciator={{ label: 'OFF', active: !getSys('pressurization.bleed2'), color: 'amber' }}
             />
         </div>
-
-        <div style={{ display: 'flex', justifyContent: 'center', marginTop: '10px' }}>
-            <Switch label="ISOLATION" active={getSys('pressurization.isolationValve')} onClick={() => onSystemAction('pressurization', 'isolationValve')} subLabel="AUTO" 
-                annunciator={{ label: 'VALVE OPEN', active: getSys('pressurization.isolationValve'), color: 'blue' }}
+        
+        <div style={{ marginTop: '10px', display: 'flex', justifyContent: 'center' }}>
+             <Switch label="ISOLATION" active={getSys('pressurization.isolationValve')} onClick={() => onSystemAction('pressurization', 'isolationValve')} subLabel="VALVE"
+                annunciator={{ label: 'OPEN', active: getSys('pressurization.isolationValve'), color: 'blue' }}
             />
         </div>
 
@@ -317,6 +317,132 @@ const OverheadPanel = ({ onClose, flightState, onSystemAction, aircraftModel }) 
         </div>
       </div>
     );
+  };
+
+  const EnginePanel = () => {
+    const eng1 = getSys('engines.eng1', {});
+    const eng2 = getSys('engines.eng2', {});
+    
+    // Helper for Multi-State Switch (GRD/OFF/CONT/FLT)
+    const StartSwitch = ({ label, value, onClick }) => (
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', margin: '5px' }}>
+            <div 
+                onClick={onClick}
+                style={{ 
+                    width: '40px', height: '40px', borderRadius: '50%', 
+                    background: '#333', border: '2px solid #555',
+                    display: 'flex', justifyContent: 'center', alignItems: 'center',
+                    cursor: 'pointer', position: 'relative'
+                }}
+            >
+                {/* Knob Indicator */}
+                <div style={{ 
+                    width: '4px', height: '15px', background: '#fff', 
+                    transform: value === 'GRD' ? 'rotate(-45deg)' : 
+                               value === 'CONT' ? 'rotate(45deg)' : 
+                               value === 'FLT' ? 'rotate(90deg)' : 'rotate(0deg)',
+                    transformOrigin: 'bottom center', position: 'absolute', top: '5px'
+                }} />
+                <div style={{ fontSize: '8px', color: '#fff', marginTop: '45px' }}>{value}</div>
+            </div>
+            <div style={{ fontSize: '10px', color: '#ccc', marginTop: '5px' }}>{label}</div>
+        </div>
+    );
+
+    return (
+        <div className="panel-section">
+            <h4 className="panel-title">ENGINES</h4>
+            
+            {/* Gauges */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '10px' }}>
+                <div style={{ display: 'flex', gap: '5px' }}>
+                    <Gauge label="N2" value={Math.round(eng1.n2 || 0)} unit="%" max={105} />
+                    <Gauge label="EGT" value={Math.round(eng1.egt || 0)} unit="°C" max={900} color={(eng1.egt || 0) > 800 ? '#f00' : '#0f0'} />
+                </div>
+                <div style={{ display: 'flex', gap: '5px' }}>
+                    <Gauge label="N2" value={Math.round(eng2.n2 || 0)} unit="%" max={105} />
+                    <Gauge label="EGT" value={Math.round(eng2.egt || 0)} unit="°C" max={900} color={(eng2.egt || 0) > 800 ? '#f00' : '#0f0'} />
+                </div>
+            </div>
+
+            {/* Start Switches */}
+            <div style={{ display: 'flex', justifyContent: 'space-around', borderTop: '1px solid #444', paddingTop: '10px' }}>
+                <StartSwitch label="ENG 1 START" value={eng1.startSwitch || 'OFF'} onClick={() => onSystemAction('engines', 'eng1_start_toggle')} />
+                <StartSwitch label="ENG 2 START" value={eng2.startSwitch || 'OFF'} onClick={() => onSystemAction('engines', 'eng2_start_toggle')} />
+            </div>
+
+            {/* Fuel Control */}
+            <div style={{ display: 'flex', justifyContent: 'space-around', marginTop: '10px' }}>
+                <Switch label="ENG 1" active={eng1.fuelControl} onClick={() => onSystemAction('engines', 'eng1_fuel')} subLabel="CUTOFF" 
+                    annunciator={{ label: 'RUN', active: eng1.fuelControl, color: 'green' }}
+                />
+                <Switch label="ENG 2" active={eng2.fuelControl} onClick={() => onSystemAction('engines', 'eng2_fuel')} subLabel="CUTOFF"
+                    annunciator={{ label: 'RUN', active: eng2.fuelControl, color: 'green' }}
+                />
+            </div>
+        </div>
+    );
+  };
+
+  const FirePanel = () => {
+      const fire = getSys('fire', {});
+      
+      const Handle = ({ label, active, pulled, onClick, onDischarge }) => (
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', margin: '5px' }}>
+              <div onClick={onClick} style={{
+                  width: '50px', height: '60px', 
+                  background: pulled ? '#500' : '#333',
+                  border: '2px solid #555', borderRadius: '4px',
+                  display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+                  cursor: 'pointer',
+                  boxShadow: active ? '0 0 10px #f00' : 'none',
+                  transform: pulled ? 'translateY(10px)' : 'none',
+                  transition: 'transform 0.2s'
+              }}>
+                  <div style={{ fontSize: '10px', color: '#fff', fontWeight: 'bold' }}>{label}</div>
+                  <div style={{ width: '30px', height: '30px', background: active ? '#f00' : '#550000', borderRadius: '50%', marginTop: '5px' }}></div>
+                  <div style={{ fontSize: '8px', color: '#ccc' }}>{pulled ? 'PULLED' : 'IN'}</div>
+              </div>
+
+              {/* Discharge Buttons (Visible when pulled) */}
+              {pulled && (
+                  <div style={{ display: 'flex', gap: '5px', marginTop: '5px' }}>
+                      <button 
+                        onClick={(e) => { e.stopPropagation(); onDischarge(1); }}
+                        style={{ fontSize: '8px', padding: '2px', background: '#444', color: '#fff', border: '1px solid #666', cursor: 'pointer' }}
+                      >
+                        BTL 1
+                      </button>
+                      <button 
+                        onClick={(e) => { e.stopPropagation(); onDischarge(2); }}
+                        style={{ fontSize: '8px', padding: '2px', background: '#444', color: '#fff', border: '1px solid #666', cursor: 'pointer' }}
+                      >
+                        BTL 2
+                      </button>
+                  </div>
+              )}
+          </div>
+      );
+
+      return (
+          <div className="panel-section" style={{ borderColor: '#f00' }}>
+              <h4 className="panel-title" style={{ color: '#f00' }}>FIRE PROTECTION</h4>
+              <div style={{ display: 'flex', justifyContent: 'center' }}>
+                  <Handle label="ENG 1" active={fire.eng1} pulled={fire.eng1Handle} 
+                    onClick={() => onSystemAction('fire', 'eng1_handle')} 
+                    onDischarge={(btl) => onSystemAction('fire', `eng1_bottle${btl}`)}
+                  />
+                  <Handle label="APU" active={fire.apu} pulled={fire.apuHandle} 
+                    onClick={() => onSystemAction('fire', 'apu_handle')} 
+                    onDischarge={(btl) => onSystemAction('fire', `apu_bottle${btl}`)} // Usually APU has only 1 bottle, but simplifying
+                  />
+                  <Handle label="ENG 2" active={fire.eng2} pulled={fire.eng2Handle} 
+                    onClick={() => onSystemAction('fire', 'eng2_handle')} 
+                    onDischarge={(btl) => onSystemAction('fire', `eng2_bottle${btl}`)}
+                  />
+              </div>
+          </div>
+      );
   };
 
   const HydraulicsPanel = () => {
@@ -396,6 +522,8 @@ const OverheadPanel = ({ onClose, flightState, onSystemAction, aircraftModel }) 
                 <LightsPanel />
             </div>
             <div className="col">
+                <FirePanel />
+                <EnginePanel />
                 <div className="panel-section">
                     <h4 className="panel-title">MISC</h4>
                     <div style={{ display: 'flex', gap: '10px', justifyContent: 'center' }}>

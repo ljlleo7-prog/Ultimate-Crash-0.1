@@ -538,7 +538,15 @@ class SceneManager {
       }
     } else {
       // Default: time-based completion
-      isPhaseComplete = this.elapsedInPhase >= phase.durationSeconds;
+      // If Pro/Devil, disable time-based completion for startup phases to enforce checklist
+      const isHardcore = ['pro', 'devil'].includes(this.scenario.difficulty);
+      const isStartupPhase = [FlightPhases.BOARDING, FlightPhases.DEPARTURE_CLEARANCE, FlightPhases.PUSHBACK].includes(phase.type);
+      
+      if (isHardcore && isStartupPhase) {
+          isPhaseComplete = false; // Only manual skip allowed via 'Continue' button
+      } else {
+          isPhaseComplete = this.elapsedInPhase >= phase.durationSeconds;
+      }
     }
 
     if (isPhaseComplete) {

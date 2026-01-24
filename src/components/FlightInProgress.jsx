@@ -241,7 +241,7 @@ const FlightInProgress = ({
 
     // Map phases to checklist requirements
     // Scene 1: Boarding/Pre-flight -> Power Up
-    if (currentPhaseType === 'boarding' || currentPhaseType === 'takeoff_prep') {
+    if (currentPhaseType === 'boarding' || currentPhaseType === 'takeoff_prep' || currentPhaseType === 'departure_clearance') {
         // Note: takeoff_prep is usually just before takeoff, but if we start cold & dark,
         // we might be in boarding.
         phaseToCheck = StartupPhases.POWER_UP;
@@ -975,6 +975,23 @@ const FlightInProgress = ({
                   break;
                 }
                 case 'skip-phase': {
+                  // Check if we can proceed (Hardcore modes only)
+                  if ((difficulty === 'pro' || difficulty === 'devil') && !startupStatus.canContinue) {
+                    const missing = startupStatus.missingItems.join(', ');
+                    const warningMsg = {
+                        title: 'Checklist Incomplete',
+                        content: `Cannot proceed. Missing items: ${missing}`,
+                        severity: 'warning'
+                    };
+                    
+                    // Show warning via narrative
+                    setNarrative(warningMsg);
+                    
+                    // Also log to console
+                    console.warn('❌ Cannot skip phase:', missing);
+                    return;
+                  }
+
                   sceneManager.skipPhase();
                   console.log(`📡 FlightPanel Action: ${action}`);
                   break;

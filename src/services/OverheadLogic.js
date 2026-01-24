@@ -62,6 +62,12 @@ class OverheadLogic {
 
         // 7. Lighting (Dependent on Elec)
         this.updateLighting(systems, context, dt);
+
+        // 8. Engines (Start Sequence)
+        this.updateEngines(systems, context, dt);
+
+        // 9. Fire Protection
+        this.updateFireProtection(systems, context, dt);
     }
 
     /**
@@ -442,6 +448,150 @@ class OverheadLogic {
         // Just power check
         const hasPower = systems.electrical.dcVolts > 20;
         systems.lighting.powered = hasPower;
+    }
+
+    /**
+     * ENGINE START SYSTEM
+     * Simulates N2 spool up, EGT rise, and starter cutout.
+     */
+    updateEngines(systems, context, dt) {
+        if (!systems.engines) return;
+
+        ['eng1', 'eng2'].forEach((engId, index) => {
+            const eng = systems.engines[engId];
+            const pneu = systems.pressurization;
+            
+            // Pneumatic pressure available for start?
+            // Need > 30 PSI (approx)
+            // If APU bleed is on, we likely have pressure.
+            const pressureAvailable = (index === 0 ? pneu.ductPressL : pneu.ductPressR) > 20;
+
+            // State Machine for Start
+            if (eng.startSwitch === 'GRD') {
+                if (pressureAvailable) {
+                    // Spool up
+                    if (eng.n2 < 20) {
+                        eng.n2 += 2.0 * dt; // Starter torque
+                    } else {
+                        // Lightoff region
+                        if (eng.fuelControl) {
+                            eng.n2 += 5.0 * dt; // Combustion accel
+                            eng.egt += 50 * dt; // Rapid EGT rise
+                        }
+                    }
+                }
+            } else if (eng.startSwitch === 'CONT' || eng.startSwitch === 'FLT') {
+                 // Ignition always on
+                 // In a deeper sim, this prevents flameout in heavy rain/turbulence
+            }
+
+            // Running Logic
+            // Once N2 > 50, we hand over control to the Physics Engine (RealisticFlightPhysicsService).
+            // We only monitor for shutdown conditions here.
+            if (eng.n2 > 50) {
+                // Starter Cutout
+                if (eng.startSwitch === 'GRD') eng.startSwitch = 'OFF';
+                
+                // We do NOT update N2/EGT here anymore. 
+                // The Physics Service will update systems.engines.n2 based on throttle and aerodynamics.
+                
+            } else if (eng.startSwitch === 'OFF' && eng.n2 > 0) {
+                // Spool down
+                // If fuel control is ON but switch is OFF, engine still runs! 
+                // Wait, Start Switch is for Starter/Ignition. Fuel Control is for Fuel.
+                // If N2 > 50 and Fuel Control ON, it runs regardless of Start Switch (unless in OFF, but usually it's Auto/Off/Cont/Flt).
+                // Actually, in 737, if Start Switch is OFF, ignition is off (unless auto-ignite logic).
+                // But combustion sustains itself.
+                
+                if (eng.fuelControl && eng.n2 > 40) {
+                     // Engine is running self-sustaining
+                     const targetN2 = 60;
+                     const targetEgt = 400;
+                     eng.n2 = eng.n2 + (targetN2 - eng.n2) * 0.1 * dt;
+                     eng.egt = eng.egt + (targetEgt - eng.egt) * 0.05 * dt;
+                } else {
+                    // Shutdown / Spool down
+                    eng.n2 -= 2.0 * dt;
+                    eng.egt -= 10.0 * dt;
+                }
+                
+                if (eng.n2 < 0) eng.n2 = 0;
+                if (eng.egt < 20) eng.egt = 20;
+            }
+
+            // Sync with Physics Context if needed (Optional, usually one-way)
+            // context.engineN2[index] = eng.n2; 
+        });
+    }
+
+    /**
+     * FIRE PROTECTION SYSTEM
+     * Handles, Bottles, and System Cutoffs.
+     */
+    updateFireProtection(systems, context, dt) {
+        if (!systems.fire) return;
+
+        // Engine 1
+        if (systems.fire.eng1Handle) {
+            // Cutoff Systems
+            systems.fuel.leftPumps = false;
+            systems.hydraulics.sysA.engPump = false;
+            systems.electrical.gen1 = false;
+            systems.engines.eng1.fuelControl = false;
+        }
+
+        // Engine 2
+        if (systems.fire.eng2Handle) {
+            systems.fuel.rightPumps = false;
+            systems.hydraulics.sysB.engPump = false;
+            systems.electrical.gen2 = false;
+            systems.engines.eng2.fuelControl = false;
+        }
+
+        // APU
+        if (systems.fire.apuHandle) {
+            systems.apu.master = false;
+            systems.apu.bleed = false;
+            systems.electrical.apuGen = false;
+        }
+
+        // Bottles Discharge Logic
+        // We assume 2 bottles shared for engines, or 1 per engine? 737 has 2 bottles that can be fired into either engine.
+        // For simplicity, let's say bottle1 can go to eng1/eng2, bottle2 can go to eng1/eng2.
+        // But here we just check generic discharge flags.
+        
+        const dischargeRate = 50 * dt; // Empty in 2 seconds
+
+        if (systems.fire.bottle1_discharge) {
+            if (systems.fire.bottle1 > 0) {
+                systems.fire.bottle1 -= dischargeRate;
+                // If discharging into an engine with handle pulled, extinguish fire
+                if (systems.fire.eng1Handle) systems.fire.eng1 = false;
+                if (systems.fire.eng2Handle) systems.fire.eng2 = false;
+            } else {
+                systems.fire.bottle1 = 0;
+                systems.fire.bottle1_discharge = false; // Reset trigger
+            }
+        }
+
+        if (systems.fire.bottle2_discharge) {
+            if (systems.fire.bottle2 > 0) {
+                systems.fire.bottle2 -= dischargeRate;
+                 if (systems.fire.eng1Handle) systems.fire.eng1 = false;
+                 if (systems.fire.eng2Handle) systems.fire.eng2 = false;
+            } else {
+                systems.fire.bottle2 = 0;
+                systems.fire.bottle2_discharge = false;
+            }
+        }
+        
+        // APU Bottle (Separate usually)
+        // If we reuse bottle1 for APU (common in some sims for simplicity, but 737 has dedicated APU bottle)
+        // Let's assume APU has its own auto-fire or we use bottle1.
+        // For this sim, if APU handle pulled and any discharge, extinguish APU.
+        if (systems.fire.apuHandle && (systems.fire.bottle1_discharge || systems.fire.bottle2_discharge)) {
+             systems.fire.apu = false;
+        }
     }
 }
 

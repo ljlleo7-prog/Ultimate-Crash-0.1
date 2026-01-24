@@ -155,7 +155,13 @@ export function useAircraftPhysics(config = {}, autoStart = true, model = 'reali
         const { initialLatitude, initialLongitude, ...restConfig } = config;
 
         // Use RealisticFlightPhysicsService exclusively as requested
-        const service = new RealisticFlightPhysicsService(finalAircraft, initialLatitude, initialLongitude);
+        // Pass difficulty to constructor to ensure correct system initialization (Cold & Dark vs Hot)
+        const service = new RealisticFlightPhysicsService(
+            finalAircraft, 
+            initialLatitude, 
+            initialLongitude, 
+            config.difficulty
+        );
         
         // Apply initial conditions from config
         if (service && typeof service.setInitialConditions === 'function') {

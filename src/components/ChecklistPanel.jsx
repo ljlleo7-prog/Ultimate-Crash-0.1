@@ -4,7 +4,7 @@ import { Checklists, ChecklistCategories } from '../services/ChecklistData';
 import './ChecklistPanel.css';
 
 const ChecklistPanel = ({ onClose, physicsState, flightState }) => {
-  const [activeTab, setActiveTab] = useState(ChecklistCategories.STARTUP);
+  const [activeTab, setActiveTab] = useState(ChecklistCategories.PREFLIGHT);
   const [checkedItems, setCheckedItems] = useState({});
   const [isFolding, setIsFolding] = useState(false);
 
