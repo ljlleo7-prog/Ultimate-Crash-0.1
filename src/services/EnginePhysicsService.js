@@ -79,11 +79,9 @@ class EnginePhysicsService {
                 const reverseRatio = Math.min(1, Math.abs(throttle) / 0.7); // Clamp ratio to 1
                 targetN1 = this.config.idleN1 + reverseRatio * (maxReverseN1 - this.config.idleN1);
             }
-        } else if (throttle > 0.1) {
-            // Autostart logic simplified: if throttle > 10%, start engine
-            this.state.running = true; 
-        }
-
+        } 
+        // Removed simplified autostart logic to allow for proper system-based starting (Fuel/Starters)
+        
         this.state.isReverse = isReverse;
 
         // N1 Dynamics (Lag)

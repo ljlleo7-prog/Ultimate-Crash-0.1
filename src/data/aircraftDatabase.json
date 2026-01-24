@@ -17,6 +17,7 @@
     "landingDistance": 1600,
     "engineType": "CFM56-7B",
     "engineCount": 2,
+    "hydraulicCount": 2,
     "category": "Medium-haul",
     "wingArea": 125,
     "wingSpan": 35.8,
@@ -78,9 +79,11 @@
     },
     "minNoseGearFailedPitch": -0.2,
     "maxGroundPitch": 0.3,
-    "groundCollisionPitchTorqueFactor": 0.5
+    "groundCollisionPitchTorqueFactor": 0.5,
+    "gearHeight": 3.5
   },
-    {"model": "Airbus A320-200",
+    {
+      "model": "Airbus A320-200",
       "type": "Narrow-body",
       "manufacturer": "Airbus",
       "iata": "320",
@@ -95,8 +98,9 @@
       "takeoffDistance": 2300,
       "landingDistance": 1500,
       "engineType": "CFM56-5A/5B",
-      "engineCount": 2,
-      "category": "Medium-haul",
+    "engineCount": 2,
+    "hydraulicCount": 3,
+    "category": "Medium-haul",
       "wingArea": 122,
       "wingSpan": 34.1,
       "aspectRatio": 9.5,
@@ -155,7 +159,8 @@
     },
     "minNoseGearFailedPitch": -0.2,
     "maxGroundPitch": 0.3,
-    "groundCollisionPitchTorqueFactor": 0.5
+    "groundCollisionPitchTorqueFactor": 0.5,
+    "gearHeight": 3.8
   },
     {
       "model": "Boeing 777-300ER",
@@ -174,6 +179,7 @@
       "landingDistance": 1800,
       "engineType": "GE90-115B",
       "engineCount": 2,
+      "hydraulicCount": 3,
       "category": "Long-haul",
       "wingArea": 428,
       "wingSpan": 64.8,
@@ -232,7 +238,8 @@
     },
     "minNoseGearFailedPitch": -0.2,
     "maxGroundPitch": 0.3,
-    "groundCollisionPitchTorqueFactor": 0.5
+    "groundCollisionPitchTorqueFactor": 0.5,
+    "gearHeight": 5.5
   },
     {
       "model": "Airbus A350-900",
@@ -251,6 +258,7 @@
       "landingDistance": 1600,
       "engineType": "Rolls-Royce Trent XWB",
       "engineCount": 2,
+      "hydraulicCount": 2,
       "category": "Long-haul",
       "wingArea": 442,
       "wingSpan": 64.8,
@@ -298,8 +306,9 @@
       },
       "minNoseGearFailedPitch": -0.2,
       "maxGroundPitch": 0.3,
-      "groundCollisionPitchTorqueFactor": 0.5
-    },
+    "groundCollisionPitchTorqueFactor": 0.5,
+    "gearHeight": 5.8
+  },
     {
       "model": "Embraer E190",
       "type": "Regional",
@@ -331,6 +340,7 @@
       "zeroLiftDragCoefficient": 0.027,
       "inducedDragFactor": 0.042,
       "basicLiftCoefficient": 0.41,
+      "hydraulicCount": 3,
       "horizontalStabilizerArea": 18,
       "horizontalStabilizerCL": -0.13,
       "horizontalStabilizerMomentArm": 9.0,
@@ -362,8 +372,9 @@
       },
       "minNoseGearFailedPitch": -0.2,
       "maxGroundPitch": 0.3,
-      "groundCollisionPitchTorqueFactor": 0.5
-    },
+    "groundCollisionPitchTorqueFactor": 0.5,
+    "gearHeight": 3.0
+  },
     {
       "model": "Cessna Citation X",
       "type": "Business",
@@ -381,6 +392,7 @@
       "landingDistance": 900,
       "engineType": "Rolls-Royce AE3007C",
       "engineCount": 2,
+      "hydraulicCount": 2,
       "category": "Business",
       "wingArea": 32.5,
       "wingSpan": 19.3,
@@ -424,6 +436,7 @@
       },
       "minNoseGearFailedPitch": -0.2,
       "maxGroundPitch": 0.3,
+      "gearHeight": 2.8,
       "groundCollisionPitchTorqueFactor": 0.5
     },
     {
@@ -441,8 +454,10 @@
       "typicalFuelBurn": 22.5,
       "takeoffDistance": 3300,
       "landingDistance": 2100,
+      "gearHeight": 9.5,
       "engineType": "PW4000/CF6-80C2/RB211-524",
       "engineCount": 4,
+      "hydraulicCount": 4,
       "category": "Long-haul",
       "wingArea": 525,
       "wingSpan": 64.4,
@@ -511,6 +526,7 @@
       "landingDistance": 2000,
       "engineType": "Trent 900/GP7200",
       "engineCount": 4,
+      "hydraulicCount": 2,
       "category": "Long-haul",
       "wingArea": 845,
       "wingSpan": 79.8,
@@ -558,8 +574,9 @@
       },
       "minNoseGearFailedPitch": -0.2,
       "maxGroundPitch": 0.3,
-      "groundCollisionPitchTorqueFactor": 0.5
-    },
+    "groundCollisionPitchTorqueFactor": 0.5,
+    "gearHeight": 6.5
+  },
     {
       "model": "Airbus A330-300",
       "type": "Wide-body",
@@ -575,8 +592,10 @@
       "typicalFuelBurn": 12.1,
       "takeoffDistance": 2700,
       "landingDistance": 1700,
+      "gearHeight": 5.8,
       "engineType": "Trent 700/CF6-80E1/PW4000",
       "engineCount": 2,
+      "hydraulicCount": 3,
       "category": "Long-haul",
       "wingArea": 363,
       "wingSpan": 60.3,
@@ -651,9 +670,11 @@
       "typicalFuelBurn": 15.8,
       "takeoffDistance": 3100,
       "landingDistance": 1800,
+      "gearHeight": 6.2,
       "engineType": "Trent 500",
-      "engineCount": 4,
-      "category": "Long-haul",
+    "engineCount": 4,
+    "hydraulicCount": 3,
+    "category": "Long-haul",
       "wingArea": 438,
       "wingSpan": 63.5,
       "aspectRatio": 9.2,
@@ -729,6 +750,7 @@
       "landingDistance": 1500,
       "engineType": "RB211-535E4/PW2037/PW2040",
       "engineCount": 2,
+      "hydraulicCount": 3,
       "category": "Medium-haul",
       "wingArea": 181,
       "wingSpan": 38.0,
@@ -788,7 +810,8 @@
       "momentOfInertiaYaw": 95000,
       "minNoseGearFailedPitch": -0.2,
       "maxGroundPitch": 0.3,
-      "groundCollisionPitchTorqueFactor": 0.5
+      "groundCollisionPitchTorqueFactor": 0.5,
+      "gearHeight": 4.5
     }
   ]
 }

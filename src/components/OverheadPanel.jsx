@@ -138,7 +138,92 @@ const OverheadPanel = ({ onClose, flightState, onSystemAction, aircraftModel }) 
     const elecSys = getSys('electrical', {});
     const genKeys = Object.keys(elecSys).filter(k => k.match(/^gen\d+$/)).sort();
 
+    const ADIRSPanel = () => {
+    const ir1 = getSys('adirs.ir1', 'OFF');
+    const ir2 = getSys('adirs.ir2', 'OFF');
+    const aligned = getSys('adirs.aligned', false);
+    const alignState = getSys('adirs.alignState', 0);
+    const onBat = getSys('adirs.onBat', false);
+    
+    // Switch States: OFF -> ALIGN -> NAV
+    // We'll toggle OFF -> NAV -> ALIGN -> OFF for simplicity or just OFF/NAV
+    // Let's implement OFF <-> NAV for sim simplicity, ALIGN is transient in real life usually or a specific mode.
+    // Actually, usually OFF -> NAV. ALIGN is intermediate.
+    // Let's toggle: OFF -> NAV -> OFF
+    const toggleIRS = (id) => {
+        const current = getSys(`adirs.${id}`, 'OFF');
+        const next = current === 'OFF' ? 'NAV' : 'OFF';
+        onSystemAction('adirs', id, next);
+    };
+
     return (
+      <div className="panel-section">
+        <h4 className="panel-title">ADIRS</h4>
+        <div style={{ display: 'flex', justifyContent: 'center', gap: '20px' }}>
+            <Switch label="IRS 1" active={ir1 === 'NAV'} onClick={() => toggleIRS('ir1')} 
+               subLabel="NAV"
+               annunciator={{ label: 'ON BAT', active: onBat, color: 'amber' }}
+            />
+            
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
+                <div style={{ fontSize: '10px', color: '#ccc', marginBottom: '4px' }}>ALIGN</div>
+                {aligned ? (
+                     <div style={{ color: '#0f0', fontWeight: 'bold' }}>RDY</div>
+                ) : (
+                    ir1 !== 'OFF' || ir2 !== 'OFF' ? (
+                        <div style={{ width: '40px', background: '#333', height: '6px', borderRadius: '3px' }}>
+                             <div style={{ width: `${alignState}%`, background: '#fa0', height: '100%', borderRadius: '3px' }}></div>
+                        </div>
+                    ) : <div style={{ color: '#444' }}>OFF</div>
+                )}
+            </div>
+
+            <Switch label="IRS 2" active={ir2 === 'NAV'} onClick={() => toggleIRS('ir2')} 
+               subLabel="NAV"
+               annunciator={{ label: 'ON BAT', active: onBat, color: 'amber' }}
+            />
+        </div>
+      </div>
+    );
+  };
+
+  const IceRainPanel = () => {
+      return (
+        <div className="panel-section">
+            <h4 className="panel-title">ICE & RAIN</h4>
+            <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'center', gap: '8px' }}>
+                 <Switch label="WIND HEAT" active={getSys('ice.windowHeat')} onClick={() => onSystemAction('ice', 'windowHeat')} subLabel="ON" 
+                    annunciator={{ label: 'OVHT', active: false, color: 'amber' }}
+                 />
+                 <Switch label="PROBE HEAT" active={getSys('ice.probeHeat')} onClick={() => onSystemAction('ice', 'probeHeat')} subLabel="ON" 
+                    annunciator={{ label: 'CAPT', active: !getSys('ice.probeHeat'), color: 'amber' }}
+                 />
+                 <Switch label="WING ANTI-ICE" active={getSys('ice.wingAntiIce')} onClick={() => onSystemAction('ice', 'wingAntiIce')} />
+                 <Switch label="ENG ANTI-ICE" active={getSys('ice.engAntiIce')} onClick={() => onSystemAction('ice', 'engAntiIce')} />
+            </div>
+        </div>
+      );
+  };
+
+  const MiscPanel = () => {
+    return (
+      <div className="panel-section">
+        <h4 className="panel-title">MISC</h4>
+        <div style={{ display: 'flex', gap: '10px', justifyContent: 'center', flexWrap: 'wrap' }}>
+            <Switch label="SEAT BELTS" active={getSys('signs.seatBelts')} onClick={() => onSystemAction('signs', 'seatBelts')} subLabel="AUTO" />
+            <Switch label="NO SMOKE" active={getSys('signs.noSmoking')} onClick={() => onSystemAction('signs', 'noSmoking')} subLabel="ON" />
+            <Switch label="YAW DAMPER" active={getSys('flightControls.yawDamper')} onClick={() => onSystemAction('flightControls', 'yawDamper')} subLabel="ON" 
+                annunciator={{ label: 'OFF', active: !getSys('flightControls.yawDamper'), color: 'amber' }}
+            />
+            <Switch label="EMER LIGHTS" active={getSys('lighting.emergencyExit') === 'ARMED'} onClick={() => onSystemAction('lighting', 'emergencyExit')} subLabel="ARMED" 
+                 annunciator={{ label: 'NOT ARMED', active: getSys('lighting.emergencyExit') !== 'ARMED', color: 'amber' }}
+            />
+        </div>
+      </div>
+    );
+  };
+
+  return (
       <div className="panel-section">
         <h4 className="panel-title">ELECTRICAL</h4>
         
@@ -473,35 +558,55 @@ const OverheadPanel = ({ onClose, flightState, onSystemAction, aircraftModel }) 
   };
 
   const HydraulicsPanel = () => {
+    const hyd = getSys('hydraulics', {});
+    const hydKeys = Object.keys(hyd).sort();
+
     return (
       <div className="panel-section">
         <h4 className="panel-title">HYDRAULICS</h4>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
-            <div style={{ textAlign: 'center' }}>
-                <span style={{ fontSize: '10px', color: '#aaa' }}>SYS A</span>
-                <Gauge label="PRESS" value={Math.round(getSys('hydraulics.sysA.pressure', 0))} unit="PSI" max={4000} />
-                <div style={{ fontSize: '10px', marginTop: '2px' }}>QTY: {Math.round(getSys('hydraulics.sysA.qty', 0))}%</div>
-            </div>
-            <div style={{ textAlign: 'center' }}>
-                <span style={{ fontSize: '10px', color: '#aaa' }}>SYS B</span>
-                <Gauge label="PRESS" value={Math.round(getSys('hydraulics.sysB.pressure', 0))} unit="PSI" max={4000} />
-                <div style={{ fontSize: '10px', marginTop: '2px' }}>QTY: {Math.round(getSys('hydraulics.sysB.qty', 0))}%</div>
-            </div>
+        {/* Dynamic Gauges Grid */}
+        <div style={{ display: 'grid', gridTemplateColumns: `repeat(${hydKeys.length}, 1fr)`, gap: '10px' }}>
+            {hydKeys.map((key) => {
+                 const label = key.replace('sys', 'SYS ').toUpperCase();
+                 const sys = hyd[key];
+                 return (
+                    <div key={key} style={{ textAlign: 'center' }}>
+                        <span style={{ fontSize: '10px', color: '#aaa' }}>{label}</span>
+                        <Gauge label="PRESS" value={Math.round(sys.pressure || 0)} unit="PSI" max={4000} />
+                        <div style={{ fontSize: '10px', marginTop: '2px' }}>QTY: {Math.round(sys.qty || 0)}%</div>
+                    </div>
+                 );
+            })}
         </div>
         
+        {/* Dynamic Switches */}
         <div style={{ display: 'flex', justifyContent: 'center', gap: '10px', marginTop: '10px', flexWrap: 'wrap' }}>
-             <Switch label="ENG 1" active={getSys('hydraulics.sysA.engPump')} onClick={() => onSystemAction('hydraulics', 'eng1Pump')} 
-                annunciator={{ label: 'LOW PRESS', active: getSys('hydraulics.sysA.pressure') < 1500, color: 'amber' }}
-             />
-             <Switch label="ELEC 2" active={getSys('hydraulics.sysA.elecPump')} onClick={() => onSystemAction('hydraulics', 'elec1Pump')} 
-                annunciator={{ label: 'OVERHEAT', active: false, color: 'amber' }}
-             />
-             <Switch label="ELEC 1" active={getSys('hydraulics.sysB.elecPump')} onClick={() => onSystemAction('hydraulics', 'elec2Pump')} 
-                annunciator={{ label: 'OVERHEAT', active: false, color: 'amber' }}
-             />
-             <Switch label="ENG 2" active={getSys('hydraulics.sysB.engPump')} onClick={() => onSystemAction('hydraulics', 'eng2Pump')} 
-                annunciator={{ label: 'LOW PRESS', active: getSys('hydraulics.sysB.pressure') < 1500, color: 'amber' }}
-             />
+             {hydKeys.map((key, i) => {
+                 const sys = hyd[key];
+                 const label = key.replace('sys', 'SYS ').toUpperCase();
+                 
+                 // Engine Pump (Primary)
+                 const engPump = (
+                     <Switch key={`${key}_eng`} label={`ENG ${i+1}`} active={sys.engPump} onClick={() => onSystemAction('hydraulics', `${key}.engPump`)} 
+                        annunciator={{ label: 'LOW PRESS', active: (sys.pressure || 0) < 1500, color: 'amber' }}
+                     />
+                 );
+
+                 // Elec Pump (Secondary/Demand)
+                 // Some planes have 1 Elec per sys, some have distinct. We'll just render it if it exists in state
+                 const elecPump = (
+                     <Switch key={`${key}_elec`} label={`ELEC ${i+1}`} active={sys.elecPump} onClick={() => onSystemAction('hydraulics', `${key}.elecPump`)} 
+                        annunciator={{ label: 'OVERHEAT', active: false, color: 'amber' }}
+                     />
+                 );
+
+                 return (
+                     <div key={key} style={{ display: 'flex', gap: '5px' }}>
+                         {engPump}
+                         {elecPump}
+                     </div>
+                 );
+             })}
         </div>
       </div>
     );
@@ -538,6 +643,7 @@ const OverheadPanel = ({ onClose, flightState, onSystemAction, aircraftModel }) 
         <div className="overhead-grid">
             <div className="col">
                 <ElectricalPanel />
+                <ADIRSPanel />
                 <APUPanel />
             </div>
             <div className="col">
@@ -546,18 +652,13 @@ const OverheadPanel = ({ onClose, flightState, onSystemAction, aircraftModel }) 
             </div>
             <div className="col">
                 <PneumaticPanel />
+                <IceRainPanel />
                 <LightsPanel />
             </div>
             <div className="col">
                 <FirePanel />
                 <EnginePanel />
-                <div className="panel-section">
-                    <h4 className="panel-title">MISC</h4>
-                    <div style={{ display: 'flex', gap: '10px', justifyContent: 'center' }}>
-                        <Switch label="SEAT BELTS" active={getSys('signs.seatBelts')} onClick={() => onSystemAction('signs', 'seatBelts')} subLabel="AUTO" />
-                        <Switch label="NO SMOKE" active={getSys('signs.noSmoking')} onClick={() => onSystemAction('signs', 'noSmoking')} subLabel="ON" />
-                    </div>
-                </div>
+                <MiscPanel />
                 {/* Transponder could go here or be separate */}
             </div>
         </div>

@@ -42,6 +42,18 @@ class OverheadLogic {
     update(systems, context, dt) {
         if (!systems) return;
 
+        // Initialize ADIRS if missing
+        if (!systems.adirs) {
+            systems.adirs = {
+                ir1: 'OFF', // OFF, ALIGN, NAV
+                ir2: 'OFF',
+                ir3: 'OFF', // Optional (Widebody)
+                alignState: 0, // 0 to 100%
+                aligned: false,
+                onBat: false
+            };
+        }
+
         // 1. Electrical System (Power distribution foundation)
         this.updateElectrical(systems, context, dt);
 
@@ -68,6 +80,51 @@ class OverheadLogic {
 
         // 9. Fire Protection
         this.updateFireProtection(systems, context, dt);
+
+        // 10. ADIRS Logic
+        this.updateADIRS(systems, context, dt);
+    }
+
+    updateADIRS(systems, context, dt) {
+        if (!systems.adirs) return;
+        
+        const adirs = systems.adirs;
+        const hasPower = systems.electrical.dcVolts > 20; // Need DC for alignment/bat check
+        
+        // Are IRS switches in NAV or ALIGN?
+        const irsActive = (adirs.ir1 === 'NAV' || adirs.ir1 === 'ALIGN') &&
+                          (adirs.ir2 === 'NAV' || adirs.ir2 === 'ALIGN');
+                          
+        if (irsActive && hasPower) {
+             // Alignment Process
+             if (!adirs.aligned) {
+                 // Align rate: ~10 minutes normally. 
+                 // Fast Align for Sim: 30 seconds
+                 const alignRate = 100 / 30; 
+                 
+                 adirs.alignState += alignRate * dt;
+                 
+                 if (adirs.alignState >= 100) {
+                     adirs.alignState = 100;
+                     adirs.aligned = true;
+                 }
+             }
+        } else {
+            // Loss of power or switched OFF
+            if (!hasPower && irsActive) {
+                adirs.onBat = true;
+                // Battery drain would happen here
+            } else {
+                adirs.onBat = false;
+                adirs.alignState = 0;
+                adirs.aligned = false;
+            }
+            
+            if (adirs.ir1 === 'OFF' && adirs.ir2 === 'OFF') {
+                 adirs.alignState = 0;
+                 adirs.aligned = false;
+            }
+        }
     }
 
     /**
@@ -166,8 +223,14 @@ class OverheadLogic {
         let load = 0;
         if (systems.fuel.leftPumps) load += 10;
         if (systems.fuel.rightPumps) load += 10;
-        if (systems.hydraulics.sysA.elecPump) load += 35;
-        if (systems.hydraulics.sysB.elecPump) load += 35;
+        
+        // Dynamic hydraulic load
+        if (systems.hydraulics) {
+            Object.values(systems.hydraulics).forEach(sys => {
+                if (sys && sys.elecPump) load += 35;
+            });
+        }
+
         if (systems.lighting.landing) load += 40;
         if (systems.pressurization.packL) load += 20;
         
@@ -237,7 +300,7 @@ class OverheadLogic {
                 if (!masterSw) apu.state = 'OFF';
                 break;
 
-            case 'RUNNING':
+            case 'RUNNING': {
                 apu.running = true;
                 apu.starting = false;
                 apu.n2 = 100;
@@ -251,11 +314,12 @@ class OverheadLogic {
                 
                 if (!masterSw) apu.state = 'COOLDOWN';
                 break;
+            }
 
-            case 'COOLDOWN':
+            case 'COOLDOWN': {
                 apu.running = true; // Still running, just cooling
                 apu.n2 = 100;
-                targetEgt = 300;
+                let targetEgt = 300;
                 apu.egt = apu.egt + (targetEgt - apu.egt) * 0.1;
                 
                 if (!apu.cooldownTimer) apu.cooldownTimer = 0;
@@ -267,6 +331,7 @@ class OverheadLogic {
                 }
                 if (masterSw) apu.state = 'RUNNING'; // Abort shutdown
                 break;
+            }
         }
     }
 
@@ -316,17 +381,36 @@ class OverheadLogic {
         // 2. Duct Pressure
         // Left Duct
         pneu.ductPressL = maxBleedPressureL;
-        if (apuBleedPressure > pneu.ductPressL) pneu.ductPressL = apuBleedPressure; // APU check valve logic simplified
+        // APU feeds Left Duct logic (usually check valve)
+        if (apuBleedPressure > pneu.ductPressL) pneu.ductPressL = apuBleedPressure;
         
         // Right Duct
         pneu.ductPressR = maxBleedPressureR;
         
-        // Isolation Valve
+        // Isolation Valve Logic (Connects Left and Right)
+        // If Isolation Valve is OPEN, pressure equalizes
+        // If APU is ON and Bleed is ON, it pressurizes the manifold.
+        // On 737: APU feeds Left side of Iso Valve.
+        // On 747/Widebodies: APU usually feeds Center or can feed both via Iso.
+        // Simplified Logic: If Iso Valve Open, take Max.
+        // If Iso Valve Closed, APU feeds Left (Standard 737) OR Both if configured (Widebody).
+        
+        // Fix for 4-engine start: Ensure APU bleed reaches Right Duct if Iso Valve is Open OR if widebody logic applies
+        const isWidebody = engineCount > 2;
+
         if (pneu.isolationValve) {
-            // Equalize
+            // Equalize (Open Valve)
             const maxP = Math.max(pneu.ductPressL, pneu.ductPressR);
             pneu.ductPressL = maxP;
             pneu.ductPressR = maxP;
+        } else if (isWidebody) {
+             // For widebodies (e.g. 747), APU feeds a central manifold that distributes to both sides
+             // UNLESS specific isolation logic prevents it. 
+             // Let's assume APU can feed Right side too if enabled, or at least if Iso is open (handled above).
+             // If Iso is CLOSED on 747, APU feeds L and R usually has its own APU logic or crossfeed.
+             // But simpler fix: If APU bleed is high, allow it to pressurize R if L is pressurized?
+             // Actually, 747 APU feeds the manifold. Let's just say if Iso is closed, APU -> Left.
+             // User needs to OPEN Isolation Valve to start Right Engines (3 & 4) with APU!
         }
 
         // 3. Packs
@@ -340,34 +424,53 @@ class OverheadLogic {
      * Sys A/B, Standby, Pressure building
      */
     updateHydraulics(systems, context, dt) {
-        ['sysA', 'sysB'].forEach((sysName, sysIdx) => {
+        const hydKeys = Object.keys(systems.hydraulics);
+        const engineCount = context.engineN2.length;
+
+        hydKeys.forEach((sysName, sysIdx) => {
             const sys = systems.hydraulics[sysName];
             let supply = false;
 
-            // Engine Pumps (Dynamic Mapping for 2-4 Engines)
-            // Sys A (idx 0) <- Eng 1 (idx 0) + Eng 3 (idx 2)
-            // Sys B (idx 1) <- Eng 2 (idx 1) + Eng 4 (idx 3)
-            const engineCount = context.engineN2.length;
+            // Engine Pumps Logic
+            // 1. Direct Engine Drive (EDP)
+            // Determine which engines drive this system
+            let drivingEngineIndices = [];
             
-            for (let i = 0; i < engineCount; i++) {
-                // Determine if this engine feeds this system
-                // Sys A (0): Engines 0, 2
-                // Sys B (1): Engines 1, 3
-                const feedsThisSystem = (sysIdx === 0 && (i === 0 || i === 2)) || 
-                                      (sysIdx === 1 && (i === 1 || i === 3));
-                
-                if (feedsThisSystem) {
-                    const engN2 = context.engineN2[i];
-                    // Note: shared pump switch for the system in this simplified model
-                    if (sys.engPump && engN2 > 10) {
-                        supply = true;
-                    }
+            if (sysIdx < engineCount) {
+                // Default 1:1 mapping (Sys A -> Eng 1, Sys B -> Eng 2...)
+                drivingEngineIndices.push(sysIdx);
+            }
+            
+            // Special Logic for 4-Engine Aircraft with fewer Hydraulic Systems (e.g., A380 has 2 main systems + backups)
+            // If we have 4 engines but only 2 hydraulic systems (Sys A/B), map them:
+            // Sys A (Left) <- Eng 1 & 2
+            // Sys B (Right) <- Eng 3 & 4
+            if (engineCount === 4 && hydKeys.length === 2) {
+                if (sysIdx === 0) drivingEngineIndices = [0, 1]; // Sys A driven by Eng 1 or 2
+                if (sysIdx === 1) drivingEngineIndices = [2, 3]; // Sys B driven by Eng 3 or 4
+            }
+            
+            // Check if ANY driving engine is providing pressure
+            const isDriven = drivingEngineIndices.some(idx => {
+                const engN2 = context.engineN2[idx];
+                return (engN2 > 10);
+            });
+
+            if (sys.engPump && isDriven) {
+                supply = true;
+            } 
+            // 2. Redundant/Auxiliary Systems (e.g., Center/Blue on 2-engine planes)
+            // Driven by Bleed Air or PTU (Power Transfer Unit) from other engines
+            else {
+                // If any engine is running, we assume bleed/PTU is available for this backup system
+                const anyEngineRunning = context.engineN2.some(n2 => n2 > 10);
+                if (sys.engPump && anyEngineRunning) {
+                     supply = true;
                 }
             }
 
-            // Electric Pump
+            // Electric Pump (ACMP)
             const elec = systems.electrical;
-            // Simplified bus check - just generic AC available
             const acAvail = elec.acVolts > 100;
             if (sys.elecPump && acAvail) supply = true;
 
@@ -410,46 +513,15 @@ class OverheadLogic {
         // Consumption Logic (Drain from tanks based on pump config)
         const apuBurn = (systems.apu.running) ? 0.2 * dt : 0;
         
-        // Engine Count
-        const engineCount = context.engineN2.length;
-        const splitPoint = Math.ceil(engineCount / 2);
-
-        for (let i = 0; i < engineCount; i++) {
-            const n2 = context.engineN2[i];
-            const burn = (n2 > 10) ? 1.2 * dt : 0;
-            
-            if (burn > 0) {
-                // Determine feed logic
-                // Left engines (0 to splitPoint-1) feed from Left/Center
-                // Right engines (splitPoint to end) feed from Right/Center
-                const isLeft = i < splitPoint;
-                
-                if (fuel.pressC > 10 && fuel.tanks.center > 0) {
-                    fuel.tanks.center -= burn;
-                } else if (isLeft) {
-                    if (fuel.pressL > 10 && fuel.tanks.left > 0) {
-                        fuel.tanks.left -= burn;
-                    } else if (fuel.crossfeed && fuel.pressR > 10 && fuel.tanks.right > 0) {
-                        fuel.tanks.right -= burn; // Crossfeed
-                    } else if (n2 > 50) {
-                         // Starvation
-                         // In future, set a starvation flag per engine
-                    }
-                } else {
-                    // Right Side
-                    if (fuel.pressR > 10 && fuel.tanks.right > 0) {
-                        fuel.tanks.right -= burn;
-                    } else if (fuel.crossfeed && fuel.pressL > 10 && fuel.tanks.left > 0) {
-                        fuel.tanks.left -= burn; // Crossfeed
-                    } else if (n2 > 50) {
-                         // Starvation
-                    }
-                }
-            }
-        }
-        
         // APU Feed (Usually Left side)
-        if (fuel.tanks.left > 0) fuel.tanks.left -= apuBurn;
+        // Check for Left Pump pressure or Suction Feed
+        // APU usually has its own DC pump or suction, but for simplicity:
+        if (systems.apu.running && fuel.tanks.left > 0) {
+             fuel.tanks.left -= apuBurn;
+        }
+
+        // NOTE: Engine fuel burn is now handled in RealisticFlightPhysicsService.js
+        // to ensure synchronization with physics fuel flow and mass.
     }
 
     /**
@@ -516,14 +588,30 @@ class OverheadLogic {
             const index = parseInt(engId.replace('eng', '')) - 1;
             const eng = systems.engines[engId];
             const pneu = systems.pressurization;
+            const fuel = systems.fuel;
+            
+            // Engine Side Logic (Left vs Right)
+            const engineCount = Object.keys(systems.engines).length;
+            const splitPoint = Math.ceil(engineCount / 2);
+            const isLeft = index < splitPoint;
+            
+            // Check Fuel Pressure Availability
+            let hasFuelPressure = false;
+            // Allow Suction Feed on Ground or if Pump Pressure is high
+            const suctionAvailable = context.onGround;
+
+            if (fuel.pressC > 10) hasFuelPressure = true;
+            else if (isLeft) {
+                 if (fuel.pressL > 10 || (suctionAvailable && fuel.tanks.left > 0)) hasFuelPressure = true;
+                 else if (fuel.crossfeed && fuel.pressR > 10) hasFuelPressure = true;
+            } else {
+                 if (fuel.pressR > 10 || (suctionAvailable && fuel.tanks.right > 0)) hasFuelPressure = true;
+                 else if (fuel.crossfeed && fuel.pressL > 10) hasFuelPressure = true;
+            }
             
             // Pneumatic pressure available for start?
             // Need > 30 PSI (approx)
             // Left side engines (1,2) need ductL, Right side (3,4) need ductR
-            // Split based on engine count
-            const engineCount = Object.keys(systems.engines).length;
-            const splitPoint = Math.ceil(engineCount / 2);
-            
             const ductPress = (index < splitPoint) ? pneu.ductPressL : pneu.ductPressR;
             const pressureAvailable = ductPress > 20;
 
@@ -535,7 +623,7 @@ class OverheadLogic {
                         eng.n2 += 2.0 * dt; // Starter torque
                     } else {
                         // Lightoff region
-                        if (eng.fuelControl) {
+                        if (eng.fuelControl && hasFuelPressure) {
                             eng.n2 += 5.0 * dt; // Combustion accel
                             eng.egt += 50 * dt; // Rapid EGT rise
                         }
@@ -551,7 +639,7 @@ class OverheadLogic {
                 if (eng.startSwitch === 'GRD') eng.startSwitch = 'OFF';
             } else if (eng.startSwitch === 'OFF' && eng.n2 > 0) {
                 // Spool down
-                if (eng.fuelControl && eng.n2 > 40) {
+                if (eng.fuelControl && eng.n2 > 40 && hasFuelPressure) {
                      // Engine is running self-sustaining
                      const targetN2 = 60;
                      const targetEgt = 400;
@@ -589,12 +677,29 @@ class OverheadLogic {
                     systems.electrical[`gen${index+1}`] = false;
                     
                     // Cutoff Hydraulics?
-                    // Map engines to hydraulic systems roughly
-                    if (index === 0) systems.hydraulics.sysA.engPump = false;
-                    if (index === 1) systems.hydraulics.sysB.engPump = false;
-                    // For 4 engines (simplified mapping):
-                    if (index === 2) systems.hydraulics.sysA.engPump = false; // Backup/redundant mapping
-                    if (index === 3) systems.hydraulics.sysB.engPump = false;
+                    // Map engines to hydraulic systems using same logic as updateHydraulics
+                    const hydKeys = Object.keys(systems.hydraulics);
+                    const engineCount = Object.keys(systems.engines).length;
+                    
+                    hydKeys.forEach((sysName, sysIdx) => {
+                        let drivingEngineIndices = [];
+                        
+                        // Default 1:1 mapping
+                        if (sysIdx < engineCount) {
+                            drivingEngineIndices.push(sysIdx);
+                        }
+                        
+                        // Special 4-Engine/2-System Logic (A380 style)
+                        if (engineCount === 4 && hydKeys.length === 2) {
+                            if (sysIdx === 0) drivingEngineIndices = [0, 1]; // Sys A driven by Eng 1 or 2
+                            if (sysIdx === 1) drivingEngineIndices = [2, 3]; // Sys B driven by Eng 3 or 4
+                        }
+                        
+                        // If the fire engine drives this system, cut the pump
+                        if (drivingEngineIndices.includes(index)) {
+                            systems.hydraulics[sysName].engPump = false;
+                        }
+                    });
                 }
             }
         });

@@ -42,7 +42,23 @@ export const checkStartupRequirements = (phase, systems, engines = []) => {
             missingItems.push('Battery Switch ON');
         }
 
-        // 2. APU Bleed must be ON (User: "only after APU bleed starts")
+        // 2. ADIRS Alignment (NAV Mode)
+        // User requested ADIRS
+        if (systems.adirs) {
+             if (systems.adirs.ir1 !== 'NAV' || systems.adirs.ir2 !== 'NAV') {
+                 missingItems.push('ADIRS IR 1 & 2 to NAV');
+             }
+             if (!systems.adirs.aligned) {
+                 // Warn if not aligned, but maybe allow continue if switches are correct?
+                 // Let's enforce switches first. Alignment takes time.
+                 // Ideally, we wait for alignment.
+                 if (systems.adirs.alignState < 100) {
+                     missingItems.push(`ADIRS Aligning (${Math.floor(systems.adirs.alignState)}%)`);
+                 }
+             }
+        }
+
+        // 3. APU Bleed must be ON (User: "only after APU bleed starts")
         if (!systems.apu?.bleed) {
             missingItems.push('APU Bleed Switch ON');
         }
@@ -100,29 +116,38 @@ export const checkStartupRequirements = (phase, systems, engines = []) => {
 
         // 5. Hydraulics
         // User: "engines starts to power hydraulics"
-        // System A and B engine pumps must be ON
-        // For 4 engines, we might map eng1/2 to Sys A and eng3/4 to Sys B or similar.
-        // Simplified: Check if *any* engine pump is ON for Sys A and Sys B
+        // Check ALL available hydraulic systems based on config
         const hyd = systems.hydraulics || {};
+        const hydKeys = Object.keys(hyd);
         
-        // Dynamic check based on available pumps. 
-        // Usually Sys A is powered by Eng 1 (and 2 in some planes), Sys B by Eng 2 (and 3/4).
-        // Let's enforce standard 737-style for 2 engines, and generic for 4.
-        
-        if (engineCount <= 2) {
-            if (!hyd.sysA?.engPump) missingItems.push('Hydraulic Pump ENG 1 ON');
-            if (!hyd.sysB?.engPump) missingItems.push('Hydraulic Pump ENG 2 ON');
+        if (hydKeys.length > 0) {
+            hydKeys.forEach(key => {
+                // Check pump status
+                if (!hyd[key].engPump) {
+                    // Format key nicely (sysA -> SYS A, sys1 -> SYS 1)
+                    const label = key.replace('sys', 'SYS ').toUpperCase();
+                    missingItems.push(`Hydraulic Pump ${label} ON`);
+                }
+                // Check pressure
+                if ((hyd[key].pressure || 0) < 2000) {
+                    const label = key.replace('sys', 'SYS ').toUpperCase();
+                    missingItems.push(`Hydraulic ${label} Pressure Low`);
+                }
+            });
         } else {
-            // For 4 engines (e.g. 747), typically Sys 1/2/3/4. 
-            // But our hydraulics model might be limited to Sys A/B.
-            // If Sys A/B is all we have, just check if they are powered.
-             if (!hyd.sysA?.engPump) missingItems.push('Hydraulic Pump SYS A ON');
-             if (!hyd.sysB?.engPump) missingItems.push('Hydraulic Pump SYS B ON');
+             // Fallback for missing hydraulics object
+             missingItems.push('Hydraulics Not Initialized');
         }
+        // 6. Window Heat & Probe Heat
+        if (systems.ice?.windowHeat === false) missingItems.push('Window Heat ON');
+        if (systems.ice?.probeHeat === false) missingItems.push('Probe Heat ON');
         
-        // Check pressure (if simulated in systems object)
-        if ((hyd.sysA?.pressure || 0) < 2000) missingItems.push('Hydraulic Sys A Pressure Low');
-        if ((hyd.sysB?.pressure || 0) < 2000) missingItems.push('Hydraulic Sys B Pressure Low');
+        // 7. Yaw Damper
+        if (systems.flightControls?.yawDamper === false) missingItems.push('Yaw Damper ON');
+
+        // 8. Emergency Lights (Armed)
+        if (systems.lighting?.emergencyExit !== 'ARMED') missingItems.push('Emergency Lights ARMED');
+
     }
 
     return {

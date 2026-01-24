@@ -241,11 +241,12 @@ function App() {
 
     setTimeout(() => {
       setCinematicPhase('cinematic_review');
-
-      setTimeout(() => {
-        setCinematicPhase('narrative_scene');
-      }, reviewDuration);
+      // No auto-transition to narrative_scene
     }, fadeDuration);
+  };
+
+  const handleCinematicReviewComplete = () => {
+    setCinematicPhase('narrative_scene');
   };
 
   const handleNarrativeComplete = () => {
@@ -277,13 +278,14 @@ function App() {
         selectedArrival: selectedArrival,
         aircraftModel: aircraftModel,
         weatherData: weatherData,
-      setWeatherData: setWeatherData,
+        setWeatherData: setWeatherData,
         crewCount: crewCount,
         failureType: failureType,
         difficulty: difficulty,
         pax: pax,
         payload: payload,
-        routeDetails: detailedRoute
+        routeDetails: detailedRoute,
+        onComplete: handleCinematicReviewComplete
       }),
 
       cinematicPhase === 'narrative_scene' && React.createElement(NarrativeScene, {

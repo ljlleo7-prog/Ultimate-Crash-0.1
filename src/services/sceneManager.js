@@ -334,6 +334,7 @@ class SceneManager {
     const phase = this.currentPhase();
     if (phase) {
       console.log(`⏩ Skipping phase: ${phase.name}`);
+      this.userSkipped = true; // Mark as user-initiated skip
       this.elapsedInPhase = phase.durationSeconds + 1; // Force completion
       this.checkPhaseCompletion(0, null); // Trigger completion check immediately
     }
@@ -344,6 +345,7 @@ class SceneManager {
       return;
     }
     this.status = 'running';
+    this.userSkipped = false;
     this.elapsedInPhase = 0;
     this.totalElapsed = 0;
     this.activeFailures.clear();
@@ -391,6 +393,7 @@ class SceneManager {
     // Move to next phase
     this.currentIndex += 1;
     this.elapsedInPhase = 0;
+    this.userSkipped = false; // Reset skip flag for the new phase
     this.currentPhaseData = null;
     this.takeoffClearanceReceived = false;
     
@@ -537,58 +540,123 @@ class SceneManager {
       if (altitude_ft >= (this.scenario.targetCruiseAltitude - 1000)) {
         isPhaseComplete = true;
       }
+    } else if (phase.type === FlightPhases.PUSHBACK) {
+        const isHardcore = ['pro', 'devil'].includes(this.scenario.difficulty.toLowerCase());
+        // Wait for engines to start (N2 > 50%) or significant time pass
+        const enginesRunning = payload?.systems?.engines && Object.values(payload.systems.engines).some(e => e.n2 > 50);
+        
+        if (isHardcore) {
+            // In Pro mode, we require checklist completion AND manual continue
+             if (payload && payload.systems) {
+               const checklistResult = checkStartupRequirements(StartupPhases.ENGINE_START, payload.systems, payload.engines || []);
+               
+               if (checklistResult.canContinue && this.userSkipped) {
+                   isPhaseComplete = true;
+               } else {
+                   isPhaseComplete = false;
+                   // Warn logic (simplified)
+                   if (this.elapsedInPhase >= phase.durationSeconds && checklistResult.missingItems.length > 0) {
+                        const timeOver = Math.floor(this.elapsedInPhase - phase.durationSeconds);
+                        if (timeOver > 0 && timeOver % 15 === 5) {
+                            const lastWarnTime = this.lastChecklistWarningTime || 0;
+                            const now = Date.now();
+                            if (now - lastWarnTime > 2000) {
+                                this.publishNarrative({
+                                    title: 'Startup Checklist Incomplete',
+                                    content: `Cannot proceed to next phase. Missing: ${checklistResult.missingItems.join(', ')}`,
+                                    severity: 'warning'
+                                });
+                                this.lastChecklistWarningTime = now;
+                            }
+                        }
+                   }
+               }
+            } else {
+                isPhaseComplete = false;
+            }
+        } else {
+            // Normal mode: Auto-complete if engines running
+            // Minimum 20s, but wait for engines unless it takes too long (> 5 mins)
+            if (this.elapsedInPhase > 20 && enginesRunning) {
+                isPhaseComplete = true;
+            } else if (this.elapsedInPhase > 300) {
+                isPhaseComplete = true; // Timeout
+            }
+        }
+    } else if (phase.type === FlightPhases.TAXIING) {
+        const isHardcore = ['pro', 'devil'].includes(this.scenario.difficulty.toLowerCase());
+        
+        if (isHardcore) {
+             // In Pro mode, Taxiing ends ONLY when user clicks Continue (presumably at Hold Short)
+             if (this.userSkipped) {
+                 isPhaseComplete = true;
+             } else {
+                 isPhaseComplete = false;
+             }
+        } else {
+            // Wait for taxi (speed > 5 kts) and duration
+            const groundSpeed = payload?.airspeed || 0; // Approx
+            if (this.elapsedInPhase > 30 && groundSpeed > 5) {
+                 // Maybe wait until aligned? Hard to detect without runway logic.
+                 // Just give them more time.
+                 if (this.elapsedInPhase > 120) isPhaseComplete = true;
+            } else if (this.elapsedInPhase > 300) {
+                isPhaseComplete = true; // Timeout
+            }
+        }
     } else {
       // Default: time-based completion
-      // If Pro/Devil, disable time-based completion for startup phases to enforce checklist
-      const isHardcore = ['pro', 'devil'].includes(this.scenario.difficulty);
-      const isStartupPhase = [FlightPhases.BOARDING, FlightPhases.DEPARTURE_CLEARANCE, FlightPhases.PUSHBACK].includes(phase.type);
+      const isHardcore = ['pro', 'devil'].includes(this.scenario.difficulty.toLowerCase());
       
-      if (isHardcore && isStartupPhase) {
-          // Map FlightPhase to StartupPhase
-          let startupPhase = null;
-          if (phase.type === FlightPhases.BOARDING || phase.type === FlightPhases.DEPARTURE_CLEARANCE) {
-              startupPhase = StartupPhases.POWER_UP;
-          } else if (phase.type === FlightPhases.PUSHBACK) {
-              startupPhase = StartupPhases.ENGINE_START;
-          }
-
-          if (startupPhase && payload && payload.systems) {
-              const checklistResult = checkStartupRequirements(startupPhase, payload.systems, payload.engines || []);
-              
-              if (checklistResult.canContinue) {
-                  // If checklist is complete, allow completion after minimum duration
-                  isPhaseComplete = this.elapsedInPhase >= phase.durationSeconds;
-              } else {
-                  isPhaseComplete = false;
-                  
-                  // If we have exceeded the phase duration but are blocked by checklist, warn the user
-                  if (this.elapsedInPhase >= phase.durationSeconds) {
-                      // Check if we should emit a warning (throttle to every 10 seconds)
-                      // We use a simple modulo check on the integer seconds
-                      const timeOver = Math.floor(this.elapsedInPhase - phase.durationSeconds);
-                      
-                      // Warn at 5s, 15s, 25s... (every 10s starting 5s after deadline)
-                      // We use a dedicated property to track last warning to avoid multiple emits in the same second
-                      if (timeOver > 0 && timeOver % 15 === 5) {
-                          const lastWarnTime = this.lastChecklistWarningTime || 0;
-                          const now = Date.now();
-                          
-                          if (now - lastWarnTime > 2000) { // Ensure at least 2s between warnings
-                              this.publishNarrative({
-                                  title: 'Startup Checklist Incomplete',
-                                  content: `Cannot proceed to next phase. Missing: ${checklistResult.missingItems.join(', ')}`,
-                                  severity: 'warning'
-                              });
-                              this.lastChecklistWarningTime = now;
-                          }
-                      }
-                  }
-              }
+      // If Pro/Devil, disable time-based completion for ALL phases to enforce user control
+      // Exceptions: purely physics-driven phases that have their own logic above (Takeoff, Climb, etc.)
+      // But this 'else' block only catches phases that fell through the specific checks above.
+      // So effectively, we are disabling the "durationSeconds" timeout for Boarding, Cruise, Taxi, etc.
+      if (isHardcore) {
+          // For startup phases, we also enforce the checklist (already handled or we handle it here)
+          const isStartupPhase = [FlightPhases.BOARDING, FlightPhases.DEPARTURE_CLEARANCE, FlightPhases.PUSHBACK].includes(phase.type);
+          
+          if (isStartupPhase && payload && payload.systems) {
+               // Enforce checklist
+               const checklistResult = checkStartupRequirements(
+                  phase.type === FlightPhases.PUSHBACK ? StartupPhases.ENGINE_START : StartupPhases.POWER_UP, 
+                  payload.systems, 
+                  payload.engines || []
+               );
+               
+               // Even if checklist is good, we WAIT for user to click Continue
+               if (checklistResult.canContinue && this.userSkipped) {
+                   isPhaseComplete = true;
+               } else {
+                   isPhaseComplete = false;
+                   // Warn if timeout passed?
+                   if (this.elapsedInPhase >= phase.durationSeconds && checklistResult.missingItems.length > 0) {
+                        const timeOver = Math.floor(this.elapsedInPhase - phase.durationSeconds);
+                        if (timeOver > 0 && timeOver % 15 === 5) {
+                            const lastWarnTime = this.lastChecklistWarningTime || 0;
+                            const now = Date.now();
+                            if (now - lastWarnTime > 2000) {
+                                this.publishNarrative({
+                                    title: 'Startup Checklist Incomplete',
+                                    content: `Cannot proceed to next phase. Missing: ${checklistResult.missingItems.join(', ')}`,
+                                    severity: 'warning'
+                                });
+                                this.lastChecklistWarningTime = now;
+                            }
+                        }
+                   }
+               }
           } else {
-              // If no systems data available (shouldn't happen in realistic mode), block or fallback
-              isPhaseComplete = false; 
+               // Non-startup phases (e.g. Cruise, Taxi, Shutoff) in Hardcore mode
+               // STRICTLY require user to click Continue. NEVER auto-complete on time.
+               if (this.userSkipped) {
+                   isPhaseComplete = true;
+               } else {
+                   isPhaseComplete = false;
+               }
           }
       } else {
+          // Rookie/Captain modes: Auto-complete when time is up
           isPhaseComplete = this.elapsedInPhase >= phase.durationSeconds;
       }
     }

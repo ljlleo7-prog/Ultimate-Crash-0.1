@@ -223,7 +223,13 @@ const FlightInProgress = ({
   const [activeFlightPlan, setActiveFlightPlan] = useState(flightPlan);
 
   // Startup Checklist Logic (Pro/Devil)
-  const [startupStatus, setStartupStatus] = useState({ canContinue: true, missingItems: [] });
+  const [startupStatus, setStartupStatus] = useState(() => {
+    const isHardcore = difficulty === 'pro' || difficulty === 'devil';
+    return { 
+      canContinue: !isHardcore, 
+      missingItems: isHardcore ? ['System Initialization...'] : [] 
+    };
+  });
 
   useEffect(() => {
     if (!physicsState || !physicsState.systems) return;

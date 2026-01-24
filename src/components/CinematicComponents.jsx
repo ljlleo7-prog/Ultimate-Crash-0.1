@@ -6,7 +6,7 @@ const FadeOverlay = ({ phase, children }) => {
   return React.createElement('div', { className: `fade-overlay ${phase}` }, children);
 };
 
-const CinematicReview = ({ callsign, selectedDeparture, selectedArrival, aircraftModel, weatherData, crewCount, failureType, difficulty, pax, payload, routeDetails }) => {
+const CinematicReview = ({ callsign, selectedDeparture, selectedArrival, aircraftModel, weatherData, crewCount, failureType, difficulty, pax, payload, routeDetails, onComplete }) => {
   // Safe access to weather data with fallbacks
   const safeWeatherData = weatherData || {
     windSpeed: 0,
@@ -100,24 +100,35 @@ const CinematicReview = ({ callsign, selectedDeparture, selectedArrival, aircraf
 
           {/* Section 4: Risk Assessment */}
           <div className="fax-section">
-            <div className="fax-section-title">04. RISK ASSESSMENT</div>
-            <div className="situation-text">
-              <p>
-                <strong>MISSION PROFILE:</strong> {safeDifficulty.toUpperCase()} LEVEL SIMULATION. 
-                FLIGHT {safeCallsign} CLEARED FOR DEPARTURE. 
-                EXPECT {safeFailureType === 'random' ? 'VARIABLE SYSTEM BEHAVIOR' : `${safeFailureType.toUpperCase()} SCENARIO`}.
-              </p>
-              <p>
-                <strong>NOTAM:</strong> PILOT DISCRETION ADVISED. MAINTAIN SITUATIONAL AWARENESS AT ALL TIMES.
-              </p>
+            <div className="fax-section-title">04. OPERATIONAL RISK</div>
+            <div className="fax-grid">
+              <div className="fax-row"><span className="fax-label">DIFFICULTY</span> <span className="fax-value">{safeDifficulty.toUpperCase()}</span></div>
+              <div className="fax-row"><span className="fax-label">FAILURE MODE</span> <span className="fax-value">{safeFailureType.toUpperCase()}</span></div>
             </div>
           </div>
 
         </div>
 
-        <div className="countdown-footer">
-          // HANDOFF TO COCKPIT IN PROGRESS... //
-        </div>
+        {onComplete && (
+          <div className="fax-footer" style={{ marginTop: '2rem', display: 'flex', justifyContent: 'center' }}>
+            <button 
+              className="accept-btn" 
+              onClick={onComplete}
+              style={{
+                background: '#000',
+                color: '#fff',
+                border: '2px solid #000',
+                padding: '10px 30px',
+                fontFamily: 'monospace',
+                fontSize: '1.2rem',
+                cursor: 'pointer',
+                letterSpacing: '2px'
+              }}
+            >
+              ACKNOWLEDGE DISPATCH
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );
