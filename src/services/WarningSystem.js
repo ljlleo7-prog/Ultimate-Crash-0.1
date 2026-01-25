@@ -90,7 +90,7 @@ class WarningSystem {
         this.checkConfiguration(flaps, gear, airBrakes, throttle, groundStatus, pitchDeg, brakes, altitudeAGL);
 
         // --- System Checks ---
-        this.checkSystems(systems, fuel, engineParams, altitudeAGL);
+        this.checkSystems(systems, fuel, engineParams, altitudeAGL, controls);
         
         // --- Autopilot/Nav Checks ---
         this.checkAutomation(autopilot, autopilotTargets, altitudeMSL);
@@ -163,12 +163,13 @@ class WarningSystem {
         }
 
         // Bank Angle
-        if (Math.abs(roll) > this.thresholds.bankAngleWarn) {
+        // Only trigger if AIRBORNE (not on ground) to prevent nuisance alarms during taxi/pushback
+        if (!onGround && Math.abs(roll) > this.thresholds.bankAngleWarn) {
             this.addWarning('BANK_ANGLE', 'BANK ANGLE', 'WARNING', true);
         }
     }
 
-    checkSystems(systems, fuel, engines, agl) {
+    checkSystems(systems, fuel, engines, agl, controls) {
         if (!systems) return;
 
         // Fire
@@ -198,17 +199,23 @@ class WarningSystem {
 
         // Engine Failure (In Air)
         // Check engineParams structure (arrays of values)
-        if (agl > 500 && engines) {
+        const throttleDemand = typeof controls?.throttle === 'number' ? controls.throttle : 0;
+        const fuelControls = systems.engines ? Object.values(systems.engines).map(eng => eng?.fuelControl !== false) : [];
+
+        if (agl > 500 && engines && throttleDemand > 0.2) {
             if (Array.isArray(engines.n1)) {
                  engines.n1.forEach((n1Val, i) => {
-                    if (n1Val < 10) { 
+                    const n2Val = Array.isArray(engines.n2) ? engines.n2[i] : undefined;
+                    const fuelOn = fuelControls[i] !== false;
+                    if (fuelOn && n1Val < 10 && (n2Val === undefined || n2Val < 25)) { 
                         this.addWarning(`ENG_${i+1}_FAIL`, `ENGINE ${i+1} FAIL`, 'CRITICAL', true);
                     }
                 });
             } else if (Array.isArray(engines)) {
                 // Fallback for legacy format if any
                  engines.forEach((eng, i) => {
-                    if (eng.n1 < 10) {
+                    const fuelOn = fuelControls[i] !== false;
+                    if (fuelOn && eng.n1 < 10 && (eng.n2 === undefined || eng.n2 < 25)) {
                         this.addWarning(`ENG_${i+1}_FAIL`, `ENGINE ${i+1} FAIL`, 'CRITICAL', true);
                     }
                 });

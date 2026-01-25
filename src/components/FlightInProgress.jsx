@@ -3,6 +3,7 @@ import { useAircraftPhysics } from '../hooks/useAircraftPhysics';
 import { updateWeather } from '../services/weatherService';
 import { realWeatherService } from '../services/RealWeatherService';
 import { terrainService } from '../services/TerrainService';
+import { terrainRadarService } from '../services/TerrainRadarService';
 import { airportService } from '../services/airportService';
 import weatherConfig from '../config/weatherConfig.json';
 import FlightPanelModular from './FlightPanelModular';
@@ -133,8 +134,9 @@ const FlightInProgress = ({
     setTimeScale,
     timeScale,
     updateFlightPlan,
-    setEngineThrottle
-  } = useAircraftPhysics(aircraftConfig, true, physicsModel);
+    setEngineThrottle,
+    setMotionEnabled
+  } = useAircraftPhysics(aircraftConfig, false, physicsModel);
 
   // Control state for UI components
   const [throttleControl, setThrottleControl] = useState(0); // Initialize at IDLE
@@ -144,6 +146,20 @@ const FlightInProgress = ({
   const [useRealWeather, setUseRealWeather] = useState(true); // Enable Real Weather by default
   const [sceneState, setSceneState] = useState(sceneManager.getState());
   const [narrative, setNarrative] = useState(null);
+
+  // Control Physics Motion based on Phase (Narrative vs Active)
+  useEffect(() => {
+    if (!setMotionEnabled) return;
+
+    // Phases where the plane should be static (physics integration disabled, systems active)
+    // We disable motion for all pre-flight and taxi phases because the plane spawns at the runway threshold
+    // Motion is only enabled when the actual Takeoff roll begins
+    const staticPhases = ['boarding', 'departure_clearance', 'pushback', 'taxiing', 'takeoff_prep', 'debrief']; 
+    const shouldFreeze = staticPhases.includes(sceneState.currentPhase?.type);
+    
+    setMotionEnabled(!shouldFreeze);
+    // console.log(`Physics Motion ${shouldFreeze ? 'DISABLED' : 'ENABLED'} for phase ${sceneState.currentPhase?.type}`);
+  }, [sceneState.currentPhase, setMotionEnabled]);
 
   // Radio Message Handler
   const handleRadioTransmit = (messageDataOrText, type, templateId, params) => {
@@ -528,24 +544,22 @@ const FlightInProgress = ({
 
   // Terrain update effect
   useEffect(() => {
-    // FORCE DISABLE TERRAIN FOR DEBUGGING as requested
-    const DISABLE_TERRAIN = true;
-    
-    if (DISABLE_TERRAIN) {
-        if (physicsService) {
-             // Assume flat ground at initial airport elevation
-             // If initialDeparture elevation is missing, default to 0
-             physicsService.terrainElevation = initialDeparture?.elevation || 0;
-        }
-        return;
-    }
-
     const fetchTerrain = async () => {
        if (!physicsService || !physicsService.state || !physicsService.state.geo) return;
        
        const { lat, lon } = physicsService.state.geo;
        
        try {
+           // 1. Try Radar Service (Fastest, cached, consistent with visuals)
+           // Returns feet, convert to meters
+           const radarEleFt = terrainRadarService.getTerrainHeight(lat, lon);
+           
+           if (radarEleFt !== null) {
+               physicsService.terrainElevation = radarEleFt * 0.3048;
+               return;
+           }
+
+           // 2. Fallback to direct Terrain Service fetch
            const ele = await terrainService.getElevation(lat, lon);
            if (ele !== null && typeof ele === 'number') {
                physicsService.terrainElevation = ele;
@@ -613,7 +627,10 @@ const FlightInProgress = ({
 
       const lastSceneState = sceneManager.getState();
       let physicsState = null;
-      if (lastSceneState.physicsActive && isInitialized) {
+      // Always update physics if initialized, even if scene says "physics inactive"
+      // This allows systems (engines, hydraulics) to update while motion is disabled.
+      // Motion is controlled via setMotionEnabled in the useEffect above.
+      if (isInitialized) {
         // Use real elapsed time (safeDt) instead of hardcoded 1/60
         // This fixes the "doubled update speed" on high refresh rate monitors (e.g. 120Hz)
         physicsState = updatePhysics(safeDt, now);

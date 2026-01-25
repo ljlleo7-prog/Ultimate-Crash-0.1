@@ -547,6 +547,12 @@ export function useAircraftPhysics(config = {}, autoStart = true, model = 'reali
     }
   }, []);
 
+  const setMotionEnabled = useCallback((enabled) => {
+    if (physicsServiceRef.current && typeof physicsServiceRef.current.setMotionEnabled === 'function') {
+      physicsServiceRef.current.setMotionEnabled(enabled);
+    }
+  }, []);
+
   const setTrim = useCallback((value) => {
     // Trim sensitivity adjustment
     // Map -1..1 to -0.2..0.2 radians (approx +/- 11.5 degrees)
@@ -645,6 +651,7 @@ export function useAircraftPhysics(config = {}, autoStart = true, model = 'reali
     setFlaps,
     setAirBrakes,
     setGear,
+    setMotionEnabled,
     setTrim,
     performSystemAction,
     setEnvironment: useCallback((envData) => {

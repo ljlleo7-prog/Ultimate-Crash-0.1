@@ -198,7 +198,9 @@ class OverheadLogic {
                 const index = parseInt(key.replace('gen', '')) - 1; // 0-based index
                 const genOn = elec[key];
                 const n2 = context.engineN2[index] || 0;
-                const genReady = n2 > 55;
+                // Generator comes online when engine is running stable (Idle is ~30% in physics, but ~20% is start cut-out)
+                // Lowering threshold to ensure power at idle.
+                const genReady = n2 > 25;
                 
                 if (genOn && genReady) {
                     genPowerAvailable = true;
@@ -637,8 +639,12 @@ class OverheadLogic {
             
             // Check Fuel Pressure Availability
             let hasFuelPressure = false;
-            // Allow Suction Feed on Ground or if Pump Pressure is high
-            const suctionAvailable = context.onGround;
+            
+            // Allow Suction Feed on Ground or at lower altitudes (e.g. < 20,000 ft)
+            // Realistically, gravity/suction works unless lines are broken or altitude is too high (vapor lock).
+            // We also check if altitude is defined (default to 0/ground if missing)
+            const currentAlt = context.altitude || 0;
+            const suctionAvailable = context.onGround || (currentAlt < 20000);
 
             if (fuel.pressC > 10) hasFuelPressure = true;
             else if (isLeft) {
@@ -656,44 +662,30 @@ class OverheadLogic {
             const pressureAvailable = ductPress > 20;
 
             // State Machine for Start
-            if (eng.startSwitch === 'GRD') {
-                if (pressureAvailable) {
-                    // Spool up
-                    if (eng.n2 < 20) {
-                        eng.n2 += 2.0 * dt; // Starter torque
-                    } else {
-                        // Lightoff region
-                        if (eng.fuelControl && hasFuelPressure) {
-                            eng.n2 += 5.0 * dt; // Combustion accel
-                            eng.egt += 50 * dt; // Rapid EGT rise
-                        }
-                    }
-                }
-            } else if (eng.startSwitch === 'CONT' || eng.startSwitch === 'FLT') {
-                 // Ignition always on
-            }
+            const isRookie = ['rookie', 'student'].includes(context.difficulty);
+            const isPro = ['pro', 'devil', 'survival'].includes(context.difficulty);
 
-            // Running Logic
-            if (eng.n2 > 50) {
-                // Starter Cutout
-                if (eng.startSwitch === 'GRD') eng.startSwitch = 'OFF';
-            } else if (eng.startSwitch === 'OFF' && eng.n2 > 0) {
-                // Spool down
-                if (eng.fuelControl && eng.n2 > 40 && hasFuelPressure) {
-                     // Engine is running self-sustaining
-                     const targetN2 = 60;
-                     const targetEgt = 400;
-                     eng.n2 = eng.n2 + (targetN2 - eng.n2) * 0.1 * dt;
-                     eng.egt = eng.egt + (targetEgt - eng.egt) * 0.05 * dt;
-                } else {
-                    // Shutdown / Spool down
-                    eng.n2 -= 2.0 * dt;
-                    eng.egt -= 10.0 * dt;
+            // NOTE: Actual N2/EGT Physics is now handled in RealisticFlightPhysicsService -> EnginePhysicsService.
+            // OverheadLogic only manages the switches and valve logic.
+
+            if (eng.startSwitch === 'GRD') {
+                // Monitor for Starter Cutout
+                if (eng.n2 > 50) {
+                    eng.startSwitch = 'OFF';
                 }
-                
-                if (eng.n2 < 0) eng.n2 = 0;
-                if (eng.egt < 20) eng.egt = 20;
+            } else if (eng.startSwitch === 'OFF') {
+                 // Rookie Helper: If fuel control ON and engine stopped, maybe we should auto-start?
+                 // But RealisticFlightPhysicsService needs to know.
+                 // For now, let's trust the user to use the starter.
+                 // Or we can auto-set the switch for rookies?
+                 if (isRookie && eng.fuelControl && eng.n2 < 20 && !eng.running) {
+                     // Auto-engage starter for Rookie if they flip fuel lever
+                     // But this might be annoying. Let's leave it manual for now.
+                 }
             }
+            
+            // Legacy/Fallback Logic cleanup:
+            // We no longer manually integrate N2/EGT here to avoid conflict with Physics Service.
         });
     }
 

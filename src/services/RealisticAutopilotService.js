@@ -126,6 +126,16 @@ class RealisticAutopilotService {
         if (targets.mode) {
             this.mode = targets.mode;
         }
+        
+        // Handle alias: ias -> speed (UI uses ias, Logic uses speed)
+        if (targets.ias !== undefined) {
+            targets.speed = targets.ias;
+        }
+        // Handle alias: speed -> ias (Ensure UI gets the updated value)
+        if (targets.speed !== undefined) {
+            targets.ias = targets.speed;
+        }
+
         this.targets = { ...this.targets, ...targets };
     }
 
@@ -142,7 +152,10 @@ class RealisticAutopilotService {
 
             // If we have current state, capture targets if they are currently 0
             if (currentState) {
-                if (this.targets.speed === 0) this.targets.speed = Math.round(currentState.airspeed);
+                if (this.targets.speed === 0) {
+                    this.targets.speed = Math.round(currentState.airspeed);
+                    this.targets.ias = this.targets.speed;
+                }
                 if (this.targets.vs === 0) this.targets.vs = Math.round(currentState.verticalSpeed / 100) * 100;
                 if (this.targets.altitude === 0) this.targets.altitude = Math.round(currentState.altitude / 100) * 100;
                 if (this.targets.heading === 0) {
@@ -167,7 +180,12 @@ class RealisticAutopilotService {
         const { airspeed, verticalSpeed, pitch, roll, heading, latitude, longitude, altitude } = state;
         
         // Ensure targets are initialized if they were somehow left at 0
-        if (this.targets.speed === 0) this.targets.speed = Math.round(airspeed);
+        if (this.targets.speed === 0) {
+            this.targets.speed = Math.round(airspeed);
+            this.targets.ias = this.targets.speed;
+        } else if (this.targets.ias === undefined) {
+             this.targets.ias = this.targets.speed;
+        }
         if (this.targets.vs === 0 && Math.abs(verticalSpeed) > 100) {
              this.targets.vs = Math.round(verticalSpeed / 100) * 100;
         }

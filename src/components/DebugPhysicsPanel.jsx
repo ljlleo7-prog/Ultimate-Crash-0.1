@@ -11,6 +11,8 @@ const DebugPhysicsPanel = ({ debugPhysicsData, thrust, drag, waypoints = [], fli
     pitchMoment_y, 
     pitchRate_q, 
     altitude_z, 
+    altitude_amsl,
+    altitude_agl,
     isOnGround,
     lift,
     pitchTorque,
@@ -78,7 +80,9 @@ const DebugPhysicsPanel = ({ debugPhysicsData, thrust, drag, waypoints = [], fli
 
       <div>Lift: {typeof lift === 'number' ? (lift / 1000).toFixed(1) : 'N/A'} kN (CL: {typeof CL === 'number' ? CL.toFixed(2) : 'N/A'})</div>
       <div>Dynamic Pressure (q): {typeof dynamicPressure_q === 'number' ? dynamicPressure_q.toFixed(2) : 'N/A'} Pa</div>
-      <div>Altitude (Z): {typeof altitude_z === 'number' ? altitude_z.toFixed(2) : 'N/A'} m</div>
+      <div>Altitude (Z - Rel): {typeof altitude_z === 'number' ? altitude_z.toFixed(2) : 'N/A'} m</div>
+      <div>Altitude (AMSL): {typeof altitude_amsl === 'number' ? altitude_amsl.toFixed(2) : 'N/A'} m ({(altitude_amsl * 3.28084).toFixed(0)} ft)</div>
+      <div>Altitude (AGL): {typeof altitude_agl === 'number' ? altitude_agl.toFixed(2) : 'N/A'} m ({(altitude_agl * 3.28084).toFixed(0)} ft)</div>
       <div>On Ground: {isOnGround ? 'YES' : 'NO'}</div>
       
       <div style={{ fontWeight: 'bold', marginTop: '8px', marginBottom: '5px', borderBottom: '1px solid #444', paddingBottom: '3px' }}>GROUND STATUS</div>

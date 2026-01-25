@@ -91,7 +91,8 @@ export const checkStartupRequirements = (phase, systems, engines = []) => {
         }
 
         const engineCount = engineEntries.length || 2;
-        const requiredEngines = Math.min(2, engineCount);
+        // Check ALL engines, not just the first 2 (supports 4-engine aircraft)
+        const requiredEngines = engineCount; 
 
         for (let i = 0; i < requiredEngines; i++) {
             const eng = engineEntries[i];

@@ -37,7 +37,11 @@ class EnginePhysicsService {
             running: true, // Default to running for immediate gameplay
             failed: false,
             throttleCommand: 0, // Last commanded throttle
-            isReverse: false
+            isReverse: false,
+            starterEngaged: false,
+            pneumaticPressure: false,
+            fuelAvailable: false,
+            ignition: false
         };
         
         this._prevFuelFlow = 0;
@@ -51,6 +55,16 @@ class EnginePhysicsService {
         this.state.throttleCommand = val;
     }
 
+    /**
+     * Set Startup Configuration
+     */
+    setStartupState(starterEngaged, pneumaticPressure, fuelAvailable, ignition) {
+        this.state.starterEngaged = starterEngaged;
+        this.state.pneumaticPressure = pneumaticPressure;
+        this.state.fuelAvailable = fuelAvailable;
+        this.state.ignition = ignition;
+    }
+
     update(dt, throttleInput, mach, altitude, airDensityRatio, ambientTemp) {
         if (this.state.failed) {
             this.spoolDown(dt);
@@ -58,99 +72,161 @@ class EnginePhysicsService {
         }
 
         // Use passed throttle input if provided (legacy/direct drive), otherwise use internal state
-        // This supports both direct update(dt, throttle...) calls and setThrottle() -> update(dt...) patterns
         const throttle = (throttleInput !== undefined) ? throttleInput : this.state.throttleCommand;
         this.state.throttleCommand = throttle;
 
-        // Target N1 based on throttle
-        // Idle at 0 throttle is not 0 RPM if engine is running
-        let targetN1 = 0;
+        // Auto-Start Logic (Transition from Cranking to Running)
+        // Requirements: N2 > 20%, Fuel Available, Ignition (or Cont)
+        if (!this.state.running && this.state.fuelAvailable && this.state.n2 > 15) {
+             // In a real jet, you need ignition. 
+             // We'll assume ignition is auto/on if we are in this state (simplified) or passed in.
+             // If we have fuel and rotation, LIGHTOFF!
+             this.state.running = true;
+             this.state.egt += 100; // Initial spike
+        }
+
+        // Shutdown Logic: If fuel is cut, engine stops running (flameout)
+        if (this.state.running && !this.state.fuelAvailable) {
+            this.state.running = false;
+        }
+
+        // Target N2 based on throttle (Core Speed drives the engine)
+        // User Reference:
+        // Start-Up: ~20-30% N2
+        // Taxi: ~50-60% N2
+        // Takeoff: ~90-100% N2
+        
+        let targetN2 = 0;
         let isReverse = false;
 
         if (this.state.running) {
             if (throttle >= 0) {
-                // Forward Thrust: 0% to 100% Throttle -> 20% to 102% N1
-                targetN1 = this.config.idleN1 + throttle * (this.config.maxN1 - this.config.idleN1);
+                // Forward Thrust
+                // Idle (0 throttle) -> 20% N2
+                // Max (1 throttle) -> 100% N2
+                // Linear map for core speed control
+                const idleN2 = 30; // Increased from 20 to 30 for better idle stability
+                const maxN2 = 102; // Allow slight overspeed
+                targetN2 = idleN2 + throttle * (maxN2 - idleN2);
             } else {
-                // Reverse Thrust: -0.7 (or less) to 0% Throttle
-                // User requirement: N1 20% to 75%
+                // Reverse Thrust
+                // Throttle -1 -> N2 ~ 75%
                 isReverse = true;
-                const maxReverseN1 = 75;
-                const reverseRatio = Math.min(1, Math.abs(throttle) / 0.7); // Clamp ratio to 1
-                targetN1 = this.config.idleN1 + reverseRatio * (maxReverseN1 - this.config.idleN1);
+                const idleN2 = 30;
+                const maxReverseN2 = 75;
+                const reverseRatio = Math.min(1, Math.abs(throttle) / 0.7);
+                targetN2 = idleN2 + reverseRatio * (maxReverseN2 - idleN2);
             }
-        } 
-        // Removed simplified autostart logic to allow for proper system-based starting (Fuel/Starters)
+        } else {
+            // Not running
+            if (this.state.starterEngaged && this.state.pneumaticPressure) {
+                // Starter Motoring Speed (Max ~25%)
+                targetN2 = 25;
+            } else {
+                // Spool down
+                targetN2 = 0;
+            }
+        }
         
         this.state.isReverse = isReverse;
 
-        // N1 Dynamics (Lag)
-        const n1Diff = targetN1 - this.state.n1;
-        const rate = n1Diff > 0 ? this.config.spoolUpRate : this.config.spoolDownRate;
+        // N2 Dynamics (Core Lag)
+        // Core speed follows throttle command with inertia
+        const n2Diff = targetN2 - this.state.n2;
         
-        // Acceleration decays near max N1 (inertia)
-        // And acceleration is slower at low N1 (inertia)
-        // Apply responsiveness factor (uncertainty)
-        this.state.n1 += n1Diff * rate * dt * 0.05 * this.config.responsiveness; 
+        // Asymmetric rates: Spool Up is slower than Spool Down (usually)
+        // UNLESS it's the starter, which is quite slow to spool up
+        let n2Rate = this.config.spoolUpRate;
+        
+        if (!this.state.running && this.state.starterEngaged) {
+            // Starter torque is weaker than combustion
+            n2Rate = 5.0; // 5% per second roughly
+        } else if (n2Diff < 0) {
+            n2Rate = this.config.spoolDownRate;
+        }
+
+        // Apply responsiveness factor
+        // N2 is the heavy core, takes time to spool
+        this.state.n2 += n2Diff * n2Rate * dt * 0.04 * this.config.responsiveness;
+
+        // Clamp N2
+        if (this.state.n2 < 0) this.state.n2 = 0;
+
+        // Calculate Target N1 from Current N2 (Non-linear relationship)
+        // N1 (Fan) responds to N2 (Core)
+        const targetN1 = this.calculateN1FromN2(this.state.n2);
+
+        // N1 Dynamics (Fan Lag)
+        // Fan has inertia but follows core airflow
+        const n1Diff = targetN1 - this.state.n1;
+        // Fan responds faster to core changes than core responds to fuel
+        this.state.n1 += n1Diff * dt * 2.0; 
 
         // Clamp N1
         if (this.state.n1 < 0) this.state.n1 = 0;
 
-        // N2 Dynamics (Core Speed)
-        // Core responds slightly differently than fan
-        // N2 target is roughly N1 * 1.1 but with its own lag
-        const targetN2 = this.state.n1 * 1.1;
-        const n2Diff = targetN2 - this.state.n2;
-        // Core is lighter but follows N1 aerodynamics
-        this.state.n2 += n2Diff * dt * 2.0; // Simple lag towards target
-
         // Thrust Calculation
         // Thrust = MaxThrust * (N1_ratio)^2 * (Density_ratio)^0.7 * (1 - 0.2 * Mach)
-        // High bypass engines lose thrust with speed and altitude
         const n1Ratio = this.state.n1 / this.config.maxN1;
         
-        // Thrust is negligible below idle
+        // Thrust is negligible below idle N1
+        // At Start-Up (N2=25%), N1 is ~5%.
+        // We want almost zero thrust at 5% N1.
         let thrustFactor = 0;
-        if (this.state.n1 > 10) {
-            thrustFactor = Math.pow(n1Ratio, 2.5); // Thrust ~ RPM^2.5 approx
+        const thrustThresholdN1 = 5.0; // Start generating meaningful thrust above 5% N1
+        
+        if (this.state.n1 > thrustThresholdN1) {
+            // Smooth ramp up from threshold
+            const effectiveRatio = (this.state.n1 - thrustThresholdN1) / (this.config.maxN1 - thrustThresholdN1);
+            thrustFactor = Math.pow(Math.max(0, effectiveRatio), 2.5); 
         }
 
         // Apply Reverse Thrust Logic
-        if (isReverse && throttle < -0.01) { // Threshold to avoid flickering at 0
+        if (isReverse && throttle < -0.01) { 
              // User requirement: -70% Thrust at Max Reverse (75% N1)
-             // At 75% N1, thrustFactor is roughly (75/102)^2.5 ~= 0.45
-             // We want -0.70 total thrust factor.
-             // So we need to scale the physical thrust produced by N1 to match the reverse effectiveness.
-             // Scalar = 0.70 / 0.45 ~= 1.55
-             // Also apply negative sign.
              const reverseScalar = 1.55; 
              thrustFactor = -1 * thrustFactor * reverseScalar;
         }
 
         const altitudeFactor = Math.pow(airDensityRatio, 0.7);
-        const machFactor = Math.max(0, 1 - 0.2 * mach); // Ram drag effect simplified
+        const machFactor = Math.max(0, 1 - 0.2 * mach); 
 
         this.state.thrust = this.config.maxThrust * thrustFactor * altitudeFactor * machFactor;
 
-        // Fuel Flow (environment-aware, N1-informed, always positive)
+        // Fuel Flow (N2 based mostly for core, but N1 is good proxy)
+        // Using N1 for consistency with existing TSFC methods
         const tsfcEff = this.computeTSFC(this.config.tsfc, airDensityRatio, mach, this.state.n1);
         const idleFlow = this.computeIdleFuelFlow(this.config.tsfc, airDensityRatio, this.state.n1);
         
         const thrustDemandAbs = Math.abs(this.state.thrust);
         const rawFuelFlow = idleFlow + tsfcEff * thrustDemandAbs;
         
-        const alpha = 0.35; // smoothing factor
+        const alpha = 0.35; 
         const smoothed = this._prevFuelFlow * (1 - alpha) + rawFuelFlow * alpha;
         this.state.fuelFlow = Math.max(idleFlow, smoothed);
         this._prevFuelFlow = this.state.fuelFlow;
 
         // EGT
-        // Increases with N1 and Mach
-        const baseEGT = ambientTemp; // Ambient
-        const runningEGT = 400 + (this.state.n1 * 4);
+        const baseEGT = ambientTemp; 
+        const runningEGT = 400 + (this.state.n2 * 4); // EGT correlates well with N2 (Core)
         this.state.egt = this.state.running ? runningEGT : baseEGT + (this.state.egt - baseEGT) * 0.99;
 
         return this.getOutput();
+    }
+
+    calculateN1FromN2(n2) {
+        // Quadratic approximation: N1 = N2^2 / 100
+        // Fits user reference:
+        // Start-Up: 20% N2 -> 4% N1 (Ref: ~5-10%)
+        // Taxi: 60% N2 -> 36% N1 (Ref: ~20-30% N1 from 50-60% N2)
+        // Takeoff: 100% N2 -> 100% N1
+        
+        if (n2 <= 0) return 0;
+        
+        // Use a simple quadratic curve as requested
+        let n1 = (n2 * n2) / 100;
+        
+        return n1;
     }
     
     computeTSFC(tsfc0, densityRatio, mach, n1) {

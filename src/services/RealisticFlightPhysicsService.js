@@ -43,6 +43,10 @@ class Vector3 {
         const m = this.magnitude();
         return m > 0 ? this.scale(1 / m) : new Vector3();
     }
+    set(x, y, z) {
+        this.x = x; this.y = y; this.z = z;
+        return this;
+    }
     clone() { return new Vector3(this.x, this.y, this.z); }
 }
 
@@ -161,7 +165,7 @@ class RealisticFlightPhysicsService {
             rudder: 0,   // -1 to 1 (Yaw)
             flaps: 0,    // 0 to 1
             gear: 1,     // 0 (up) to 1 (down)
-            brakes: 0,
+            brakes: 1.0, // Start with parking brake set
             trim: 0      // Pitch trim
         };
 
@@ -193,6 +197,12 @@ class RealisticFlightPhysicsService {
         this.difficulty = difficulty; // Set from constructor
         // Initialize airport elevation from config (converted from feet to meters if provided)
         this.airportElevation = (aircraftData.airportElevation || 0) * 0.3048; 
+        console.log("Physics Init: Elevation Data", {
+            inputFt: aircraftData.airportElevation,
+            convertedM: this.airportElevation,
+            gearHeight: this.aircraft.gearHeight
+        });
+
         this.terrainElevation = null; // AMSL in meters
         this.currentGroundZ = 0; // NED Z coordinate of ground (usually negative or zero)
 
@@ -218,13 +228,30 @@ class RealisticFlightPhysicsService {
         this.warningSystem = new WarningSystem();
         this.sensors = { pitotBlocked: false };
 
+        // Motion control flag (allows disabling physics integration while keeping systems active)
+        this.motionEnabled = true;
+
         // Aircraft Systems State
         this.initializeSystems(this.difficulty);
+    }
+
+    setMotionEnabled(enabled) {
+        this.motionEnabled = !!enabled;
+        if (!enabled) {
+            // Reset rates to stop rotation when freezing
+            this.state.rates = new Vector3(0, 0, 0);
+            this.state.vel = new Vector3(0, 0, 0);
+        }
     }
 
     initializeSystems(difficulty) {
         // Cold & Dark for Pro/Devil/Survival
         const isColdDark = difficulty === 'pro' || difficulty === 'devil' || difficulty === 'professional' || difficulty === 'survival';
+        
+        // For Rookie/Student (not cold & dark), ensure we are fully ready
+        // But if difficulty is 'advanced', user might want a warm start but not cold & dark. 
+        // Logic says: if !isColdDark, we are ready.
+        
         const engineCount = this.aircraft.engineCount || 2;
         
         // Generate Engine States dynamically
@@ -233,7 +260,7 @@ class RealisticFlightPhysicsService {
             enginesState[`eng${i}`] = { 
                 startSwitch: 'OFF', 
                 fuelControl: !isColdDark, 
-                n2: isColdDark ? 0 : 60, 
+                n2: isColdDark ? 0 : 20, // Idle N2
                 egt: isColdDark ? 20 : 400 
             };
         }
@@ -249,10 +276,10 @@ class RealisticFlightPhysicsService {
                     eng.state.ff = 0;
                 } else {
                     eng.state.running = true;
-                    eng.state.n1 = 20; // Idle N1
-                    eng.state.n2 = 60; // Idle N2
+                    eng.state.n1 = 5; // Idle N1 (derived from ~20% N2)
+                    eng.state.n2 = 20; // Idle N2
                     eng.state.egt = 400;
-                    eng.state.ff = 0.8; // Idle fuel flow
+                    eng.state.ff = 0.3; // Idle fuel flow
                 }
             });
         }
@@ -399,7 +426,7 @@ class RealisticFlightPhysicsService {
                 right: false
             },
             brakes: {
-                parkingBrake: isColdDark, // On if cold & dark
+                parkingBrake: true, // Always ON initially to prevent movement
                 autobrake: 'OFF', // RTO, OFF, 1, 2, 3, MAX
                 temp: [20, 20, 20, 20] // Brake temps
             },
@@ -718,13 +745,16 @@ class RealisticFlightPhysicsService {
 
             // 1. Position Update (Geo)
             // NED to Geo approximation
-            const v_ned = this.state.quat.rotate(this.state.vel);
-            const latRad = this.state.geo.lat * Math.PI / 180;
-            const metersPerLat = 111132.92 - 559.82 * Math.cos(2 * latRad) + 1.175 * Math.cos(4 * latRad);
-            const metersPerLon = 111412.84 * Math.cos(latRad) - 93.5 * Math.cos(3 * latRad);
-            
-            this.state.geo.lat += (v_ned.x * subDt) / metersPerLat;
-            this.state.geo.lon += (v_ned.y * subDt) / metersPerLon;
+            // Only update position if motion is enabled
+            if (this.motionEnabled) {
+                const v_ned = this.state.quat.rotate(this.state.vel);
+                const latRad = this.state.geo.lat * Math.PI / 180;
+                const metersPerLat = 111132.92 - 559.82 * Math.cos(2 * latRad) + 1.175 * Math.cos(4 * latRad);
+                const metersPerLon = 111412.84 * Math.cos(latRad) - 93.5 * Math.cos(3 * latRad);
+                
+                this.state.geo.lat += (v_ned.x * subDt) / metersPerLat;
+                this.state.geo.lon += (v_ned.y * subDt) / metersPerLon;
+            }
 
             // 2. Environment
             const env = this.calculateEnvironment(this.state.pos.z);
@@ -756,7 +786,13 @@ class RealisticFlightPhysicsService {
             }
 
             // 5. Integrate
-            this.integrate(forces, moments, subDt);
+            if (this.motionEnabled) {
+                this.integrate(forces, moments, subDt);
+            } else {
+                // Force velocity to zero when motion is disabled to prevent drift
+                this.state.vel.set(0, 0, 0);
+                this.state.rates.set(0, 0, 0);
+            }
 
             // 6. Constraints
             this.checkConstraints();
@@ -983,62 +1019,74 @@ class RealisticFlightPhysicsService {
              // 1. Get Control Inputs
              const engineThrottle = this.controls.engineThrottles[index];
              
-             // 2. Check for Starter Drive (from OverheadLogic)
-             // OverheadLogic simulates the starter motor and initial lightoff.
-             // It updates this.systems.engines[id].n2.
-             // If the system N2 is higher than our physics N2 (and < 55%), we assume the starter is driving the engine.
+             // 2. Feed System State to Engine Physics
              const sysEng = this.systems.engines[`eng${index + 1}`];
-             const isBeingStarted = sysEng && (sysEng.startSwitch === 'GRD' || (sysEng.n2 > engine.state.n2 && sysEng.n2 < 55));
+             const pneu = this.systems.pressurization;
              
-             if (isBeingStarted) {
-                 // Force physics engine to match starter state if starter is faster
-                 if (sysEng.n2 > engine.state.n2) {
-                     engine.state.n2 = sysEng.n2;
-                     engine.state.n1 = engine.state.n2 * 0.9; // Approximate N1 from N2 during start
-                     
-                     // If OverheadLogic says we have lightoff (EGT rising), sync EGT too
-                     if (sysEng.egt > engine.state.egt) {
-                         engine.state.egt = sysEng.egt;
-                     }
-                     
-                     // If fuel introduced, tell physics engine it's running
-                     if (sysEng.fuelControl && sysEng.n2 > 20) {
-                         engine.state.running = true;
-                     }
+             if (sysEng) {
+                 // Determine Pneumatic Pressure Availability
+                 // Split point logic (same as OverheadLogic)
+                 const engineCount = this.engines.length;
+                 const splitPoint = Math.ceil(engineCount / 2);
+                 const isLeft = index < splitPoint;
+                 
+                 const ductPress = isLeft ? (pneu?.ductPressL || 0) : (pneu?.ductPressR || 0);
+                 const pneumaticAvailable = ductPress > 20;
+                 
+                 // Pass Startup State to Physics Engine
+                 // starterEngaged: Switch is GRD or CONT/FLT doesn't engage starter usually, only GRD.
+                 // fuelAvailable: Checked below in source logic, but we pass the valve status here.
+                 // Actually, we determine "fuelAvailable" based on tank logic below.
+                 
+                 // Let's calculate fuel availability first
+                 const fuel = this.systems.fuel;
+                 let fuelSourceAvailable = false;
+                 
+                 const currentAltFt = Math.max(0, (-this.state.pos.z || 0) * 3.28084);
+                 // Suction feed available at low altitude, but limited by fuel flow demand (N2)
+                 // If thrust is high (>65% N2) without pumps, suction is insufficient (cavitation)
+                 const highThrust = engine.state.n2 > 65;
+                 const suctionAvailable = (this.onGround || currentAltFt < 20000) && !highThrust;
+                 
+                 if (fuel.pressC > 10 && fuel.tanks.center > 0) fuelSourceAvailable = true;
+                 else if (isLeft) {
+                     if ((fuel.pressL > 10 || suctionAvailable) && fuel.tanks.left > 0) fuelSourceAvailable = true;
+                     else if (fuel.crossfeed && fuel.pressR > 10 && fuel.tanks.right > 0) fuelSourceAvailable = true;
+                 } else {
+                     if ((fuel.pressR > 10 || suctionAvailable) && fuel.tanks.right > 0) fuelSourceAvailable = true;
+                     else if (fuel.crossfeed && fuel.pressL > 10 && fuel.tanks.left > 0) fuelSourceAvailable = true;
                  }
-             }
-
-             // Fuel Sourcing & Starvation Logic
-             const fuel = this.systems.fuel;
-             const engineCount = this.engines.length;
-             const splitPoint = Math.ceil(engineCount / 2);
-             const isLeft = index < splitPoint;
-             let availableSources = [];
-             
-             // Identify active fuel sources (Pump Pressure > 10 PSI OR Suction Feed on Ground)
-             const suctionAvailable = this.onGround;
-
-             if (fuel.pressC > 10 && fuel.tanks.center > 0) availableSources.push('center');
-             
-             if (isLeft) {
-                 if ((fuel.pressL > 10 || suctionAvailable) && fuel.tanks.left > 0) availableSources.push('left');
-                 if (fuel.crossfeed && fuel.pressR > 10 && fuel.tanks.right > 0) availableSources.push('right');
-             } else {
-                 if ((fuel.pressR > 10 || suctionAvailable) && fuel.tanks.right > 0) availableSources.push('right');
-                 if (fuel.crossfeed && fuel.pressL > 10 && fuel.tanks.left > 0) availableSources.push('left');
-             }
-             
-             // Apply Starvation
-             if (availableSources.length === 0) {
-                 engine.state.running = false;
-             } else {
-                 // Distribute fuel burn equally among active sources
+                 
+                 // Update Engine Physics State
+                 engine.setStartupState(
+                     sysEng.startSwitch === 'GRD', // Starter Valve Open
+                     pneumaticAvailable,          // Air Pressure
+                     sysEng.fuelControl && fuelSourceAvailable, // Fuel Valve & Supply
+                     true // Ignition (Assume Auto/On for now)
+                 );
+                 
+                 // Sync External Fuel Burn
+                 // We need to actually remove fuel from tanks if engine is burning it
                  if (engine.state.running && engine.state.fuelFlow > 0) {
-                     const burn = engine.state.fuelFlow * dt;
-                     const burnPerSource = burn / availableSources.length;
-                     availableSources.forEach(src => {
-                         fuel.tanks[src] = Math.max(0, fuel.tanks[src] - burnPerSource);
-                     });
+                     // Find active sources for distribution
+                     let activeSources = [];
+                     if (fuel.pressC > 10 && fuel.tanks.center > 0) activeSources.push('center');
+                     if (isLeft) {
+                         if ((fuel.pressL > 10 || suctionAvailable) && fuel.tanks.left > 0) activeSources.push('left');
+                         if (fuel.crossfeed && fuel.pressR > 10 && fuel.tanks.right > 0) activeSources.push('right');
+                     } else {
+                         if ((fuel.pressR > 10 || suctionAvailable) && fuel.tanks.right > 0) activeSources.push('right');
+                         if (fuel.crossfeed && fuel.pressL > 10 && fuel.tanks.left > 0) activeSources.push('left');
+                     }
+                     
+                     // Fallback if logic mismatch (shouldn't happen if fuelSourceAvailable is true)
+                     if (activeSources.length > 0) {
+                         const burn = engine.state.fuelFlow * dt;
+                         const burnPerSource = burn / activeSources.length;
+                         activeSources.forEach(src => {
+                             fuel.tanks[src] = Math.max(0, fuel.tanks[src] - burnPerSource);
+                         });
+                     }
                  }
              }
 
@@ -1047,10 +1095,12 @@ class RealisticFlightPhysicsService {
              
              // 4. Sync Back to Systems (for UI and Logic)
              // We are the source of truth for running engines
-             sysEng.n1 = engine.state.n1;
-             sysEng.n2 = engine.state.n2;
-             sysEng.egt = engine.state.egt;
-             sysEng.ff = engine.state.fuelFlow;
+             if (sysEng) {
+                 sysEng.n1 = engine.state.n1;
+                 sysEng.n2 = engine.state.n2;
+                 sysEng.egt = engine.state.egt;
+                 sysEng.ff = engine.state.fuelFlow;
+             }
              
              // 5. Detect Engine Stall/Failure conditions?
              // (Already handled in engine.update mostly)
@@ -2829,9 +2879,10 @@ class RealisticFlightPhysicsService {
     }
     reset() {
         const gearHeight = this.aircraft.gearHeight || 2;
-        const initialZ = -(this.airportElevation + gearHeight);
+        // Z is relative to Airport Elevation (Origin), so we just want to be gearHeight above 0
+        const initialZ = -gearHeight;
         this.state.pos = new Vector3(0, 0, initialZ);
-        this.currentGroundZ = -this.airportElevation; // Reset ground level to airport level
+        this.currentGroundZ = 0; // Reset ground level to airport level (Relative Z = 0)
         
         this.state.vel = new Vector3(0, 0, 0);
         this.state.rates = new Vector3(0, 0, 0);

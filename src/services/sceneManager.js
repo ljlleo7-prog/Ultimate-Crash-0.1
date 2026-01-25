@@ -44,7 +44,7 @@ const defaultScenario = {
       id: 'phase-boarding',
       name: 'Boarding',
       type: FlightPhases.BOARDING,
-      durationSeconds: 15, // Shortened for gameplay
+      durationSeconds: 3600, // Long duration to allow setup without timeout
       physics: { mode: 'off' },
       narrative: {
         title: 'Boarding at ${departure}',
@@ -55,7 +55,7 @@ const defaultScenario = {
       id: 'phase-departure-clearance',
       name: 'Departure Clearance',
       type: FlightPhases.DEPARTURE_CLEARANCE,
-      durationSeconds: 15,
+      durationSeconds: 3600,
       physics: { mode: 'off' },
       narrative: {
         title: 'IFR Clearance',
@@ -66,7 +66,7 @@ const defaultScenario = {
       id: 'phase-pushback',
       name: 'Pushback & Start',
       type: FlightPhases.PUSHBACK,
-      durationSeconds: 20,
+      durationSeconds: 3600,
       physics: { mode: 'off' },
       narrative: {
         title: 'Pushback Approved',
@@ -77,7 +77,7 @@ const defaultScenario = {
       id: 'phase-taxiing',
       name: 'Taxi',
       type: FlightPhases.TAXIING,
-      durationSeconds: 20,
+      durationSeconds: 3600,
       physics: { mode: 'off' },
       narrative: {
         title: 'Taxi to Runway ${departureRunway}',
@@ -558,15 +558,18 @@ class SceneManager {
       }
     } else if (phase.type === FlightPhases.PUSHBACK) {
         const isHardcore = ['pro', 'devil'].includes(this.scenario.difficulty.toLowerCase());
-        // Wait for engines to start (N2 > 50%) or significant time pass
-        const enginesRunning = payload?.systems?.engines && Object.values(payload.systems.engines).some(e => e.n2 > 50);
+        // Wait for engines to start (N2 > 15% - Idle is 20%) or significant time pass
+        const enginesRunning = payload?.systems?.engines && Object.values(payload.systems.engines).some(e => e.n2 > 15);
         
         if (isHardcore) {
             // In Pro mode, we require checklist completion AND manual continue
              if (payload && payload.systems) {
-               const checklistResult = checkStartupRequirements(StartupPhases.ENGINE_START, payload.systems, payload.engines || []);
+               // Use systems.engines because payload.engines might be empty/undefined in outputState
+               const checklistResult = checkStartupRequirements(StartupPhases.ENGINE_START, payload.systems, payload.systems.engines);
                
-               if (checklistResult.canContinue && this.userSkipped) {
+               // User requested to DISABLE the barrier.
+               // So we allow progression if the user clicks Continue (this.userSkipped), regardless of checklist.
+               if (this.userSkipped) {
                    isPhaseComplete = true;
                } else {
                    isPhaseComplete = false;
@@ -588,12 +591,14 @@ class SceneManager {
                    }
                }
             } else {
-                isPhaseComplete = false;
+                // Fallback if systems payload missing
+                if (this.userSkipped) isPhaseComplete = true;
+                else isPhaseComplete = false;
             }
         } else {
-            // Normal mode: Auto-complete if engines running
-            // Minimum 20s, but wait for engines unless it takes too long (> 5 mins)
-            if (this.elapsedInPhase > 20 && enginesRunning) {
+            // Normal mode: Auto-complete if engines running OR User Manual Continue
+            // Fix: Added this.userSkipped check so Rookies aren't stuck waiting for timer
+            if (this.userSkipped || (this.elapsedInPhase > 20 && enginesRunning)) {
                 isPhaseComplete = true;
             } else if (this.elapsedInPhase > 300) {
                 isPhaseComplete = true; // Timeout
@@ -612,7 +617,10 @@ class SceneManager {
         } else {
             // Wait for taxi (speed > 5 kts) and duration
             const groundSpeed = payload?.airspeed || 0; // Approx
-            if (this.elapsedInPhase > 30 && groundSpeed > 5) {
+            // Fix: Allow manual continue for Rookies too
+            if (this.userSkipped) {
+                isPhaseComplete = true;
+            } else if (this.elapsedInPhase > 30 && groundSpeed > 5) {
                  // Maybe wait until aligned? Hard to detect without runway logic.
                  // Just give them more time.
                  if (this.elapsedInPhase > 120) isPhaseComplete = true;
@@ -640,8 +648,8 @@ class SceneManager {
                   payload.engines || []
                );
                
-               // Even if checklist is good, we WAIT for user to click Continue
-               if (checklistResult.canContinue && this.userSkipped) {
+               // FORCE ALLOW if user skipped, regardless of checklist
+               if (this.userSkipped) {
                    isPhaseComplete = true;
                } else {
                    isPhaseComplete = false;
@@ -673,7 +681,8 @@ class SceneManager {
           }
       } else {
           // Rookie/Captain modes: Auto-complete when time is up
-          isPhaseComplete = this.elapsedInPhase >= phase.durationSeconds;
+          // Fix: Allow manual continue here too
+          isPhaseComplete = this.userSkipped || (this.elapsedInPhase >= phase.durationSeconds);
       }
     }
 
