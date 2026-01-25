@@ -61,7 +61,7 @@ class AircraftService {
   async getAircraftByModel(modelName) {
     const db = await this.initialize();
     return db.find(aircraft => 
-      aircraft.model.toLowerCase() === modelName.toLowerCase()
+      aircraft.model.toLowerCase() === modelName.trim().toLowerCase()
     );
   }
 
@@ -255,21 +255,26 @@ class AircraftService {
     };
   }
 
-  // Calculate flight time
+  // Calculate flight time with overhead (climb/descent/taxi)
   async calculateFlightTime(aircraftModel, distance) {
     const aircraft = await this.getAircraftByModel(aircraftModel);
     if (!aircraft) {
       throw new Error(`Aircraft model '${aircraftModel}' not found`);
     }
 
-    const flightTimeHours = distance / aircraft.cruiseSpeed;
-    const hours = Math.floor(flightTimeHours);
-    const minutes = Math.round((flightTimeHours - hours) * 60);
+    const cruiseTimeHours = distance / aircraft.cruiseSpeed;
+    // Add overhead: Taxi (15m) + Climb/Descent inefficiency (20m equivalent cruise time penalty)
+    // ~30 mins overhead to flight time estimation
+    const overheadHours = 0.5; 
+    const totalFlightHours = cruiseTimeHours + overheadHours;
+
+    const hours = Math.floor(totalFlightHours);
+    const minutes = Math.round((totalFlightHours - hours) * 60);
 
     return {
       hours,
       minutes,
-      totalMinutes: Math.round(flightTimeHours * 60)
+      totalMinutes: Math.round(totalFlightHours * 60)
     };
   }
 

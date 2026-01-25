@@ -204,20 +204,15 @@ class RealisticFlightPhysicsService {
         });
 
         this.terrainElevation = null; // AMSL in meters
-        this.currentGroundZ = 0; // NED Z coordinate of ground (usually negative or zero)
+        this.currentGroundZ = 0; // NED Z coordinate of ground (runway level in local frame)
 
-        // If starting on ground, set initial Z based on airport elevation
+        // If starting on ground, spawn at 0 AGL (runway level) with gear height above ground.
+        // Internal Z is always relative to runway; AMSL is derived later as:
+        // altitudeAMSL = (-state.pos.z) + airportElevation.
         if (this.onGround) {
-             // We want AMSL = airportElevation + gearHeight (approx)
-             // NED Frame: Z is Down. Altitude is -Z.
-             // So -Z = airportElevation + gearHeight
-             // Z = -(airportElevation + gearHeight)
              const gearHeight = this.aircraft.gearHeight || 2;
-             this.state.pos.z = -(this.airportElevation + gearHeight);
-             
-             // Also update currentGroundZ so we don't think we are underground relative to terrain
-             // If terrain is flat at airport elevation:
-             this.currentGroundZ = -this.airportElevation;
+             // Ground is Z = 0, aircraft CG starts gearHeight above ground
+             this.state.pos.z = -gearHeight;
         }
 
         // Autopilot
@@ -241,6 +236,13 @@ class RealisticFlightPhysicsService {
             // Reset rates to stop rotation when freezing
             this.state.rates = new Vector3(0, 0, 0);
             this.state.vel = new Vector3(0, 0, 0);
+
+            // If on ground (preparing for flight), enforce flat attitude (NO pitch/roll)
+            if (this.onGround) {
+                const euler = this.state.quat.toEuler();
+                // Reset pitch (theta) and roll (phi) to 0, preserve yaw (psi)
+                this.state.quat = Quaternion.fromEuler(0, 0, euler.psi);
+            }
         }
     }
 
@@ -1738,21 +1740,29 @@ class RealisticFlightPhysicsService {
         const altitude = this.currentGroundZ - this.state.pos.z; 
         
         // 1. Underground Check (Standard)
-        if (this.state.pos.z > this.currentGroundZ && !this.onGround) {
-            // Underground?
-            // If we hit ground hard
-            if (this.state.vel.z > 10) { // > 10 m/s sink rate
+        // User Request: "clamp aircraft to stay above ground for at least 0ft (except crashing)"
+        if (this.state.pos.z > this.currentGroundZ) {
+            // Check for Hard Landing / Crash
+            if (!this.crashed && this.state.vel.z > 10) { // > 10 m/s sink rate
                  this.crashed = true;
                  this.crashReason = "Hard Landing / Crash";
-            } else {
-                // Reset to surface if just minor penetration (handled by ground spring mostly)
-                // DISABLED HARD RESET to prevent energy injection/jitter
-                // Instead, rely on the spring forces we calculated in calculateForces
-                // Only clamp if deep underground to prevent falling through world
-                if (this.state.pos.z > this.currentGroundZ + 2.0) {
-                     this.state.pos.z = this.currentGroundZ;
-                     this.state.vel.z = 0; // Stop downward momentum if hard reset
-                }
+            } 
+            
+            if (!this.crashed) {
+                // Hard Clamp to Surface
+                this.state.pos.z = this.currentGroundZ;
+                
+                // Stop downward velocity
+                if (this.state.vel.z > 0) this.state.vel.z = 0;
+                
+                // User Request: "place roll to 0 (but without stiff damping because they might overshoot)"
+                // We reset the roll directly in the quaternion state
+                const euler = this.state.quat.toEuler();
+                // Keep pitch (theta) and yaw (psi), force roll (phi) to 0
+                this.state.quat = Quaternion.fromEuler(0, euler.theta, euler.psi);
+                this.state.rates.x = 0; // Kill roll rate
+                
+                this.onGround = true;
             }
         }
 

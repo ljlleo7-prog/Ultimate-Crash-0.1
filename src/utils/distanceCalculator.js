@@ -78,7 +78,14 @@ async function calculateFlightPlan(departureAirport, arrivalAirport, aircraftMod
     arrivalAirport.longitude
   );
 
-  const flightTime = calculateFlightTime(distance);
+  let flightTime;
+  try {
+    flightTime = await aircraftService.calculateFlightTime(aircraftModel, distance);
+  } catch (error) {
+    console.warn('Using generic flight time calculation:', error.message);
+    flightTime = calculateFlightTime(distance);
+  }
+
   const fuelData = await calculateFuelConsumption(distance, aircraftModel, payload, fuelReserve);
   
   // Get aircraft performance data

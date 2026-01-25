@@ -279,46 +279,7 @@ const FlightInitialization = ({
     // Difficulty logic here if needed in future
   }, [difficulty]);
 
-  // Calculate flight plan when route or parameters change
-  useEffect(() => {
-    const calculatePlan = async () => {
-      // Trigger if we have departure and arrival
-      if (selectedDeparture && selectedArrival) {
-        // Safe parsing for calculations
-        const safePayload = parseFloat(payload) || 0;
-        const safeReserve = parseFloat(reserveHours) || 1.0;
 
-        // Calculate distance
-        const distance = distanceCalculator.calculateDistance(
-          selectedDeparture.lat, selectedDeparture.lon,
-          selectedArrival.lat, selectedArrival.lon
-        );
-        
-        // Calculate fuel (pass reserveHours)
-        const fuel = await distanceCalculator.calculateFuelConsumption(
-          distance.nauticalMiles, 
-          aircraftModel, 
-          safePayload,
-          safeReserve
-        );
-        
-        // Calculate flight time (simple estimation)
-        const speed = 450; // knots (approx)
-        const timeHours = distance.nauticalMiles / speed;
-        
-        setFlightPlan({
-          distance,
-          fuel,
-          time: {
-            hours: Math.floor(timeHours),
-            minutes: Math.round((timeHours % 1) * 60)
-          }
-        });
-      }
-    };
-    
-    calculatePlan();
-  }, [selectedDeparture, selectedArrival, aircraftModel, payload, reserveHours, currentStep]); // Added currentStep to ensure recalc when moving to route page
 
   return (
     <div className="flight-initialization">

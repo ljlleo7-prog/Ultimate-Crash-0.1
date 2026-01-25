@@ -149,17 +149,15 @@ const FlightInProgress = ({
 
   // Control Physics Motion based on Phase (Narrative vs Active)
   useEffect(() => {
-    if (!setMotionEnabled) return;
+    if (!setMotionEnabled || !isInitialized) return;
 
     // Phases where the plane should be static (physics integration disabled, systems active)
-    // We disable motion for all pre-flight and taxi phases because the plane spawns at the runway threshold
-    // Motion is only enabled when the actual Takeoff roll begins
-    const staticPhases = ['boarding', 'departure_clearance', 'pushback', 'taxiing', 'takeoff_prep', 'debrief']; 
-    const shouldFreeze = staticPhases.includes(sceneState.currentPhase?.type);
+    const staticPhases = ['boarding', 'departure_clearance', 'pushback', 'taxiing', 'takeoff_prep']; 
+    const phaseType = sceneState.currentPhase?.type;
+    const shouldFreeze = staticPhases.includes(phaseType);
     
     setMotionEnabled(!shouldFreeze);
-    // console.log(`Physics Motion ${shouldFreeze ? 'DISABLED' : 'ENABLED'} for phase ${sceneState.currentPhase?.type}`);
-  }, [sceneState.currentPhase, setMotionEnabled]);
+  }, [sceneState.currentPhase, setMotionEnabled, isInitialized]);
 
   // Radio Message Handler
   const handleRadioTransmit = (messageDataOrText, type, templateId, params) => {
