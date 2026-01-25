@@ -149,7 +149,7 @@ const defaultScenario = {
       id: 'phase-cruise',
       name: 'Cruise Flight',
       type: FlightPhases.CRUISE,
-      durationSeconds: 180,
+      durationSeconds: 3600, // Extended to 1 hour to prevent early descent
       physics: {
         mode: 'continuous',
         targetAltitude: 35000,
@@ -556,6 +556,23 @@ class SceneManager {
       if (altitude_ft >= (this.scenario.targetCruiseAltitude - 1000)) {
         isPhaseComplete = true;
       }
+    } else if (phase.type === FlightPhases.CRUISE) {
+        // Transition from CRUISE to DESCENT based on distance to destination
+        if (this.scenario.arrival && payload?.geo) {
+            const arrivalAirport = airportService.getAirportByCode(this.scenario.arrival);
+            if (arrivalAirport) {
+                const distance = airportService.calculateDistance(
+                    { latitude: payload.geo.latitude, longitude: payload.geo.longitude },
+                    { latitude: arrivalAirport.latitude, longitude: arrivalAirport.longitude }
+                );
+                
+                // Trigger descent if distance <= 200 nm
+                if (distance <= 200) {
+                    isPhaseComplete = true;
+                    console.log(`📉 Initiating descent: Distance to ${this.scenario.arrival} is ${distance}nm`);
+                }
+            }
+        }
     } else if (phase.type === FlightPhases.PUSHBACK) {
         const isHardcore = ['pro', 'devil'].includes(this.scenario.difficulty.toLowerCase());
         // Wait for engines to start (N2 > 15% - Idle is 20%) or significant time pass
@@ -698,6 +715,7 @@ class SceneManager {
 
   // Check for failure points to trigger in current phase
   checkFailureTriggers(phase) {
+    return; // DISABLED: User requested to disable failures for now
     if (!phase.failurePoints) return;
     
     for (const failurePoint of phase.failurePoints) {
@@ -944,9 +962,10 @@ class SceneManager {
         phaseType: phase.type,
         // Pass minimal conditions if any (e.g. brake release)
         initialConditions: Object.keys(minimalConditions).length > 0 ? minimalConditions : undefined,
-        targetAltitude: physics.targetAltitude ? physics.targetAltitude * 0.3048 : undefined,
-        targetSpeed: physics.targetSpeed ? physics.targetSpeed * 0.514444 : undefined,
-        targetHeading: physics.targetHeading ? physics.targetHeading * Math.PI / 180 : undefined
+        // DISABLED: Do not update AP targets during continuous transitions
+        // targetAltitude: physics.targetAltitude ? physics.targetAltitude * 0.3048 : undefined,
+        // targetSpeed: physics.targetSpeed ? physics.targetSpeed * 0.514444 : undefined,
+        // targetHeading: physics.targetHeading ? physics.targetHeading * Math.PI / 180 : undefined
       });
       return;
     }

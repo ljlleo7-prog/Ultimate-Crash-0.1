@@ -129,6 +129,7 @@ class FailureSystem {
     }
 
     checkRandomFailures(state) {
+        return; // DISABLED: User requested to disable failures for now
         // If max failures reached, don't add more
         if (this.activeFailures.size >= this.settings.maxFailures) return;
         

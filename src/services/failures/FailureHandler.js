@@ -102,6 +102,7 @@ class FailureHandler {
     }
 
     checkRandomFailures(state) {
+        return; // DISABLED: User requested to disable failures for now
         if (this.activeFailures.size >= this.settings.maxFailures) return;
         
         const baseProb = 0.005 * this.settings.probMultiplier;
