@@ -910,6 +910,7 @@ class SceneManager {
       activeFailures: Array.from(this.activeFailures.values()),
       completedPhases: Array.from(this.completedPhases),
       lastCommand: this.lastCommand,
+      takeoffClearanceReceived: this.takeoffClearanceReceived,
       narrativeHistory: this.narrativeHistory.slice(-5) // Return last 5 narrative entries
     };
   }

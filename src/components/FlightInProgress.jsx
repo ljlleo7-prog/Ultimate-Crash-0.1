@@ -152,12 +152,31 @@ const FlightInProgress = ({
     if (!setMotionEnabled || !isInitialized) return;
 
     // Phases where the plane should be static (physics integration disabled, systems active)
-    const staticPhases = ['boarding', 'departure_clearance', 'pushback', 'taxiing', 'takeoff_prep']; 
+    // STRICT MODE: Ensure no movement until Takeoff Clearance is explicitly received
+    // This prevents "creep" during startup, pushback, and taxi if not fully simulated
     const phaseType = sceneState.currentPhase?.type;
-    const shouldFreeze = staticPhases.includes(phaseType);
     
-    setMotionEnabled(!shouldFreeze);
-  }, [sceneState.currentPhase, setMotionEnabled, isInitialized]);
+    // Check if we are in a pre-takeoff phase
+    const isGroundPhase = ['boarding', 'departure_clearance', 'pushback', 'taxiing', 'takeoff_prep'].includes(phaseType);
+    
+    // Logic: Freeze if we are on ground AND haven't received takeoff clearance
+    // Note: Once takeoff clearance is received, sceneManager usually transitions to 'takeoff' phase.
+    // But even if it stays in 'takeoff_prep' for a moment, this flag will unlock it.
+    // Conversely, if we force 'takeoff' phase but clearance logic hasn't fired, this might keep it frozen (safety).
+    // However, for non-ground phases (Cruise, etc), we always enable motion.
+    
+    const shouldFreeze = isGroundPhase && !sceneState.takeoffClearanceReceived;
+    
+    if (shouldFreeze) {
+         // Force zero velocity and lock integration
+         setMotionEnabled(false);
+         // console.log('🔒 Physics Motion FROZEN (Waiting for Takeoff Clearance)');
+    } else {
+         // Enable integration (Systems run in both cases)
+         setMotionEnabled(true);
+         // console.log('🔓 Physics Motion ENABLED');
+    }
+  }, [sceneState.currentPhase, sceneState.takeoffClearanceReceived, setMotionEnabled, isInitialized]);
 
   // Radio Message Handler
   const handleRadioTransmit = (messageDataOrText, type, templateId, params) => {

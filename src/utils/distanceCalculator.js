@@ -52,12 +52,13 @@ async function calculateFuelConsumption(distance, aircraftModel, payload = 0, re
       aircraft: 'Generic Jet',
       distance: distance,
       baseFuel: Math.round(baseFuel),
+      tripFuel: Math.round(baseFuel), // Added tripFuel for compatibility
       payloadFactor: 1.0,
       adjustedFuel: Math.round(baseFuel),
       reserveFuel: Math.round(reserveFuel),
       totalFuel: Math.round(totalFuel),
       maxFuelCapacity: 50000, // Generic maximum
-      fuelSufficient: true,
+      fuelSufficient: totalFuel <= 50000,
       flightTime: Math.round((distance / 450) * 60), // minutes
       units: 'kg',
       isGeneric: true
