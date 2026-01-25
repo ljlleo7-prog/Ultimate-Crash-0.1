@@ -4,7 +4,11 @@ import React from 'react';
 const FlightPosePanel = ({ flightState }) => {
   // FIXED: Add safety checks for all properties
   const indicatedAirspeed = flightState.indicatedAirspeed || 0;
-  const trueAltitude = flightState.altitude || 0; // AMSL from physics
+  // Use derived AMSL altitude if available (from physics engine), otherwise fallback
+  const trueAltitude = (flightState.derived && flightState.derived.altitude_ft) 
+    ? flightState.derived.altitude_ft 
+    : (flightState.altitude || 0);
+    
   const verticalSpeed = flightState.verticalSpeed || 0;
   const heading = flightState.heading || 0;
   const groundSpeed = flightState.groundSpeed || 0;
@@ -28,7 +32,10 @@ const FlightPosePanel = ({ flightState }) => {
   const indicatedTerrainElevation = terrainElevation + (altimeterSetting - localQNH) * 1000;
   
   // AGL (Above Ground Level)
-  const agl = trueAltitude - terrainElevation;
+  // Use physics-derived AGL if available for precision (handles objects/runway)
+  const agl = (flightState.derived && flightState.derived.altitude_agl_ft)
+    ? flightState.derived.altitude_agl_ft
+    : (trueAltitude - terrainElevation);
 
   // Visibility Logic
   const visibility = flightState.visibility;

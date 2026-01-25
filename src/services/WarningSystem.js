@@ -9,6 +9,9 @@
  * - Bank Angle
  * - System Failures (Engine, Hydraulics, etc.)
  */
+
+import { terrainRadarService } from './TerrainRadarService.js';
+
 class WarningSystem {
     constructor() {
         this.activeWarnings = [];
@@ -111,36 +114,73 @@ class WarningSystem {
         }
     }
 
-    checkGPWS(agl, vs, gear, flaps, airspeed, groundStatus) {
-        // Disable GPWS if on runway or ground
-        if (groundStatus && (groundStatus.status === 'RUNWAY' || groundStatus.status === 'GRASS')) {
+    checkGPWS(agl, vs, gear, flaps, airspeed, groundStatus, physicsState) {
+        // Disable GPWS if in Airport Region (Runway or Grass below)
+        // OR if in Landing Configuration (Gear Down + Flaps) - as per user request to avoid nuisance
+        const isLandingConfig = gear > 0.9 && flaps > 0.5;
+        
+        if ((groundStatus && (groundStatus.status === 'RUNWAY' || groundStatus.status === 'GRASS')) || isLandingConfig) {
             return;
         }
 
-        // Mode 1: Excessive Sink Rate
-        // Don't warn if on ground or very low (landing flare)
-        if (agl > 50 && agl < 2500) {
-            if (vs < -this.thresholds.sinkRatePullUp) {
-                this.addWarning('GPWS_PULL_UP', 'PULL UP', 'CRITICAL', true);
-            } else if (vs < -this.thresholds.sinkRateWarn) {
-                this.addWarning('GPWS_SINK_RATE', 'SINK RATE', 'WARNING', true);
-            }
+        const PREDICTION_TIME_WARN = 20; // Seconds
+        const PREDICTION_TIME_PULL_UP = 10; // Seconds
+
+        // --- Mode 1: Excessive Sink Rate & Collision Prediction (Vertical) ---
+        // User Request: "descending with an estimated 20s before collision based on sinkrate"
+        
+        // vs is negative ft/min when descending. 
+        if (vs < -100 && agl > 0) { 
+             const sinkRateFtSec = -vs / 60; // Convert to ft/sec positive value
+             const ttiSink = agl / sinkRateFtSec; // Seconds to impact
+             
+             if (ttiSink < PREDICTION_TIME_PULL_UP) {
+                  this.addWarning('GPWS_PULL_UP', 'PULL UP', 'CRITICAL', true);
+             } else if (ttiSink < PREDICTION_TIME_WARN) {
+                  this.addWarning('GPWS_TERRAIN', 'TERRAIN', 'CRITICAL', true);
+             }
+        }
+        
+        // --- Mode 2: Terrain Ahead Prediction (Horizontal Lookahead) ---
+        // User Request: "terrain higher than me in front of me... within 20s reach... at any airspeed"
+        
+        if (physicsState && physicsState.derived && physicsState.position) {
+             const validGS = physicsState.derived.groundSpeed || 0; // Knots
+             const validHeading = physicsState.derived.heading || 0; // Degrees
+             const lat = physicsState.position.latitude || 0;
+             const lon = physicsState.position.longitude || 0;
+             const altAMSL = physicsState.derived.altitude_ft || 0;
+             
+             // Calculate future positions
+             const headingRad = validHeading * Math.PI / 180;
+             const nmPerSec = validGS / 3600;
+             
+             // Check 10s (PULL UP)
+             const distNm10 = nmPerSec * PREDICTION_TIME_PULL_UP;
+             const distDeg10 = distNm10 / 60;
+             const dLat10 = distDeg10 * Math.cos(headingRad);
+             const dLon10 = distDeg10 * Math.sin(headingRad) / Math.cos(lat * Math.PI / 180);
+             
+             const futureTerrainFt10 = terrainRadarService.getTerrainHeight(lat + dLat10, lon + dLon10);
+             
+             if (futureTerrainFt10 !== null && futureTerrainFt10 > altAMSL) {
+                  this.addWarning('GPWS_PULL_UP', 'PULL UP', 'CRITICAL', true);
+             } else {
+                  // Check 20s (TERRAIN)
+                  const distNm20 = nmPerSec * PREDICTION_TIME_WARN;
+                  const distDeg20 = distNm20 / 60;
+                  const dLat20 = distDeg20 * Math.cos(headingRad);
+                  const dLon20 = distDeg20 * Math.sin(headingRad) / Math.cos(lat * Math.PI / 180);
+                  
+                  const futureTerrainFt20 = terrainRadarService.getTerrainHeight(lat + dLat20, lon + dLon20);
+                  
+                  if (futureTerrainFt20 !== null && futureTerrainFt20 > altAMSL) {
+                       this.addWarning('GPWS_TERRAIN', 'TERRAIN', 'CRITICAL', true);
+                  }
+             }
         }
 
-        // Mode 2: Terrain
-        // Disabled if in landing configuration (Gear Down + Flaps) which implies "Airport Region" intent
-        const isLandingConfig = gear > 0.9 && flaps > 0.5;
-
-        if (!isLandingConfig && agl < 500 && airspeed > 250 && vs < -1000) {
-            this.addWarning('GPWS_TERRAIN', 'TERRAIN', 'CRITICAL', true);
-        }
-
-        // Mode 3: Altitude Loss After Takeoff (Don't Sink)
-        // Requires tracking takeoff phase, simplified here:
-        // If low altitude, high power, but sinking
-        // (Skipping complex state machine for now)
-
-        // Mode 4: Unsafe Terrain Clearance
+        // Mode 4: Unsafe Terrain Clearance (Legacy Checks)
         if (agl < this.thresholds.gearWarningAlt && !gear && airspeed < 180) {
             this.addWarning('GPWS_TOO_LOW_GEAR', 'TOO LOW GEAR', 'WARNING');
         }
