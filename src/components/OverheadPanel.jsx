@@ -836,10 +836,14 @@ const OverheadPanel = ({ onClose, flightState, onSystemAction, aircraftModel }) 
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '10px' }}>
                 {engineKeys.map((key, i) => {
                     const eng = engines[key];
+                    // Use flightState top-level arrays which are reliably updated from physics
+                    const n2Val = flightState.engineN2 ? flightState.engineN2[i] : (eng.n2 || 0);
+                    const egtVal = flightState.engineEGT ? flightState.engineEGT[i] : (eng.egt || 0);
+
                     return (
                         <div key={key} style={{ display: 'flex', gap: '5px' }}>
-                            <Gauge label={`N2 ${i+1}`} value={Math.round(eng.n2 || 0)} unit="%" max={105} />
-                            <Gauge label={`EGT ${i+1}`} value={Math.round(eng.egt || 0)} unit="°C" max={900} color={(eng.egt || 0) > 800 ? '#f00' : '#0f0'} />
+                            <Gauge label={`N2 ${i+1}`} value={Math.round(n2Val)} unit="%" max={105} />
+                            <Gauge label={`EGT ${i+1}`} value={Math.round(egtVal)} unit="°C" max={1000} color={egtVal > 850 ? '#f00' : '#0f0'} />
                         </div>
                     );
                 })}

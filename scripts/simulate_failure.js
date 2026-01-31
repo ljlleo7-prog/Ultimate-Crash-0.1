@@ -98,7 +98,7 @@ async function runSimulation(failureId, failureContext = {}, customParams = {}) 
         physics.failureSystem.triggerFailure(failureId, ctx);
     } else {
         log(`❌ Error: Failure System not available`);
-        return;
+        process.exit(1);
     }
     
     // 4. Run Simulation Loop
@@ -127,6 +127,7 @@ async function runSimulation(failureId, failureContext = {}, customParams = {}) 
     unsub();
     unsub2();
     log(`✅ Simulation Complete`);
+    process.exit(0);
 }
 
 function logStatus(time, physics) {
@@ -152,11 +153,15 @@ function logStatus(time, physics) {
     const ductL = pneu.ductPressL.toFixed(1);
     const ductR = pneu.ductPressR.toFixed(1);
     
+    // Fuel Status
+    const fuelL = physics.systems.fuel?.tanks?.left.toFixed(0) || 0;
+    const fuelR = physics.systems.fuel?.tanks?.right.toFixed(0) || 0;
+    
     log(`[T+${time.toFixed(1)}s] ` +
         `ENG1: N1=${eng1.state.n1.toFixed(1)}% EGT=${eng1.state.egt.toFixed(0)} VIB=${(eng1.state.vibration || 0).toFixed(1)} [${fire1}] | ` +
         `ENG2: N1=${eng2.state.n1.toFixed(1)}% EGT=${eng2.state.egt.toFixed(0)} VIB=${(eng2.state.vibration || 0).toFixed(1)} [${fire2}]`
     );
-    log(`           SYS : ELEC [G1:${gen1} G2:${gen2} ${volts}V] | HYD [A:${hydA} B:${hydB}] | BLEED [L:${ductL} R:${ductR}]`);
+    log(`           SYS : ELEC [G1:${gen1} G2:${gen2} ${volts}V] | HYD [A:${hydA} B:${hydB}] | BLEED [L:${ductL} R:${ductR}] | FUEL [L:${fuelL} R:${fuelR}]`);
 }
 
 // --- Execution ---
@@ -165,5 +170,9 @@ const args = process.argv.slice(2);
 const failureArg = args[0] || 'engine_fire';
 const engineIndexArg = args[1] ? parseInt(args[1]) : 0;
 
-runSimulation(failureArg, { engineIndex: engineIndexArg });
+runSimulation(failureArg, { engineIndex: engineIndexArg })
+    .catch(err => {
+        console.error('❌ Simulation Failed:', err);
+        process.exit(1);
+    });
 

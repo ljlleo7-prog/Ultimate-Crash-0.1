@@ -1847,6 +1847,7 @@ class RealisticFlightPhysicsService {
                 n2: this.engines.map(e => e.state.n2), 
                 egt: this.engines.map(e => e.state.egt),
                 fuelFlow: this.engines.map(e => e.state.fuelFlow),
+                oilPressure: this.engines.map(e => e.state.oilPressure),
                 vibration: this.engines.map(e => e.state.vibration)
             },
             systems: this.systems,

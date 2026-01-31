@@ -9,7 +9,7 @@ const EngineFailures = {
         stages: {
             inactive: { next: 'incipient' },
             incipient: {
-                duration: (ctx) => isHard(ctx) ? 8.0 : 2.0,
+                duration: (ctx) => isHard(ctx) ? 12.0 : 3.0,
                 next: 'active',
                 description: (ctx) => isHard(ctx) 
                     ? `Engine ${ctx.engineIndex + 1} Parameters Fluctuation.` 
@@ -17,13 +17,28 @@ const EngineFailures = {
                 effect: (sys, intensity, ctx) => {
                     const eng = sys.engines[ctx.engineIndex];
                     if (eng) {
-                        // Subtle decay for hard mode
+                        // Subtle decay/fluctuation for hard mode
                         if (isHard(ctx)) {
-                            eng.state.n2 *= 0.99; // Slow spool down
-                            eng.state.oilPressure *= 0.98;
+                            // Fluctuation rather than just decay
+                            const noise = (Math.random() - 0.5) * 2.0; // +/- 1%
+                            eng.state.n2 += noise;
+                            eng.state.n1 += noise * 1.5;
+                            
+                            // Oil Pressure slow drop
+                            eng.state.oilPressure *= 0.995;
+                            
+                            // Fuel Flow Oscillation
+                            eng.state.fuelFlow *= (1.0 + (Math.random() - 0.5) * 0.1);
+                            
+                            // Occasional EGT Spike
+                            if (Math.random() > 0.8) {
+                                eng.state.egt += 50;
+                            }
                         } else {
                              // Obvious warning for easy mode
                             eng.state.n1 = eng.state.n1 * 0.9 + Math.random() * 5.0;
+                            eng.state.egt += 100; // Visible heat spike
+                            eng.state.vibration = 5.0;
                         }
                     }
                 }
@@ -64,7 +79,15 @@ const EngineFailures = {
                         
                         // Accumulate EGT rise (since physics resets EGT every frame)
                         if (ctx.egtOffset === undefined) ctx.egtOffset = 0;
-                        const riseRate = isHard(ctx) ? 1.5 : 0.8;
+                        
+                        // Initial Spike
+                        if (intensity > 0.1 && !ctx.hasSpiked) {
+                             ctx.egtOffset += 50;
+                             ctx.hasSpiked = true;
+                        }
+
+                        // Faster rise rate
+                        const riseRate = isHard(ctx) ? 3.0 : 2.0;
                         ctx.egtOffset += riseRate * intensity;
                         
                         eng.state.egtOffset = ctx.egtOffset;
@@ -79,8 +102,11 @@ const EngineFailures = {
                     const eng = sys.engines[ctx.engineIndex];
                     if (eng) {
                         if (!eng.state.failed) {
-                            // In real life, fire doesn't always fail engine immediately
-                            // But for simulation purposes, we can degrade it
+                            // If fire burns too hot/long, engine fails
+                            // EGT offset > 600 means fire is raging
+                            if (eng.state.egtOffset > 600 && Math.random() < 0.05) {
+                                eng.setFailed(true, 'fire', 'critical');
+                            }
                         }
                         if (sys.systems && sys.systems.fire) {
                             sys.systems.fire[`eng${ctx.engineIndex + 1}`] = true;
@@ -154,11 +180,29 @@ const EngineFailures = {
         stages: {
             inactive: { next: 'active' },
             active: {
-                description: (ctx) => `Fuel Imbalance Detected. Leak suspected.`,
+                description: (ctx) => isHard(ctx) 
+                    ? `Fuel Flow Mismatch Detected.` 
+                    : `Fuel Leak: Tank Imbalance increasing.`,
                 effect: (sys, intensity, ctx) => {
                     // Leak rate scales with intensity
                     const rate = 2.0 + (intensity * 5.0); // kg/s
-                    sys.state.fuel -= rate * 0.016; // approx dt
+                    
+                    // Drain from tanks (Left/Right depending on engine index, or random for leak)
+                    // Simplify: Leak from the tank feeding this engine (or left/right evenly if unknown)
+                    const side = (ctx.engineIndex % 2 === 0) ? 'left' : 'right';
+                    
+                    if (sys.systems && sys.systems.fuel && sys.systems.fuel.tanks) {
+                         const tanks = sys.systems.fuel.tanks;
+                         if (tanks[side] > 0) {
+                             tanks[side] -= rate * 0.1; 
+                         } else {
+                             // Tank empty -> Flameout
+                             const eng = sys.engines[ctx.engineIndex];
+                             if (eng && !eng.state.failed) {
+                                 eng.setFailed(true, 'flameout', 'critical');
+                             }
+                         }
+                    }
                 }
             }
         }

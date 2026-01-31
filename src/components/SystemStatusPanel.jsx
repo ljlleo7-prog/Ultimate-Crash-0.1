@@ -19,8 +19,16 @@ const SystemStatusPanel = ({ flightState }) => {
         <div className="system-values" style={{ flex: 1, padding: '5px', overflowY: 'auto', borderRight: '1px solid #444' }}>
           <div className="system-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '5px' }}>
             <div className="system-item">
+              <span className="label">N1</span>
+              <span className="value">{flightState.engineN1 ? flightState.engineN1.map(v => formatValue(v, 1)).join(' | ') : '0'}%</span>
+            </div>
+            <div className="system-item">
+              <span className="label">EGT</span>
+              <span className="value">{flightState.engineEGT ? flightState.engineEGT.map(v => formatValue(v)).join(' | ') : '0'}°C</span>
+            </div>
+            <div className="system-item">
               <span className="label">Fuel</span>
-              <span className="value">{formatValue(flightState.fuel)}%</span>
+              <span className="value">{formatValue(flightState.fuel)}</span>
             </div>
             <div className="system-item">
               <span className="label">Oil</span>

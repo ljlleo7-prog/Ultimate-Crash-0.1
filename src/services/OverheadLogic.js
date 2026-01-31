@@ -412,8 +412,20 @@ class OverheadLogic {
             const bleedSw = pneu[`bleed${i+1}`];
             const n2 = context.engineN2[i];
             
-            if (bleedSw && n2 > 15) {
-                const pressure = 30 + (n2/100)*15;
+            if (bleedSw && n2 > 5) {
+                // Modified Bleed Logic:
+                // Full pressure available only above idle (~50% N2)
+                // Below idle (windmilling), pressure drops significantly
+                let pressure = 0;
+                
+                if (n2 >= 50) {
+                    // Normal operation: 30-45 PSI
+                    pressure = 30 + ((n2-50)/50) * 15;
+                } else {
+                    // Sub-idle/Windmilling: Rapid drop off
+                    // At 20% N2 (windmilling) -> ~8 PSI
+                    pressure = (n2 / 50) * 20;
+                }
                 
                 if (i < splitPoint) {
                     // Left Side
@@ -493,31 +505,39 @@ class OverheadLogic {
             }
             
             // Check if ANY driving engine is providing pressure
-            const isDriven = drivingEngineIndices.some(idx => {
+            // Modified: Calculate pressure capability based on N2
+            let maxEnginePressure = 0;
+            
+            drivingEngineIndices.forEach(idx => {
                 const engN2 = context.engineN2[idx];
-                return (engN2 > 10);
+                if (engN2 > 0) {
+                     // 3000 PSI at > 40% N2 (Idle is usually enough)
+                     // Linear drop below 40%
+                     const p = (engN2 >= 40) ? this.CONSTANTS.HYD_MAX_PRESSURE : (engN2 / 40) * this.CONSTANTS.HYD_MAX_PRESSURE;
+                     if (p > maxEnginePressure) maxEnginePressure = p;
+                }
             });
 
-            if (sys.engPump && isDriven) {
-                supply = true;
+            if (sys.engPump && maxEnginePressure > 0) {
+                // Supply is available, but target is limited by N2
             } 
             // 2. Redundant/Auxiliary Systems (e.g., Center/Blue on 2-engine planes)
             // Driven by Bleed Air or PTU (Power Transfer Unit) from other engines
             else {
                 // If any engine is running, we assume bleed/PTU is available for this backup system
-                const anyEngineRunning = context.engineN2.some(n2 => n2 > 10);
+                const anyEngineRunning = context.engineN2.some(n2 => n2 > 40);
                 if (sys.engPump && anyEngineRunning) {
-                     supply = true;
+                     maxEnginePressure = this.CONSTANTS.HYD_MAX_PRESSURE;
                 }
             }
 
             // Electric Pump (ACMP)
             const elec = systems.electrical;
             const acAvail = elec.acVolts > 100;
-            if (sys.elecPump && acAvail) supply = true;
+            const elecPressure = (sys.elecPump && acAvail) ? this.CONSTANTS.HYD_MAX_PRESSURE : 0;
 
             // Pressure Logic
-            const target = supply ? this.CONSTANTS.HYD_MAX_PRESSURE : 0;
+            const target = Math.max(maxEnginePressure, elecPressure);
             
             if (sys.pressure < target) {
                 sys.pressure += this.CONSTANTS.HYD_BUILD_RATE * dt;

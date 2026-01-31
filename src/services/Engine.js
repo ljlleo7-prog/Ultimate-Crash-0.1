@@ -228,18 +228,30 @@ export class Engine {
     switch (failure.failureType) {
       case 'flameout':
         // Flameout: Very low N1, low EGT, minimal thrust
-        baseN1 = Math.max(0, baseN1 * 0.1); // 90% reduction
-        baseN2 = baseN2 * 0.5; // N2 continues to spin
-        baseEGT = Math.max(100, baseEGT * 0.3); // Drop to 100°C or 70% reduction
-        baseThrust = baseThrust * 0.05; // 95% reduction
-        baseFuelFlow = baseFuelFlow * 0.1; // Minimal fuel
+        // N2 drops to windmilling speed (below 25% to cut generators)
+        baseN1 = Math.max(0, baseN1 * 0.1); 
+        baseN2 = 15 + (Math.random() * 5); // Windmilling 15-20%
+        baseEGT = Math.max(100, baseEGT * 0.3); 
+        baseThrust = baseThrust * 0.05; 
+        baseFuelFlow = baseFuelFlow * 0.1; 
         break;
         
       case 'fire':
         // Engine fire: High EGT, reduced thrust
-        baseEGT = Math.min(1400, baseEGT * 1.8); // Can exceed normal max
-        baseThrust = baseThrust * 0.6; // 40% reduction due to damage
-        baseN1 = baseN1 * 0.8; // Slight reduction
+        baseEGT = Math.min(1400, baseEGT * 1.8); 
+        baseThrust = baseThrust * 0.4; // Significant thrust loss
+        baseN1 = baseN1 * 0.5; // Fan slows down
+        baseN2 = baseN2 * 0.5; // Core slows down (eventually seizures or shut down)
+        break;
+      
+      case 'separation':
+      case 'seizure':
+        // Total loss
+        baseN1 = 0;
+        baseN2 = 0;
+        baseEGT = ambientTemp || 15;
+        baseThrust = 0;
+        baseFuelFlow = 0;
         break;
         
       case 'damage':
@@ -345,6 +357,17 @@ export class Engine {
     return this.currentState.n1 > 5; // Consider running if N1 > 5%
   }
   
+  /**
+   * Set failure state directly (compatibility wrapper)
+   */
+  setFailed(isFailed, type = 'flameout', severity = 'major') {
+    if (isFailed) {
+      this.triggerFailure(type, severity, false);
+    } else {
+      this.recoverFromFailure();
+    }
+  }
+
   /**
    * Trigger a failure condition
    */

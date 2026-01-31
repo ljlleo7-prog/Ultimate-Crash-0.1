@@ -18,6 +18,7 @@ import SaveLoadPanel from './SaveLoadPanel';
 import TimerPanel from './TimerPanel';
 import FlightComputerPanel from './FlightComputerPanel';
 import ChecklistPanel from './ChecklistPanel';
+import SystemStatusPanel from './SystemStatusPanel';
 import './FlightPanel.css';
 
 const FlightPanelModular = ({ flightData, physicsState, weatherData, onActionRequest, aircraftModel, selectedArrival, flightPlan, radioMessages, onRadioFreqChange, npcs, frequencyContext, currentRegion, timeScale, setTimeScale, onUpdateFlightPlan, availableRunways, startupStatus }) => {
@@ -119,15 +120,19 @@ const FlightPanelModular = ({ flightData, physicsState, weatherData, onActionReq
         visibility: weatherData?.visibility, // Update visibility
         
         // Engine
-        engineN1: flightData.engineN1 || prevState.engineN1,
-        engineN2: flightData.engineN2 || prevState.engineN2,
-        engineEGT: flightData.engineEGT || prevState.engineEGT,
-        engineFuelFlow: flightData.engineFuelFlow || prevState.engineFuelFlow || [0, 0],
+        engineN1: (flightData.engineParams && flightData.engineParams.n1) || flightData.engineN1 || prevState.engineN1,
+        engineN2: (flightData.engineParams && flightData.engineParams.n2) || flightData.engineN2 || prevState.engineN2,
+        engineEGT: (flightData.engineParams && flightData.engineParams.egt) || flightData.engineEGT || prevState.engineEGT,
+        engineFuelFlow: (flightData.engineParams && flightData.engineParams.fuelFlow) || flightData.engineFuelFlow || prevState.engineFuelFlow || [0, 0],
         fuel: flightData.fuel || prevState.fuel,
         engineThrottles: flightData.engineThrottles || prevState.engineThrottles,
         
         // Systems
         hydraulicPressure: flightData.hydraulicPressure || prevState.hydraulicPressure,
+        oilPressure: (flightData.engineParams && flightData.engineParams.oilPressure && flightData.engineParams.oilPressure.length > 0) 
+            ? Math.min(...flightData.engineParams.oilPressure) 
+            : (flightData.systems?.engines?.left?.oilPressure || 45),
+        electricalVoltage: (flightData.systems?.electrical?.acVolts) || 115,
         circuitBreakers: prevState.circuitBreakers,
         alarms: flightData.alarms || prevState.alarms,
         activeWarnings: flightData.activeWarnings || [],
@@ -142,6 +147,8 @@ const FlightPanelModular = ({ flightData, physicsState, weatherData, onActionReq
         // Surface controls
         flapsValue: flightData.flapsValue,
         gearValue: flightData.gearValue,
+        flaps: (typeof flightData.flaps === 'number') ? flightData.flaps : (flightData.flapsValue || 0),
+        gearDown: (typeof flightData.gear === 'boolean') ? flightData.gear : (flightData.gearValue > 0.5),
         airBrakesValue: flightData.airBrakesValue,
         trimValue: typeof flightData.trimValue === 'number' ? flightData.trimValue : prevState.trimValue,
         
@@ -595,6 +602,50 @@ const FlightPanelModular = ({ flightData, physicsState, weatherData, onActionReq
         onClose: () => setActiveSidebarPanel(null),
         onLoadFlight: handleLoadFlight
     }),
+
+    // System Status Panel Overlay
+    activeSidebarPanel === 'systems' && React.createElement('div', {
+        style: {
+            position: 'absolute',
+            top: '60px',
+            left: '80px',
+            width: '350px',
+            height: '400px',
+            backgroundColor: 'rgba(20, 24, 30, 0.95)',
+            border: '1px solid #444',
+            borderRadius: '8px',
+            zIndex: 100,
+            display: 'flex',
+            flexDirection: 'column',
+            boxShadow: '0 4px 12px rgba(0,0,0,0.5)'
+        }
+    }, [
+        React.createElement('div', {
+            key: 'header',
+            style: {
+                display: 'flex',
+                justifyContent: 'flex-end',
+                padding: '5px',
+                borderBottom: '1px solid #333'
+            }
+        }, React.createElement('button', {
+            onClick: () => setActiveSidebarPanel(null),
+            style: {
+                background: 'none',
+                border: 'none',
+                color: '#aaa',
+                cursor: 'pointer',
+                fontSize: '18px',
+                padding: '0 5px'
+            }
+        }, '×')),
+        React.createElement('div', {
+            key: 'content',
+            style: { flex: 1, overflow: 'hidden' }
+        }, React.createElement(SystemStatusPanel, {
+            flightState: flightState
+        }))
+    ]),
 
     // Main Content Area (Wrapped in a div to take remaining width)
     React.createElement('div', { style: { flex: 1, position: 'relative', padding: '20px' } },
