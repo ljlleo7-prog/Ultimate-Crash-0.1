@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import './FlightInitialization.css';
 import AirportSearchInput from './AirportSearchInput.jsx';
 import { randomFlightService } from '../services/randomFlightService.js';
+import { useLanguage } from '../contexts/LanguageContext';
 
 const FlightInitialization = ({
   difficulty, setDifficulty,
@@ -27,6 +28,7 @@ const FlightInitialization = ({
   handleSearch,
   apiKey, setApiKey
 }) => {
+  const { t } = useLanguage();
   
   // Fuel Reserve State (hours)
   const [reserveHours, setReserveHours] = useState(1.0);
@@ -293,7 +295,7 @@ const FlightInitialization = ({
         }}
       >
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', borderBottom: '2px solid #30363d' }}>
-          <h2 className="section-header" style={{ borderBottom: 'none', marginBottom: 0 }}>01. OPERATIONAL LEVEL & INTEL</h2>
+          <h2 className="section-header" style={{ borderBottom: 'none', marginBottom: 0 }}>{t('initialization.sections.difficulty')}</h2>
           <button className="dispatch-btn random" onClick={randomizeStep1} title="Randomize Difficulty">
             🎲
           </button>
@@ -307,25 +309,17 @@ const FlightInitialization = ({
                 className={`difficulty-btn ${level} ${difficulty === level ? 'active' : ''}`}
                 onClick={() => setDifficulty(level)}
               >
-                {level.toUpperCase()}
+                {t(`initialization.difficulty.${level}`)}
               </button>
             ))}
           </div>
           
           <div className="intel-panel">
             <div className="crew-intel-box">
-              <span className="intel-label">CREW INTELLIGENCE:</span>
+              <span className="intel-label">{t('initialization.difficulty.intel_label')}</span>
               <p className="intel-text">
                 {(() => {
-                  switch(difficulty) {
-                    case 'rookie': return 'Highly supportive. NPCs assist with all checks. Standard procedures strictly followed.';
-                    case 'amateur': return 'Experienced crew. Reliable support during significant events. NPC will assist.';
-                    case 'intermediate': return 'Standard operations. Crew follows leads and executes commands precisely.';
-                    case 'advanced': return 'Competent but prone to hesitation or minor errors under high-stress conditions.';
-                    case 'pro': return 'High stress. Crew acts nervously and is prone to significant mistakes during emergencies.';
-                    case 'devil': return 'Independent priorities. Active deviation from procedures possible. Do not rely on assistance.';
-                    default: return 'Awaiting difficulty selection...';
-                  }
+                  return t(`initialization.difficulty.descriptions.${difficulty}`) || t('initialization.difficulty.descriptions.waiting');
                 })()}
               </p>
             </div>
@@ -339,7 +333,7 @@ const FlightInitialization = ({
               onClick={handleNextStep}
               disabled={!isStep1Valid()}
             >
-              NEXT: FLIGHT PARAMETERS →
+              {t('initialization.buttons.next_params')}
             </button>
           </div>
         )}
@@ -355,7 +349,7 @@ const FlightInitialization = ({
         }}
       >
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', borderBottom: '2px solid #30363d' }}>
-          <h2 className="section-header" style={{ borderBottom: 'none', marginBottom: 0 }}>02. FLIGHT PARAMETERS</h2>
+          <h2 className="section-header" style={{ borderBottom: 'none', marginBottom: 0 }}>{t('initialization.sections.parameters')}</h2>
           <button className="dispatch-btn random" onClick={randomizeStep2} title="Randomize Parameters">
             🎲
           </button>
@@ -363,29 +357,29 @@ const FlightInitialization = ({
 
         <div className="dispatch-grid">
           <div className="parameter-group">
-            <label>AIRLINE</label>
+            <label>{t('initialization.parameters.airline')}</label>
             <input
               type="text"
               value={airline}
               onChange={(e) => setAirline(e.target.value)}
               className="dispatch-input"
-              placeholder="OPERATOR NAME"
+              placeholder={t('initialization.parameters.placeholders.operator')}
             />
           </div>
 
           <div className="parameter-group">
-            <label>CALLSIGN</label>
+            <label>{t('initialization.parameters.callsign')}</label>
             <input
               type="text"
               value={callsign}
               onChange={(e) => setCallsign(e.target.value)}
               className="dispatch-input"
-              placeholder="FLIGHT NUMBER"
+              placeholder={t('initialization.parameters.placeholders.flight_number')}
             />
           </div>
 
           <div className="parameter-group">
-            <label>AIRCRAFT TYPE</label>
+            <label>{t('initialization.parameters.aircraft_type')}</label>
             <select
               value={aircraftModel}
               onChange={(e) => setAircraftModel(e.target.value)}
@@ -400,67 +394,67 @@ const FlightInitialization = ({
           </div>
 
           <div className="parameter-group">
-            <label>CREW COUNT</label>
+            <label>{t('initialization.parameters.crew_count')}</label>
             <input
               type="number"
               value={crewCount}
               onChange={(e) => setCrewCount(e.target.value)}
               className="dispatch-input"
               min="1" max="10"
-              placeholder="1-10"
+              placeholder={t('initialization.parameters.placeholders.count_range')}
             />
           </div>
 
           <div className="parameter-group">
-            <label>PASSENGERS (PAX)</label>
+            <label>{t('initialization.parameters.passengers')}</label>
             <input
               type="number"
               value={pax}
               onChange={(e) => setPax(e.target.value)}
               className="dispatch-input"
               min="0" max="1000"
-              placeholder="0-1000"
+              placeholder={t('initialization.parameters.placeholders.pax_range')}
             />
           </div>
 
           <div className="parameter-group">
-            <label>PAYLOAD (KG)</label>
+            <label>{t('initialization.parameters.payload')}</label>
             <input
               type="number"
               value={payload}
               onChange={(e) => setPayload(e.target.value)}
               className="dispatch-input"
               min="0" max="100000"
-              placeholder="KG"
+              placeholder={t('initialization.parameters.placeholders.weight_unit')}
             />
           </div>
 
           <div className="parameter-group">
-            <label>CRUISE HEIGHT (FT)</label>
+            <label>{t('initialization.parameters.cruise_height')}</label>
             <input
               type="number"
               value={cruiseHeight}
               onChange={(e) => setCruiseHeight(e.target.value)}
               className="dispatch-input"
               min="1000" max="50000"
-              placeholder="FT"
+              placeholder={t('initialization.parameters.placeholders.height_unit')}
             />
           </div>
 
           <div className="parameter-group">
-            <label>RESERVE FUEL (HOURS)</label>
+            <label>{t('initialization.parameters.reserve_fuel')}</label>
             <input
               type="number"
               value={reserveHours}
               onChange={(e) => setReserveHours(e.target.value)}
               className="dispatch-input"
               min="0.5" max="5.0" step="0.1"
-              placeholder="HRS"
+              placeholder={t('initialization.parameters.placeholders.hours')}
             />
           </div>
 
           <div className="parameter-group">
-            <label>ZULU TIME</label>
+            <label>{t('initialization.parameters.zulu_time')}</label>
             <div className="checkbox-input-group">
               <input
                 type="text"
@@ -468,7 +462,7 @@ const FlightInitialization = ({
                 onChange={(e) => setTimeZulu(e.target.value)}
                 className="dispatch-input"
                 disabled={useRandomTime}
-                placeholder="HH:MMZ"
+                placeholder={t('initialization.parameters.placeholders.time_format')}
               />
               <label className="checkbox-label">
                 <input
@@ -478,13 +472,13 @@ const FlightInitialization = ({
                     setUseRandomTime(e.target.checked);
                     if (e.target.checked) setTimeZulu(generateRandomTime());
                   }}
-                /> RANDOM
+                /> {t('initialization.parameters.random_checkbox')}
               </label>
             </div>
           </div>
 
           <div className="parameter-group">
-            <label>SEASON</label>
+            <label>{t('initialization.parameters.season')}</label>
             <div className="checkbox-input-group">
               <select
                 value={season}
@@ -492,10 +486,10 @@ const FlightInitialization = ({
                 className="dispatch-select"
                 disabled={useRandomSeason}
               >
-                <option value="Spring">SPRING</option>
-                <option value="Summer">SUMMER</option>
-                <option value="Autumn">AUTUMN</option>
-                <option value="Winter">WINTER</option>
+                <option value="Spring">{t('initialization.parameters.seasons.spring')}</option>
+                <option value="Summer">{t('initialization.parameters.seasons.summer')}</option>
+                <option value="Autumn">{t('initialization.parameters.seasons.autumn')}</option>
+                <option value="Winter">{t('initialization.parameters.seasons.winter')}</option>
               </select>
               <label className="checkbox-label">
                 <input
@@ -505,7 +499,7 @@ const FlightInitialization = ({
                     setUseRandomSeason(e.target.checked);
                     if (e.target.checked) setSeason(generateRandomSeason());
                   }}
-                /> RANDOM
+                /> {t('initialization.parameters.random_checkbox')}
               </label>
             </div>
           </div>
@@ -518,7 +512,7 @@ const FlightInitialization = ({
               onClick={handleNextStep}
               disabled={!isStep2Valid()}
             >
-              NEXT: ROUTE SELECTION →
+              {t('initialization.buttons.next_route')}
             </button>
           </div>
         )}
@@ -534,7 +528,7 @@ const FlightInitialization = ({
         }}
       >
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', borderBottom: '2px solid #30363d' }}>
-          <h2 className="section-header" style={{ borderBottom: 'none', marginBottom: 0 }}>03. ROUTE SELECTION</h2>
+          <h2 className="section-header" style={{ borderBottom: 'none', marginBottom: 0 }}>{t('initialization.sections.route')}</h2>
           <button className="dispatch-btn random" onClick={randomizeStep3} title="Randomize Route">
             🎲
           </button>
@@ -542,9 +536,9 @@ const FlightInitialization = ({
 
         <div className="airport-selection-grid">
           <div className="parameter-group">
-            <label>DEPARTURE AIRPORT</label>
+            <label>{t('initialization.route.departure')}</label>
             <AirportSearchInput
-              placeholder="SEARCH ICAO/IATA..."
+              placeholder={t('initialization.route.search_placeholder')}
               searchResults={searchResults}
               handleSearch={handleSearch}
               onSelect={selectDeparture}
@@ -553,9 +547,9 @@ const FlightInitialization = ({
           </div>
 
           <div className="parameter-group">
-            <label>ARRIVAL AIRPORT</label>
+            <label>{t('initialization.route.arrival')}</label>
             <AirportSearchInput
-              placeholder="SEARCH ICAO/IATA..."
+              placeholder={t('initialization.route.search_placeholder')}
               searchResults={searchResults}
               handleSearch={handleSearch}
               onSelect={selectArrival}
@@ -569,23 +563,23 @@ const FlightInitialization = ({
       {flightPlan && selectedDeparture && selectedArrival && (
         <div className="dispatch-summary">
           <div className="summary-item">
-            <span className="summary-label">ROUTE:</span>
+            <span className="summary-label">{t('initialization.summary.route')}</span>
             <span className="summary-value">{selectedDeparture.iata} → {selectedArrival.iata}</span>
           </div>
           <div className="summary-item">
-            <span className="summary-label">DISTANCE:</span>
+            <span className="summary-label">{t('initialization.summary.distance')}</span>
             <span className="summary-value">{formatDistance(flightPlan.distance.nauticalMiles)}</span>
           </div>
           <div className="summary-item">
-            <span className="summary-label">EST. TIME:</span>
+            <span className="summary-label">{t('initialization.summary.est_time')}</span>
             <span className="summary-value">{formatFlightTime(flightPlan.time)}</span>
           </div>
           <div className="summary-item">
-            <span className="summary-label">FUEL REQ:</span>
+            <span className="summary-label">{t('initialization.summary.fuel_req')}</span>
             <span className="summary-value" style={{fontSize: '0.9em'}}>
-              TRIP: {flightPlan.fuel.tripFuel}kg | RSV: {flightPlan.fuel.reserveFuel}kg
+              {t('initialization.summary.trip')}: {flightPlan.fuel.tripFuel}kg | {t('initialization.summary.rsv')}: {flightPlan.fuel.reserveFuel}kg
               <br/>
-              TOTAL: {formatFuel(flightPlan.fuel)}
+              {t('initialization.summary.total')}: {formatFuel(flightPlan.fuel)}
             </span>
           </div>
         </div>
@@ -600,7 +594,7 @@ const FlightInitialization = ({
             disabled={!isStep3Valid()}
             style={{ width: '100%' }}
           >
-            FINALIZE DISPATCH & INITIALIZE
+            {t('initialization.buttons.finalize')}
           </button>
         </div>
       )}

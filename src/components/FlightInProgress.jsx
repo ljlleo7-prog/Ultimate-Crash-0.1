@@ -18,6 +18,8 @@ import { atcManager } from '../services/ATCLogic';
 import { npcService } from '../services/NPCService';
 import { regionControlService } from '../services/RegionControlService';
 import { checkStartupRequirements, StartupPhases } from '../services/StartupChecklist';
+import { useLanguage } from '../contexts/LanguageContext';
+import LanguageSwitcher from './LanguageSwitcher';
 
 const FlightInProgress = ({ 
   callsign, 
@@ -47,7 +49,7 @@ const FlightInProgress = ({
   physicsModel = 'realistic',
   routeDetails
 }) => {
-
+  const { t } = useLanguage();
 
   const averagePassengerWeight = 90;
   const averageCrewWeight = 90;
@@ -746,8 +748,8 @@ const FlightInProgress = ({
         color: 'white'
       }}>
         <div style={{ textAlign: 'center' }}>
-          <div style={{ fontSize: '24px', marginBottom: '20px' }}>✈️ Starting Flight Simulation...</div>
-          <div style={{ color: '#4ade80' }}>Initializing physics engine...</div>
+          <div style={{ fontSize: '24px', marginBottom: '20px' }}>✈️ {t('flight.status.starting')}</div>
+          <div style={{ color: '#4ade80' }}>{t('flight.status.init_physics')}</div>
         </div>
       </div>
     );
@@ -765,7 +767,7 @@ const FlightInProgress = ({
         color: 'white'
       }}>
         <div style={{ textAlign: 'center' }}>
-          <div style={{ fontSize: '24px', marginBottom: '20px', color: '#ef4444' }}>❌ Initialization Error</div>
+          <div style={{ fontSize: '24px', marginBottom: '20px', color: '#ef4444' }}>❌ {t('flight.status.error')}</div>
           <div style={{ marginBottom: '20px' }}>{error}</div>
           <button 
             onClick={() => window.location.reload()}
@@ -779,7 +781,7 @@ const FlightInProgress = ({
               cursor: 'pointer'
             }}
           >
-            Reload Page
+            {t('flight.status.reload')}
           </button>
         </div>
       </div>
@@ -818,7 +820,7 @@ const FlightInProgress = ({
               marginBottom: '4px'
             }}
           >
-            {phaseName || 'Situation'}
+            {phaseName || t('flight.status.situation')}
           </div>
           
           {/* Conditional Rendering: Only show narrative in Header if Physics is ACTIVE (PHY-ON) 
@@ -834,7 +836,7 @@ const FlightInProgress = ({
                   marginBottom: '4px'
                 }}
               >
-                {narrative?.title || 'Awaiting flight instructions...'}
+                {narrative?.title || t('flight.status.awaiting_instructions')}
               </div>
               <div
                 style={{
@@ -844,7 +846,7 @@ const FlightInProgress = ({
                   marginBottom: '8px'
                 }}
               >
-                {narrative?.content || 'Prepare for takeoff.'}
+                {narrative?.content || t('flight.status.prepare_takeoff')}
               </div>
             </>
           )}
@@ -862,7 +864,7 @@ const FlightInProgress = ({
                 alignItems: 'center',
                 gap: '6px'
               }}>
-                <span>⚠️ Checklist Incomplete</span>
+                <span>⚠️ {t('flight.status.checklist_incomplete')}</span>
               </div>
               <div style={{
                 display: 'flex',
@@ -896,7 +898,7 @@ const FlightInProgress = ({
                 color: '#ef4444',
                 marginBottom: '4px'
               }}>
-                Active Failures ({activeFailures.length})
+                {t('flight.status.active_failures')} ({activeFailures.length})
               </div>
               <div style={{
                 display: 'flex',
@@ -914,7 +916,7 @@ const FlightInProgress = ({
                     justifyContent: 'space-between'
                   }}>
                     <span>{failure.type.toUpperCase()} {failure.data.engineIndex !== undefined ? `ENGINE ${failure.data.engineIndex + 1}` : ''}</span>
-                    <span>{failure.isCritical ? 'CRITICAL' : `${Math.round(failure.progress)}%`}</span>
+                    <span>{failure.isCritical ? t('flight.status.critical') : `${Math.round(failure.progress)}%`}</span>
                   </div>
                 ))}
               </div>
@@ -930,6 +932,9 @@ const FlightInProgress = ({
             isChannelBusy={isChannelBusy}
             frequencyType={getFrequencyType(currentFreq)}
           />
+        </div>
+        <div style={{ display: 'flex', alignItems: 'flex-start', paddingTop: '4px' }}>
+            <LanguageSwitcher />
         </div>
       </div>
 

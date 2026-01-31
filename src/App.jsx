@@ -11,10 +11,13 @@ import RouteSelectionFrame from './components/RouteSelectionFrame.jsx';
 import NarrativeScene from './components/NarrativeScene.jsx';
 import { generateInitialWeather, updateWeather } from './services/weatherService';
 import { getRunwayHeading } from './utils/routeGenerator';
+import { useLanguage } from './contexts/LanguageContext';
+import LanguageSwitcher from './components/LanguageSwitcher.jsx';
 
 import { FadeOverlay, CinematicReview } from './components/CinematicComponents.jsx';
 
 function App() {
+  const { t } = useLanguage();
   // Add development mode flag
   const [devMode, setDevMode] = useState(false);
   
@@ -340,8 +343,13 @@ function App() {
 
   return React.createElement('div', { className: 'App' },
     React.createElement('header', { className: 'app-header' },
-      React.createElement('h1', null, 'Ultimate Crash - Flight Initialization'),
-      React.createElement('p', null, 'Configure your flight parameters and select difficulty level'),
+      React.createElement('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', width: '100%' } },
+        React.createElement('div', null,
+          React.createElement('h1', null, 'Ultimate Crash - ' + t('initialization.title')),
+          React.createElement('p', null, t('initialization.subtitle'))
+        ),
+        React.createElement(LanguageSwitcher)
+      ),
       // Development mode toggle
       React.createElement('div', { className: 'dev-mode-toggle', style: { marginTop: '10px' } },
         React.createElement('button', {
@@ -355,7 +363,7 @@ function App() {
             cursor: 'pointer',
             fontSize: '12px'
           }
-        }, devMode ? '🔧 Dev Mode: ON' : '🔧 Dev Mode: OFF')
+        }, devMode ? '🔧 ' + t('common.devMode') + ': ON' : '🔧 ' + t('common.devMode') + ': OFF')
       ),
       // Development mode quick start button
       devMode && React.createElement('div', { className: 'dev-start', style: { marginTop: '10px' } },
