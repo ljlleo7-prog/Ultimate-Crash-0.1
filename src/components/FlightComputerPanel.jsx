@@ -461,6 +461,71 @@ const FlightComputerPanel = ({ onClose, flightPlan, onUpdateFlightPlan, flightSt
             <button className="refresh-btn" onClick={findNearestAirports}>Refresh</button>
           </div>
         )}
+
+        {activeTab === 'radio' && (
+          <div className="radio-section" style={{ padding: '10px', color: '#e2e8f0' }}>
+            <div className="utils-block" style={{ marginBottom: '20px', background: 'rgba(0,0,0,0.2)', padding: '10px', borderRadius: '4px' }}>
+              <h4 style={{ margin: '0 0 10px 0', borderBottom: '1px solid #475569', paddingBottom: '5px' }}>Navigation Radio</h4>
+              
+              <div style={{ marginBottom: '15px' }}>
+                <div style={{ color: '#94a3b8', fontSize: '12px', marginBottom: '5px' }}>Current NAV1 Frequency</div>
+                <div style={{ fontSize: '24px', fontWeight: 'bold', color: '#4ade80', fontFamily: 'monospace' }}>
+                  {flightState?.autopilotDebug?.nav1Frequency ? flightState.autopilotDebug.nav1Frequency.toFixed(2) : '---'} <span style={{fontSize: '14px', color: '#64748b'}}>MHz</span>
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', gap: '10px', alignItems: 'flex-end' }}>
+                <div style={{ flex: 1 }}>
+                  <label style={{ display: 'block', color: '#94a3b8', fontSize: '12px', marginBottom: '5px' }}>Set Frequency (MHz)</label>
+                  <input 
+                    type="number" 
+                    step="0.05"
+                    placeholder="108.00 - 117.95"
+                    value={nav1FreqInput}
+                    onChange={(e) => setNav1FreqInput(e.target.value)}
+                    style={{ 
+                      width: '100%', 
+                      background: '#1e293b', 
+                      border: '1px solid #475569', 
+                      color: 'white', 
+                      padding: '8px',
+                      borderRadius: '4px',
+                      fontSize: '16px'
+                    }}
+                  />
+                </div>
+                <button 
+                  onClick={() => {
+                    const freq = parseFloat(nav1FreqInput);
+                    if (!isNaN(freq) && freq >= 108 && freq <= 118) {
+                      if (onActionRequest) {
+                        onActionRequest('set-nav-frequency', freq);
+                        setNav1FreqInput(''); // Clear input on success
+                      }
+                    } else {
+                      alert('Invalid Frequency. Must be between 108.00 and 117.95 MHz');
+                    }
+                  }}
+                  style={{
+                    background: '#0ea5e9',
+                    color: 'white',
+                    border: 'none',
+                    padding: '8px 16px',
+                    borderRadius: '4px',
+                    cursor: 'pointer',
+                    fontWeight: 'bold',
+                    height: '38px' // Match input height roughly
+                  }}
+                >
+                  TUNE
+                </button>
+              </div>
+              <div style={{ marginTop: '10px', fontSize: '11px', color: '#64748b' }}>
+                Common ILS Frequencies: 108.10, 108.15, ..., 111.95
+              </div>
+            </div>
+          </div>
+        )}
         
         {activeTab === 'utils' && (
           <div className="utils-section" style={{ padding: '10px', color: '#e2e8f0' }}>

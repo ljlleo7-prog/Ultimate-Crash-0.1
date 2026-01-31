@@ -573,7 +573,8 @@ const FlightPanelModular = ({ flightData, physicsState, weatherData, onActionReq
       onClose: () => setActiveSidebarPanel(null),
       flightPlan: flightPlan,
       onUpdateFlightPlan: onUpdateFlightPlan,
-      flightState: flightState
+      flightState: flightState,
+      onActionRequest: onActionRequest
     }),
 
     // Timer Panel Overlay

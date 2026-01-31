@@ -302,6 +302,39 @@ class AirportService {
         // If the DB says "06" and user asks "06", heading is 60.
     }
 
+    // Lookup ILS Frequency
+    // Hardcoded map for common test airports/runways
+    const ILS_FREQUENCIES = {
+        "KLAX": {
+            "24R": 108.50,
+            "24L": 108.40,
+            "25R": 108.75,
+            "25L": 109.90,
+            "06L": 108.40,
+            "06R": 108.50,
+            "07L": 109.90,
+            "07R": 108.75
+        },
+        "KSFO": {
+            "28L": 109.55,
+            "28R": 111.70
+        },
+        "KJFK": {
+            "04R": 109.50,
+            "22L": 110.90,
+            "13L": 111.50
+        }
+    };
+
+    let ilsFrequency = null;
+    if (ILS_FREQUENCIES[airportCode] && ILS_FREQUENCIES[airportCode][runwayName]) {
+        ilsFrequency = ILS_FREQUENCIES[airportCode][runwayName];
+    } else {
+        // Deterministic generation for others: 108.00 + (First Digit + Last Digit)/10
+        // Just a placeholder so it's not null
+        ilsFrequency = 110.00; 
+    }
+
     return {
       airportLat: airport.latitude,
       airportLon: airport.longitude,
@@ -310,7 +343,8 @@ class AirportService {
       width: widthM,
       thresholdStart: start,
       thresholdEnd: end,
-      runwayName: runwayName || runway.name
+      runwayName: runwayName || runway.name,
+      ilsFrequency: ilsFrequency
     };
   }
 

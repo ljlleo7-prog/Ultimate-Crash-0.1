@@ -85,6 +85,19 @@ const FlightInProgress = ({
               console.log(`Spawn Point Adjusted to Runway ${runwayName} Threshold:`, geom.thresholdStart);
               initialLat = geom.thresholdStart.latitude;
               initialLon = geom.thresholdStart.longitude;
+
+              // Apply 100m offset along runway heading to prevent "sliding off the back" or grass glitches
+              // 1 deg Lat ~= 111,111m
+              // 1 deg Lon ~= 111,111m * cos(lat)
+              const offsetMeters = 100;
+              const metersPerLat = 111111;
+              const metersPerLon = 111111 * Math.cos(initialLat * Math.PI / 180);
+              
+              const dLat = (offsetMeters * Math.cos(runwayHeadingRad)) / metersPerLat;
+              const dLon = (offsetMeters * Math.sin(runwayHeadingRad)) / metersPerLon;
+              
+              initialLat += dLat;
+              initialLon += dLon;
           }
       }
   }
@@ -1031,6 +1044,13 @@ const FlightInProgress = ({
                     physicsService.updateAutopilotTargets(targets);
                   }
                   console.log(`📡 FlightPanel Action: ${action} = ${JSON.stringify(payload)}`);
+                  break;
+                }
+                case 'set-nav-frequency': {
+                  if (physicsService && physicsService.autopilot && typeof physicsService.autopilot.setNavFrequency === 'function') {
+                    physicsService.autopilot.setNavFrequency(payload);
+                    console.log(`📡 FlightPanel Action: ${action} = ${payload}`);
+                  }
                   break;
                 }
                 case 'system-action': {

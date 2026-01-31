@@ -227,7 +227,8 @@ class RealisticFlightPhysicsService {
         this.sensors = { pitotBlocked: false };
 
         // Motion control flag (allows disabling physics integration while keeping systems active)
-        this.motionEnabled = true;
+        // Start DISABLED to prevent initial settling/sliding until scene is fully ready
+        this.motionEnabled = false;
 
         // Aircraft Systems State
         this.initializeSystems(this.difficulty);
@@ -617,6 +618,17 @@ class RealisticFlightPhysicsService {
         const euler = this.state.quat.toEuler();
         const currentHeading = (euler.psi * 180 / Math.PI + 360) % 360;
         
+        // Calculate Track (Ground Course)
+        const track = (Math.atan2(v_earth.y, v_earth.x) * 180 / Math.PI + 360) % 360;
+
+        // Calculate Sideslip (Beta) for coordinated turns
+        // Body Frame: X=Forward, Y=Right, Z=Down
+        // Beta = atan(Vy / Vx)
+        const vx = this.state.vel.x;
+        const vy = this.state.vel.y;
+        // Avoid division by zero
+        const beta = (Math.abs(vx) > 1) ? Math.atan2(vy, vx) : 0;
+
         const apState = {
             airspeed: currentAirspeed,
             verticalSpeed: currentVS,
@@ -624,8 +636,10 @@ class RealisticFlightPhysicsService {
             roll: euler.phi,
             altitude: -this.state.pos.z * 3.28084,
             heading: currentHeading,
+            track: track,
             latitude: this.state.geo.lat,
-            longitude: this.state.geo.lon
+            longitude: this.state.geo.lon,
+            beta: beta // Radians
         };
 
         // --- Waypoint Sequencing & LNAV ---
@@ -2447,6 +2461,10 @@ class RealisticFlightPhysicsService {
         // Orientation (psi = yaw in radians)
         if (conditions.orientation && conditions.orientation.psi !== undefined) {
             this.state.quat = Quaternion.fromEuler(0, 0, conditions.orientation.psi);
+        } else if (conditions.heading !== undefined) {
+            // Handle simple heading (degrees)
+            const psi = conditions.heading * Math.PI / 180;
+            this.state.quat = Quaternion.fromEuler(0, 0, psi);
         }
 
         // Difficulty
