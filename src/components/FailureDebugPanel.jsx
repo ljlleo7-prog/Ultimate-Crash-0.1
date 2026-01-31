@@ -176,7 +176,7 @@ const FailureDebugPanel = ({ physicsService, onClose }) => {
                                                 opacity: isActive ? 0.8 : 1
                                             }}
                                         >
-                                            <span style={{ fontWeight: 'bold' }}>{def.label}</span>
+                                            <span style={{ fontWeight: 'bold' }}>{def.label || def.name || def.id}</span>
                                             {isActive && <span style={{ fontSize: '9px', color: '#ff3333' }}>ACTIVE</span>}
                                         </button>
                                     );

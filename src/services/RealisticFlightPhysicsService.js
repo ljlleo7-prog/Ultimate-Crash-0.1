@@ -219,7 +219,10 @@ class RealisticFlightPhysicsService {
         this.autopilot = new RealisticAutopilotService();
         
         // Failure System
-        this.failureSystem = new FailureHandler({ difficulty: this.difficulty });
+        this.failureSystem = new FailureHandler({ 
+            difficulty: this.difficulty,
+            engineCount: this.aircraft.engineCount
+        });
         this.warningSystem = new WarningSystem();
         this.sensors = { pitotBlocked: false };
 
@@ -740,6 +743,13 @@ class RealisticFlightPhysicsService {
         }
 
         this.processInputs(finalInput, dt); // Process inputs once per frame
+        
+        // Update Failure System
+        if (this.failureSystem) {
+            this.failureSystem.update(dt, this.getOutputState());
+            this.failureSystem.applyImpact(this);
+        }
+
         this.updateSystems(dt); // Update overhead systems logic
 
         for (let i = 0; i < subSteps; i++) {
@@ -1836,7 +1846,8 @@ class RealisticFlightPhysicsService {
                 n1: this.engines.map(e => e.state.n1),
                 n2: this.engines.map(e => e.state.n2), 
                 egt: this.engines.map(e => e.state.egt),
-                fuelFlow: this.engines.map(e => e.state.fuelFlow)
+                fuelFlow: this.engines.map(e => e.state.fuelFlow),
+                vibration: this.engines.map(e => e.state.vibration)
             },
             systems: this.systems,
             fuel: this.state.fuel,
@@ -2492,7 +2503,7 @@ class RealisticFlightPhysicsService {
         // Failure System Config
         if (this.failureSystem) {
             // Re-initialize failure system with new config if provided
-            const failureConfig = {};
+            const failureConfig = { engineCount: this.aircraft.engineCount };
             if (conditions.difficulty) failureConfig.difficulty = conditions.difficulty;
             
             // Only re-create if we have new config, otherwise just reset

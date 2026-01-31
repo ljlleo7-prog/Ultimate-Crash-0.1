@@ -41,7 +41,8 @@ class EnginePhysicsService {
             starterEngaged: false,
             pneumaticPressure: false,
             fuelAvailable: false,
-            ignition: false
+            ignition: false,
+            egtOffset: 0 // External offset for failures/fires
         };
         
         this._prevFuelFlow = 0;
@@ -209,7 +210,8 @@ class EnginePhysicsService {
         // EGT
         const baseEGT = ambientTemp; 
         const runningEGT = 400 + (this.state.n2 * 4); // EGT correlates well with N2 (Core)
-        this.state.egt = this.state.running ? runningEGT : baseEGT + (this.state.egt - baseEGT) * 0.99;
+        const totalEGT = runningEGT + (this.state.egtOffset || 0);
+        this.state.egt = this.state.running ? totalEGT : baseEGT + (this.state.egt - baseEGT) * 0.99;
 
         return this.getOutput();
     }

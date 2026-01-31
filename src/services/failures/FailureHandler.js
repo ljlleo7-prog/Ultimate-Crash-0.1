@@ -11,6 +11,7 @@ import EnvironmentFailures from './types/EnvironmentFailures.js';
 class FailureHandler {
     constructor(config = {}) {
         this.difficulty = config.difficulty || 'intermediate';
+        this.engineCount = config.engineCount || 2;
         this.activeFailures = new Map(); // id -> failureInstance
         this.registry = new Map();
         
@@ -75,9 +76,13 @@ class FailureHandler {
             return;
         }
 
-        // Auto-fill context if needed (e.g., random engine index)
+        // Auto-fill context if needed
+        if (context.difficulty === undefined) {
+            context.difficulty = this.difficulty;
+        }
+
         if (def.category === 'engine' && context.engineIndex === undefined) {
-            context.engineIndex = Math.random() > 0.5 ? 1 : 0;
+            context.engineIndex = Math.floor(Math.random() * this.engineCount);
         }
 
         const failure = new BaseFailure(def, context);

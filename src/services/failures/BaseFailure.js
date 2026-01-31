@@ -37,8 +37,14 @@ class BaseFailure {
 
         // Check for stage progression
         if (stageDef.next && stageDef.duration) {
+            // Resolve duration (Function or Value)
+            let rawDuration = stageDef.duration;
+            if (typeof rawDuration === 'function') {
+                rawDuration = rawDuration(this.variation.context);
+            }
+
             // Variation applied to duration
-            const duration = stageDef.duration * (1 / this.variation.progressionRate);
+            const duration = rawDuration * (1 / this.variation.progressionRate);
             if (this.timeInStage > duration) {
                 this.transitionTo(stageDef.next);
             }

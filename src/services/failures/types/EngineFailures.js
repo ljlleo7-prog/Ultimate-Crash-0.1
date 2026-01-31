@@ -1,57 +1,104 @@
 
+const isHard = (ctx) => ['advanced', 'pro', 'devil', 'survival'].includes(ctx.difficulty);
+
 const EngineFailures = {
     ENGINE_FAILURE: {
         id: 'engine_failure',
-        name: 'Engine Failure',
+        name: 'Engine Failure (Generic)',
         category: 'engine',
-        condition: (state) => true,
         stages: {
             inactive: { next: 'incipient' },
             incipient: {
-                duration: 4.0,
+                duration: (ctx) => isHard(ctx) ? 8.0 : 2.0,
                 next: 'active',
-                description: (ctx) => `Engine ${ctx.engineIndex + 1} EGT rising abnormally.`,
+                description: (ctx) => isHard(ctx) 
+                    ? `Engine ${ctx.engineIndex + 1} Parameters Fluctuation.` 
+                    : `Engine ${ctx.engineIndex + 1} Flameout Imminent.`,
                 effect: (sys, intensity, ctx) => {
                     const eng = sys.engines[ctx.engineIndex];
                     if (eng) {
-                        // Simulate pre-failure struggle
-                        eng.state.egt += 50 * intensity;
-                        eng.state.n1 *= (1.0 - (0.1 * intensity * Math.random()));
+                        // Subtle decay for hard mode
+                        if (isHard(ctx)) {
+                            eng.state.n2 *= 0.99; // Slow spool down
+                            eng.state.oilPressure *= 0.98;
+                        } else {
+                             // Obvious warning for easy mode
+                            eng.state.n1 = eng.state.n1 * 0.9 + Math.random() * 5.0;
+                        }
                     }
                 }
             },
             active: {
-                description: (ctx) => `Engine ${ctx.engineIndex + 1} Flameout.`,
+                description: (ctx) => isHard(ctx) 
+                    ? `Engine ${ctx.engineIndex + 1} Failure.` 
+                    : `ENGINE ${ctx.engineIndex + 1} FLAMEOUT DETECTED.`,
                 effect: (sys, intensity, ctx) => {
                     const eng = sys.engines[ctx.engineIndex];
-                    if (eng) eng.setFailed(true);
+                    if (eng) {
+                        if (!eng.state.failed) {
+                            eng.setFailed(true);
+                        }
+                    }
                 }
             }
         }
     },
     
     ENGINE_FIRE: {
-        id: 'onboard_fire', // Matching ID from list
+        id: 'engine_fire',
         name: 'Engine Fire',
         category: 'engine',
         stages: {
             inactive: { next: 'incipient' },
             incipient: {
-                duration: 10.0,
+                duration: (ctx) => isHard(ctx) ? 5.0 : 10.0,
+                intensityTarget: 1.0, // Ramp up intensity
                 next: 'active',
-                description: (ctx) => `Engine ${ctx.engineIndex + 1} Vibration High.`,
-                effect: (sys, intensity, ctx) => {
-                    const eng = sys.engines[ctx.engineIndex];
-                    if (eng) eng.state.n2 += (Math.random() - 0.5) * 5;
-                }
-            },
-            active: {
-                description: (ctx) => `FIRE ALERT: Engine ${ctx.engineIndex + 1}.`,
+                description: (ctx) => isHard(ctx) 
+                    ? `Engine ${ctx.engineIndex + 1} Vibration High.` 
+                    : `Engine ${ctx.engineIndex + 1} Fire Loop Alert.`,
                 effect: (sys, intensity, ctx) => {
                     const eng = sys.engines[ctx.engineIndex];
                     if (eng) {
-                        eng.setFailed(true);
-                        sys.systems.fire[`eng${ctx.engineIndex + 1}`] = true;
+                        eng.state.vibration = 5.0 + (intensity * 2.0);
+                        
+                        // Accumulate EGT rise (since physics resets EGT every frame)
+                        if (ctx.egtOffset === undefined) ctx.egtOffset = 0;
+                        const riseRate = isHard(ctx) ? 1.5 : 0.8;
+                        ctx.egtOffset += riseRate * intensity;
+                        
+                        eng.state.egtOffset = ctx.egtOffset;
+                    }
+                }
+            },
+            active: {
+                description: (ctx) => isHard(ctx) 
+                    ? `Engine ${ctx.engineIndex + 1} Temp Exceedance.` 
+                    : `FIRE ALERT: Engine ${ctx.engineIndex + 1}.`,
+                effect: (sys, intensity, ctx) => {
+                    const eng = sys.engines[ctx.engineIndex];
+                    if (eng) {
+                        if (!eng.state.failed) {
+                            // In real life, fire doesn't always fail engine immediately
+                            // But for simulation purposes, we can degrade it
+                        }
+                        if (sys.systems && sys.systems.fire) {
+                            sys.systems.fire[`eng${ctx.engineIndex + 1}`] = true;
+                        }
+                        
+                        // Continue EGT rise
+                        if (ctx.egtOffset === undefined) ctx.egtOffset = 0;
+                        ctx.egtOffset += 0.5; // Continue rising
+                        
+                        // Ensure minimum fire temperature (approx 1100C)
+                        // If base is ~500-700, we need offset ~400-600
+                        if (ctx.egtOffset < 400) ctx.egtOffset = 400;
+                        
+                        eng.state.egtOffset = ctx.egtOffset;
+                        
+                        // Cap at melting point
+                        // If base is 700, max offset 900 gives 1600
+                        if (eng.state.egtOffset > 900) eng.state.egtOffset = 900;
                     }
                 }
             }
@@ -89,7 +136,7 @@ const EngineFailures = {
                         // Pop noise (thrust cut and spike)
                         if (Math.random() > 0.7) eng.state.thrust *= 0.2; // Use state.thrust directly if needed, or rely on update loop
                         eng.state.egt += 10;
-                        eng.setVibration(8.0 * intensity);
+                        eng.state.vibration = 8.0 * intensity;
                     }
                 }
             },
@@ -122,16 +169,44 @@ const EngineFailures = {
         name: 'Bird Strike',
         category: 'engine',
         stages: {
-            inactive: { next: 'active' },
-            active: {
-                description: (ctx) => `BIRD STRIKE: Engine ${ctx.engineIndex + 1}.`,
+            inactive: { next: 'impact' },
+            impact: {
+                duration: 2.0,
+                next: 'active',
+                description: (ctx) => isHard(ctx) 
+                    ? `LOUD BANG detected.` 
+                    : `Bird Strike Detected: Engine ${ctx.engineIndex + 1}`,
                 effect: (sys, intensity, ctx) => {
                     const eng = sys.engines[ctx.engineIndex];
                     if (eng) {
-                        // High damage probability
-                        eng.setFailed(true);
-                        eng.state.n1 = 0;
-                        sys.systems.fire[`eng${ctx.engineIndex + 1}`] = Math.random() > 0.5;
+                        // Impact shock
+                        eng.state.vibration = 10.0;
+                        eng.state.n1 = eng.state.n1 * (0.9 + Math.random() * 0.2); // Fluctuations
+                        
+                        // Hard mode: potential immediate damage without warning
+                        if (isHard(ctx) && Math.random() > 0.5) {
+                            eng.state.n1 *= 0.5; 
+                        }
+                    }
+                }
+            },
+            active: {
+                description: (ctx) => isHard(ctx) 
+                    ? `Engine ${ctx.engineIndex + 1} Unstable.` 
+                    : `Engine ${ctx.engineIndex + 1} Severe Damage.`,
+                effect: (sys, intensity, ctx) => {
+                    const eng = sys.engines[ctx.engineIndex];
+                    if (eng) {
+                        if (!eng.state.failed) {
+                            // High chance of flameout or severe damage
+                            const type = Math.random() > 0.3 ? 'damage' : 'flameout';
+                            eng.setFailed(true);
+                        }
+                        
+                        // Persistent vibration if rotating
+                        if (eng.state.n2 > 10) {
+                            eng.state.vibration = 8.0;
+                        }
                     }
                 }
             }

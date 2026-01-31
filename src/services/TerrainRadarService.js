@@ -1,4 +1,4 @@
-import { calculateDistance } from '../utils/distanceCalculator';
+import { calculateDistance } from '../utils/distanceCalculator.js';
 
 class TerrainRadarService {
     constructor() {

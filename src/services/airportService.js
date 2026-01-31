@@ -1,4 +1,4 @@
-import airportDatabase from '../data/airportDatabase.json';
+import airportDatabase from '../data/airportDatabase.json' with { type: "json" };
 
 class AirportService {
   constructor(apiKey = '') {
