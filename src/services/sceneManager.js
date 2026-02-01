@@ -318,14 +318,11 @@ class SceneManager {
   
   // Apply random template (unless rookie mode operational phase)
   applyNarrativeTemplate(narrative, phaseType) {
-    if (this.scenario.difficulty === 'rookie' && 
-        [FlightPhases.TAKEOFF_PREP, FlightPhases.TAKEOFF, FlightPhases.INITIAL_CLIMB].includes(phaseType)) {
-        return narrative;
-    }
-    const template = getRandomTemplate(phaseType);
-    if (template) {
-        return { ...narrative, ...template };
-    }
+    // Legacy template system disabled to support internationalization via narrativeDatabase.json
+    // const template = getRandomTemplate(phaseType);
+    // if (template) {
+    //     return { ...narrative, ...template };
+    // }
     return narrative;
   }
 
@@ -760,9 +757,10 @@ class SceneManager {
     
     // Create narrative for failure
     this.publishNarrative({
-      title: 'System Alert',
+      title: 'narrative.failures.title.alert',
       content: this.getFailureNarrative(failure),
-      severity: 'warning'
+      severity: 'warning',
+      data: failure.data
     });
   }
   
@@ -786,9 +784,10 @@ class SceneManager {
         });
         
         this.publishNarrative({
-          title: 'Critical Failure Alert',
+          title: 'narrative.failures.title.critical',
           content: this.getCriticalFailureNarrative(failure),
-          severity: 'critical'
+          severity: 'critical',
+          data: failure.data
         });
       }
       
@@ -817,18 +816,37 @@ class SceneManager {
     
     if (resolvedByUser) {
       this.publishNarrative({
-        title: 'System Restored',
+        title: 'narrative.failures.title.restored',
         content: this.getResolutionNarrative(failure),
-        severity: 'success'
+        severity: 'success',
+        data: failure.data
       });
     }
   }
   
   // Publish narrative message
   publishNarrative(narrative) {
-    // Parse template in title and content
-    const parsedTitle = narrative.title ? this.parseTemplate(narrative.title, narrative.data) : '';
-    const parsedContent = narrative.content ? this.parseTemplate(narrative.content, narrative.data) : '';
+    // Create a context with scenario data and provided data for translation
+    const context = {
+      callsign: this.scenario.callsign || 'Flight 123',
+      departure: this.scenario.departure || 'Unknown',
+      arrival: this.scenario.arrival || 'Unknown',
+      aircraft: this.scenario.aircraftModel || 'Unknown Aircraft',
+      difficulty: this.scenario.difficulty || 'Unknown',
+      ...narrative.data
+    };
+
+    // If title/content contains ${} templates (legacy), parse them.
+    // If they are translation keys (no ${}), pass them through.
+    const hasTemplate = (str) => str && str.includes('${');
+    
+    const parsedTitle = hasTemplate(narrative.title) 
+      ? this.parseTemplate(narrative.title, narrative.data) 
+      : narrative.title;
+      
+    const parsedContent = hasTemplate(narrative.content) 
+      ? this.parseTemplate(narrative.content, narrative.data) 
+      : narrative.content;
     
     const narrativeEntry = {
       id: `narrative-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
@@ -837,7 +855,7 @@ class SceneManager {
       title: parsedTitle,
       content: parsedContent,
       severity: narrative.severity,
-      data: narrative.data
+      data: context // Pass full context to UI for translation interpolation
     };
     
     this.narrativeHistory.push(narrativeEntry);

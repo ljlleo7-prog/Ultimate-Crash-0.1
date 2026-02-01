@@ -1,7 +1,9 @@
 import React from 'react';
+import { useLanguage } from '../contexts/LanguageContext';
 
 // System Status Panel Component
 const SystemStatusPanel = ({ flightState }) => {
+  const { t } = useLanguage();
   // Safety check for flightState
   if (!flightState) return null;
 

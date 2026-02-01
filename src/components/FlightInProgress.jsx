@@ -162,6 +162,32 @@ const FlightInProgress = ({
   const [sceneState, setSceneState] = useState(sceneManager.getState());
   const [narrative, setNarrative] = useState(null);
 
+  // Sync sceneState with sceneManager updates
+  useEffect(() => {
+    const handlePhaseChange = (payload) => {
+        setSceneState(prev => ({
+            ...prev,
+            currentPhase: payload.phase
+        }));
+    };
+    
+    const handleTakeoffClearance = () => {
+        console.log('FlightInProgress: Takeoff Clearance Received');
+        setSceneState(prev => ({
+            ...prev,
+            takeoffClearanceReceived: true
+        }));
+    };
+
+    const unsubPhase = eventBus.subscribe('phase.changed', handlePhaseChange);
+    const unsubClearance = eventBus.subscribe('atc.clearance.takeoff', handleTakeoffClearance);
+    
+    return () => {
+        if (unsubPhase) unsubPhase();
+        if (unsubClearance) unsubClearance();
+    };
+  }, []);
+
   // Control Physics Motion based on Phase (Narrative vs Active)
   useEffect(() => {
     if (!setMotionEnabled || !isInitialized) return;
@@ -836,7 +862,7 @@ const FlightInProgress = ({
                   marginBottom: '4px'
                 }}
               >
-                {narrative?.title || t('flight.status.awaiting_instructions')}
+                {narrative?.title ? t(narrative.title, narrative.data) : t('flight.status.awaiting_instructions')}
               </div>
               <div
                 style={{
@@ -846,7 +872,7 @@ const FlightInProgress = ({
                   marginBottom: '8px'
                 }}
               >
-                {narrative?.content || t('flight.status.prepare_takeoff')}
+                {narrative?.content ? t(narrative.content, narrative.data) : t('flight.status.prepare_takeoff')}
               </div>
             </>
           )}

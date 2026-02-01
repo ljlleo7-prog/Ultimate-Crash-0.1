@@ -1,3 +1,5 @@
+import zhNarratives from './narratives/zh';
+
 const zh = {
   common: {
     loading: "加载中...",
@@ -197,6 +199,7 @@ const zh = {
     }
   },
   narrative: {
+    ...zhNarratives,
     labels: {
       designation: "代号:",
       background: "背景:",

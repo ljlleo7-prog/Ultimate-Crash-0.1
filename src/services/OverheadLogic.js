@@ -388,87 +388,122 @@ class OverheadLogic {
     /**
      * PNEUMATICS SYSTEM
      * Bleed Air -> Packs -> Mix Manifold
+     * User Request: Simulate pressure drops from loads (Packs, Starters) and limited source capacity.
      */
     updatePneumatics(systems, context, dt) {
-        const pneu = systems.pressurization; // Using existing structure but expanding logic
+        const pneu = systems.pressurization;
         const apu = systems.apu;
+        const electrical = systems.electrical;
         
-        // 1. Bleed Sources
-        // Engines - Iterate dynamic bleeds
-        let maxBleedPressureL = 0;
-        let maxBleedPressureR = 0;
+        // 1. Bleed Sources (Potential Pressure)
+        let sourcePressL = 0;
+        let sourcePressR = 0;
         
-        // Count engines
         const engineCount = context.engineN2.length;
-        
-        // Assign engines to ducts (Left: 1, 2... Right: 3, 4...) or Split (1->L, 2->R)
-        // Standard logic:
-        // 2 Engines: 1->L, 2->R
-        // 4 Engines: 1,2->L, 3,4->R
-        
         const splitPoint = Math.ceil(engineCount / 2);
 
+        // Engines
         for (let i = 0; i < engineCount; i++) {
             const bleedSw = pneu[`bleed${i+1}`];
             const n2 = context.engineN2[i];
             
-            if (bleedSw && n2 > 5) {
-                // Modified Bleed Logic:
-                // Full pressure available only above idle (~50% N2)
-                // Below idle (windmilling), pressure drops significantly
+            if (bleedSw && n2 > 10) {
+                // Pressure curve based on N2
+                // Idle (20%) -> ~25 PSI
+                // Cruise/Max -> ~45 PSI
                 let pressure = 0;
-                
                 if (n2 >= 50) {
-                    // Normal operation: 30-45 PSI
-                    pressure = 30 + ((n2-50)/50) * 15;
+                    pressure = 35 + ((n2-50)/50) * 15;
                 } else {
-                    // Sub-idle/Windmilling: Rapid drop off
-                    // At 20% N2 (windmilling) -> ~8 PSI
-                    pressure = (n2 / 50) * 20;
+                    pressure = (n2 / 50) * 35;
                 }
                 
                 if (i < splitPoint) {
-                    // Left Side
-                    if (pressure > maxBleedPressureL) maxBleedPressureL = pressure;
+                    if (pressure > sourcePressL) sourcePressL = pressure;
                 } else {
-                    // Right Side
-                    if (pressure > maxBleedPressureR) maxBleedPressureR = pressure;
+                    if (pressure > sourcePressR) sourcePressR = pressure;
                 }
             }
         }
         
-        // APU
-        const apuBleedPressure = (apu.bleed && apu.running) ? 40 : 0;
+        // APU (Feeds Left Duct typically)
+        // APU Bleed Valve must be OPEN and APU running
+        const apuBleedPressure = (apu.bleed && apu.running && apu.n2 > 90) ? 45 : 0;
         
-        // 2. Duct Pressure
-        // Left Duct
-        pneu.ductPressL = maxBleedPressureL;
-        // APU feeds Left Duct logic (usually check valve)
-        if (apuBleedPressure > pneu.ductPressL) pneu.ductPressL = apuBleedPressure;
-        
-        // Right Duct
-        pneu.ductPressR = maxBleedPressureR;
-        
-        // Isolation Valve Logic (Connects Left and Right)
-        // Default to OPEN if undefined to assist with engine starts
-        if (pneu.isolationValve === undefined) pneu.isolationValve = true;
+        // APU usually feeds the manifold. If Isolation Valve is closed, it might only feed Left.
+        // If Open, feeds both.
+        // We'll assume APU taps into the Left side ducting for this model.
+        if (apuBleedPressure > sourcePressL) sourcePressL = apuBleedPressure;
 
-        const isWidebody = engineCount > 2;
+        // 2. Calculate Loads (Pressure Drops)
+        // Each active consumer reduces the available pressure in the manifold
+        let dropL = 0;
+        let dropR = 0;
 
-        if (pneu.isolationValve) {
-            // Equalize (Open Valve)
-            const maxP = Math.max(pneu.ductPressL, pneu.ductPressR);
-            pneu.ductPressL = maxP;
-            pneu.ductPressR = maxP;
-        } else if (isWidebody) {
-             // For widebodies (e.g. 747), APU feeds a central manifold.
-             // Simplification: If APU is running and valve is closed, maybe it feeds both?
-             // But usually Isolation Valve is required.
-             // We will leave it strictly controlled by valve to encourage proper procedure.
+        // Packs (Heavy Load)
+        if (pneu.packL) dropL += 12;
+        if (pneu.packR) dropR += 12;
+
+        // Wing Anti-Ice (Medium Load)
+        // Assuming we have switches for these
+        if (systems.ice && systems.ice.wingAntiIce) {
+            dropL += 4;
+            dropR += 4;
         }
 
-        // 3. Packs
-        // Packs need duct pressure to work
+        // Starters (Very Heavy Load)
+        // We need to know which starters are engaged.
+        // Currently, we don't track "start switch" here easily, but we can check if engines are cranking.
+        // Actually, we need to PREDICT the drop to pass to the engine.
+        // The EngineService logic calls THIS logic to get pressure.
+        // So we need to check the switches from the system state.
+        
+        // Check Engine Start Switches (GRD position)
+        if (systems.engines) {
+            for (let i = 0; i < engineCount; i++) {
+                const engId = `eng${i+1}`;
+                const eng = systems.engines[engId];
+                
+                // If switch is in GRD (Start), it consumes huge air
+                if (eng && eng.startSwitch === 'GRD') {
+                    if (i < splitPoint) dropL += 15;
+                    else dropR += 15;
+                }
+            }
+        }
+
+        // 3. Isolation Valve & Final Pressure
+        if (pneu.isolationValve === undefined) pneu.isolationValve = true;
+
+        let finalPressL = 0;
+        let finalPressR = 0;
+
+        if (pneu.isolationValve) {
+            // OPEN: Manifolds connected.
+            // Pressure equalizes to the highest source.
+            // Loads are summed.
+            // Cross-bleed penalty (friction).
+            
+            const maxSource = Math.max(sourcePressL, sourcePressR);
+            const totalDrop = dropL + dropR + 2; // +2 PSI for cross-bleed friction/inefficiency
+            
+            const commonPress = Math.max(0, maxSource - totalDrop);
+            
+            finalPressL = commonPress;
+            finalPressR = commonPress;
+            
+        } else {
+            // CLOSED: Independent systems.
+            finalPressL = Math.max(0, sourcePressL - dropL);
+            finalPressR = Math.max(0, sourcePressR - dropR);
+        }
+
+        // 4. Update State
+        pneu.ductPressL = finalPressL;
+        pneu.ductPressR = finalPressR;
+        
+        // 5. Update Pack Flow status based on new pressures
+        // Packs cut out if pressure is too low (< 15 PSI)
         pneu.packLFlow = (pneu.packL && pneu.ductPressL > 15);
         pneu.packRFlow = (pneu.packR && pneu.ductPressR > 15);
     }

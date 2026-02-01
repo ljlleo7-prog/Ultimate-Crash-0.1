@@ -103,26 +103,41 @@ class EnginePhysicsService {
         if (this.state.running) {
             if (throttle >= 0) {
                 // Forward Thrust
-                // Idle (0 throttle) -> 20% N2
-                // Max (1 throttle) -> 100% N2
-                // Linear map for core speed control
-                const idleN2 = 30; // Increased from 20 to 30 for better idle stability
-                const maxN2 = 102; // Allow slight overspeed
-                targetN2 = idleN2 + throttle * (maxN2 - idleN2);
+                // User Request: Throttle controls N1 directly (Linear).
+                // Idle N1 = 20%, Max N1 = 102%.
+                const idleN1 = 20.0;
+                const maxN1 = 102.0;
+                
+                // Linear N1 Target
+                const targetN1 = idleN1 + throttle * (maxN1 - idleN1);
+                
+                // Drive N2 (Core) from Target N1 using inverse of N1-curve
+                // Curve: N1 = N2^2 / 100  =>  N2 = 10 * sqrt(N1)
+                targetN2 = 10 * Math.sqrt(Math.max(0, targetN1));
+                
             } else {
                 // Reverse Thrust
                 // Throttle -1 -> N2 ~ 75%
                 isReverse = true;
-                const idleN2 = 30;
+                const idleN2 = 45; // ~20% N1
                 const maxReverseN2 = 75;
                 const reverseRatio = Math.min(1, Math.abs(throttle) / 0.7);
                 targetN2 = idleN2 + reverseRatio * (maxReverseN2 - idleN2);
             }
         } else {
             // Not running
-            if (this.state.starterEngaged && this.state.pneumaticPressure) {
-                // Starter Motoring Speed (Max ~25%)
-                targetN2 = 25;
+            // Check pneumatic pressure (PSI) for starter effectiveness
+            // If passed as boolean (legacy), assume 30 PSI if true
+            let pressure = this.state.pneumaticPressure;
+            if (pressure === true) pressure = 30; 
+            if (pressure === false) pressure = 0;
+            
+            if (this.state.starterEngaged && pressure > 5) {
+                // Starter Motoring Speed calculation
+                // Nominal 30 PSI -> 25% N2
+                // Low pressure -> Lower max motoring speed
+                const efficiency = Math.min(1.2, Math.max(0, (pressure - 5) / 25));
+                targetN2 = 25 * efficiency;
             } else {
                 // Spool down
                 targetN2 = 0;
@@ -140,8 +155,14 @@ class EnginePhysicsService {
         let n2Rate = this.config.spoolUpRate;
         
         if (!this.state.running && this.state.starterEngaged) {
-            // Starter torque is weaker than combustion
-            n2Rate = 5.0; // 5% per second roughly
+            // Starter torque depends on pressure
+            let pressure = this.state.pneumaticPressure;
+            if (pressure === true) pressure = 30; 
+            if (pressure === false) pressure = 0;
+            
+            const efficiency = Math.min(1.2, Math.max(0, (pressure - 5) / 25));
+            n2Rate = 5.0 * efficiency; // 5% per second at nominal pressure
+            
         } else if (n2Diff < 0) {
             n2Rate = this.config.spoolDownRate;
         }

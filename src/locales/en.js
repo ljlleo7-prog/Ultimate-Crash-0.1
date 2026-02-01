@@ -1,3 +1,5 @@
+import enNarratives from './narratives/en';
+
 const en = {
   common: {
     loading: "Loading...",
@@ -215,6 +217,7 @@ const en = {
     }
   },
   narrative: {
+    ...enNarratives,
     labels: {
       designation: "DESIGNATION:",
       background: "BACKGROUND:",

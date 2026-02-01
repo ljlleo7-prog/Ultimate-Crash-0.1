@@ -23,6 +23,7 @@ import SystemStatusPanel from './SystemStatusPanel';
 import './FlightPanel.css';
 
 const FlightPanelModular = ({ flightData, physicsState, weatherData, onActionRequest, aircraftModel, selectedArrival, flightPlan, radioMessages, onRadioFreqChange, npcs, frequencyContext, currentRegion, timeScale, setTimeScale, onUpdateFlightPlan, availableRunways, startupStatus }) => {
+  const { t } = useLanguage();
   // Use flightData from parent component instead of creating own physics service
   const [showOverhead, setShowOverhead] = useState(false);
   const [activeSidebarPanel, setActiveSidebarPanel] = useState(null);

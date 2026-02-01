@@ -1069,12 +1069,14 @@ class RealisticFlightPhysicsService {
                  let fuelSourceAvailable = false;
                  
                  const currentAltFt = Math.max(0, (-this.state.pos.z || 0) * 3.28084);
-                 // Suction feed available at low altitude, but limited by fuel flow demand (N2)
-                 // If thrust is high (>65% N2) without pumps, suction is insufficient (cavitation)
-                 const highThrust = engine.state.n2 > 65;
-                 const suctionAvailable = (this.onGround || currentAltFt < 20000) && !highThrust;
-                 
-                 if (fuel.pressC > 10 && fuel.tanks.center > 0) fuelSourceAvailable = true;
+                // Suction feed available at low altitude, but limited by fuel flow demand (N2)
+                // If thrust is high (>65% N2) without pumps, suction is insufficient (cavitation)
+                // User Request: Reverted to allow suction feed on ground/low altitude (realism),
+                // but ensures engines can be cut in the air (Cruise > 20,000ft).
+                const highThrust = engine.state.n2 > 65;
+                const suctionAvailable = (this.onGround || currentAltFt < 20000) && !highThrust;
+                
+                if (fuel.pressC > 10 && fuel.tanks.center > 0) fuelSourceAvailable = true;
                  else if (isLeft) {
                      if ((fuel.pressL > 10 || suctionAvailable) && fuel.tanks.left > 0) fuelSourceAvailable = true;
                      else if (fuel.crossfeed && fuel.pressR > 10 && fuel.tanks.right > 0) fuelSourceAvailable = true;
@@ -1084,12 +1086,12 @@ class RealisticFlightPhysicsService {
                  }
                  
                  // Update Engine Physics State
-                 engine.setStartupState(
-                     sysEng.startSwitch === 'GRD', // Starter Valve Open
-                     pneumaticAvailable,          // Air Pressure
-                     sysEng.fuelControl && fuelSourceAvailable, // Fuel Valve & Supply
-                     true // Ignition (Assume Auto/On for now)
-                 );
+                engine.setStartupState(
+                    sysEng.startSwitch === 'GRD', // Starter Valve Open
+                    ductPress,                   // Air Pressure (PSI)
+                    sysEng.fuelControl && fuelSourceAvailable, // Fuel Valve & Supply
+                    true // Ignition (Assume Auto/On for now)
+                );
                  
                  // Sync External Fuel Burn
                  // We need to actually remove fuel from tanks if engine is burning it
