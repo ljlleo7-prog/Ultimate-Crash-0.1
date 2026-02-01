@@ -1,19 +1,21 @@
 
 import React, { useState, useEffect } from 'react';
 import './NarrativeScene.css';
-import { generateNarrative } from '../utils/narrativeGenerator';
+import { generateNarrativeIndices } from '../utils/narrativeGenerator';
+import { useLanguage } from '../contexts/LanguageContext';
 
 const NarrativeScene = ({ onComplete, context }) => {
-  const [narrative, setNarrative] = useState(null);
+  const { t } = useLanguage();
+  const [narrativeIndices, setNarrativeIndices] = useState(null);
   const [visibleLines, setVisibleLines] = useState(0);
   const [isReady, setIsReady] = useState(false);
 
   useEffect(() => {
-    setNarrative(generateNarrative(context));
+    setNarrativeIndices(generateNarrativeIndices(context));
   }, []);
 
   useEffect(() => {
-    if (!narrative) return;
+    if (!narrativeIndices) return;
     
     // Sequence the text appearance
     const sequence = async () => {
@@ -39,32 +41,49 @@ const NarrativeScene = ({ onComplete, context }) => {
     };
     
     sequence();
-  }, [narrative]);
+  }, [narrativeIndices]);
 
-  if (!narrative) return <div className="narrative-container" />;
+  if (!narrativeIndices) return <div className="narrative-container" />;
+
+  // Resolve translations based on indices
+  const roles = t('narrative.roles') || [];
+  const roleText = roles[narrativeIndices.roleIndex] || 'Captain';
+  
+  const diffKey = narrativeIndices.diffKey;
+  const experiencePool = (t('narrative.experience') || {})[diffKey] || [];
+  const experienceText = experiencePool[narrativeIndices.experienceIndex] || 'Ready';
+
+  const planPool = t('narrative.flight_plan') || [];
+  const planFunc = planPool[narrativeIndices.planIndex];
+  const planText = typeof planFunc === 'function' 
+    ? planFunc(context.departure?.name || 'Departure', context.arrival?.name || 'Arrival', context.pax || 150)
+    : 'Flight plan filed.';
+
+  const difficultyPool = (t('narrative.difficulty_desc') || {})[diffKey] || [];
+  const difficultyText = difficultyPool[narrativeIndices.difficultyIndex] || 'Good luck.';
 
   return (
     <div className="narrative-container">
       <div className="narrative-content">
         <div className={`narrative-line role ${visibleLines >= 1 ? 'visible' : ''}`}>
-          <span className="label">DESIGNATION:</span> {narrative.role} {context.callsign || 'UNKNOWN'}
+          <span className="label">{t('narrative.labels.designation')}</span> {roleText} {context.callsign || 'UNKNOWN'}
         </div>
         
         <div className={`narrative-line experience ${visibleLines >= 2 ? 'visible' : ''}`}>
-          <span className="label">BACKGROUND:</span> You are {narrative.experience}
+          <span className="label">{t('narrative.labels.background')}</span> {t('common.you_are', { context: experienceText }) || `You are ${experienceText}`}
         </div>
         
         <div className={`narrative-line plan ${visibleLines >= 3 ? 'visible' : ''}`}>
-          <span className="label">MISSION:</span> {narrative.plan}
+          <span className="label">{t('narrative.labels.mission')}</span> {planText}
         </div>
         
         <div className={`narrative-line difficulty ${visibleLines >= 4 ? 'visible' : ''}`}>
-          <span className="label">INTELLIGENCE:</span> {narrative.potentialDifficulty}
+          <span className="label">{t('narrative.labels.intelligence')}</span> {difficultyText}
         </div>
 
         <div className={`narrative-action ${isReady ? 'visible' : ''}`}>
           <button className="accept-btn" onClick={onComplete}>
-            ACCEPT ASSIGNMENT
+            {t('narrative.labels.accept')}
           </button>
         </div>
       </div>

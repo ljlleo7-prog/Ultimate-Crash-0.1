@@ -20,7 +20,7 @@ export const LanguageProvider = ({ children }) => {
     document.documentElement.lang = language;
   }, [language]);
 
-  const t = (key) => {
+  const t = (key, params = {}) => {
     const keys = key.split('.');
     let value = translations[language];
     
@@ -37,10 +37,15 @@ export const LanguageProvider = ({ children }) => {
             return key; // Return key if not found
           }
         }
-        return fallback;
+        return typeof fallback === 'string' ? replaceParams(fallback, params) : fallback;
       }
     }
-    return value;
+    return typeof value === 'string' ? replaceParams(value, params) : value;
+  };
+
+  const replaceParams = (text, params) => {
+    if (!params) return text;
+    return text.replace(/\{(\w+)\}/g, (_, k) => params[k] !== undefined ? params[k] : `{${k}}`);
   };
 
   return (

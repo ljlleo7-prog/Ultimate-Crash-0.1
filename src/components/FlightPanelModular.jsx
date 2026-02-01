@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { useLanguage } from '../contexts/LanguageContext';
 
 // Import modular components
 import CrashWarningFlash from './CrashWarningFlash';
@@ -454,7 +455,7 @@ const FlightPanelModular = ({ flightData, physicsState, weatherData, onActionReq
               e.target.style.opacity = 0.8;
               e.target.style.boxShadow = 'none';
             }
-          }, 'CONTINUE ►'),
+          }, t('flight.immersive.continue')),
           
           // Startup Requirements Tooltip
           startupStatus && !startupStatus.canContinue && startupStatus.missingItems && startupStatus.missingItems.length > 0 &&
@@ -475,10 +476,10 @@ const FlightPanelModular = ({ flightData, physicsState, weatherData, onActionReq
               minWidth: '200px'
             }
           },
-            React.createElement('div', { style: { fontWeight: 'bold', marginBottom: '6px', color: '#ef4444', borderBottom: '1px solid rgba(239, 68, 68, 0.3)', paddingBottom: '4px' } }, '⚠️ STARTUP REQUIRED'),
-            startupStatus.missingItems.map(item => React.createElement('div', { key: item, style: { marginBottom: '2px', display: 'flex', alignItems: 'center' } }, 
+            React.createElement('div', { style: { fontWeight: 'bold', marginBottom: '6px', color: '#ef4444', borderBottom: '1px solid rgba(239, 68, 68, 0.3)', paddingBottom: '4px' } }, t('flight.immersive.startup_required')),
+            startupStatus.missingItems.map(item => React.createElement('div', { key: typeof item === 'string' ? item : item.key, style: { marginBottom: '2px', display: 'flex', alignItems: 'center' } }, 
                React.createElement('span', { style: { color: '#ef4444', marginRight: '6px' } }, '×'),
-               item
+               typeof item === 'string' ? item : t(item.key, item.params)
             ))
           )
         )

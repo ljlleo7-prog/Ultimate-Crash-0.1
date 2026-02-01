@@ -22,7 +22,7 @@ export const checkStartupRequirements = (phase, systems, engines = []) => {
     const missingItems = [];
 
     if (!systems) {
-        return { canContinue: false, missingItems: ['Systems not initialized'] };
+        return { canContinue: false, missingItems: [{ key: 'startup.error.systems_not_init' }] };
     }
 
     // Helper to check electrical bus status (simplified)
@@ -39,38 +39,41 @@ export const checkStartupRequirements = (phase, systems, engines = []) => {
         
         // 1. Battery must be ON (implicit if we are checking APU, but let's check)
         if (!systems.electrical?.battery) {
-            missingItems.push('Battery Switch ON');
+            missingItems.push({ key: 'startup.checklist.battery_on' });
         }
 
         // 2. ADIRS Alignment (NAV Mode)
         // User requested ADIRS
         if (systems.adirs) {
              if (systems.adirs.ir1 !== 'NAV' || systems.adirs.ir2 !== 'NAV') {
-                 missingItems.push('ADIRS IR 1 & 2 to NAV');
+                 missingItems.push({ key: 'startup.checklist.adirs_nav' });
              }
              if (!systems.adirs.aligned) {
                  // Warn if not aligned, but maybe allow continue if switches are correct?
                  // Let's enforce switches first. Alignment takes time.
                  // Ideally, we wait for alignment.
                  if (systems.adirs.alignState < 100) {
-                     missingItems.push(`ADIRS Aligning (${Math.floor(systems.adirs.alignState)}%)`);
+                     missingItems.push({ 
+                         key: 'startup.checklist.adirs_aligning', 
+                         params: { progress: Math.floor(systems.adirs.alignState) } 
+                     });
                  }
              }
         }
 
         // 3. APU Bleed must be ON (User: "only after APU bleed starts")
         if (!systems.apu?.bleed) {
-            missingItems.push('APU Bleed Switch ON');
+            missingItems.push({ key: 'startup.checklist.apu_bleed_on' });
         }
 
         // 3. APU Generator must be ON (User: "powered the batteries and stuff")
         if (!systems.electrical?.apuGen) {
-            missingItems.push('APU Generator Switch ON');
+            missingItems.push({ key: 'startup.checklist.apu_gen_on' });
         }
 
         // 4. APU must be running (stabilized)
         if (!systems.apu?.running || systems.apu?.n2 < 90) {
-            missingItems.push('APU Running & Stabilized (>90%)');
+            missingItems.push({ key: 'startup.checklist.apu_running' });
         }
 
     } else if (phase === StartupPhases.ENGINE_START) {
@@ -99,23 +102,29 @@ export const checkStartupRequirements = (phase, systems, engines = []) => {
             const n2 = eng ? (typeof eng.n2 === 'number' ? eng.n2 : eng.state && eng.state.n2) : null;
             const engRunning = typeof n2 === 'number' && n2 > 50;
             if (!engRunning) {
-                missingItems.push(`Engine ${i + 1} Running (N2 > 50%)`);
+                missingItems.push({ 
+                    key: 'startup.checklist.engine_running', 
+                    params: { index: i + 1 } 
+                });
             }
         }
 
         for (let i = 0; i < requiredEngines; i++) {
             const genKey = `gen${i + 1}`;
             if (!systems.electrical?.[genKey]) {
-                missingItems.push(`Generator ${i + 1} ON`);
+                missingItems.push({ 
+                    key: 'startup.checklist.gen_on', 
+                    params: { index: i + 1 } 
+                });
             }
         }
 
         if (systems.apu?.running || systems.electrical?.apuGen) {
-            missingItems.push('APU Shutdown & APU Gen OFF');
+            missingItems.push({ key: 'startup.checklist.apu_shutdown' });
         }
 
         if (systems.adirs && !systems.adirs.aligned) {
-            missingItems.push('ADIRS Alignment Complete');
+            missingItems.push({ key: 'startup.checklist.adirs_aligned' });
         }
     }
 

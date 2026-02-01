@@ -598,8 +598,9 @@ class SceneManager {
                             const now = Date.now();
                             if (now - lastWarnTime > 2000) {
                                 this.publishNarrative({
-                                    title: 'Startup Checklist Incomplete',
-                                    content: `Cannot proceed to next phase. Missing: ${checklistResult.missingItems.join(', ')}`,
+                                    title: 'flight.status.checklist_incomplete',
+                                    content: 'flight.alerts.checklist_incomplete_content',
+                                    data: { missingItems: checklistResult.missingItems },
                                     severity: 'warning'
                                 });
                                 this.lastChecklistWarningTime = now;
@@ -678,8 +679,9 @@ class SceneManager {
                             const now = Date.now();
                             if (now - lastWarnTime > 2000) {
                                 this.publishNarrative({
-                                    title: 'Startup Checklist Incomplete',
-                                    content: `Cannot proceed to next phase. Missing: ${checklistResult.missingItems.join(', ')}`,
+                                    title: 'flight.status.checklist_incomplete',
+                                    content: 'flight.alerts.checklist_incomplete_content',
+                                    data: { missingItems: checklistResult.missingItems },
                                     severity: 'warning'
                                 });
                                 this.lastChecklistWarningTime = now;

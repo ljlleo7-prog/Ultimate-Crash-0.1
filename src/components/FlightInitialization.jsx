@@ -165,11 +165,11 @@ const FlightInitialization = ({
       console.log('Random flight initialized:', randomParams);
       
       // Show confirmation message
-      alert(`Random flight initialized!\nRoute: ${randomParams.selectedDeparture.iata} → ${randomParams.selectedArrival.iata}\nAircraft: ${randomParams.aircraftModel}\nDifficulty: ${randomParams.difficulty}\nFailure: ${randomFailure}\nWeather: ${randomWeather.type}`);
+      alert(`${t('initialization.messages.random_initialized')}\n${t('initialization.summary.route')} ${randomParams.selectedDeparture.iata} → ${randomParams.selectedArrival.iata}\n${t('initialization.parameters.aircraft_type')}: ${randomParams.aircraftModel}\n${t('initialization.sections.difficulty')}: ${randomParams.difficulty}\n${t('initialization.tooltips.random_difficulty')}: ${randomFailure}\n${t('initialization.parameters.season')}: ${randomWeather.type}`);
       
     } catch (error) {
       console.error('Error initializing random flight:', error);
-      alert('Error initializing random flight. Please try again.');
+      alert(t('initialization.messages.error_random'));
     }
   };
 
@@ -296,7 +296,7 @@ const FlightInitialization = ({
       >
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', borderBottom: '2px solid #30363d' }}>
           <h2 className="section-header" style={{ borderBottom: 'none', marginBottom: 0 }}>{t('initialization.sections.difficulty')}</h2>
-          <button className="dispatch-btn random" onClick={randomizeStep1} title="Randomize Difficulty">
+          <button className="dispatch-btn random" onClick={randomizeStep1} title={t('initialization.tooltips.random_difficulty')}>
             🎲
           </button>
         </div>
@@ -350,7 +350,7 @@ const FlightInitialization = ({
       >
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', borderBottom: '2px solid #30363d' }}>
           <h2 className="section-header" style={{ borderBottom: 'none', marginBottom: 0 }}>{t('initialization.sections.parameters')}</h2>
-          <button className="dispatch-btn random" onClick={randomizeStep2} title="Randomize Parameters">
+          <button className="dispatch-btn random" onClick={randomizeStep2} title={t('initialization.tooltips.random_params')}>
             🎲
           </button>
         </div>
@@ -529,7 +529,7 @@ const FlightInitialization = ({
       >
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', borderBottom: '2px solid #30363d' }}>
           <h2 className="section-header" style={{ borderBottom: 'none', marginBottom: 0 }}>{t('initialization.sections.route')}</h2>
-          <button className="dispatch-btn random" onClick={randomizeStep3} title="Randomize Route">
+          <button className="dispatch-btn random" onClick={randomizeStep3} title={t('initialization.tooltips.random_route')}>
             🎲
           </button>
         </div>
@@ -590,8 +590,13 @@ const FlightInitialization = ({
         <div className="dispatch-actions" style={{ borderTop: 'none', paddingTop: 0 }}>
           <button
             className="dispatch-btn primary"
-            onClick={handleInitializeFlight}
-            disabled={!isStep3Valid()}
+            onClick={() => {
+              if (!selectedDeparture || !selectedArrival) {
+                alert(t('initialization.messages.select_airports'));
+                return;
+              }
+              handleInitializeFlight();
+            }}
             style={{ width: '100%' }}
           >
             {t('initialization.buttons.finalize')}

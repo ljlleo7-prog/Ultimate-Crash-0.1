@@ -136,7 +136,7 @@ function App() {
 
   const handleInitializeFlight = () => {
     if (!selectedDeparture || !selectedArrival) {
-      alert('Please select both departure and arrival airports');
+      alert(t('initialization.messages.select_airports'));
       return;
     }
     setShowRouteSelection(true);

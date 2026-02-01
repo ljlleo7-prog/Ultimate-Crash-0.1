@@ -199,7 +199,7 @@ const FlightInProgress = ({
     if (atcManager.isBusy()) {
         setRadioMessages(prev => [...prev, {
             sender: 'System',
-            text: '[FREQUENCY BUSY]',
+            text: t('flight.messages.freq_busy'),
             timestamp: Date.now(),
             type: 'system'
         }]);
@@ -275,7 +275,7 @@ const FlightInProgress = ({
     const isHardcore = difficulty === 'pro' || difficulty === 'devil';
     return { 
       canContinue: !isHardcore, 
-      missingItems: isHardcore ? ['System Initialization...'] : [] 
+      missingItems: isHardcore ? [{ key: 'startup.error.systems_not_init' }] : [] 
     };
   });
 
@@ -820,7 +820,7 @@ const FlightInProgress = ({
               marginBottom: '4px'
             }}
           >
-            {phaseName || t('flight.status.situation')}
+            {(sceneState.currentPhase && t(`initialization.phases.${sceneState.currentPhase.type}`)) || phaseName || t('flight.status.situation')}
           </div>
           
           {/* Conditional Rendering: Only show narrative in Header if Physics is ACTIVE (PHY-ON) 
@@ -882,7 +882,7 @@ const FlightInProgress = ({
                     display: 'flex',
                     alignItems: 'center'
                   }}>
-                    <span style={{ marginRight: '6px' }}>☐</span> {item}
+                    <span style={{ marginRight: '6px' }}>☐</span> {typeof item === 'string' ? item : t(item.key, item.params)}
                   </div>
                 ))}
               </div>
@@ -915,7 +915,7 @@ const FlightInProgress = ({
                     display: 'flex',
                     justifyContent: 'space-between'
                   }}>
-                    <span>{failure.type.toUpperCase()} {failure.data.engineIndex !== undefined ? `ENGINE ${failure.data.engineIndex + 1}` : ''}</span>
+                    <span>{failure.type.toUpperCase()} {failure.data.engineIndex !== undefined ? `${t('flight.panels.systems.engine_label')} ${failure.data.engineIndex + 1}` : ''}</span>
                     <span>{failure.isCritical ? t('flight.status.critical') : `${Math.round(failure.progress)}%`}</span>
                   </div>
                 ))}
@@ -1231,7 +1231,7 @@ const FlightInProgress = ({
       {isCrashed && (
         <div className="end-scene-overlay">
           <div className="end-scene-content">
-            <div style={{ fontSize: '24px', marginBottom: '12px' }}>Flight Ended</div>
+            <div style={{ fontSize: '24px', marginBottom: '12px' }}>{t('flight.status.flight_ended')}</div>
             <div style={{ marginBottom: '20px', maxWidth: '420px' }}>
               Placeholder: post-incident summary and narrative debrief will appear here.
             </div>
@@ -1250,7 +1250,7 @@ const FlightInProgress = ({
                 fontWeight: 600
               }}
             >
-              Return to Initialization
+              {t('flight.status.return_init')}
             </button>
           </div>
         </div>

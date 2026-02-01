@@ -1,6 +1,8 @@
 import React, { useState, useRef, useEffect } from 'react';
+import { useLanguage } from '../contexts/LanguageContext';
 
 const AirportSearchInput = ({ placeholder, onSelect, selectedAirport, searchResults, handleSearch }) => {
+  const { t } = useLanguage();
   const [inputValue, setInputValue] = useState('');
   const [isResultsVisible, setIsResultsVisible] = useState(false);
   const wrapperRef = useRef(null);
@@ -51,14 +53,14 @@ const AirportSearchInput = ({ placeholder, onSelect, selectedAirport, searchResu
         <div className="selected-airport-badge">
           <span className="airport-code">{selectedAirport.iata || selectedAirport.icao}</span>
           <span className="airport-name"> - {selectedAirport.name}</span>
-          <button onClick={handleClear} className="clear-btn" title="Clear selection">×</button>
+          <button onClick={handleClear} className="clear-btn" title={t('search.clear')}>×</button>
         </div>
       )}
 
       {isResultsVisible && searchResults && searchResults.length > 0 && !selectedAirport && (
         <div className="search-results">
           <div className="results-count">
-            {searchResults.length} airport{searchResults.length !== 1 ? 's' : ''} found
+            {t('search.results_found', { count: searchResults.length })}
           </div>
           {searchResults.map((airport, index) => (
             <div
