@@ -192,6 +192,55 @@ const FlightComputerPanel = ({ onClose, flightPlan, onUpdateFlightPlan, flightSt
     setSearchResults(results);
   };
 
+  const calculateApproachFix = (airport, runwayName) => {
+    // Default to airport coordinates if no runway specified
+    if (!runwayName) {
+      return {
+        latitude: airport.latitude,
+        longitude: airport.longitude,
+        label: airport.iata || airport.icao
+      };
+    }
+
+    const geometry = airportService.getRunwayGeometry(airport.iata || airport.icao, runwayName);
+    
+    if (geometry) {
+       // Calculate 12nm fix on reciprocal heading
+       // geometry.heading is the runway heading (e.g. 240 for 24R)
+       // We want to go back 12nm from thresholdStart
+       // This is equivalent to moving 12nm in direction (heading + 180)
+       
+       const lat1 = geometry.thresholdStart.latitude * Math.PI / 180;
+       const lon1 = geometry.thresholdStart.longitude * Math.PI / 180;
+       const headingRad = (geometry.heading + 180) * Math.PI / 180;
+       // Increased to 15nm to ensure safe terrain clearance and glideslope intercept from below
+       const distanceNm = 15.0; 
+       const R = 3440.065; // Earth radius in NM
+       
+       const lat2 = Math.asin(Math.sin(lat1)*Math.cos(distanceNm/R) + Math.cos(lat1)*Math.sin(distanceNm/R)*Math.cos(headingRad));
+       const lon2 = lon1 + Math.atan2(Math.sin(headingRad)*Math.sin(distanceNm/R)*Math.cos(lat1), Math.cos(distanceNm/R)-Math.sin(lat1)*Math.sin(lat2));
+       
+       // Target 4000ft AGL for safe intercept (approx 15nm * 300ft/nm = 4500ft, so 4000ft is a good capture from below)
+       // Ensure airport.elevation is treated as number (feet)
+       const elevation = Number(airport.elevation) || 0;
+       const targetAlt = elevation + 4000;
+
+       return {
+         latitude: lat2 * 180 / Math.PI,
+         longitude: lon2 * 180 / Math.PI,
+         altitude: targetAlt,
+         label: `${airport.iata || airport.icao}`
+       };
+    }
+    
+    // Fallback if geometry not found
+    return {
+      latitude: airport.latitude,
+      longitude: airport.longitude,
+      label: airport.iata || airport.icao
+    };
+  };
+
   const handleAddAirport = (airport) => {
     // Extract individual runway designators (e.g. "08L/26R" -> ["08L", "26R"])
     const runwayOptions = [];
@@ -208,14 +257,17 @@ const FlightComputerPanel = ({ onClose, flightPlan, onUpdateFlightPlan, flightSt
       runwayOptions.push("27");
     }
 
+    const selectedRunway = runwayOptions.length > 0 ? runwayOptions[0] : null;
+    const fix = calculateApproachFix(airport, selectedRunway);
+
     const newWaypoint = {
-      latitude: airport.latitude,
-      longitude: airport.longitude,
-      label: airport.iata || airport.icao,
+      latitude: fix.latitude,
+      longitude: fix.longitude,
+      label: fix.label,
       type: 'airport',
       details: airport,
       availableRunways: runwayOptions,
-      selectedRunway: runwayOptions.length > 0 ? runwayOptions[0] : null
+      selectedRunway: selectedRunway
     };
     
     const newWaypoints = [...waypoints, newWaypoint];
@@ -225,7 +277,18 @@ const FlightComputerPanel = ({ onClose, flightPlan, onUpdateFlightPlan, flightSt
 
   const handleRunwayChange = (index, runway) => {
     const newWaypoints = [...waypoints];
-    newWaypoints[index] = { ...newWaypoints[index], selectedRunway: runway };
+    const wp = newWaypoints[index];
+    
+    // Recalculate fix for new runway
+    const fix = calculateApproachFix(wp.details, runway);
+    
+    newWaypoints[index] = { 
+        ...wp, 
+        selectedRunway: runway,
+        latitude: fix.latitude,
+        longitude: fix.longitude,
+        label: fix.label 
+    };
     updateParent(newWaypoints);
   };
 

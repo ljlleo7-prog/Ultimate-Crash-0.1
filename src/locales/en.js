@@ -1,382 +1,542 @@
-import enNarratives from './narratives/en';
-
 const en = {
-  common: {
-    loading: "Loading...",
-    error: "Error",
-    close: "Close",
-    cancel: "Cancel",
-    confirm: "Confirm",
-    select: "Select...",
-    back: "Back",
-    next: "Next",
-    random: "Random",
-    settings: "Settings",
-    language: "Language",
-    devMode: "Dev Mode",
-    you_are: "You are {context}"
-  },
-  initialization: {
-    title: "Flight Initialization",
-    subtitle: "Configure your flight parameters",
-    sections: {
-      difficulty: "01. OPERATIONAL LEVEL & INTEL",
-      parameters: "02. FLIGHT PARAMETERS",
-      route: "03. ROUTE SELECTION"
-    },
-    difficulty: {
-      rookie: "ROOKIE",
-      amateur: "AMATEUR",
-      intermediate: "INTERMEDIATE",
-      advanced: "ADVANCED",
-      pro: "PRO",
-      devil: "DEVIL",
-      intel_label: "CREW INTELLIGENCE:",
-      descriptions: {
-        rookie: "Highly supportive. NPCs assist with all checks. Standard procedures strictly followed.",
-        amateur: "Experienced crew. Reliable support during significant events. NPC will assist.",
-        intermediate: "Standard operations. Crew follows leads and executes commands precisely.",
-        advanced: "Competent but prone to hesitation or minor errors under high-stress conditions.",
-        pro: "High stress. Crew acts nervously and is prone to significant mistakes during emergencies.",
-        devil: "Independent priorities. Active deviation from procedures possible. Do not rely on assistance.",
-        waiting: "Awaiting difficulty selection..."
-      }
-    },
-    parameters: {
-      airline: "AIRLINE",
-      callsign: "CALLSIGN",
-      aircraft_type: "AIRCRAFT TYPE",
-      crew_count: "CREW COUNT",
-      passengers: "PASSENGERS (PAX)",
-      payload: "PAYLOAD (KG)",
-      cruise_height: "CRUISE HEIGHT (FT)",
-      reserve_fuel: "RESERVE FUEL (HOURS)",
-      zulu_time: "ZULU TIME",
-      season: "SEASON",
-      random_checkbox: "RANDOM",
-      seasons: {
-        spring: "SPRING",
-        summer: "SUMMER",
-        autumn: "AUTUMN",
-        winter: "WINTER"
-      },
-      placeholders: {
-        operator: "OPERATOR NAME",
-        flight_number: "FLIGHT NUMBER",
-        count_range: "1-10",
-        pax_range: "0-1000",
-        weight_unit: "KG",
-        height_unit: "FT",
-        time_format: "HH:MMZ",
-        hours: "HRS"
-      }
-    },
-    route: {
-      departure: "DEPARTURE AIRPORT",
-      arrival: "ARRIVAL AIRPORT",
-      search_placeholder: "SEARCH ICAO/IATA..."
-    },
-    summary: {
-      route: "ROUTE:",
-      distance: "DISTANCE:",
-      est_time: "EST. TIME:",
-      fuel_req: "FUEL REQ:",
-      trip: "TRIP",
-      rsv: "RSV",
-      total: "TOTAL"
-    },
-    startup: {
-      checklist: {
-        battery_on: "Battery Switch ON",
-        adirs_nav: "ADIRS IR 1 & 2 to NAV",
-        adirs_aligning: "ADIRS Aligning ({progress}%)",
-        apu_bleed_on: "APU Bleed Switch ON",
-        apu_gen_on: "APU Generator Switch ON",
-        apu_running: "APU Running & Stabilized (>90%)",
-        engine_running: "Engine {index} Running (N2 > 50%)",
-        gen_on: "Generator {index} ON",
-        apu_shutdown: "APU Shutdown & APU Gen OFF",
-        adirs_aligned: "ADIRS Alignment Complete"
-      },
-      error: {
-        systems_not_init: "Systems not initialized"
-      }
-    },
-    buttons: {
-      next_params: "NEXT: FLIGHT PARAMETERS →",
-      next_route: "NEXT: ROUTE SELECTION →",
-      finalize: "FINALIZE DISPATCH & INITIALIZE"
-    },
-    messages: {
-      random_initialized: "Random flight initialized!",
-      error_random: "Error initializing random flight. Please try again.",
-      select_airports: "Please select both departure and arrival airports"
-    },
+  narrative: {
     phases: {
-      boarding: "BOARDING",
-      departure_clearance: "DEPARTURE CLEARANCE",
-      pushback: "PUSHBACK & START",
-      taxiing: "TAXI",
-      takeoff_prep: "TAKEOFF PREPARATION",
-      takeoff: "TAKEOFF ROLL",
-      initial_climb: "INITIAL CLIMB",
-      main_climb: "MAIN CLIMB",
-      climb: "CLIMB",
-      cruise: "CRUISE",
-      descent: "DESCENT",
-      approach: "APPROACH",
-      landing: "LANDING",
-      after_land_taxiing: "TAXI TO GATE",
-      shutoff: "SHUTDOWN",
-      emergency: "EMERGENCY",
-      post_mortem: "FLIGHT REPORT"
-    },
-    tooltips: {
-      random_difficulty: "Randomize Difficulty",
-      random_params: "Randomize Parameters",
-      random_route: "Randomize Route"
-    }
-  },
-  flight: {
-    status: {
-      starting: "Starting Flight Simulation...",
-      init_physics: "Initializing physics engine...",
-      error: "Initialization Error",
-      reload: "Reload Page",
-      ready: "Ready",
-      paused: "PAUSED",
-      crashed: "CRITICAL FAILURE",
-      landed: "LANDED SAFELY",
-      situation: "Situation",
-      checklist_incomplete: "Checklist Incomplete",
-      active_failures: "Active Failures",
-      critical: "CRITICAL",
-      awaiting_instructions: "Awaiting flight instructions...",
-      prepare_takeoff: "Prepare for takeoff.",
-      flight_ended: "Flight Ended",
-      return_init: "Return to Initialization"
-    },
-    sidebar: {
-      checklist: "Checklist",
-      f_comp: "F-Comp",
-      systems: "Systems",
-      timer: "Timer",
-      save_load: "Save/Load",
-      inspect: "Inspect",
-      settings: "Settings"
-    },
-    panels: {
-      radio: {
-        title: "RADIO",
-        transmit: "TRANSMIT",
-        cancel: "CANCEL",
-        freq_busy: "FREQ BUSY",
-        placeholder: "Type message...",
-        frequency: "FREQUENCY"
-      },
-      systems: {
-        engines: "ENGINES",
-        hydraulics: "HYDRAULICS",
-        electrics: "ELECTRICS",
-        fuel: "FUEL",
-        engine_label: "ENGINE"
-      }
-    },
-    messages: {
-      freq_busy: "[FREQUENCY BUSY]"
-    },
-    alerts: {
-      checklist_incomplete_content: "Cannot proceed. Missing items: {items}"
-    },
-    immersive: {
-      systems_btn: "SYSTEMS [OH PNL]",
-      awaiting: "Awaiting instructions...",
-      continue: "CONTINUE ►",
-      startup_required: "⚠️ STARTUP REQUIRED"
-    },
-    panel: {
-      system: {
-        title: "System Status",
-        warnings: "Warnings",
-        no_warnings: "No active warnings",
-        labels: {
-          n1: "N1",
-          egt: "EGT",
-          fuel: "Fuel",
-          oil: "Oil",
-          hyd: "Hyd",
-          elec: "Elec",
-          gear: "Gear",
-          flaps: "Flaps"
+      boarding: {
+        default: {
+          0: {
+            title: 'Boarding at ${departure}',
+            content: 'The smell of jet fuel and coffee fills the cabin as passengers stow their luggage. Outside, the ground crew is prepping for our departure. "Welcome aboard ${callsign}," the flight attendant announces over the PA. The ${aircraft} is ready for the journey to ${arrival}.'
+          },
+          1: {
+            title: 'Final Boarding Call',
+            content: 'Passengers are taking their seats. The cabin crew is performing final checks. The captain welcomes everyone aboard. "We have a smooth flight ahead to ${arrival}." The doors will be closing shortly.'
+          },
+          2: {
+            title: 'Pre-flight Checks',
+            content: 'Cockpit preparation is underway. Checking fuel, route, and systems. "Boarding complete," the gate agent confirms. The jetway retracts. We are ready to go.'
+          }
         },
-        gear_state: {
-          up: "UP",
-          down: "DOWN"
+        sunny: {
+            0: {
+                title: 'Sunny Departure',
+                content: 'Sunlight streams through the windows as passengers board. It\'s a beautiful day for flying. "Welcome to ${callsign}," the crew greets everyone warmly.'
+            }
+        },
+        rainy: {
+            0: {
+                title: 'Rainy Boarding',
+                content: 'Rain drums against the fuselage as passengers hurry on board. "Watch your step," the crew advises. A gray day for a flight to ${arrival}.'
+            }
+        },
+        shakespearean: {
+            0: {
+                title: 'The Stage is Set',
+                content: 'Friends, Romans, countrymen, lend me your ears! We embark upon a journey to ${arrival}. The iron bird awaits its masters.'
+            }
+        }
+      },
+      departure_clearance: {
+        default: {
+          0: {
+            title: 'IFR Clearance',
+            content: 'The radio crackles. "${callsign}, cleared to ${arrival} via flight plan route. Climb and maintain FL350. Departure frequency 124.7. Squawk 4211." You read back the clearance as the systems come online.'
+          },
+          1: {
+            title: 'Clearance Delivery',
+            content: '"${callsign}, ready to copy clearance." "Cleared to ${arrival}, maintain 5000, expect FL350 ten minutes after departure." The pen scratches on the pad. "Readback correct."'
+          },
+          2: {
+            title: 'Route Confirmation',
+            content: 'Verifying the route to ${arrival}. "Clearance received," the First Officer nods. Setting up the FMS and checking the squawk code. Ready for pushback.'
+          }
+        },
+        shakespearean: {
+            0: {
+                title: 'Permission Granted',
+                content: 'The gods of the ether have spoken! We are granted passage to the lands of ${arrival}. Let us ascend!'
+            }
+        }
+      },
+      pushback: {
+        default: {
+          0: {
+            title: 'Pushback Approved',
+            content: 'A gentle jolt as the tug connects. "Ground to Cockpit, brakes released." The terminal building slowly drifts away as you start the engines. The hum of the APU is replaced by the roar of the main turbines.'
+          },
+          1: {
+            title: 'Starting Engines',
+            content: '"Pushback complete, set parking brake." "Starting engine 2." The N2 rises, followed by fuel flow and light off. A good start. "Starting engine 1."'
+          },
+          2: {
+            title: 'Better Pushback',
+            content: 'The tug pushes us back onto the taxiway. "Clear to start." The engines whine to life. "Tow bar disconnected, hand signals on the left." We are under our own power.'
+          }
+        },
+        rainy: {
+            0: {
+                title: 'Wet Pushback',
+                content: 'Rain streaks the windshield as we push back. The tarmac glistens under the lights. "Engine start approved." The spray kicks up behind us.'
+            }
+        },
+        shakespearean: {
+            0: {
+                title: 'Backward We Go',
+                content: 'We retreat to advance! The beast awakens, breathing fire and smoke. Release us from our tether!'
+            }
+        }
+      },
+      taxiing: {
+        default: {
+          0: {
+            title: 'Taxi to Runway ${departureRunway}',
+            content: '"${callsign}, taxi to runway ${departureRunway} via Alpha, Bravo." You release the parking brake. The tires thump rhythmically over the concrete joints as you weave through the maze of taxiways. Sunlight glints off the tarmac.'
+          },
+          1: {
+            title: 'Taxi Instructions',
+            content: '"Hold short of runway 27L." We taxi past heavy jets. "Give way to the 747 on your right." Proceeding to the holding point. Flaps set for takeoff.'
+          },
+          2: {
+            title: 'On the Move',
+            content: 'Rolling out to the active runway. Performing flight control checks. "Cabin crew, prepare for takeoff." The long line of planes awaits departure.'
+          }
+        },
+        sunny: {
+            0: {
+                title: 'Bright Taxi',
+                content: 'The sun is blinding as we taxi. Heat haze shimmers over the runway. "Taxi to holding point." Ready to fly.'
+            }
+        },
+        rainy: {
+            0: {
+                title: 'Slippery Taxi',
+                content: 'Wipers on. The taxiway lights reflect in the puddles. "Caution, braking action reported medium." We taxi carefully to the runway.'
+            }
+        },
+        shakespearean: {
+            0: {
+                title: 'The March Begins',
+                content: 'We march towards destiny! The path is winding, but the destination is clear. To the runway!'
+            }
+        }
+      },
+      takeoff_prep: {
+        default: {
+          0: {
+            title: 'Lined Up and Waiting',
+            content: 'Lined up on runway ${departureRunway}. Brakes set. Engines at idle. "Tower, ${callsign} holding in position ${departureRunway}, ready for takeoff." Check flaps, trim, and verify takeoff data.'
+          },
+          1: {
+            title: 'Holding Position',
+            content: 'Waiting for traffic to clear. "Line up and wait, runway ${departureRunway}." We position on the centerline. The runway stretches out before us.'
+          },
+          2: {
+            title: 'Final Checks',
+            content: 'Before takeoff checklist complete. "Approaching departure." Engines stable. "Ready to go?" The captain asks. "Ready," you reply.'
+          }
+        },
+        rookie: {
+            title: 'Ready for Takeoff',
+            content: 'You are on the runway. Push the throttle forward to take off! Pull back on the stick when you reach speed.'
+        },
+        shakespearean: {
+            0: {
+                title: 'The Precipice',
+                content: 'We stand upon the edge of the world! The sky beckons. Shall we fly, or shall we fall?'
+            }
+        }
+      },
+      takeoff: {
+        default: {
+          0: {
+            title: 'Takeoff Clearance',
+            content: 'Lined up on runway ${departureRunway}. "Wind 130 at 8, runway ${departureRunway} cleared for takeoff." Throttles forward. The engines roar to life, pressing you back into the seat. Rotate at Vr.'
+          },
+          1: {
+            title: 'Rolling',
+            content: '"Takeoff thrust set." 80 knots. "V1, Rotate." The nose lifts off the ground. We leave the earth behind.'
+          },
+          2: {
+            title: 'Airborne',
+            content: 'Full power. The runway blurs. Pulling back. The wheels leave the tarmac. "Positive rate, gear up." We are flying.'
+          }
+        },
+        rookie: {
+            title: 'Takeoff!',
+            content: 'Full power! Pull up! You are flying!'
+        },
+        rainy: {
+            0: {
+                title: 'Wet Takeoff',
+                content: 'Spray kicks up from the wheels. Throttles forward. We pierce through the rain and into the clouds.'
+            }
+        },
+        shakespearean: {
+            0: {
+                title: 'Ascension',
+                content: 'We defy gravity! The earth cannot hold us. Up, up, into the heavens!'
+            }
+        }
+      },
+      initial_climb: {
+        default: {
+          0: {
+            title: 'Positive Rate',
+            content: 'The ground falls away beneath you. "Gear up." Punching through the lower cloud layer into the sunlight. The city of ${departure} shrinks into a miniature grid below. Speed increasing to 250 knots.'
+          },
+          1: {
+            title: 'Climbing Out',
+            content: '"Contact Departure." "Climbing to 5000." Flaps up. The view is spectacular. Proceeding on course.'
+          },
+          2: {
+            title: 'Departure',
+            content: 'Turning to intercept the radial. "Maintain 250 knots." The airport is far behind us now. Climbing steadily.'
+          }
+        },
+        rookie: {
+            title: 'Climbing',
+            content: 'Keep climbing! Don\'t go too fast or too slow.'
+        },
+        sunny: {
+            0: {
+                title: 'Sunny Climb',
+                content: 'Breaking through the haze into brilliant sunshine. The world below is a map. Climbing to cruise.'
+            }
+        },
+        rainy: {
+            0: {
+                title: 'Cloudy Climb',
+                content: 'Entering the clouds. Visibility drops. Flying by instruments. Turbulence shakes the wings.'
+            }
+        },
+        shakespearean: {
+            0: {
+                title: 'Higher Still',
+                content: 'We soar on wings of steel! The clouds are our domain. Higher, ever higher!'
+            }
+        }
+      },
+      main_climb: {
+        default: {
+          0: {
+            title: 'Climb to Cruise',
+            content: 'Passing 10,000 feet. "Accelerate to cruise speed." The sky darkens to a deeper blue as we ascend. The air is smooth. Climbing steadily to Flight Level 350.'
+          },
+          1: {
+            title: 'Passing FL180',
+            content: '"Altimeters standard." The air is thin and cold. The engines are efficient here. Settling in for the long haul.'
+          },
+          2: {
+            title: 'High Altitude',
+            content: 'Approaching top of climb. The curve of the earth is visible. "Traffic at 2 o\'clock." We are in the high airways.'
+          }
+        },
+        shakespearean: {
+            0: {
+                title: 'The Summit',
+                content: 'We reach for the stars! The air is thin, but our spirits are high. Onward to the destination!'
+            }
+        }
+      },
+      cruise: {
+        default: {
+          0: {
+            title: 'Cruising at FL350',
+            content: 'Level at 35,000 feet. The horizon is a curved line of haze. "Maintain Mach 0.78." The engines hum with a steady, reassuring rhythm. Passengers are settling in for the flight to ${arrival}.'
+          },
+          1: {
+            title: 'Smooth Flight',
+            content: 'Autopilot is engaged. Monitoring systems. Fuel flow is nominal. "Coffee?" the flight attendant asks. A peaceful journey.'
+          },
+          2: {
+            title: 'Mid-flight',
+            content: 'Halfway there. Checking navigation. Waypoints pass by. The sun sets on the horizon, painting the sky in orange and purple.'
+          }
+        },
+        sunny: {
+            0: {
+                title: 'Clear Skies',
+                content: 'Not a cloud in sight. The ground is visible miles below. Perfect flying weather.'
+            }
+        },
+        shakespearean: {
+            0: {
+                title: 'The Voyage',
+                content: 'We sail the ocean of the sky. The wind is our friend. Peace reigns in the heavens.'
+            }
+        }
+      },
+      descent: {
+        default: {
+          0: {
+            title: 'Top of Descent',
+            content: 'Throttles back. The pitch drops slightly as we begin our descent. "Descend and maintain 10,000 feet." The destination ${arrival} lies ahead.'
+          },
+          1: {
+            title: 'Descending',
+            content: '"Cross constraint at 12,000." Spoilers out to slow down. The city lights of ${arrival} appear in the distance. Preparing for arrival.'
+          },
+          2: {
+            title: 'Arrival Prep',
+            content: 'Checking arrival ATIS. "Altimeters set." Cabin crew prepare for landing. Descending through the clouds.'
+          }
+        },
+        rainy: {
+            0: {
+                title: 'Descent into Rain',
+                content: 'Descending into the gloom. Rain lashes the windows again. "Expect ILS approach." Radar shows storms ahead.'
+            }
+        },
+        shakespearean: {
+            0: {
+                title: 'The Return',
+                content: 'We descend from our throne! The earth reclaims us. Prepare for the return to the mortal coil.'
+            }
+        }
+      },
+      approach: {
+        default: {
+          0: {
+            title: 'Approach to ${arrival}',
+            content: 'Lined up for runway ${landingRunway}. "Gear down, flaps 30." The runway threshold looms ahead through the haze. Speed checked, localized captured.'
+          },
+          1: {
+            title: 'Final Approach',
+            content: '"Cleared to land." Three greens. Checklist complete. Focusing on the touchdown zone. 1000 feet.'
+          },
+          2: {
+            title: 'Short Final',
+            content: '500 feet. Stable approach. "Land check." The runway lights are bright. Almost there.'
+          }
+        },
+        rainy: {
+            0: {
+                title: 'Stormy Approach',
+                content: 'Fighting the crosswind. Wipers on high. The runway appears out of the mist. "Minimums." Continuing.'
+            }
+        },
+        shakespearean: {
+            0: {
+                title: 'The Landing',
+                content: 'The ground rushes to meet us! Steady now, steady. We shall kiss the earth!'
+            }
+        }
+      },
+      landing: {
+        default: {
+          0: {
+            title: 'Touchdown',
+            content: 'Flare... Touchdown. Spoilers deployed. Reverse thrust roaring. "${callsign}, welcome to ${arrival}." Braking to taxi speed.'
+          },
+          1: {
+            title: 'Landed',
+            content: 'Firm touchdown. "Speedbrakes up, reversers normal." Slowing down. "Turn off next taxiway." We made it.'
+          },
+          2: {
+            title: 'Arrival',
+            content: 'Greased it. Smooth rollout. "Welcome to ${arrival}." Passengers applaud. Exiting the runway.'
+          }
+        },
+        rainy: {
+            0: {
+                title: 'Wet Landing',
+                content: 'Hydroplaning risk. Firm landing to break the water tension. Spray everywhere. Slowing safely.'
+            }
+        },
+        shakespearean: {
+            0: {
+                title: 'Safe Return',
+                content: 'We have returned! The journey ends. Glory to the pilots!'
+            }
+        }
+      },
+      after_land_taxiing: {
+        default: {
+          0: {
+            title: 'Taxi to Gate',
+            content: '"Turn left next taxiway, contact Ground." The flight is over. Taxing past other aircraft to our assigned gate.'
+          },
+          1: {
+            title: 'Parking',
+            content: 'Cleaning up the aircraft. Flaps up, lights off. Approaching the terminal. The marshaller waves us in.'
+          },
+          2: {
+            title: 'Gate Arrival',
+            content: 'Turning into the gate. "Stop." Parking brake set. Engines cooling down. Welcome home.'
+          }
+        },
+        shakespearean: {
+            0: {
+                title: 'The End',
+                content: 'The chariot stops. The journey is done. Rest now, weary travelers.'
+            }
+        }
+      },
+      shutoff: {
+        default: {
+          0: {
+            title: 'Engine Shutdown',
+            content: 'Parking brake set. Fuel cutoff. The engines spin down into silence. APU off. "Thank you for flying with us." Flight complete.'
+          },
+          1: {
+            title: 'Debrief',
+            content: 'Completing the logbook. Passengers disembarking. The aircraft is quiet. Job well done.'
+          },
+          2: {
+            title: 'Shutdown',
+            content: 'All systems off. The cockpit goes dark. One last look at the plane. Until next time.'
+          }
+        },
+        shakespearean: {
+            0: {
+                title: 'Silence',
+                content: 'Silence falls. The beast sleeps. Exeunt all.'
+            }
         }
       }
     }
   },
-  narrative: {
-    ...enNarratives,
-    labels: {
-      designation: "DESIGNATION:",
-      background: "BACKGROUND:",
-      mission: "MISSION:",
-      intelligence: "INTELLIGENCE:",
-      accept: "ACCEPT ASSIGNMENT"
+  failures: {
+    engine: {
+      minor: 'Engine ${engineIndex + 1} showing abnormal vibrations. Monitor closely.',
+      critical: 'Engine ${engineIndex + 1} FAILED! Immediate action required!',
+      resolved: 'Engine ${engineIndex + 1} restored to normal operation.'
     },
-    roles: [
-      "Captain", 
-      "Commander", 
-      "Pilot in Command", 
-      "Skipper", 
-      "Chief Pilot"
-    ],
-    experience: {
-      rookie: [
-        "fresh from the flight academy. The ink on your license is barely dry.",
-        "on your first week with the airline. Nerves are high, but so is your ambition.",
-        "still proving yourself to the chief pilot. Every maneuver counts today.",
-        "sitting in the left seat for the first time. Don't forget your training."
-      ],
-      amateur: [
-        "building your flight hours. You know the aircraft, but she still surprises you sometimes.",
-        "gaining confidence with every leg. You've handled calm skies, but today might be different.",
-        "no longer a cadet, but not yet a veteran. The crew looks to you for steady hands.",
-        "starting to feel at home in the cockpit, though the complex systems still demand full attention."
-      ],
-      intermediate: [
-        "a seasoned First Officer ready for upgrade. You know the procedures by heart.",
-        "an experienced pilot with thousands of hours. Standard operations are second nature.",
-        "reliable and steady. The airline trusts you with their most valuable routes.",
-        "competent and focused. You've seen your share of rough weather and technical glitches."
-      ],
-      advanced: [
-        "a senior Captain. Your name is whispered with respect in the crew lounge.",
-        "a veteran of the skies. You've flown through hurricanes and landed with engines out.",
-        "an instructor examiner. You wrote the manual that others are struggling to learn.",
-        "the master of this fleet. The aircraft feels like an extension of your own body."
-      ],
-      pro: [
-        "a legendary aviator. They say you can land on a postage stamp in a crosswind.",
-        "an ace pilot. Systems failures are just an opportunity to show off your skills.",
-        "the best of the best. When others panic, you just check your watch.",
-        "an elite commander. Nothing surprises you anymore, not even total hydraulic loss."
-      ],
-      devil: [
-        "a test pilot pushing the envelope. Safety margins are just suggestions.",
-        "flying a cursed aircraft. The mechanics crossed themselves when you walked out to the tarmac.",
-        "facing the impossible. The odds are stacked against you, just the way you like it.",
-        "about to experience a simulation designed to break you. Good luck."
-      ]
+    hydraulic: {
+      minor: 'Primary hydraulic pressure dropping. Check systems.',
+      critical: 'Primary hydraulic system FAILURE! Manual reversion required!',
+      resolved: 'Hydraulic pressure stabilized. System restored.'
     },
-    flight_plan: [
-      (dep, arr, pax) => `Today's manifest lists ${pax} souls on board for the leg from ${dep} to ${arr}.`,
-      (dep, arr, pax) => `You are cleared for the route from ${dep} to ${arr}, carrying ${pax} passengers depending on you.`,
-      (dep, arr, pax) => `The flight plan is filed: ${dep} departure, destination ${arr}. ${pax} passengers are settling into their seats.`,
-      (dep, arr, pax) => `From the gate at ${dep} to the tarmac at ${arr}, you are responsible for ${pax} lives today.`
-    ],
-    difficulty_desc: {
-      rookie: [
-        "System reports are normal. Focus on your decision-making and standard procedures.",
-        "Expect a routine flight with minor procedural tasks. Your crew is fully supportive.",
-        "A straightforward mission ahead. Minor issues may arise, but nothing you can't handle with basic logic."
-      ],
-      amateur: [
-        "A single, significant operational challenge is anticipated. Keep it simple and follow the checklist.",
-        "You might encounter an impactful situation today, but your crew is ready to assist with the workload.",
-        "Stay alert for one major event. Direct control requirements remain low, letting you focus on management."
-      ],
-      intermediate: [
-        "Prepare for dynamic conditions and potential interference. This leg requires hands-on flying.",
-        "Standard flight protocols apply, but be ready for shifting priorities and active control needs.",
-        "Your crew will follow your commands precisely, but the environment is becoming increasingly unpredictable."
-      ],
-      advanced: [
-        "Multiple critical issues may develop simultaneously. Sharp maneuvers and quick decisions are vital.",
-        "Expect deadly scenarios where hands-on control is non-negotiable. Watch your crew—they may falter under pressure.",
-        "The simulation will test your reflexes today. Dynamic failures require constant attention and manual intervention."
-      ],
-      pro: [
-        "Systematic failures are imminent. Automation is unreliable; you are the primary control loop.",
-        "Complex CRM and skilled maneuvering are required. Your crew is stressed and prone to significant errors.",
-        "Deadly, interconnected issues will challenge every skill you have. Expect a high workload and nervous support."
-      ],
-      devil: [
-        "Total chaos is the forecast. No autopilot, no safety nets, and no reliable assistance.",
-        "The aircraft is pushed beyond its limits. Your crew might actively complicate the situation.",
-        "Forget your training—this is about survival. Every system is a potential threat, and your \"help\" has their own agenda."
-      ]
+    electrical: {
+      minor: 'Electrical bus ${bus} experiencing intermittent power loss.',
+      critical: 'Main electrical bus FAILURE! Emergency power engaged!',
+      resolved: 'Electrical bus power restored to normal levels.'
+    },
+    fuel: {
+      minor: 'Fuel imbalance detected. Crossfeed engaged automatically.',
+      critical: 'Fuel leak detected! Rapid fuel loss occurring!',
+      resolved: 'Fuel imbalance resolved.'
+    },
+    default: {
+      minor: 'System ${type} failure detected.',
+      critical: 'System ${type} CRITICAL FAILURE!',
+      resolved: 'System ${type} restored.'
     }
   },
-  cinematic: {
-    review: {
-      title: "FLIGHT MANIFEST",
-      subtitle: "OFFICIAL DISPATCH DOCUMENT",
-      date: "DATE",
-      time: "TIME",
-      page: "PAGE",
-      sections: {
-      flight_data: "01. FLIGHT DATA",
-      route_logistics: "02. ROUTE LOGISTICS",
-      metar_env: "03. METAR & ENV",
-      risk: "04. OPERATIONAL RISK"
+  ui: {
+    flight: {
+        time_zulu: 'Time (Zulu)',
+        fuel: 'Fuel',
+        pax: 'PAX',
+        distance: 'Dist',
+        altitude: 'Alt',
+        speed: 'Spd',
+        heading: 'Hdg',
+        vertical_speed: 'V/S',
+        throttle: 'THR',
+        flaps: 'Flaps',
+        gear: 'Gear',
+        brakes: 'Brakes',
+        parking_brake: 'Park Brk',
+        spoilers: 'Spoilers',
+        messages: {
+            freq_busy: 'Frequency is busy. Please wait.'
+        }
     },
-    labels: {
-      operator: "OPERATOR",
-      aircraft: "AIRCRAFT",
-      origin: "ORIGIN",
-      destination: "DESTINATION",
-      pax_crew: "PAX/CREW",
-      payload: "PAYLOAD",
-      dep_gate: "DEPARTURE GATE",
-      arr_gate: "ARRIVAL GATE",
-      taxi_out: "TAXIWAY OUT",
-      taxi_in: "TAXIWAY IN",
-      dep_rwy: "DEPARTURE RWY",
-      landing_rwy: "LANDING RWY",
-      sid: "SID",
-      star: "STAR",
-      waypoints: "WAYPOINTS",
-      wind: "WIND",
-      visibility: "VISIBILITY",
-      turbulence: "TURBULENCE",
-      cloud_cover: "CLOUD COVER",
-      difficulty: "DIFFICULTY",
-      failure_mode: "FAILURE MODE"
+    menu: {
+        resume: 'Resume Flight',
+        restart: 'Restart Scenario',
+        settings: 'Settings',
+        quit: 'Quit to Main Menu',
+        language: 'Language / 语言'
     },
-    confidential: "CONFIDENTIAL",
-    button: "ACKNOWLEDGE DISPATCH"
+    systems: {
+        engines: 'Engines',
+        electrics: 'Electrics',
+        hydraulics: 'Hydraulics',
+        fuel: 'Fuel',
+        apu: 'APU',
+        pumps: 'Pumps',
+        generators: 'Gens',
+        batteries: 'Batteries',
+        on: 'ON',
+        off: 'OFF',
+        auto: 'AUTO',
+        avail: 'AVAIL',
+        fault: 'FAULT',
+        low_press: 'LOW PRESS'
+    },
+    startup: {
+        checklist_incomplete: 'Startup Checklist Incomplete',
+        missing_items: 'Missing items: ${items}',
+        cant_proceed: 'Cannot proceed to next phase.',
+        continue_anyway: 'Continue Anyway (Disable Safety)',
+        continue: 'Continue'
     }
   },
-  route_selection: {
-    title: "Detailed Route Selection",
-    mode: "{difficulty} MODE",
-    departure: "Departure ({airport})",
-    arrival: "Arrival ({airport})",
-    gate_ramp: "Gate/Ramp",
-    taxiway: "Taxiway",
-    runway: "Runway",
-    select_runway: "Select Runway",
-    sid: "SID",
-    star: "STAR",
-    enroute: "Enroute",
-    waypoints: "Waypoints",
-    generate: "Generate",
-    confirm: "Confirm Route",
-    skip: "Skip / Auto",
-    cancel: "Cancel",
-    approach: "Approach",
-    final: "Final",
-    placeholder_gate: "e.g. A12",
-    placeholder_taxi: "e.g. A",
-    placeholder_sid: "e.g. OMA12D"
-  },
-  search: {
-    clear: "Clear selection",
-    results_found: "{count} airport(s) found",
-    placeholder_dep: "Search Departure (e.g. LHR, Heathrow)",
-    placeholder_arr: "Search Arrival (e.g. JFK, New York)"
+  initialization: {
+    title: 'Ultimate Crash - Flight Initialization',
+    subtitle: 'Configure your flight parameters and select difficulty level',
+    steps: {
+      1: '01. OPERATIONAL LEVEL & INTEL',
+      2: '02. FLIGHT PARAMETERS',
+      3: '03. ROUTE SELECTION'
+    },
+    difficulty: {
+      rookie: 'ROOKIE',
+      amateur: 'AMATEUR',
+      intermediate: 'INTERMEDIATE',
+      advanced: 'ADVANCED',
+      pro: 'PRO',
+      devil: 'DEVIL'
+    },
+    intel: {
+      label: 'CREW INTELLIGENCE:',
+      descriptions: {
+        rookie: 'Highly supportive. NPCs assist with all checks. Standard procedures strictly followed.',
+        amateur: 'Experienced crew. Reliable support during significant events. NPC will assist.',
+        intermediate: 'Standard operations. Crew follows leads and executes commands precisely.',
+        advanced: 'Competent but prone to hesitation or minor errors under high-stress conditions.',
+        pro: 'High stress. Crew acts nervously and is prone to significant mistakes during emergencies.',
+        devil: 'Independent priorities. Active deviation from procedures possible. Do not rely on assistance.'
+      }
+    },
+    params: {
+      airline: 'AIRLINE',
+      callsign: 'CALLSIGN',
+      aircraft_type: 'AIRCRAFT TYPE',
+      crew_count: 'CREW COUNT',
+      passengers: 'PASSENGERS (PAX)',
+      payload: 'PAYLOAD (KG)',
+      cruise_height: 'CRUISE HEIGHT (FT)',
+      reserve_fuel: 'RESERVE FUEL (HOURS)',
+      zulu_time: 'ZULU TIME',
+      season: 'SEASON',
+      seasons: {
+        Spring: 'SPRING',
+        Summer: 'SUMMER',
+        Autumn: 'AUTUMN',
+        Winter: 'WINTER'
+      },
+      random: 'RANDOM'
+    },
+    route: {
+      departure: 'DEPARTURE AIRPORT',
+      arrival: 'ARRIVAL AIRPORT',
+      summary: {
+        route: 'ROUTE:',
+        distance: 'DISTANCE:',
+        est_time: 'EST. TIME:',
+        fuel_req: 'FUEL REQ:',
+        trip: 'TRIP',
+        rsv: 'RSV',
+        total: 'TOTAL'
+      }
+    },
+    buttons: {
+      next_params: 'NEXT: FLIGHT PARAMETERS →',
+      next_route: 'NEXT: ROUTE SELECTION →',
+      finalize: 'FINALIZE DISPATCH & INITIALIZE'
+    }
   }
 };
 

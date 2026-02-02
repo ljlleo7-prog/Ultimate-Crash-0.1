@@ -18,8 +18,6 @@ import { atcManager } from '../services/ATCLogic';
 import { npcService } from '../services/NPCService';
 import { regionControlService } from '../services/RegionControlService';
 import { checkStartupRequirements, StartupPhases } from '../services/StartupChecklist';
-import { useLanguage } from '../contexts/LanguageContext';
-import LanguageSwitcher from './LanguageSwitcher';
 
 const FlightInProgress = ({ 
   callsign, 
@@ -49,7 +47,7 @@ const FlightInProgress = ({
   physicsModel = 'realistic',
   routeDetails
 }) => {
-  const { t } = useLanguage();
+
 
   const averagePassengerWeight = 90;
   const averageCrewWeight = 90;
@@ -162,32 +160,6 @@ const FlightInProgress = ({
   const [sceneState, setSceneState] = useState(sceneManager.getState());
   const [narrative, setNarrative] = useState(null);
 
-  // Sync sceneState with sceneManager updates
-  useEffect(() => {
-    const handlePhaseChange = (payload) => {
-        setSceneState(prev => ({
-            ...prev,
-            currentPhase: payload.phase
-        }));
-    };
-    
-    const handleTakeoffClearance = () => {
-        console.log('FlightInProgress: Takeoff Clearance Received');
-        setSceneState(prev => ({
-            ...prev,
-            takeoffClearanceReceived: true
-        }));
-    };
-
-    const unsubPhase = eventBus.subscribe('phase.changed', handlePhaseChange);
-    const unsubClearance = eventBus.subscribe('atc.clearance.takeoff', handleTakeoffClearance);
-    
-    return () => {
-        if (unsubPhase) unsubPhase();
-        if (unsubClearance) unsubClearance();
-    };
-  }, []);
-
   // Control Physics Motion based on Phase (Narrative vs Active)
   useEffect(() => {
     if (!setMotionEnabled || !isInitialized) return;
@@ -225,7 +197,7 @@ const FlightInProgress = ({
     if (atcManager.isBusy()) {
         setRadioMessages(prev => [...prev, {
             sender: 'System',
-            text: t('flight.messages.freq_busy'),
+            text: '[FREQUENCY BUSY]',
             timestamp: Date.now(),
             type: 'system'
         }]);
@@ -301,7 +273,7 @@ const FlightInProgress = ({
     const isHardcore = difficulty === 'pro' || difficulty === 'devil';
     return { 
       canContinue: !isHardcore, 
-      missingItems: isHardcore ? [{ key: 'startup.error.systems_not_init' }] : [] 
+      missingItems: isHardcore ? ['System Initialization...'] : [] 
     };
   });
 
@@ -774,8 +746,8 @@ const FlightInProgress = ({
         color: 'white'
       }}>
         <div style={{ textAlign: 'center' }}>
-          <div style={{ fontSize: '24px', marginBottom: '20px' }}>✈️ {t('flight.status.starting')}</div>
-          <div style={{ color: '#4ade80' }}>{t('flight.status.init_physics')}</div>
+          <div style={{ fontSize: '24px', marginBottom: '20px' }}>✈️ Starting Flight Simulation...</div>
+          <div style={{ color: '#4ade80' }}>Initializing physics engine...</div>
         </div>
       </div>
     );
@@ -793,7 +765,7 @@ const FlightInProgress = ({
         color: 'white'
       }}>
         <div style={{ textAlign: 'center' }}>
-          <div style={{ fontSize: '24px', marginBottom: '20px', color: '#ef4444' }}>❌ {t('flight.status.error')}</div>
+          <div style={{ fontSize: '24px', marginBottom: '20px', color: '#ef4444' }}>❌ Initialization Error</div>
           <div style={{ marginBottom: '20px' }}>{error}</div>
           <button 
             onClick={() => window.location.reload()}
@@ -807,7 +779,7 @@ const FlightInProgress = ({
               cursor: 'pointer'
             }}
           >
-            {t('flight.status.reload')}
+            Reload Page
           </button>
         </div>
       </div>
@@ -846,7 +818,7 @@ const FlightInProgress = ({
               marginBottom: '4px'
             }}
           >
-            {(sceneState.currentPhase && t(`initialization.phases.${sceneState.currentPhase.type}`)) || phaseName || t('flight.status.situation')}
+            {phaseName || 'Situation'}
           </div>
           
           {/* Conditional Rendering: Only show narrative in Header if Physics is ACTIVE (PHY-ON) 
@@ -862,7 +834,7 @@ const FlightInProgress = ({
                   marginBottom: '4px'
                 }}
               >
-                {narrative?.title ? t(narrative.title, narrative.data) : t('flight.status.awaiting_instructions')}
+                {narrative?.title || 'Awaiting flight instructions...'}
               </div>
               <div
                 style={{
@@ -872,7 +844,7 @@ const FlightInProgress = ({
                   marginBottom: '8px'
                 }}
               >
-                {narrative?.content ? t(narrative.content, narrative.data) : t('flight.status.prepare_takeoff')}
+                {narrative?.content || 'Prepare for takeoff.'}
               </div>
             </>
           )}
@@ -890,7 +862,7 @@ const FlightInProgress = ({
                 alignItems: 'center',
                 gap: '6px'
               }}>
-                <span>⚠️ {t('flight.status.checklist_incomplete')}</span>
+                <span>⚠️ Checklist Incomplete</span>
               </div>
               <div style={{
                 display: 'flex',
@@ -908,7 +880,7 @@ const FlightInProgress = ({
                     display: 'flex',
                     alignItems: 'center'
                   }}>
-                    <span style={{ marginRight: '6px' }}>☐</span> {typeof item === 'string' ? item : t(item.key, item.params)}
+                    <span style={{ marginRight: '6px' }}>☐</span> {item}
                   </div>
                 ))}
               </div>
@@ -924,7 +896,7 @@ const FlightInProgress = ({
                 color: '#ef4444',
                 marginBottom: '4px'
               }}>
-                {t('flight.status.active_failures')} ({activeFailures.length})
+                Active Failures ({activeFailures.length})
               </div>
               <div style={{
                 display: 'flex',
@@ -941,8 +913,8 @@ const FlightInProgress = ({
                     display: 'flex',
                     justifyContent: 'space-between'
                   }}>
-                    <span>{failure.type.toUpperCase()} {failure.data.engineIndex !== undefined ? `${t('flight.panels.systems.engine_label')} ${failure.data.engineIndex + 1}` : ''}</span>
-                    <span>{failure.isCritical ? t('flight.status.critical') : `${Math.round(failure.progress)}%`}</span>
+                    <span>{failure.type.toUpperCase()} {failure.data.engineIndex !== undefined ? `ENGINE ${failure.data.engineIndex + 1}` : ''}</span>
+                    <span>{failure.isCritical ? 'CRITICAL' : `${Math.round(failure.progress)}%`}</span>
                   </div>
                 ))}
               </div>
@@ -958,9 +930,6 @@ const FlightInProgress = ({
             isChannelBusy={isChannelBusy}
             frequencyType={getFrequencyType(currentFreq)}
           />
-        </div>
-        <div style={{ display: 'flex', alignItems: 'flex-start', paddingTop: '4px' }}>
-            <LanguageSwitcher />
         </div>
       </div>
 
@@ -1257,9 +1226,9 @@ const FlightInProgress = ({
       {isCrashed && (
         <div className="end-scene-overlay">
           <div className="end-scene-content">
-            <div style={{ fontSize: '24px', marginBottom: '12px' }}>{t('flight.status.flight_ended')}</div>
+            <div style={{ fontSize: '24px', marginBottom: '12px' }}>{t('narrative.phases.shutoff.default.0.title') || 'Flight Ended'}</div>
             <div style={{ marginBottom: '20px', maxWidth: '420px' }}>
-              Placeholder: post-incident summary and narrative debrief will appear here.
+              {t('narrative.phases.shutoff.default.2.content') || 'Placeholder: post-incident summary and narrative debrief will appear here.'}
             </div>
             <button
               onClick={() => {
@@ -1276,7 +1245,7 @@ const FlightInProgress = ({
                 fontWeight: 600
               }}
             >
-              {t('flight.status.return_init')}
+              {t('ui.menu.quit') || 'Return to Initialization'}
             </button>
           </div>
         </div>

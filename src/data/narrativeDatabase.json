@@ -395,31 +395,31 @@
   },
   "failures": {
     "engine": {
-      "minor": "narrative.failures.engine.minor",
-      "critical": "narrative.failures.engine.critical",
-      "resolved": "narrative.failures.engine.resolved"
+      "minor": "failures.engine.minor",
+      "critical": "failures.engine.critical",
+      "resolved": "failures.engine.resolved"
     },
     "hydraulic": {
-      "minor": "narrative.failures.hydraulic.minor",
-      "critical": "narrative.failures.hydraulic.critical",
-      "resolved": "narrative.failures.hydraulic.resolved"
+      "minor": "failures.hydraulic.minor",
+      "critical": "failures.hydraulic.critical",
+      "resolved": "failures.hydraulic.resolved"
     },
     "electrical": {
-      "minor": "narrative.failures.electrical.minor",
-      "critical": "narrative.failures.electrical.critical",
-      "resolved": "narrative.failures.electrical.resolved"
+      "minor": "failures.electrical.minor",
+      "critical": "failures.electrical.critical",
+      "resolved": "failures.electrical.resolved"
     },
     "fuel": {
-      "minor": "narrative.failures.fuel.minor",
-      "critical": "narrative.failures.fuel.critical",
-      "resolved": "narrative.failures.fuel.resolved"
+      "minor": "failures.fuel.minor",
+      "critical": "failures.fuel.critical",
+      "resolved": "failures.fuel.resolved"
     }
   },
   "defaults": {
     "failure": {
-      "minor": "narrative.defaults.failure.minor",
-      "critical": "narrative.defaults.failure.critical",
-      "resolved": "narrative.defaults.failure.resolved"
+      "minor": "failures.default.minor",
+      "critical": "failures.default.critical",
+      "resolved": "failures.default.resolved"
     }
   }
 }

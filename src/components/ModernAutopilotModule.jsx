@@ -97,27 +97,37 @@ const ModernAutopilotModule = ({ flightState, setAutopilotTargets, toggleAutopil
         }, flightState.autopilot ? 'AP ON' : 'AP OFF'),
         
         // APP Mode Button
-        React.createElement('button', {
-          style: {
-            padding: '4px 8px',
-            fontSize: '10px',
-            fontWeight: 'bold',
-            borderRadius: '4px',
-            cursor: 'pointer',
-            background: currentMode === 'ILS' ? '#f59e0b' : '#334155', 
-            color: 'white',
-            border: currentMode === 'ILS' ? '1px solid #fbbf24' : '1px solid #475569',
-            transition: 'all 0.2s',
-            opacity: frequencyContext === 'TOWER' ? 1 : 0.5
-          },
-          onClick: () => {
-              if (frequencyContext === 'TOWER') {
-                  setAutopilotMode && setAutopilotMode(currentMode === 'ILS' ? 'HDG' : 'ILS');
-              }
-          },
-          disabled: flightState.hasCrashed || frequencyContext !== 'TOWER',
-          title: frequencyContext !== 'TOWER' ? 'Requires Tower Frequency' : 'Approach Mode'
-        }, 'APP'),
+        (() => {
+            const isILSCaptured = flightState.autopilotDebug?.ils?.locCaptured || flightState.autopilotDebug?.ils?.gsCaptured;
+            const appBg = currentMode === 'ILS' 
+                ? (isILSCaptured ? '#22c55e' : '#f59e0b') 
+                : '#334155';
+            const appBorder = currentMode === 'ILS'
+                ? (isILSCaptured ? '1px solid #4ade80' : '1px solid #fbbf24')
+                : '1px solid #475569';
+
+            return React.createElement('button', {
+              style: {
+                padding: '4px 8px',
+                fontSize: '10px',
+                fontWeight: 'bold',
+                borderRadius: '4px',
+                cursor: 'pointer',
+                background: appBg, 
+                color: 'white',
+                border: appBorder,
+                transition: 'all 0.2s',
+                opacity: frequencyContext === 'TOWER' ? 1 : 0.5
+              },
+              onClick: () => {
+                  if (frequencyContext === 'TOWER') {
+                      setAutopilotMode && setAutopilotMode(currentMode === 'ILS' ? 'HDG' : 'ILS');
+                  }
+              },
+              disabled: flightState.hasCrashed || frequencyContext !== 'TOWER',
+              title: frequencyContext !== 'TOWER' ? 'Requires Tower Frequency' : (isILSCaptured ? 'Approach Captured' : 'Approach Armed')
+            }, 'APP');
+        })(),
 
         // Mode Toggle
         React.createElement('button', {

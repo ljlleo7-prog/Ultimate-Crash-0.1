@@ -11,13 +11,13 @@ import RouteSelectionFrame from './components/RouteSelectionFrame.jsx';
 import NarrativeScene from './components/NarrativeScene.jsx';
 import { generateInitialWeather, updateWeather } from './services/weatherService';
 import { getRunwayHeading } from './utils/routeGenerator';
-import { useLanguage } from './contexts/LanguageContext';
-import LanguageSwitcher from './components/LanguageSwitcher.jsx';
 
 import { FadeOverlay, CinematicReview } from './components/CinematicComponents.jsx';
+import { LanguageProvider } from './contexts/LanguageContext';
+import LanguageSwitcher from './components/LanguageSwitcher';
+import Header from './components/Header';
 
 function App() {
-  const { t } = useLanguage();
   // Add development mode flag
   const [devMode, setDevMode] = useState(false);
   
@@ -136,7 +136,7 @@ function App() {
 
   const handleInitializeFlight = () => {
     if (!selectedDeparture || !selectedArrival) {
-      alert(t('initialization.messages.select_airports'));
+      alert('Please select both departure and arrival airports');
       return;
     }
     setShowRouteSelection(true);
@@ -267,8 +267,10 @@ function App() {
 
   // Cinematic UI components
   if (cinematicPhase !== 'none') {
-    return React.createElement('div', { className: `cinematic-container ${cinematicPhase}` },
-      cinematicPhase === 'fade_out' && React.createElement(FadeOverlay, { phase: 'fade-out' },
+    return React.createElement(LanguageProvider, null,
+      React.createElement('div', { className: `cinematic-container ${cinematicPhase}` },
+        React.createElement(LanguageSwitcher, { style: { position: 'absolute', top: '20px', right: '20px', zIndex: 2000 } }),
+        cinematicPhase === 'fade_out' && React.createElement(FadeOverlay, { phase: 'fade-out' },
         React.createElement('div', { className: 'fade-content' },
           React.createElement('h1', null, 'Initializing Flight Simulation'),
           React.createElement('p', null, 'Preparing for takeoff...')
@@ -308,12 +310,14 @@ function App() {
           React.createElement('p', null, 'Flight controls are now available')
         )
       )
-    );
+    ));
   }
 
   if (flightInitialized) {
-    return React.createElement(FlightInProgress, {
-      callsign: callsign,
+    return React.createElement(LanguageProvider, null,
+      React.createElement(LanguageSwitcher, { style: { position: 'fixed', top: '10px', right: '120px', zIndex: 2000 } }),
+      React.createElement(FlightInProgress, {
+        callsign: callsign,
       aircraftModel: aircraftModel,
       difficulty: difficulty,
       selectedDeparture: selectedDeparture,
@@ -338,52 +342,15 @@ function App() {
       failureType: failureType,
       crewCount: crewCount,
       routeDetails: detailedRoute
-    });
+    }));
   }
 
-  return React.createElement('div', { className: 'App' },
-    React.createElement('header', { className: 'app-header' },
-      React.createElement('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', width: '100%' } },
-        React.createElement('div', null,
-          React.createElement('h1', null, 'Ultimate Crash - ' + t('initialization.title')),
-          React.createElement('p', null, t('initialization.subtitle'))
-        ),
-        React.createElement(LanguageSwitcher)
-      ),
-      // Development mode toggle
-      React.createElement('div', { className: 'dev-mode-toggle', style: { marginTop: '10px' } },
-        React.createElement('button', {
-          onClick: () => setDevMode(!devMode),
-          style: {
-            backgroundColor: devMode ? '#ff6b6b' : '#4ecdc4',
-            color: 'white',
-            border: 'none',
-            padding: '8px 16px',
-            borderRadius: '4px',
-            cursor: 'pointer',
-            fontSize: '12px'
-          }
-        }, devMode ? '🔧 ' + t('common.devMode') + ': ON' : '🔧 ' + t('common.devMode') + ': OFF')
-      ),
-      // Development mode quick start button
-      devMode && React.createElement('div', { className: 'dev-start', style: { marginTop: '10px' } },
-        React.createElement('button', {
-          onClick: handleDevStart,
-          style: {
-            backgroundColor: '#ff4757',
-            color: 'white',
-            border: 'none',
-            padding: '12px 24px',
-            borderRadius: '6px',
-            cursor: 'pointer',
-            fontSize: '14px',
-            fontWeight: 'bold'
-          }
-        }, '🚀 Quick Start Physics Test')
-      )
-    ),
+  return React.createElement(LanguageProvider, null,
+    React.createElement('div', { className: 'App' },
+      React.createElement(LanguageSwitcher, { style: { position: 'absolute', top: '20px', right: '20px' } }),
+      React.createElement(Header, { devMode, setDevMode, handleDevStart }),
 
-    React.createElement('main', { className: 'app-main' },
+      React.createElement('main', { className: 'app-main' },
       showRouteSelection ? React.createElement(RouteSelectionFrame, {
         isOpen: showRouteSelection,
         onConfirm: handleRouteConfirm,
@@ -443,7 +410,7 @@ function App() {
     React.createElement('footer', { className: 'app-footer' },
       React.createElement('p', null, '©2026, GeeksProductionStudio. All Rights Reserved.')
     )
-  );
+  ));
 }
 
 export default App;

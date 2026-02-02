@@ -1,10 +1,8 @@
 
 import React, { useState, useEffect } from 'react';
 import { RADIO_TEMPLATES } from '../data/radioTemplates';
-import { useLanguage } from '../contexts/LanguageContext';
 
 const RadioActionPanel = ({ onTransmit, currentStation = 'Unicom', callsign = 'Cessna 172', flightPlan, isChannelBusy, frequencyType = 'UNICOM' }) => {
-  const { t } = useLanguage();
   const [activeTab, setActiveTab] = useState('REQUEST');
   const [selectedTemplate, setSelectedTemplate] = useState(null);
   const [paramValues, setParamValues] = useState({});
@@ -150,7 +148,7 @@ const RadioActionPanel = ({ onTransmit, currentStation = 'Unicom', callsign = 'C
                 onClick={() => setSelectedTemplate(null)}
                 style={{ background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer', fontSize: '9px' }}
               >
-                {t('common.cancel')}
+                Cancel
               </button>
             </div>
 
@@ -172,7 +170,7 @@ const RadioActionPanel = ({ onTransmit, currentStation = 'Unicom', callsign = 'C
                       cursor: 'pointer'
                     }}
                   >
-                    <option value="">{t('common.select')}</option>
+                    <option value="">Select...</option>
                     {validWaypoints.map(wp => (
                       <option key={wp} value={wp}>{wp}</option>
                     ))}
@@ -231,7 +229,7 @@ const RadioActionPanel = ({ onTransmit, currentStation = 'Unicom', callsign = 'C
                 cursor: isChannelBusy ? 'not-allowed' : 'pointer'
               }}
             >
-              {isChannelBusy ? t('flight.panels.radio.freq_busy') : t('flight.panels.radio.transmit')}
+              {isChannelBusy ? 'FREQ BUSY' : 'TRANSMIT'}
             </button>
           </form>
         )}

@@ -2,7 +2,6 @@
 import React, { useState, useEffect } from 'react';
 import './RouteSelectionFrame.css';
 import { generateWaypoints, generateSID, generateSTAR, generateGate, generateTaxiway, getRunways, generateRouteWaypoints, generateSmartRoute } from '../utils/routeGenerator';
-import { useLanguage } from '../contexts/LanguageContext';
 
 const RouteSelectionFrame = ({ 
   isOpen, 
@@ -12,7 +11,6 @@ const RouteSelectionFrame = ({
   departure, 
   arrival 
 }) => {
-  const { t } = useLanguage();
   const [routeData, setRouteData] = useState({
     departureGate: '',
     departureTaxiway: '',
@@ -135,54 +133,54 @@ const RouteSelectionFrame = ({
   return (
     <div className="route-selection-overlay">
       <div className="route-selection-frame">
-        <h2>{t('route_selection.title')}</h2>
-        <div className="route-difficulty-badge">{t('route_selection.mode', { difficulty: difficulty.toUpperCase() })}</div>
+        <h2>Detailed Route Selection</h2>
+        <div className="route-difficulty-badge">{difficulty.toUpperCase()} MODE</div>
         
         <div className="route-grid">
           {/* Departure Section */}
           <div className="route-section">
-            <h3>{t('route_selection.departure', { airport: departure?.iata })}</h3>
+            <h3>Departure ({departure?.iata})</h3>
             
             <div className="form-group">
-              <label>{t('route_selection.gate_ramp')}</label>
+              <label>Gate/Ramp</label>
               <input 
                 type="text" 
                 value={routeData.departureGate} 
                 onChange={(e) => handleChange('departureGate', e.target.value)}
-                placeholder={t('route_selection.placeholder_gate')}
+                placeholder="e.g. A12"
               />
               <button className="generate-btn" onClick={() => handleChange('departureGate', generateGate())}>🎲</button>
             </div>
 
             <div className="form-group">
-              <label>{t('route_selection.taxiway')}</label>
+              <label>Taxiway</label>
               <input 
                 type="text" 
                 value={routeData.departureTaxiway} 
                 onChange={(e) => handleChange('departureTaxiway', e.target.value)}
-                placeholder={t('route_selection.placeholder_taxi')}
+                placeholder="e.g. A"
               />
             </div>
 
             <div className="form-group">
-              <label>{t('route_selection.runway')}</label>
+              <label>Runway</label>
               <select 
                 value={routeData.departureRunway} 
                 onChange={(e) => handleChange('departureRunway', e.target.value)}
               >
-                <option value="">{t('route_selection.select_runway')}</option>
+                <option value="">Select Runway</option>
                 {availableRunwaysDep.map(r => <option key={r} value={r}>{r}</option>)}
               </select>
             </div>
 
             {showSidStarFields && (
               <div className="form-group">
-                <label>{t('route_selection.sid')}</label>
+                <label>SID</label>
                 <input 
                   type="text" 
                   value={routeData.sid} 
                   onChange={(e) => handleChange('sid', e.target.value)}
-                  placeholder={t('route_selection.placeholder_sid')}
+                  placeholder="e.g. OMA12D"
                 />
                 <button className="generate-btn" onClick={() => handleChange('sid', generateSID((routeData.waypoints[0] && routeData.waypoints[0].name) || 'ABC'))}>🎲</button>
               </div>
@@ -192,16 +190,16 @@ const RouteSelectionFrame = ({
           {/* Enroute Section */}
           {showWaypoints && (
             <div className="route-section center-section">
-              <h3>{t('route_selection.enroute')}</h3>
+              <h3>Enroute</h3>
               <div className="form-group full-width">
-                 <label>{t('route_selection.waypoints')}</label>
+                 <label>Waypoints</label>
                  <div className="waypoints-display">
                     {Array.isArray(routeData.waypoints) && routeData.waypoints.length > 0
                       ? routeData.waypoints.map(wp => typeof wp === 'string' ? wp : (wp.name || 'WPT')).join(' ➝ ')
                       : ''}
                  </div>
                  <button className="action-btn" onClick={handleGenerateWaypoints} disabled={isGeneratingRoute}>
-                   {isGeneratingRoute ? t('common.loading') : t('route_selection.generate')}
+                   {isGeneratingRoute ? 'Generating...' : 'Generate New Route'}
                  </button>
               </div>
             </div>
@@ -209,11 +207,11 @@ const RouteSelectionFrame = ({
 
           {/* Arrival Section */}
           <div className="route-section">
-            <h3>{t('route_selection.arrival', { airport: arrival?.iata })}</h3>
+            <h3>Arrival ({arrival?.iata})</h3>
             
             {showSidStarFields && (
               <div className="form-group">
-                <label>{t('route_selection.star')}</label>
+                <label>STAR</label>
                 <input 
                   type="text" 
                   value={routeData.star} 
@@ -225,33 +223,33 @@ const RouteSelectionFrame = ({
             )}
 
              <div className="form-group">
-              <label>{t('route_selection.runway')}</label>
+              <label>Runway</label>
               <select 
                 value={routeData.landingRunway} 
                 onChange={(e) => handleChange('landingRunway', e.target.value)}
               >
-                <option value="">{t('route_selection.select_runway')}</option>
+                <option value="">Select Runway</option>
                 {availableRunwaysArr.map(r => <option key={r} value={r}>{r}</option>)}
               </select>
             </div>
 
             <div className="form-group">
-              <label>{t('route_selection.taxiway')}</label>
+              <label>Taxiway</label>
               <input 
                 type="text" 
                 value={routeData.landingTaxiway} 
                 onChange={(e) => handleChange('landingTaxiway', e.target.value)}
-                placeholder={t('route_selection.placeholder_taxi')}
+                placeholder="e.g. B"
               />
             </div>
 
             <div className="form-group">
-              <label>{t('route_selection.gate_ramp')}</label>
+              <label>Gate/Ramp</label>
               <input 
                 type="text" 
                 value={routeData.arrivalGate} 
                 onChange={(e) => handleChange('arrivalGate', e.target.value)}
-                placeholder={t('route_selection.placeholder_gate')}
+                placeholder="e.g. D05"
               />
               <button className="generate-btn" onClick={() => handleChange('arrivalGate', generateGate())}>🎲</button>
             </div>
@@ -261,7 +259,7 @@ const RouteSelectionFrame = ({
         <div className="route-actions">
           {showSkip && (
             <button className="skip-btn" onClick={onSkip}>
-              {t('route_selection.skip')}
+              Skip (Use Defaults)
             </button>
           )}
           <button 
@@ -269,7 +267,7 @@ const RouteSelectionFrame = ({
             onClick={() => onConfirm(routeData)}
             disabled={!isFormValid()}
           >
-            {t('route_selection.confirm')}
+            Confirm Flight Plan
           </button>
         </div>
       </div>

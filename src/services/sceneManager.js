@@ -318,11 +318,14 @@ class SceneManager {
   
   // Apply random template (unless rookie mode operational phase)
   applyNarrativeTemplate(narrative, phaseType) {
-    // Legacy template system disabled to support internationalization via narrativeDatabase.json
-    // const template = getRandomTemplate(phaseType);
-    // if (template) {
-    //     return { ...narrative, ...template };
-    // }
+    if (this.scenario.difficulty === 'rookie' && 
+        [FlightPhases.TAKEOFF_PREP, FlightPhases.TAKEOFF, FlightPhases.INITIAL_CLIMB].includes(phaseType)) {
+        return narrative;
+    }
+    const template = getRandomTemplate(phaseType);
+    if (template) {
+        return { ...narrative, ...template };
+    }
     return narrative;
   }
 
@@ -595,9 +598,8 @@ class SceneManager {
                             const now = Date.now();
                             if (now - lastWarnTime > 2000) {
                                 this.publishNarrative({
-                                    title: 'flight.status.checklist_incomplete',
-                                    content: 'flight.alerts.checklist_incomplete_content',
-                                    data: { missingItems: checklistResult.missingItems },
+                                    title: 'Startup Checklist Incomplete',
+                                    content: `Cannot proceed to next phase. Missing: ${checklistResult.missingItems.join(', ')}`,
                                     severity: 'warning'
                                 });
                                 this.lastChecklistWarningTime = now;
@@ -676,9 +678,8 @@ class SceneManager {
                             const now = Date.now();
                             if (now - lastWarnTime > 2000) {
                                 this.publishNarrative({
-                                    title: 'flight.status.checklist_incomplete',
-                                    content: 'flight.alerts.checklist_incomplete_content',
-                                    data: { missingItems: checklistResult.missingItems },
+                                    title: 'Startup Checklist Incomplete',
+                                    content: `Cannot proceed to next phase. Missing: ${checklistResult.missingItems.join(', ')}`,
                                     severity: 'warning'
                                 });
                                 this.lastChecklistWarningTime = now;
@@ -757,10 +758,9 @@ class SceneManager {
     
     // Create narrative for failure
     this.publishNarrative({
-      title: 'narrative.failures.title.alert',
+      title: 'System Alert',
       content: this.getFailureNarrative(failure),
-      severity: 'warning',
-      data: failure.data
+      severity: 'warning'
     });
   }
   
@@ -784,10 +784,9 @@ class SceneManager {
         });
         
         this.publishNarrative({
-          title: 'narrative.failures.title.critical',
+          title: 'Critical Failure Alert',
           content: this.getCriticalFailureNarrative(failure),
-          severity: 'critical',
-          data: failure.data
+          severity: 'critical'
         });
       }
       
@@ -816,46 +815,43 @@ class SceneManager {
     
     if (resolvedByUser) {
       this.publishNarrative({
-        title: 'narrative.failures.title.restored',
+        title: 'System Restored',
         content: this.getResolutionNarrative(failure),
-        severity: 'success',
-        data: failure.data
+        severity: 'success'
       });
     }
   }
   
   // Publish narrative message
   publishNarrative(narrative) {
-    // Create a context with scenario data and provided data for translation
-    const context = {
-      callsign: this.scenario.callsign || 'Flight 123',
-      departure: this.scenario.departure || 'Unknown',
-      arrival: this.scenario.arrival || 'Unknown',
-      aircraft: this.scenario.aircraftModel || 'Unknown Aircraft',
-      difficulty: this.scenario.difficulty || 'Unknown',
-      ...narrative.data
-    };
-
-    // If title/content contains ${} templates (legacy), parse them.
-    // If they are translation keys (no ${}), pass them through.
-    const hasTemplate = (str) => str && str.includes('${');
+    // If we have data, we should pass it along so the UI can interpolate it
+    // But we should NOT try to interpolate the English string here if we want translation support
     
-    const parsedTitle = hasTemplate(narrative.title) 
-      ? this.parseTemplate(narrative.title, narrative.data) 
-      : narrative.title;
-      
-    const parsedContent = hasTemplate(narrative.content) 
-      ? this.parseTemplate(narrative.content, narrative.data) 
-      : narrative.content;
+    // Check if the title/content is a key (e.g. "narrative.phases.boarding.title")
+    // If it is, we pass it as is. If it's a raw string, we also pass it as is.
+    
+    // HOWEVER, for legacy support, if we are interpolating variables into English text,
+    // we need to be careful. The new system expects keys.
+    
+    // Correct approach: Pass the key and the data separately.
+    // The UI (LanguageContext) will handle looking up the key and interpolating the data.
     
     const narrativeEntry = {
       id: `narrative-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
       timestamp: this.totalElapsed,
       phaseId: this.currentPhase()?.id,
-      title: parsedTitle,
-      content: parsedContent,
+      title: narrative.title, // Pass raw key
+      content: narrative.content, // Pass raw key
       severity: narrative.severity,
-      data: context // Pass full context to UI for translation interpolation
+      // Enrich data with scenario context for interpolation
+      data: {
+        callsign: this.scenario.callsign || 'Flight 123',
+        departure: this.scenario.departure || 'Unknown',
+        arrival: this.scenario.arrival || 'Unknown',
+        aircraft: this.scenario.aircraftModel || 'Unknown Aircraft',
+        difficulty: this.scenario.difficulty || 'Unknown',
+        ...narrative.data
+      }
     };
     
     this.narrativeHistory.push(narrativeEntry);
@@ -896,22 +892,22 @@ class SceneManager {
   // Generate narrative text for failures
   getFailureNarrative(failure) {
     const failureData = narrativeData.failures[failure.type] || narrativeData.defaults.failure;
-    const template = failureData.minor;
-    return this.parseTemplate(template, failure.data);
+    // Return key, not interpolated string
+    return failureData.minor;
   }
   
   // Generate critical failure narrative
   getCriticalFailureNarrative(failure) {
     const failureData = narrativeData.failures[failure.type] || narrativeData.defaults.failure;
-    const template = failureData.critical;
-    return this.parseTemplate(template, failure.data);
+    // Return key
+    return failureData.critical;
   }
   
   // Generate resolution narrative
   getResolutionNarrative(failure) {
     const failureData = narrativeData.failures[failure.type] || narrativeData.defaults.failure;
-    const template = failureData.resolved;
-    return this.parseTemplate(template, failure.data);
+    // Return key
+    return failureData.resolved;
   }
 
   physicsActive() {

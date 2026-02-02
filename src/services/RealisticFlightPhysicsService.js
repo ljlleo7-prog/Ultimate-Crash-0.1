@@ -2183,6 +2183,12 @@ class RealisticFlightPhysicsService {
         this.runwayGeometry = geometry;
         if (this.autopilot && typeof this.autopilot.setRunwayGeometry === 'function') {
             this.autopilot.setRunwayGeometry(geometry);
+            
+            // Auto-tune NAV1 Frequency if available
+            if (geometry.ilsFrequency && typeof this.autopilot.setNavFrequency === 'function') {
+                this.autopilot.setNavFrequency(geometry.ilsFrequency);
+                console.log(`📻 Physics Service: Auto-tuned NAV1 to ${geometry.ilsFrequency} MHz for ${geometry.runwayName}`);
+            }
         }
         console.log("Physics Service: Runway Geometry Set", geometry);
     }

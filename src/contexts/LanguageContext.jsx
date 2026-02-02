@@ -1,55 +1,60 @@
 import React, { createContext, useState, useContext, useEffect } from 'react';
-import en from '../locales/en';
-import zh from '../locales/zh';
+import en from '../locales/en.js';
+import zh from '../locales/zh.js';
 
 const LanguageContext = createContext();
 
-const translations = {
-  en,
-  zh
-};
-
 export const LanguageProvider = ({ children }) => {
-  const [language, setLanguage] = useState(() => {
-    const saved = localStorage.getItem('app_language');
-    return saved || 'en';
-  });
+  // Default to English, or detect browser language if desired
+  const [language, setLanguage] = useState('en');
+  const [translations, setTranslations] = useState(en);
 
   useEffect(() => {
-    localStorage.setItem('app_language', language);
-    document.documentElement.lang = language;
+    // Update translations when language changes
+    setTranslations(language === 'zh' ? zh : en);
   }, [language]);
 
-  const t = (key, params = {}) => {
-    const keys = key.split('.');
-    let value = translations[language];
-    
-    for (const k of keys) {
-      if (value && value[k]) {
-        value = value[k];
-      } else {
-        // Fallback to English if key missing
-        let fallback = translations['en'];
-        for (const fk of keys) {
-          if (fallback && fallback[fk]) {
-            fallback = fallback[fk];
-          } else {
-            return key; // Return key if not found
-          }
-        }
-        return typeof fallback === 'string' ? replaceParams(fallback, params) : fallback;
-      }
-    }
-    return typeof value === 'string' ? replaceParams(value, params) : value;
+  const toggleLanguage = () => {
+    setLanguage(prev => (prev === 'en' ? 'zh' : 'en'));
   };
 
-  const replaceParams = (text, params) => {
-    if (!params) return text;
-    return text.replace(/\{(\w+)\}/g, (_, k) => params[k] !== undefined ? params[k] : `{${k}}`);
+  const t = (key, params = {}) => {
+    if (!key || typeof key !== 'string') return key || '';
+    
+    // Handle nested keys (e.g., "narrative.phases.boarding.title")
+    const keys = key.split('.');
+    let value = translations;
+    
+    for (const k of keys) {
+      if (value && value[k] !== undefined) {
+        value = value[k];
+      } else {
+        // Fallback to English if missing in current language
+        let fallbackValue = en;
+        for (const fk of keys) {
+            if (fallbackValue && fallbackValue[fk] !== undefined) {
+                fallbackValue = fallbackValue[fk];
+            } else {
+                return key; // Return key if not found in fallback either
+            }
+        }
+        value = fallbackValue;
+        break; // Found in fallback
+      }
+    }
+
+    // Handle template replacement (e.g., "${callsign}")
+    if (typeof value === 'string') {
+      return value.replace(/\$\{(\w+)\}/g, (match, param) => {
+        return params[param] !== undefined ? params[param] : match;
+      });
+    }
+
+    return value;
   };
 
   return (
-    <LanguageContext.Provider value={{ language, setLanguage, t }}>
+    <LanguageContext.Provider value={{ language, setLanguage, toggleLanguage, t }}>
       {children}
     </LanguageContext.Provider>
   );

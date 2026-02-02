@@ -1,5 +1,4 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { useLanguage } from '../contexts/LanguageContext';
 
 // Import modular components
 import CrashWarningFlash from './CrashWarningFlash';
@@ -20,6 +19,7 @@ import TimerPanel from './TimerPanel';
 import FlightComputerPanel from './FlightComputerPanel';
 import ChecklistPanel from './ChecklistPanel';
 import SystemStatusPanel from './SystemStatusPanel';
+import { useLanguage } from '../contexts/LanguageContext';
 import './FlightPanel.css';
 
 const FlightPanelModular = ({ flightData, physicsState, weatherData, onActionRequest, aircraftModel, selectedArrival, flightPlan, radioMessages, onRadioFreqChange, npcs, frequencyContext, currentRegion, timeScale, setTimeScale, onUpdateFlightPlan, availableRunways, startupStatus }) => {
@@ -157,6 +157,7 @@ const FlightPanelModular = ({ flightData, physicsState, weatherData, onActionReq
         // Autopilot - Update from physics service status
         autopilot: flightData.autopilotEngaged || false, // ✅ Use physics service status
         autopilotMode: flightData.autopilotMode || prevState.autopilotMode || 'LNAV',
+        autopilotDebug: flightData.autopilotDebug || {}, // Pass debug state
         flightDirector: prevState.flightDirector,
         altitudeHold: prevState.altitudeHold,
         headingHold: prevState.headingHold,
@@ -387,14 +388,14 @@ const FlightPanelModular = ({ flightData, physicsState, weatherData, onActionReq
               color: '#4ade80',
               textShadow: '0 0 20px rgba(74, 222, 128, 0.3)'
             }
-          }, flightState.currentNarrative?.title || flightState.flightPhase),
+          }, t(flightState.currentNarrative?.title, flightState.currentNarrative?.data) || flightState.flightPhase),
           React.createElement('p', {
             style: {
               fontSize: '1.5rem',
               lineHeight: '1.6',
               color: '#cbd5e1'
             }
-          }, flightState.currentNarrative?.content || "Awaiting instructions...")
+          }, t(flightState.currentNarrative?.content, flightState.currentNarrative?.data) || "Awaiting instructions...")
         ),
 
         // Communication Module (Immersive Style)
@@ -456,7 +457,7 @@ const FlightPanelModular = ({ flightData, physicsState, weatherData, onActionReq
               e.target.style.opacity = 0.8;
               e.target.style.boxShadow = 'none';
             }
-          }, t('flight.immersive.continue')),
+          }, `${t('ui.startup.continue') || 'CONTINUE'} ►`),
           
           // Startup Requirements Tooltip
           startupStatus && !startupStatus.canContinue && startupStatus.missingItems && startupStatus.missingItems.length > 0 &&
@@ -477,10 +478,10 @@ const FlightPanelModular = ({ flightData, physicsState, weatherData, onActionReq
               minWidth: '200px'
             }
           },
-            React.createElement('div', { style: { fontWeight: 'bold', marginBottom: '6px', color: '#ef4444', borderBottom: '1px solid rgba(239, 68, 68, 0.3)', paddingBottom: '4px' } }, t('flight.immersive.startup_required')),
-            startupStatus.missingItems.map(item => React.createElement('div', { key: typeof item === 'string' ? item : item.key, style: { marginBottom: '2px', display: 'flex', alignItems: 'center' } }, 
+            React.createElement('div', { style: { fontWeight: 'bold', marginBottom: '6px', color: '#ef4444', borderBottom: '1px solid rgba(239, 68, 68, 0.3)', paddingBottom: '4px' } }, `⚠️ ${t('ui.startup.checklist_incomplete') || 'STARTUP REQUIRED'}`),
+            startupStatus.missingItems.map(item => React.createElement('div', { key: item, style: { marginBottom: '2px', display: 'flex', alignItems: 'center' } }, 
                React.createElement('span', { style: { color: '#ef4444', marginRight: '6px' } }, '×'),
-               typeof item === 'string' ? item : t(item.key, item.params)
+               item // Items like 'engines' might need translation too, but let's stick to narrative for now
             ))
           )
         )

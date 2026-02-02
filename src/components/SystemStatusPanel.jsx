@@ -14,44 +14,44 @@ const SystemStatusPanel = ({ flightState }) => {
 
   return (
     <div className="system-status-panel" style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
-      <h3 style={{ margin: '5px 0', textAlign: 'center', borderBottom: '1px solid #444' }}>{t('flight.panel.system.title')}</h3>
+      <h3 style={{ margin: '5px 0', textAlign: 'center', borderBottom: '1px solid #444' }}>{t('ui.systems.status') || 'System Status'}</h3>
       
       <div className="panel-content" style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
         {/* Left Column: System Values */}
         <div className="system-values" style={{ flex: 1, padding: '5px', overflowY: 'auto', borderRight: '1px solid #444' }}>
           <div className="system-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '5px' }}>
             <div className="system-item">
-              <span className="label">{t('flight.panel.system.labels.n1')}</span>
+              <span className="label">N1</span>
               <span className="value">{flightState.engineN1 ? flightState.engineN1.map(v => formatValue(v, 1)).join(' | ') : '0'}%</span>
             </div>
             <div className="system-item">
-              <span className="label">{t('flight.panel.system.labels.egt')}</span>
+              <span className="label">EGT</span>
               <span className="value">{flightState.engineEGT ? flightState.engineEGT.map(v => formatValue(v)).join(' | ') : '0'}°C</span>
             </div>
             <div className="system-item">
-              <span className="label">{t('flight.panel.system.labels.fuel')}</span>
+              <span className="label">{t('ui.flight.fuel')}</span>
               <span className="value">{formatValue(flightState.fuel)}</span>
             </div>
             <div className="system-item">
-              <span className="label">{t('flight.panel.system.labels.oil')}</span>
+              <span className="label">Oil</span>
               <span className="value">{formatValue(flightState.oilPressure)}psi</span>
             </div>
             <div className="system-item">
-              <span className="label">{t('flight.panel.system.labels.hyd')}</span>
+              <span className="label">{t('ui.systems.hydraulics').substring(0, 3)}</span>
               <span className="value">{formatValue(flightState.hydraulicPressure)}psi</span>
             </div>
             <div className="system-item">
-              <span className="label">{t('flight.panel.system.labels.elec')}</span>
+              <span className="label">{t('ui.systems.electrics').substring(0, 4)}</span>
               <span className="value">{formatValue(flightState.electricalVoltage, 1)}V</span>
             </div>
             <div className="system-item">
-              <span className="label">{t('flight.panel.system.labels.gear')}</span>
+              <span className="label">{t('ui.flight.gear')}</span>
               <span className={`value ${flightState.gearDown ? 'down' : 'up'}`}>
-                {flightState.gearDown ? t('flight.panel.system.gear_state.down') : t('flight.panel.system.gear_state.up')}
+                {flightState.gearDown ? t('ui.systems.on') : t('ui.systems.off')}
               </span>
             </div>
             <div className="system-item">
-              <span className="label">{t('flight.panel.system.labels.flaps')}</span>
+              <span className="label">{t('ui.flight.flaps')}</span>
               <span className="value">{formatValue(flightState.flaps)}°</span>
             </div>
           </div>
@@ -59,9 +59,9 @@ const SystemStatusPanel = ({ flightState }) => {
 
         {/* Right Column: Warnings Log */}
         <div className="warnings-log" style={{ flex: 1, padding: '5px', overflowY: 'auto', display: 'flex', flexDirection: 'column' }}>
-            <h4 style={{ margin: '0 0 5px 0', fontSize: '0.9em', color: '#aaa' }}>{t('flight.panel.system.warnings')}</h4>
+            <h4 style={{ margin: '0 0 5px 0', fontSize: '0.9em', color: '#aaa' }}>Warnings</h4>
             {warnings.length === 0 ? (
-                <div style={{ color: '#555', fontStyle: 'italic', fontSize: '0.8em' }}>{t('flight.panel.system.no_warnings')}</div>
+                <div style={{ color: '#555', fontStyle: 'italic', fontSize: '0.8em' }}>No active warnings</div>
             ) : (
                 warnings.map((w, idx) => (
                     <div key={`${w.id}-${idx}`} style={{ 
