@@ -846,8 +846,8 @@ class SceneManager {
       // Enrich data with scenario context for interpolation
       data: {
         callsign: this.scenario.callsign || 'Flight 123',
-        departure: this.scenario.departure || 'Unknown',
-        arrival: this.scenario.arrival || 'Unknown',
+        departure: this.scenario.departureName || this.scenario.departure || 'Unknown',
+        arrival: this.scenario.arrivalName || this.scenario.arrival || 'Unknown',
         aircraft: this.scenario.aircraftModel || 'Unknown Aircraft',
         difficulty: this.scenario.difficulty || 'Unknown',
         ...narrative.data

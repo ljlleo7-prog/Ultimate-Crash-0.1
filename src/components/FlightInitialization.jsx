@@ -165,11 +165,18 @@ const FlightInitialization = ({
       console.log('Random flight initialized:', randomParams);
       
       // Show confirmation message
-      alert(`Random flight initialized!\nRoute: ${randomParams.selectedDeparture.iata} → ${randomParams.selectedArrival.iata}\nAircraft: ${randomParams.aircraftModel}\nDifficulty: ${randomParams.difficulty}\nFailure: ${randomFailure}\nWeather: ${randomWeather.type}`);
+      alert(t('initialization.random.success', {
+        departure: randomParams.selectedDeparture.iata,
+        arrival: randomParams.selectedArrival.iata,
+        aircraft: randomParams.aircraftModel,
+        difficulty: t(`initialization.difficulty.${randomParams.difficulty}`),
+        failure: t(`failures.${randomFailure}`) || randomFailure,
+        weather: t(`weather.${randomWeather.type}`) || randomWeather.type
+      }));
       
     } catch (error) {
       console.error('Error initializing random flight:', error);
-      alert('Error initializing random flight. Please try again.');
+      alert(t('initialization.random.error'));
     }
   };
 

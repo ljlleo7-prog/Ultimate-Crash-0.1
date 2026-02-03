@@ -2,16 +2,21 @@ import React, { useState } from 'react';
 import { encryptFlightData, decryptFlightData } from '../utils/flightDataCrypto';
 import './SaveLoadPanel.css';
 
-const SaveLoadPanel = ({ flightData, physicsState, flightPlan, weatherData, aircraftModel, onClose, onLoadFlight }) => {
+const SaveLoadPanel = ({ flightData, physicsState, physicsService, flightPlan, weatherData, aircraftModel, onClose, onLoadFlight }) => {
   const [error, setError] = useState(null);
   const [successMsg, setSuccessMsg] = useState(null);
 
   const generateSaveData = () => {
+    // Prefer using the full serializable state from the physics service if available
+    const serializablePhysics = (physicsService && typeof physicsService.getSerializableState === 'function')
+        ? physicsService.getSerializableState()
+        : physicsState;
+
     return {
-      version: '1.0',
+      version: '2.0', // Bump version for new comprehensive format
       timestamp: Date.now(),
-      flightData: flightData,
-      physicsState: physicsState,
+      flightData: flightData, // Keep for UI reference/metadata
+      physicsState: serializablePhysics, // This now contains full deep state
       runwayGeometry: flightData?.runwayGeometry,
       flightPlan: flightPlan,
       weatherData: weatherData,

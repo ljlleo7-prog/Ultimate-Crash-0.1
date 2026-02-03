@@ -2,8 +2,11 @@ import React, { useState, useEffect } from 'react';
 import { airportService } from '../services/airportService';
 import './FlightComputerPanel.css';
 
-const FlightComputerPanel = ({ onClose, flightPlan, onUpdateFlightPlan, flightState }) => {
-  const [activeTab, setActiveTab] = useState('waypoints'); // 'waypoints', 'add', 'nearest'
+import { useLanguage } from '../contexts/LanguageContext';
+
+const FlightComputerPanel = ({ flightPlan, onUpdateFlightPlan, flightState }) => {
+    const { t } = useLanguage();
+    const [activeTab, setActiveTab] = useState('plan'); // 'waypoints', 'add', 'nearest'
   const [waypoints, setWaypoints] = useState([]);
   
   // Manual Input State
@@ -362,22 +365,22 @@ const FlightComputerPanel = ({ onClose, flightPlan, onUpdateFlightPlan, flightSt
   return (
     <div className="flight-computer-panel">
       <div className="fc-header">
-        <h3>Flight Computer</h3>
+        <h3>{t('ui.flight_computer.title')}</h3>
         <button className="close-btn" onClick={onClose}>×</button>
       </div>
       
       <div className="fc-tabs">
-        <button className={activeTab === 'waypoints' ? 'active' : ''} onClick={() => setActiveTab('waypoints')}>Plan</button>
-        <button className={activeTab === 'add' ? 'active' : ''} onClick={() => setActiveTab('add')}>Add</button>
-        <button className={activeTab === 'nearest' ? 'active' : ''} onClick={() => setActiveTab('nearest')}>Nearest</button>
-        <button className={activeTab === 'utils' ? 'active' : ''} onClick={() => setActiveTab('utils')}>Perf</button>
+        <button className={activeTab === 'waypoints' ? 'active' : ''} onClick={() => setActiveTab('waypoints')}>{t('ui.flight_computer.tabs.plan')}</button>
+        <button className={activeTab === 'add' ? 'active' : ''} onClick={() => setActiveTab('add')}>{t('ui.flight_computer.tabs.add')}</button>
+        <button className={activeTab === 'nearest' ? 'active' : ''} onClick={() => setActiveTab('nearest')}>{t('ui.flight_computer.tabs.nearest')}</button>
+        <button className={activeTab === 'utils' ? 'active' : ''} onClick={() => setActiveTab('utils')}>{t('ui.flight_computer.tabs.perf')}</button>
       </div>
       
       <div className="fc-content">
         {activeTab === 'waypoints' && (
           <div className="waypoints-list">
             {waypoints.length === 0 ? (
-              <div className="empty-state">No waypoints in flight plan.</div>
+              <div className="empty-state">{t('ui.flight_computer.plan.empty')}</div>
             ) : (
               <ul>
                 {waypoints.map((wp, index) => {
@@ -395,7 +398,7 @@ const FlightComputerPanel = ({ onClose, flightPlan, onUpdateFlightPlan, flightSt
                         <span className="wp-index" style={{ color: isActive ? '#4facfe' : '#666' }}>{index + 1}</span>
                         <div className="wp-info">
                         <span className="wp-label" style={{ color: isActive ? '#fff' : (isPassed ? '#888' : '#e0e0e0') }}>
-                            {wp.label} {isActive && <small style={{color: '#4facfe', marginLeft: '5px'}}>(ACTIVE)</small>}
+                            {wp.label} {isActive && <small style={{color: '#4facfe', marginLeft: '5px'}}>{t('ui.flight_computer.plan.active')}</small>}
                         </span>
                         <span className="wp-coords">{wp.latitude.toFixed(4)}, {wp.longitude.toFixed(4)}</span>
                         {wp.type === 'airport' && (wp.availableRunways || wp.details?.runways) && (
@@ -437,7 +440,7 @@ const FlightComputerPanel = ({ onClose, flightPlan, onUpdateFlightPlan, flightSt
                       }}
                       title="Toggle Hold Pattern (Orbit)"
                     >
-                      {wp.isHold ? 'HOLDING' : 'HOLD'}
+                      {wp.isHold ? t('ui.flight_computer.plan.holding') : t('ui.flight_computer.plan.hold')}
                     </button>
                     <button className="delete-btn" onClick={() => handleDeleteWaypoint(index)}>🗑️</button>
                   </li>
@@ -451,39 +454,39 @@ const FlightComputerPanel = ({ onClose, flightPlan, onUpdateFlightPlan, flightSt
         {activeTab === 'add' && (
           <div className="add-waypoint-section">
             <div className="manual-input">
-              <h4>Manual Entry</h4>
+              <h4>{t('ui.flight_computer.add.manual_entry')}</h4>
               <div className="input-group">
                 <input 
                   type="text" 
-                  placeholder="Lat (e.g. 37.61)" 
+                  placeholder={t('ui.flight_computer.add.lat_placeholder')} 
                   value={manualLat} 
                   onChange={(e) => setManualLat(e.target.value)} 
                 />
                 <input 
                   type="text" 
-                  placeholder="Lon (e.g. -122.37)" 
+                  placeholder={t('ui.flight_computer.add.lon_placeholder')} 
                   value={manualLon} 
                   onChange={(e) => setManualLon(e.target.value)} 
                 />
               </div>
               <input 
                 type="text" 
-                placeholder="Label (Optional)" 
+                placeholder={t('ui.flight_computer.add.label_placeholder')} 
                 value={manualLabel} 
                 onChange={(e) => setManualLabel(e.target.value)} 
                 className="label-input"
               />
-              <button className="action-btn" onClick={handleAddManual}>Add Coordinates</button>
+              <button className="action-btn" onClick={handleAddManual}>{t('ui.flight_computer.add.add_coordinates')}</button>
             </div>
             
-            <div className="divider">OR</div>
+            <div className="divider">{t('ui.flight_computer.add.or')}</div>
             
             <div className="search-input">
-              <h4>Airport Search</h4>
+              <h4>{t('ui.flight_computer.add.airport_search')}</h4>
               <form onSubmit={handleSearch}>
                 <input 
                   type="text" 
-                  placeholder="Search ICAO/IATA/Name..." 
+                  placeholder={t('ui.flight_computer.add.search_placeholder')} 
                   value={searchQuery} 
                   onChange={(e) => setSearchQuery(e.target.value)} 
                 />
@@ -493,24 +496,24 @@ const FlightComputerPanel = ({ onClose, flightPlan, onUpdateFlightPlan, flightSt
                        type="radio" 
                        checked={searchType === 'all'} 
                        onChange={() => setSearchType('all')} 
-                     /> All
+                     /> {t('ui.flight_computer.add.search_types.all')}
                    </label>
                    <label>
                      <input 
                        type="radio" 
                        checked={searchType === 'normal'} 
                        onChange={() => setSearchType('normal')} 
-                     /> Normal
+                     /> {t('ui.flight_computer.add.search_types.normal')}
                    </label>
                    <label>
                      <input 
                        type="radio" 
                        checked={searchType === 'emergency'} 
                        onChange={() => setSearchType('emergency')} 
-                     /> Emergency
+                     /> {t('ui.flight_computer.add.search_types.emergency')}
                    </label>
                 </div>
-                <button type="submit" className="action-btn secondary">Search</button>
+                <button type="submit" className="action-btn secondary">{t('ui.flight_computer.add.search_btn')}</button>
               </form>
               
               <div className="search-results">
@@ -595,12 +598,13 @@ const FlightComputerPanel = ({ onClose, flightPlan, onUpdateFlightPlan, flightSt
                   onClick={() => {
                     const freq = parseFloat(nav1FreqInput);
                     if (!isNaN(freq) && freq >= 108 && freq <= 118) {
-                      if (onActionRequest) {
-                        onActionRequest('set-nav-frequency', freq);
-                        setNav1FreqInput(''); // Clear input on success
-                      }
+                      onUpdateFlightPlan({
+                        ...flightPlan,
+                        nav1Freq: freq.toFixed(2)
+                      });
+                      setNav1FreqInput('');
                     } else {
-                      alert('Invalid Frequency. Must be between 108.00 and 117.95 MHz');
+                      alert(t('flight_computer.add.alerts.invalid_freq'));
                     }
                   }}
                   style={{

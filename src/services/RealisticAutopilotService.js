@@ -138,6 +138,56 @@ class RealisticAutopilotService {
         this.navState = { preTurnEngaged: false };
     }
 
+    /**
+     * Get serializable state for save system
+     */
+    getState() {
+        return {
+            enabled: this.engaged,
+            mode: this.mode,
+            targets: { ...this.targets },
+            runwayGeometry: this.runwayGeometry,
+            navPlan: this.navPlan,
+            navState: this.navState,
+            nav1Frequency: this.nav1Frequency
+        };
+    }
+
+    /**
+     * Restore state from save file
+     */
+    loadState(data) {
+        if (!data) return;
+        
+        if (data.enabled !== undefined) this.engaged = data.enabled;
+        if (data.mode) this.mode = data.mode;
+        if (data.targets) this.targets = { ...this.targets, ...data.targets };
+        if (data.runwayGeometry) this.runwayGeometry = data.runwayGeometry;
+        if (data.navPlan) this.navPlan = data.navPlan;
+        if (data.navState) this.navState = data.navState;
+        if (data.nav1Frequency) {
+            this.nav1Frequency = data.nav1Frequency;
+            this.debugState.nav1Frequency = data.nav1Frequency;
+        }
+        
+        // Reset PIDs to avoid huge kicks from accumulated errors or derivatives
+        this.speedPID.reset();
+        this.vsPID.reset();
+        this.altitudePID.reset();
+        this.pitchPID.reset();
+        this.rollPID.reset();
+        this.headingPID.reset();
+        this.rudderPID.reset();
+        this.glideslopePID.reset();
+        this.localizerPID.reset();
+        
+        console.log('🤖 Autopilot Service: State Loaded', {
+            mode: this.mode,
+            engaged: this.engaged,
+            targets: this.targets
+        });
+    }
+
     setRunwayGeometry(geometry) {
         this.runwayGeometry = geometry;
     }
@@ -181,6 +231,10 @@ class RealisticAutopilotService {
             targets.ias = targets.speed;
         }
 
+        if (targets.heading !== undefined) {
+            targets.heading = (targets.heading % 360 + 360) % 360;
+        }
+
         this.targets = { ...this.targets, ...targets };
     }
 
@@ -206,7 +260,11 @@ class RealisticAutopilotService {
                 if (this.targets.vs === 0) this.targets.vs = Math.round(currentState.verticalSpeed / 100) * 100;
                 if (this.targets.altitude === 0) this.targets.altitude = Math.round(currentState.altitude / 100) * 100;
                 if (this.targets.heading === 0) {
-                    const heading = (currentState.heading !== undefined) ? currentState.heading : 0;
+                    let heading = (currentState.heading !== undefined) ? currentState.heading : 0;
+                    // Ensure heading is normalized to 0-360
+                    heading = heading % 360;
+                    if (heading < 0) heading += 360;
+                    
                     this.targets.heading = heading === 0 ? 360 : heading;
                 }
             }
@@ -238,7 +296,10 @@ class RealisticAutopilotService {
              this.targets.vs = Math.round(verticalSpeed / 100) * 100;
         }
         if (this.targets.heading === 0) {
-            this.targets.heading = heading === 0 ? 360 : heading;
+            let h = heading === 0 ? 360 : heading;
+            h = h % 360;
+            if (h < 0) h += 360;
+            this.targets.heading = h;
         }
 
         // --- LNAV with Pre-Turn Logic ---
@@ -613,7 +674,8 @@ class RealisticAutopilotService {
              
              // Capture/Hold Band: 50ft
              // If we are within 50ft, we force altitude hold (VS=0 or PID)
-             if (Math.abs(altError) < 50) {
+             // UNLESS the user has explicitly requested a significant Vertical Speed (> 200 fpm)
+             if (Math.abs(altError) < 50 && Math.abs(this.targets.vs) < 200) {
                  // Hold Altitude
                  // Use PID to maintain exact altitude (VS small corrections)
                  let pidVS = this.altitudePID.update(this.targets.altitude, altitude, dt);

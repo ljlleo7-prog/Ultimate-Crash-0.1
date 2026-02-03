@@ -48,7 +48,8 @@ const FlightInProgress = ({
   physicsModel = 'realistic',
   routeDetails
 }) => {
-
+  const { t, language } = useLanguage();
+  // Physics initialization is handled later at line 131
 
   const averagePassengerWeight = 90;
   const averageCrewWeight = 90;
@@ -198,7 +199,7 @@ const FlightInProgress = ({
     if (atcManager.isBusy()) {
         setRadioMessages(prev => [...prev, {
             sender: 'System',
-            text: '[FREQUENCY BUSY]',
+            text: t('ui.flight.messages.freq_busy'),
             timestamp: Date.now(),
             type: 'system'
         }]);
@@ -238,7 +239,10 @@ const FlightInProgress = ({
         altitude: Math.round(flightData.altitude),
         heading: Math.round(flightData.heading),
         weather: weatherData, // Pass weather data to ATC context
-        frequencyType: freqType
+        frequencyType: freqType,
+        language: language, // Pass current language to ATC
+        departureRunway: aircraftConfig.departureRunway,
+        arrivalRunway: aircraftConfig.arrivalRunway
     };
 
     atcManager.processMessage(
@@ -274,7 +278,7 @@ const FlightInProgress = ({
     const isHardcore = difficulty === 'pro' || difficulty === 'devil';
     return { 
       canContinue: !isHardcore, 
-      missingItems: isHardcore ? ['System Initialization...'] : [] 
+      missingItems: isHardcore ? [{ key: 'startup.sys_init' }] : [] 
     };
   });
 
@@ -457,7 +461,7 @@ const FlightInProgress = ({
         weather: weatherData
     }, freqInfo, (msg) => {
         setRadioMessages(prev => [...prev, { ...msg, frequency: freqType }]);
-    });
+    }, language || 'en');
 
     if (messages.length > 0) {
         // Handle incoming NPC messages
@@ -575,8 +579,12 @@ const FlightInProgress = ({
 
   // Terrain update effect
   useEffect(() => {
+    let errorCount = 0;
+    const MAX_ERRORS = 5;
+    let shouldFetch = true;
+
     const fetchTerrain = async () => {
-       if (!physicsService || !physicsService.state || !physicsService.state.geo) return;
+       if (!shouldFetch || !physicsService || !physicsService.state || !physicsService.state.geo) return;
        
        const { lat, lon } = physicsService.state.geo;
        
@@ -594,9 +602,18 @@ const FlightInProgress = ({
            const ele = await terrainService.getElevation(lat, lon);
            if (ele !== null && typeof ele === 'number') {
                physicsService.terrainElevation = ele;
+               // Reset error count on success
+               errorCount = 0;
            }
        } catch (e) {
-           console.error("❌ Terrain fetch failed", e);
+           errorCount++;
+           if (errorCount > MAX_ERRORS) {
+               console.warn("❌ Terrain fetch failed too many times. Disabling terrain updates.");
+               shouldFetch = false;
+           } else {
+               // Only log the first few errors to avoid console spam
+               console.warn(`⚠️ Terrain fetch failed (${errorCount}/${MAX_ERRORS})`, e);
+           }
        }
     };
     
@@ -621,7 +638,9 @@ const FlightInProgress = ({
       sceneManager.updateScenario({
         callsign: callsign,
         departure: selectedDeparture.iata || selectedDeparture.icao,
+        departureName: selectedDeparture.name, // Pass full name
         arrival: selectedArrival.iata || selectedArrival.icao,
+        arrivalName: selectedArrival.name, // Pass full name
         aircraftModel: aircraftModel,
         departureRunway: routeDetails?.departureRunway,
         landingRunway: routeDetails?.landingRunway,
@@ -747,8 +766,8 @@ const FlightInProgress = ({
         color: 'white'
       }}>
         <div style={{ textAlign: 'center' }}>
-          <div style={{ fontSize: '24px', marginBottom: '20px' }}>✈️ Starting Flight Simulation...</div>
-          <div style={{ color: '#4ade80' }}>Initializing physics engine...</div>
+          <div style={{ fontSize: '24px', marginBottom: '20px' }}>✈️ {t('ui.loading.starting_simulation')}</div>
+          <div style={{ color: '#4ade80' }}>{t('ui.loading.initializing_physics')}</div>
         </div>
       </div>
     );
@@ -766,7 +785,7 @@ const FlightInProgress = ({
         color: 'white'
       }}>
         <div style={{ textAlign: 'center' }}>
-          <div style={{ fontSize: '24px', marginBottom: '20px', color: '#ef4444' }}>❌ Initialization Error</div>
+          <div style={{ fontSize: '24px', marginBottom: '20px', color: '#ef4444' }}>❌ {t('ui.error.initialization_error')}</div>
           <div style={{ marginBottom: '20px' }}>{error}</div>
           <button 
             onClick={() => window.location.reload()}
@@ -780,7 +799,7 @@ const FlightInProgress = ({
               cursor: 'pointer'
             }}
           >
-            Reload Page
+            {t('ui.error.reload_page')}
           </button>
         </div>
       </div>
@@ -819,7 +838,7 @@ const FlightInProgress = ({
               marginBottom: '4px'
             }}
           >
-            {phaseName || 'Situation'}
+            {phaseName || t('ui.header.situation')}
           </div>
           
           {/* Conditional Rendering: Only show narrative in Header if Physics is ACTIVE (PHY-ON) 
@@ -835,7 +854,7 @@ const FlightInProgress = ({
                   marginBottom: '4px'
                 }}
               >
-                {narrative?.title || 'Awaiting flight instructions...'}
+                {t(narrative?.title, narrative?.data) || t('ui.header.awaiting')}
               </div>
               <div
                 style={{
@@ -845,7 +864,7 @@ const FlightInProgress = ({
                   marginBottom: '8px'
                 }}
               >
-                {narrative?.content || 'Prepare for takeoff.'}
+                {t(narrative?.content, narrative?.data) || t('ui.header.prepare')}
               </div>
             </>
           )}
@@ -863,7 +882,7 @@ const FlightInProgress = ({
                 alignItems: 'center',
                 gap: '6px'
               }}>
-                <span>⚠️ Checklist Incomplete</span>
+                <span>{t('ui.header.checklist_incomplete')}</span>
               </div>
               <div style={{
                 display: 'flex',
@@ -871,7 +890,7 @@ const FlightInProgress = ({
                 gap: '4px'
               }}>
                 {startupStatus.missingItems.map((item, index) => (
-                  <div key={index} style={{
+                  <div key={item.key || index} style={{
                     fontSize: '11px',
                     color: '#fbbf24',
                     padding: '6px 8px',
@@ -881,7 +900,7 @@ const FlightInProgress = ({
                     display: 'flex',
                     alignItems: 'center'
                   }}>
-                    <span style={{ marginRight: '6px' }}>☐</span> {item}
+                    <span style={{ marginRight: '6px' }}>☐</span> {item.key ? t(item.key, item.params) : item}
                   </div>
                 ))}
               </div>
@@ -897,7 +916,7 @@ const FlightInProgress = ({
                 color: '#ef4444',
                 marginBottom: '4px'
               }}>
-                Active Failures ({activeFailures.length})
+                {t('ui.panels.active_failures')} ({activeFailures.length})
               </div>
               <div style={{
                 display: 'flex',
@@ -915,7 +934,7 @@ const FlightInProgress = ({
                     justifyContent: 'space-between'
                   }}>
                     <span>{failure.type.toUpperCase()} {failure.data.engineIndex !== undefined ? `ENGINE ${failure.data.engineIndex + 1}` : ''}</span>
-                    <span>{failure.isCritical ? 'CRITICAL' : `${Math.round(failure.progress)}%`}</span>
+                    <span>{failure.isCritical ? t('ui.common.critical') : `${Math.round(failure.progress)}%`}</span>
                   </div>
                 ))}
               </div>
@@ -964,8 +983,8 @@ const FlightInProgress = ({
               phaseName: sceneState.phase?.name
             }}
             physicsState={physicsState}
-            weatherData={weatherData}
-            aircraftModel={aircraftModel}
+            physicsService={physicsService} // Pass service instance for Save/Load
+            weatherData={weatherData}            aircraftModel={aircraftModel}
             selectedArrival={selectedArrival}
             flightPlan={activeFlightPlan} // Pass active dynamic plan
             radioMessages={radioMessages}
@@ -1035,11 +1054,12 @@ const FlightInProgress = ({
                 case 'set-autopilot-targets': {
                   if (physicsService && typeof physicsService.updateAutopilotTargets === 'function' && payload) {
                     // Direct pass-through for RealisticAutopilotService (Imperial Units)
-                    // ModernAutopilotModule sends: { ias, vs, altitude }
+                    // ModernAutopilotModule sends: { ias, vs, altitude, heading }
                     const targets = {
                       altitude: payload.altitude, // ft
                       speed: payload.ias,         // kts
-                      vs: payload.vs              // ft/min
+                      vs: payload.vs,             // ft/min
+                      heading: payload.heading    // deg
                     };
                     
                     physicsService.updateAutopilotTargets(targets);
@@ -1077,10 +1097,10 @@ const FlightInProgress = ({
                 case 'skip-phase': {
                   // Check if we can proceed (Hardcore modes only)
                   if ((difficulty === 'pro' || difficulty === 'devil') && !startupStatus.canContinue) {
-                    const missing = startupStatus.missingItems.join(', ');
+                    const missing = startupStatus.missingItems.map(item => item.key ? t(item.key, item.params) : item).join(', ');
                     const warningMsg = {
-                        title: 'Checklist Incomplete',
-                        content: `Cannot proceed. Missing items: ${missing}`,
+                        title: t('ui.header.checklist_incomplete'),
+                        content: t('ui.messages.cannot_proceed_missing_items', { items: missing }),
                         severity: 'warning'
                     };
                     
@@ -1199,7 +1219,7 @@ const FlightInProgress = ({
                   {flightData.autopilotDebug.ils.altError.toFixed(0)} ft
                 </span>
 
-                <span style={{ color: '#9ca3af' }}>Tgt Alt:</span>
+                <span style={{ color: '#9ca3af' }}>{t('ui.panels.tgt_alt')}:</span>
                 <span>{flightData.autopilotDebug.ils.targetAltitude.toFixed(0)} ft</span>
               </div>
             </>
@@ -1209,7 +1229,7 @@ const FlightInProgress = ({
           
           <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-               <span style={{ color: '#9ca3af' }}>Next WP:</span>
+               <span style={{ color: '#9ca3af' }}>{t('ui.panels.next_wp')}:</span>
                <span>
                  {(routeDetails?.waypoints || flightPlan?.waypoints || [])[flightData.currentWaypointIndex]?.name || 
                   (routeDetails?.waypoints || flightPlan?.waypoints || [])[flightData.currentWaypointIndex]?.id || 
@@ -1217,7 +1237,7 @@ const FlightInProgress = ({
                </span>
              </div>
              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-               <span style={{ color: '#9ca3af' }}>WP Index:</span>
+               <span style={{ color: '#9ca3af' }}>{t('ui.panels.wp_index')}:</span>
                <span>{flightData.currentWaypointIndex} / {(routeDetails?.waypoints || flightPlan?.waypoints || []).length}</span>
              </div>
           </div>
@@ -1227,9 +1247,9 @@ const FlightInProgress = ({
       {isCrashed && (
         <div className="end-scene-overlay">
           <div className="end-scene-content">
-            <div style={{ fontSize: '24px', marginBottom: '12px' }}>{t('narrative.phases.shutoff.default.0.title') || 'Flight Ended'}</div>
+            <div style={{ fontSize: '24px', marginBottom: '12px' }}>{t('narrative.phases.shutoff.0.title') || 'Flight Ended'}</div>
             <div style={{ marginBottom: '20px', maxWidth: '420px' }}>
-              {t('narrative.phases.shutoff.default.2.content') || 'Placeholder: post-incident summary and narrative debrief will appear here.'}
+              {t('narrative.phases.shutoff.2.content') || 'Placeholder: post-incident summary and narrative debrief will appear here.'}
             </div>
             <button
               onClick={() => {

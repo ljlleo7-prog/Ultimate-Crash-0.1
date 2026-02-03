@@ -131,6 +131,50 @@ class FailureHandler {
         this.activeFailures.clear();
         this.time = 0;
     }
+
+    getState() {
+        return {
+            time: this.time,
+            nextCheckTime: this.nextCheckTime,
+            activeFailures: Array.from(this.activeFailures.values()).map(f => ({
+                id: f.id,
+                currentStage: f.currentStage,
+                timeInStage: f.timeInStage,
+                totalTime: f.totalTime,
+                intensity: f.intensity,
+                variation: f.variation,
+                logs: f.logs
+            }))
+        };
+    }
+
+    loadState(state) {
+        if (!state) return;
+        
+        this.reset();
+        this.time = state.time || 0;
+        this.nextCheckTime = state.nextCheckTime || 10;
+        
+        if (state.activeFailures && Array.isArray(state.activeFailures)) {
+            state.activeFailures.forEach(fState => {
+                const def = this.registry.get(fState.id);
+                if (def) {
+                    // Re-create failure with original context (stored in variation.context)
+                    const failure = new BaseFailure(def, fState.variation.context);
+                    
+                    // Restore internal state
+                    failure.currentStage = fState.currentStage;
+                    failure.timeInStage = fState.timeInStage;
+                    failure.totalTime = fState.totalTime;
+                    failure.intensity = fState.intensity;
+                    failure.variation = fState.variation;
+                    failure.logs = fState.logs || [];
+                    
+                    this.activeFailures.set(fState.id, failure);
+                }
+            });
+        }
+    }
 }
 
 export default FailureHandler;

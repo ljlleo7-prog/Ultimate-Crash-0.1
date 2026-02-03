@@ -238,31 +238,17 @@ const zh = {
         }
       },
       cruise: {
-        default: {
-          0: {
-            title: '巡航在 FL350',
-            content: '平飞在 35,000 英尺。地平线是一条弯曲的雾霾线。“保持马赫 0.78。”引擎发出平稳、令人安心的节奏。乘客们正安顿下来准备前往 ${arrival}。'
-          },
-          1: {
-            title: '平稳飞行',
-            content: '自动驾驶已接通。监控系统。燃油流量正常。“咖啡吗？”空乘问道。一段宁静的旅程。'
-          },
-          2: {
-            title: '飞行中途',
-            content: '行程过半。检查导航。航路点经过。太阳在地平线上落下，将天空染成橙色和紫色。'
-          }
+        0: {
+          title: '巡航在 FL350',
+          content: '保持在 35,000 英尺。地平线是一条弯曲的雾霾线。“保持马赫数 0.78。” 引擎发出稳定、令人安心的轰鸣声。乘客们正在为飞往 ${arrival} 的旅程安顿下来。'
         },
-        sunny: {
-            0: {
-                title: '晴空万里',
-                content: '万里无云。几英里下的地面清晰可见。完美的飞行天气。'
-            }
+        1: {
+          title: '航路中',
+          content: '导航正常。“系统正常。” 自动驾驶仪精确地跟踪航线。窗外，云层在下方形成白色的毯子。“客舱服务已开始。”'
         },
-        shakespearean: {
-            0: {
-                title: '航行',
-                content: '我们在天空的海洋中航行。风是我们的朋友。和平统治着天堂。'
-            }
+        2: {
+          title: '稳定航向',
+          content: '飞行计算机显示我们按计划飞行。燃油消耗在限制范围内。“联系区调 132.5。” 切换频率。在这个高度，无线电通话很少。'
         }
       },
       descent: {
@@ -361,36 +347,19 @@ const zh = {
           },
           2: {
             title: '到达登机口',
-            content: '转入登机口。“停止。”设置停留刹车。引擎冷却。欢迎回家。'
+            content: '“停留刹车已设置。”引擎正在关车。安全带指示灯熄灭。欢迎回家。'
           }
-        },
-        shakespearean: {
-            0: {
-                title: '终章',
-                content: '战车停下了。旅程完成。休息吧，疲惫的旅行者。'
-            }
         }
       },
       shutoff: {
         default: {
           0: {
-            title: '引擎关车',
-            content: '设置停留刹车。切断燃油。引擎旋转减速至静止。APU 关闭。“感谢您的搭乘。”飞行完成。'
-          },
-          1: {
-            title: '讲评',
-            content: '完成飞行日志。乘客下机。飞机安静下来。干得好。'
+            title: '飞行结束',
+            content: '飞机已停稳，系统关闭。感谢您的飞行。'
           },
           2: {
-            title: '关机',
-            content: '所有系统关闭。驾驶舱变暗。最后看一眼飞机。下次见。'
+            content: '飞行任务已结束。请检查数据记录或返回主菜单。'
           }
-        },
-        shakespearean: {
-            0: {
-                title: '寂静',
-                content: '寂静降临。野兽沉睡。全剧终。'
-            }
         }
       }
     }
@@ -423,9 +392,32 @@ const zh = {
     }
   },
   ui: {
+    debug: {
+        title: '飞行数据 & LNAV',
+        lat: '纬度:',
+        lon: '经度:',
+        alt: '高度:',
+        ias: '指示空速:',
+        gs: '地速:',
+        mode: '模式:',
+        engaged: '激活',
+        off: '关闭',
+        tgt_hdg: '目标航向:',
+        hdg_err: '航向误差:',
+        tgt_roll: '目标滚转:',
+        act_roll: '实际滚转:',
+        ils_status: 'ILS 状态',
+        dist: '距离:',
+        loc_err: '航向道误差:',
+        gs_err: '下滑道误差:',
+        tgt_alt: '目标高度',
+        next_wp: '下一航点:',
+        wp_index: '航点索引:'
+    },
     flight: {
         time_zulu: '时间 (Zulu)',
         fuel: '燃油',
+        oil: '滑油',
         pax: '乘客',
         distance: '距离',
         altitude: '高度',
@@ -442,6 +434,140 @@ const zh = {
             freq_busy: '频率繁忙。请稍候。'
         }
     },
+    panels: {
+        overhead_button: '系统面板 [OH PNL]',
+        pfd: '主飞行显示器',
+        nd: '导航显示器',
+        engine_systems: '引擎与系统',
+        fuel: '燃油',
+        system_status: '系统状态 / 警报',
+        controls: '飞行控制',
+        flaps: '襟翼',
+        gear: '起落架',
+        brakes: '刹车',
+        trim: '配平',
+        systems: {
+        status: '系统状态',
+        hydraulics: '液压系统',
+        hydraulics_abbrev: '液压',
+        electrics: '电气系统',
+        electrics_abbrev: '电气',
+        warnings: '警告',
+        no_warnings: '无激活警告',
+        on: '开启',
+        off: '关闭'
+    },
+    active_failures: '当前故障',
+        no_active_alerts: '无警报',
+        next_wp: '下一航点',
+        wp_index: '航点索引',
+        tgt_alt: '目标高度'
+    },
+    flight_computer: {
+        title: '飞行计算机',
+        tabs: {
+            plan: '计划',
+            add: '添加',
+            nearest: '最近',
+            radio: '无线电',
+            utils: '工具',
+            perf: '性能'
+        },
+        plan: {
+            empty: '飞行计划中无航点。',
+            end_of_plan: '飞行计划结束',
+            hold: '等待',
+            holding: '等待中',
+            active: '(当前)'
+        },
+        add: {
+            manual_entry: '手动输入',
+            lat_placeholder: '纬度 (例 37.61)',
+            lon_placeholder: '经度 (例 -122.37)',
+            label_placeholder: '标签 (可选)',
+            add_coordinates: '添加坐标',
+            or: '或',
+            airport_search: '机场搜索',
+            search_placeholder: '搜索 ICAO/IATA/名称...',
+            search_types: {
+                all: '全部',
+                normal: '普通',
+                emergency: '紧急'
+            },
+            search_btn: '搜索',
+            add_to_plan: '+ 添加至计划',
+            no_results: '未找到机场。',
+            alerts: {
+                invalid_coords: '请输入有效的坐标',
+                invalid_freq: '无效频率。必须在 108.00 到 117.95 MHz 之间'
+            },
+            searching: '正在搜索...'
+        },
+        nearest: {
+            title: '最近机场 (前 20)',
+            loading: '正在查找最近机场...',
+            finding: '正在查找机场...',
+            empty: '附近未找到机场。',
+            no_results: '未找到机场。',
+            add_btn: '+ 添加',
+            refresh: '刷新',
+            emergency_tag: '紧急'
+        },
+      radio: {
+            title: '导航无线电',
+            current_freq: '当前 NAV1 频率',
+            set_freq: '设置频率 (MHz)',
+            tune: '调频',
+            common_freqs: '常见 ILS 频率: 108.10, 108.15, ..., 111.95'
+        },
+        utils: {
+            title: '预测',
+            next_wp: '下一航点:',
+            distance: '距离:',
+            ete: '预计到达:',
+            fuel_flow: '燃油流量:',
+            time_empty: '耗尽时间:',
+            target_alt: '目标高度 (ft):',
+            time_alt: '到达高度时间:',
+            wrong_vs: '垂直速度方向错误',
+            stable: '稳定'
+        },
+        converter: {
+            title: '单位转换器',
+            value_placeholder: '数值',
+            result: '结果:',
+            units: {
+                ft: '英尺 (ft)',
+                m: '米 (m)',
+                kts: '节 (kts)',
+                kmh: '千米/小时',
+                inHg: '英寸汞柱',
+                hPa: '百帕',
+                nm: '海里',
+                km: '千米'
+            }
+        }
+    },
+    header: {
+        awaiting: '等待飞行指令...',
+        prepare: '准备起飞。',
+        checklist_incomplete: '⚠️ 检查单未完成',
+        situation: '当前情况'
+    },
+    loading: {
+        starting_simulation: '正在启动飞行模拟...',
+        initializing_physics: '正在初始化物理引擎...'
+    },
+    error: {
+        initialization_error: '初始化错误',
+        reload_page: '重新加载页面'
+    },
+    common: {
+        critical: '严重'
+    },
+    messages: {
+        cannot_proceed_missing_items: '无法继续。缺失项目：${items}'
+    },
     menu: {
         resume: '继续飞行',
         restart: '重新开始',
@@ -451,6 +577,7 @@ const zh = {
     },
     systems: {
         engines: '引擎',
+        engine: '引擎',
         electrics: '电力',
         hydraulics: '液压',
         fuel: '燃油',
@@ -463,17 +590,136 @@ const zh = {
         auto: '自动',
         avail: '可用',
         fault: '故障',
-        low_press: '低压'
+        low_press: '低压',
+        status: '系统状态',
+        warnings: '警告',
+        no_warnings: '无活动警告'
     },
     startup: {
         checklist_incomplete: '启动检查单未完成',
         missing_items: '缺失项目: ${items}',
         cant_proceed: '无法进入下一阶段。',
         continue_anyway: '强制继续 (禁用安全保护)',
-        continue: '继续'
-    }
-  },
-  initialization: {
+        continue: '继续',
+        sys_init: '系统初始化',
+        checklist: {
+            systems_not_init: '系统未初始化',
+            battery_on: '电池必须开启',
+            adirs_nav: 'ADIRS IR 开关必须在 NAV 位置',
+            adirs_aligning: 'ADIRS 校准中 (${progress}%)',
+            apu_bleed_on: 'APU 引气必须开启',
+            apu_gen_on: 'APU 发电机必须开启',
+            apu_running: 'APU 必须运行并稳定',
+            engine_running: '引擎 ${index} 必须运行',
+            gen_on: '发电机 ${index} 必须开启',
+            apu_shutdown: '引擎启动后 APU 必须关闭',
+            adirs_complete: 'ADIRS 校准必须完成'
+        }
+    },
+    warnings: {
+        gpws: {
+            pull_up: '拉升 (PULL UP)',
+            terrain: '地形 (TERRAIN)',
+            too_low_gear: '高度低 起落架 (TOO LOW GEAR)',
+            too_low_flaps: '高度低 襟翼 (TOO LOW FLAPS)'
+        },
+        stall: '失速 (STALL)',
+        overspeed: '超速 (OVERSPEED)',
+        bank_angle: '倾角过大 (BANK ANGLE)',
+        fire: {
+            eng1: '引擎 1 火警',
+            eng2: '引擎 2 火警',
+            apu: 'APU 火警'
+        },
+        hydraulics: {
+            a_low: '液压 A 压力低',
+            b_low: '液压 B 压力低'
+        },
+        elec: {
+            emer_config: '电力 应急构型'
+        },
+        cabin_alt: '客舱高度 (CABIN ALT)',
+        fuel_low: '燃油低',
+        engine_fail: '引擎 ${index} 失效',
+        config: {
+            flaps: '起飞构型 襟翼',
+            spoilers: '起飞构型 扰流板',
+            brakes: '起飞构型 刹车'
+        },
+        tail_strike: '擦尾风险'
+    },
+    radio: {
+        cancel: '取消',
+        transmit: '发送',
+        preview: '预览',
+        select: '选择...',
+        enter: '输入 ${param}...',
+        frequency_type: '频率类型',
+        busy: '频率繁忙',
+        tabs: {
+            READBACK: '复诵',
+            REQUEST: '请求',
+            INFORM: '通报'
+        },
+        template: {
+            ack: { label: '收到', text: '收到, ${callsign}.' },
+            wilco: { label: '照办', text: '照办, ${callsign}.' },
+            rb_alt: { label: '复诵高度', text: '上升并保持 ${altitude}, ${callsign}.' },
+            rb_hdg: { label: '复诵航向', text: '${direction}转 航向 ${heading}, ${callsign}.' },
+            rb_freq: { label: '复诵频率', text: '联系 ${station} 频率 ${frequency}, ${callsign}.' },
+            rb_taxi: { label: '复诵滑行', text: '经 ${route} 滑行, 跑道 ${runway} 外等待, ${callsign}.' },
+            req_alt: { label: '请求高度', text: '${station}, ${callsign} 请求上升/下降至 ${altitude}.' },
+            req_direct: { label: '请求直飞', text: '${station}, ${callsign} 请求直飞 ${waypoint}.' },
+            req_land: { label: '请求着陆', text: '${station}, ${callsign} 进近, 请求着陆.' },
+            req_startup: { label: '请求开车', text: '${station}, ${callsign} 准备好开车和推出.' },
+            req_taxi: { label: '请求滑行', text: '${station}, ${callsign} 准备好滑行.' },
+            req_takeoff: { label: '请求起飞', text: '${station}, ${callsign} 准备好起飞, 跑道 ${runway}.' },
+            req_atis: { label: '请求通播', text: '${station}, ${callsign} 请求当前天气 / ATIS.' },
+            req_freq_change: { label: '请求换频', text: '${station}, ${callsign} 请求离开频率.' },
+            inf_checkin: { label: '联系', text: '${station}, ${callsign} 听你指挥, 高度 ${altitude}.' },
+            inf_pos: { label: '位置报告', text: '${station}, ${callsign} 过 ${waypoint} 高度 ${altitude}.' },
+            inf_mayday: { label: '宣布紧急', text: 'MAYDAY MAYDAY MAYDAY, ${station}, ${callsign} 宣布紧急情况: ${failure}. 请求立即返航/备降.' },
+            inf_pan: { label: '宣布PanPan', text: 'PAN-PAN PAN-PAN PAN-PAN, ${station}, ${callsign} 遇到 ${issue}. 请求优先着陆.' }
+        }
+    },
+    narrative: {
+        awaiting: '等待指令...',
+        phases: {
+            boarding: {
+                default: {
+                    0: {
+                        title: '正在 ${departure} 登机',
+                        content: '客舱内弥漫着燃油和咖啡的味道，乘客们正在安放行李。窗外，地勤人员正在为出发做准备。"${callsign}，欢迎登机，" 乘务员通过广播宣布。${aircraft} 已准备好前往 ${arrival}。'
+                    },
+                    1: {
+                        title: '最后登机广播',
+                        content: '乘客们正在就座。机组人员正在进行最后的检查。机长欢迎大家登机。"前方前往 ${arrival} 的飞行将会很平稳。" 舱门即将关闭。'
+                    },
+                    2: {
+                        title: '起飞前检查',
+                        content: '驾驶舱准备工作正在进行。检查燃油、航路和系统。"登机完毕，" 登机口工作人员确认。廊桥撤回。我们准备出发。'
+                    }
+                }
+            },
+            takeoff_prep: {
+                default: {
+                    0: {
+                        title: '起飞准备',
+                        content: '正在进行起飞前最后检查。系统正常，跑道 ${departureRunway} 已准备就绪。${callsign} 准备起飞。'
+                    },
+                    1: {
+                        title: '座舱准备',
+                        content: '设置起飞推力。检查仪表。${aircraft} 已准备好从 ${departure} 出发。'
+                    },
+                    2: {
+                        title: '起飞前最后检查',
+                        content: '检查所有控制表面。襟翼已设置。准备接收 ${departureRunway} 跑道的起飞许可。'
+                    }
+                }
+            }
+        }
+    },
+    initialization: {
     title: '终极坠机 - 航班初始化',
     subtitle: '配置您的飞行参数并选择难度等级',
     steps: {
@@ -537,6 +783,108 @@ const zh = {
       next_route: '下一步: 航线选择 →',
       finalize: '完成签派并初始化'
     }
+  },
+  narrative_generator: {
+      roles: [
+        '机长', 
+        '指挥官', 
+        '责任机长', 
+        '船长', 
+        '总飞行师'
+      ],
+      experience: {
+        rookie: [
+          '刚从飞行学院毕业。执照上的墨迹未干。',
+          '进入航空公司的第一周。虽然紧张，但雄心勃勃。',
+          '还在向总飞行师证明自己。今天的每一个操作都很重要。',
+          '第一次坐在左座。别忘了你的训练。'
+        ],
+        amateur: [
+          '正在积累飞行小时数。你了解这架飞机，但它有时仍会让你惊讶。',
+          '随着每一段航程建立自信。你处理过平静的天空，但今天可能不同。',
+          '不再是学员，但还不是老手。机组人员指望你那双稳定的手。',
+          '开始在驾驶舱里感到自在，尽管复杂的系统仍需全神贯注。'
+        ],
+        intermediate: [
+          '准备晋升的资深副驾驶。你对程序烂熟于心。',
+          '拥有数千小时经验的飞行员。标准操作已成为第二天性。',
+          '可靠且稳重。航空公司把最有价值的航线托付给你。',
+          '能力强且专注。你见过恶劣天气和技术故障。'
+        ],
+        advanced: [
+          '资深机长。在机组休息室里，人们怀着敬意低声谈论你的名字。',
+          '天空的老兵。你曾穿越飓风，并在引擎熄火的情况下着陆。',
+          '教员考官。你编写了别人正在努力学习的手册。',
+          '这支机队的掌舵者。飞机感觉就像你身体的延伸。'
+        ],
+        pro: [
+          '传奇飞行员。据说你能在侧风中降落在邮票大小的地方。',
+          '王牌飞行员。系统故障只是你展示技能的机会。',
+          '精英中的精英。当别人恐慌时，你只是看看手表。',
+          '精英指挥官。再也没有什么能让你惊讶，即使是液压完全丧失。'
+        ],
+        devil: [
+          '挑战极限的试飞员。安全裕度只是建议。',
+          '驾驶一架被诅咒的飞机。当你走向停机坪时，机械师们在胸前划十字。',
+          '面对不可能。困难重重，这正是你喜欢的。',
+          '即将体验一场旨在摧毁你的模拟。祝好运。'
+        ]
+      },
+      flight_plan: [
+        '今天的舱单显示有 ${pax} 名乘客搭乘从 ${departure} 到 ${arrival} 的航班。',
+        '你已获准执行从 ${departure} 到 ${arrival} 的航线，搭载着依赖你的 ${pax} 名乘客。',
+        '飞行计划已提交：${departure} 起飞，目的地 ${arrival}。${pax} 名乘客正在安顿下来。',
+        '从 ${departure} 的登机口到 ${arrival} 的停机坪，你今天要对 ${pax} 条生命负责。'
+      ],
+      difficulty: {
+        rookie: [
+          '系统报告正常。专注于你的决策和标准程序。',
+          '预计会有一次例行飞行，只需完成少量程序性任务。你的机组人员全力支持。',
+          '前方任务简单明了。可能会出现小问题，但没什么基本逻辑解决不了的。'
+        ],
+        amateur: [
+          '预计会遇到一个重大的操作挑战。保持简单，遵循检查单。',
+          '今天你可能会遇到有影响的情况，但你的机组人员已准备好协助处理工作量。',
+          '警惕一个重大事件。直接控制需求仍然很低，让你专注于管理。'
+        ],
+        intermediate: [
+          '准备好应对动态情况和潜在干扰。这一段航程需要手动飞行。',
+          '适用标准飞行协议，但要准备好应对优先级变化和主动控制需求。',
+          '你的机组人员将精确执行你的命令，但环境正变得越来越不可预测。'
+        ],
+        advanced: [
+          '多个关键问题可能同时发生。敏锐的机动和快速的决策至关重要。',
+          '预计会有致命场景，手动控制不可商量。注意你的机组人员——他们在压力下可能会动摇。',
+          '模拟今天将测试你的反应。动态故障需要持续关注和人工干预。'
+        ],
+        pro: [
+          '系统性故障迫在眉睫。自动化不可靠；你是主要的控制回路。',
+          '需要复杂的 CRM 和熟练的机动。你的机组人员压力很大，容易犯重大错误。',
+          '致命的、相互关联的问题将挑战你的每一项技能。预计工作量很大，支持也会很紧张。'
+        ],
+        devil: [
+          '预计会出现完全混乱。没有自动驾驶，没有安全网，没有可靠的协助。',
+          '飞机被推向极限。你的机组人员可能会主动使情况复杂化。',
+          '忘记你的训练——这是为了生存。每个系统都是潜在的威胁，你的“帮手”也有自己的算盘。'
+        ]
+      }
+    },
+  weather: {
+    clear: '晴朗',
+    cloudy: '多云',
+    rain: '下雨',
+    storm: '暴风雨',
+    fog: '雾',
+    snow: '下雪'
+  },
+  failures: {
+    engine_failure: '引擎故障',
+    engine_fire: '引擎火警',
+    hydraulic_failure: '液压故障',
+    electrical_failure: '电力故障',
+    instrument_failure: '仪表故障',
+    fuel_leak: '燃油泄漏',
+    structural_damage: '结构损坏'
   }
 };
 

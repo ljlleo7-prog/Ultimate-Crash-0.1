@@ -1,8 +1,9 @@
-
 import React, { useState, useEffect } from 'react';
 import { RADIO_TEMPLATES } from '../data/radioTemplates';
+import { useLanguage } from '../contexts/LanguageContext';
 
 const RadioActionPanel = ({ onTransmit, currentStation = 'Unicom', callsign = 'Cessna 172', flightPlan, isChannelBusy, frequencyType = 'UNICOM' }) => {
+  const { t } = useLanguage();
   const [activeTab, setActiveTab] = useState('REQUEST');
   const [selectedTemplate, setSelectedTemplate] = useState(null);
   const [paramValues, setParamValues] = useState({});
@@ -44,17 +45,15 @@ const RadioActionPanel = ({ onTransmit, currentStation = 'Unicom', callsign = 'C
     e.preventDefault();
     if (!selectedTemplate) return;
 
-    // Construct message
-    let text = selectedTemplate.template;
+    // Construct message params
+    const templateParams = {
+        station: currentStation,
+        callsign: callsign,
+        ...paramValues
+    };
     
-    // Replace context
-    text = text.replace('{station}', currentStation);
-    text = text.replace('{callsign}', callsign);
-
-    // Replace params
-    Object.keys(paramValues).forEach(key => {
-      text = text.replace(`{${key}}`, paramValues[key]);
-    });
+    // Get translated text
+    const text = t(`radio.template.${selectedTemplate.id}.text`, templateParams);
 
     onTransmit({
       type: selectedTemplate.type,
@@ -99,7 +98,7 @@ const RadioActionPanel = ({ onTransmit, currentStation = 'Unicom', callsign = 'C
               cursor: 'pointer'
             }}
           >
-            {tab}
+            {t(`radio.tabs.${tab}`) || tab}
           </button>
         ))}
       </div>
@@ -132,9 +131,11 @@ const RadioActionPanel = ({ onTransmit, currentStation = 'Unicom', callsign = 'C
                   lineHeight: '1.2'
                 }}
               >
-                <div style={{ fontWeight: 'bold', fontSize: '10px' }}>{template.label}</div>
+                <div style={{ fontWeight: 'bold', fontSize: '10px' }}>
+                    {t(`radio.template.${template.id}.label`) || template.label}
+                </div>
                 <div style={{ fontSize: '9px', color: '#94a3b8', fontStyle: 'italic', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                  {template.template}
+                  {t(`radio.template.${template.id}.text`, { station: currentStation, callsign: callsign })}
                 </div>
               </button>
             ))}
@@ -142,13 +143,15 @@ const RadioActionPanel = ({ onTransmit, currentStation = 'Unicom', callsign = 'C
         ) : (
           <form onSubmit={handleSend} style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <span style={{ fontSize: '11px', fontWeight: 'bold', color: '#38bdf8' }}>{selectedTemplate.label}</span>
+              <span style={{ fontSize: '11px', fontWeight: 'bold', color: '#38bdf8' }}>
+                {t(`radio.template.${selectedTemplate.id}.label`) || selectedTemplate.label}
+              </span>
               <button 
                 type="button" 
                 onClick={() => setSelectedTemplate(null)}
                 style={{ background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer', fontSize: '9px' }}
               >
-                Cancel
+                {t('radio.cancel')}
               </button>
             </div>
 
@@ -170,7 +173,7 @@ const RadioActionPanel = ({ onTransmit, currentStation = 'Unicom', callsign = 'C
                       cursor: 'pointer'
                     }}
                   >
-                    <option value="">Select...</option>
+                    <option value="">{t('radio.select')}</option>
                     {validWaypoints.map(wp => (
                       <option key={wp} value={wp}>{wp}</option>
                     ))}
@@ -180,7 +183,7 @@ const RadioActionPanel = ({ onTransmit, currentStation = 'Unicom', callsign = 'C
                     type="text"
                     value={paramValues[param]}
                     onChange={(e) => handleParamChange(param, e.target.value)}
-                    placeholder={`Enter ${param}...`}
+                    placeholder={t('radio.enter', { param })}
                     style={{
                       background: '#0f172a',
                       border: '1px solid #334155',
@@ -207,11 +210,12 @@ const RadioActionPanel = ({ onTransmit, currentStation = 'Unicom', callsign = 'C
               lineHeight: '1.2'
             }}>
               "
-              {selectedTemplate.template
-                .replace('{station}', currentStation)
-                .replace('{callsign}', callsign)
-                .replace(/{(\w+)}/g, (match, key) => paramValues[key] || match)
-              }"
+              {t(`radio.template.${selectedTemplate.id}.text`, {
+                station: currentStation,
+                callsign: callsign,
+                ...paramValues
+              })}
+              "
             </div>
 
             <button
@@ -229,7 +233,7 @@ const RadioActionPanel = ({ onTransmit, currentStation = 'Unicom', callsign = 'C
                 cursor: isChannelBusy ? 'not-allowed' : 'pointer'
               }}
             >
-              {isChannelBusy ? 'FREQ BUSY' : 'TRANSMIT'}
+              {isChannelBusy ? t('radio.busy') : t('radio.transmit')}
             </button>
           </form>
         )}

@@ -30,6 +30,9 @@ const ModernAutopilotModule = ({ flightState, setAutopilotTargets, toggleAutopil
         const newAlt = Number(flightState.autopilotTargets.altitude);
         const newHdg = Number(flightState.autopilotTargets.heading);
         
+        // Normalize heading to 0-359
+        const normalizedHdg = !isNaN(newHdg) ? ((newHdg % 360) + 360) % 360 : prev.heading;
+
         // In HDG mode, do NOT update heading from props unless local heading is invalid (0).
         // This prevents the "sync with flight direction" issue if the backend echos current heading.
         const shouldUpdateHeading = !isNaN(newHdg) && (currentMode === 'LNAV' || prev.heading === 0);
@@ -38,7 +41,7 @@ const ModernAutopilotModule = ({ flightState, setAutopilotTargets, toggleAutopil
            ias: (!isNaN(newIas) && newIas > 0) ? newIas : prev.ias,
            vs: !isNaN(newVs) ? newVs : prev.vs,
            altitude: (!isNaN(newAlt) && newAlt > 0) ? newAlt : prev.altitude,
-           heading: shouldUpdateHeading ? newHdg : prev.heading
+           heading: shouldUpdateHeading ? normalizedHdg : prev.heading
          };
        });
      }

@@ -22,7 +22,7 @@ import SystemStatusPanel from './SystemStatusPanel';
 import { useLanguage } from '../contexts/LanguageContext';
 import './FlightPanel.css';
 
-const FlightPanelModular = ({ flightData, physicsState, weatherData, onActionRequest, aircraftModel, selectedArrival, flightPlan, radioMessages, onRadioFreqChange, npcs, frequencyContext, currentRegion, timeScale, setTimeScale, onUpdateFlightPlan, availableRunways, startupStatus }) => {
+const FlightPanelModular = ({ flightData, physicsState, physicsService, weatherData, onActionRequest, aircraftModel, selectedArrival, flightPlan, radioMessages, onRadioFreqChange, npcs, frequencyContext, currentRegion, timeScale, setTimeScale, onUpdateFlightPlan, availableRunways, startupStatus }) => {
   const { t } = useLanguage();
   // Use flightData from parent component instead of creating own physics service
   const [showOverhead, setShowOverhead] = useState(false);
@@ -370,7 +370,7 @@ const FlightPanelModular = ({ flightData, physicsState, weatherData, onActionReq
           },
           onMouseEnter: (e) => { e.target.style.background = 'rgba(74, 222, 128, 0.2)'; },
           onMouseLeave: (e) => { e.target.style.background = 'rgba(0, 0, 0, 0.6)'; }
-        }, "SYSTEMS [OH PNL]"),
+        }, t('ui.panels.overhead_button')),
         
         // Narrative Container
         React.createElement('div', {
@@ -395,7 +395,7 @@ const FlightPanelModular = ({ flightData, physicsState, weatherData, onActionReq
               lineHeight: '1.6',
               color: '#cbd5e1'
             }
-          }, t(flightState.currentNarrative?.content, flightState.currentNarrative?.data) || "Awaiting instructions...")
+          }, t(flightState.currentNarrative?.content, flightState.currentNarrative?.data) || t('ui.narrative.awaiting'))
         ),
 
         // Communication Module (Immersive Style)
@@ -479,9 +479,9 @@ const FlightPanelModular = ({ flightData, physicsState, weatherData, onActionReq
             }
           },
             React.createElement('div', { style: { fontWeight: 'bold', marginBottom: '6px', color: '#ef4444', borderBottom: '1px solid rgba(239, 68, 68, 0.3)', paddingBottom: '4px' } }, `⚠️ ${t('ui.startup.checklist_incomplete') || 'STARTUP REQUIRED'}`),
-            startupStatus.missingItems.map(item => React.createElement('div', { key: item, style: { marginBottom: '2px', display: 'flex', alignItems: 'center' } }, 
+            startupStatus.missingItems.map((item, index) => React.createElement('div', { key: item.key || index, style: { marginBottom: '2px', display: 'flex', alignItems: 'center' } }, 
                React.createElement('span', { style: { color: '#ef4444', marginRight: '6px' } }, '×'),
-               item // Items like 'engines' might need translation too, but let's stick to narrative for now
+               item.key ? t(item.key, item.params) : item
             ))
           )
         )

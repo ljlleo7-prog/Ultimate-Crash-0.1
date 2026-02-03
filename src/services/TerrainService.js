@@ -7,6 +7,10 @@ class TerrainService {
     this.lastCallTime = 0;
     this.pendingRequest = null;
     this.MIN_INTERVAL = 1000; // 1 second
+    this.failureCount = 0;
+    this.nextRetryTime = 0;
+    this.RETRY_DELAY = 60000; // 1 minute backoff after failures
+    this.MAX_FAILURES = 5;
   }
 
   /**
@@ -24,6 +28,12 @@ class TerrainService {
     }
 
     const now = Date.now();
+
+    // Circuit breaker check
+    if (now < this.nextRetryTime) {
+      return 0; // Return sea level (safe fallback) while blocked
+    }
+
     const timeSinceLastCall = now - this.lastCallTime;
 
     if (timeSinceLastCall < this.MIN_INTERVAL) {
@@ -52,10 +62,21 @@ class TerrainService {
           this.cache.delete(firstKey);
         }
         
+        // Reset failure counters on success
+        this.failureCount = 0;
+        this.nextRetryTime = 0;
+        
         return elevation;
       }
     } catch (error) {
-      console.warn('Terrain fetch failed:', error);
+      this.failureCount++;
+      if (this.failureCount >= this.MAX_FAILURES) {
+          console.warn(`Terrain API failed ${this.failureCount} times. Backing off for ${this.RETRY_DELAY/1000}s.`);
+          this.nextRetryTime = now + this.RETRY_DELAY;
+          this.failureCount = 0; // Reset count so we try again fresh after delay
+      } else {
+          console.warn('Terrain fetch failed:', error);
+      }
     }
     
     return 0; // Fallback to sea level

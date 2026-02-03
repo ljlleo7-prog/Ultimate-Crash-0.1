@@ -33,8 +33,9 @@ export class ATCLogic {
    * @param {Object} flightState - Current aircraft state
    * @param {Object} freqInfo - Current frequency info { frequency, type, station }
    * @param {Function} onMessage - Callback to send a message from ATC
+   * @param {string} language - Current language code ('en' or 'zh')
    */
-  update(dt, flightState, freqInfo, onMessage) {
+  update(dt, flightState, freqInfo, onMessage, language) {
     if (!flightState || !freqInfo) return;
 
     // 1. ATIS Service
@@ -42,7 +43,7 @@ export class ATCLogic {
       this.atisTimer -= dt;
       if (this.atisTimer <= 0) {
         this.atisTimer = 60; // Reset to 60s
-        const msg = getATCResponse('req_atis', {}, { weather: flightState.weather, callsign: 'ALL STATIONS' });
+        const msg = getATCResponse('req_atis', {}, { weather: flightState.weather, callsign: 'ALL STATIONS' }, language);
         onMessage({
           sender: 'ATIS',
           text: msg,
@@ -67,10 +68,14 @@ export class ATCLogic {
           const isCorrecting = (diff > 0 && vs < -500) || (diff < 0 && vs > 500);
           
           if (!isCorrecting) {
-            const action = diff > 0 ? 'descend and maintain' : 'climb and maintain';
+            const msg = getATCResponse('sys_traffic_alert', { 
+                diff, 
+                assignedAltitude: this.assignedAltitude 
+            }, { callsign: flightState.callsign }, language);
+
             onMessage({
               sender: 'ATC',
-              text: `${flightState.callsign || 'Station'}, traffic alert. Check altitude. Immediately ${action} ${this.assignedAltitude}.`,
+              text: msg,
               timestamp: Date.now(),
               frequency: freqInfo.frequency
             });
@@ -100,9 +105,13 @@ export class ATCLogic {
       if (this.assignedAltitude && Math.abs(readbackAlt - this.assignedAltitude) > 100) {
         // Wrong readback
         setTimeout(() => {
+          const msg = getATCResponse('sys_readback_wrong', { 
+              assignedAltitude: this.assignedAltitude 
+          }, { callsign: context.callsign }, context.language);
+          
           onResponse({
             sender: 'ATC',
-            text: `Negative ${context.callsign}, maintain ${this.assignedAltitude}.`,
+            text: msg,
             timestamp: Date.now()
           });
         }, 1500);
@@ -116,7 +125,7 @@ export class ATCLogic {
       this.responseTimeout = null;
     }
 
-    const responseText = getATCResponse(message.templateId, message.params || {}, context);
+    const responseText = getATCResponse(message.templateId, message.params || {}, context, context.language || 'en');
 
     // Track Assignments
     if (message.templateId === 'req_alt' && responseText.includes('Unable') === false) {

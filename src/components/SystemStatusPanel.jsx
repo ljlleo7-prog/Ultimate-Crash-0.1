@@ -14,7 +14,7 @@ const SystemStatusPanel = ({ flightState }) => {
 
   return (
     <div className="system-status-panel" style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
-      <h3 style={{ margin: '5px 0', textAlign: 'center', borderBottom: '1px solid #444' }}>{t('ui.systems.status') || 'System Status'}</h3>
+      <h3 style={{ margin: '5px 0', textAlign: 'center', borderBottom: '1px solid #444' }}>{t('ui.systems.status')}</h3>
       
       <div className="panel-content" style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
         {/* Left Column: System Values */}
@@ -33,15 +33,15 @@ const SystemStatusPanel = ({ flightState }) => {
               <span className="value">{formatValue(flightState.fuel)}</span>
             </div>
             <div className="system-item">
-              <span className="label">Oil</span>
+              <span className="label">{t('ui.flight.oil')}</span>
               <span className="value">{formatValue(flightState.oilPressure)}psi</span>
             </div>
             <div className="system-item">
-              <span className="label">{t('ui.systems.hydraulics').substring(0, 3)}</span>
+              <span className="label">{t('ui.systems.hydraulics_abbrev')}</span>
               <span className="value">{formatValue(flightState.hydraulicPressure)}psi</span>
             </div>
             <div className="system-item">
-              <span className="label">{t('ui.systems.electrics').substring(0, 4)}</span>
+              <span className="label">{t('ui.systems.electrics_abbrev')}</span>
               <span className="value">{formatValue(flightState.electricalVoltage, 1)}V</span>
             </div>
             <div className="system-item">
@@ -59,9 +59,9 @@ const SystemStatusPanel = ({ flightState }) => {
 
         {/* Right Column: Warnings Log */}
         <div className="warnings-log" style={{ flex: 1, padding: '5px', overflowY: 'auto', display: 'flex', flexDirection: 'column' }}>
-            <h4 style={{ margin: '0 0 5px 0', fontSize: '0.9em', color: '#aaa' }}>Warnings</h4>
+            <h4 style={{ margin: '0 0 5px 0', fontSize: '0.9em', color: '#aaa' }}>{t('ui.systems.warnings')}</h4>
             {warnings.length === 0 ? (
-                <div style={{ color: '#555', fontStyle: 'italic', fontSize: '0.8em' }}>No active warnings</div>
+                <div style={{ color: '#555', fontStyle: 'italic', fontSize: '0.8em' }}>{t('ui.systems.no_warnings')}</div>
             ) : (
                 warnings.map((w, idx) => (
                     <div key={`${w.id}-${idx}`} style={{ 
@@ -72,7 +72,7 @@ const SystemStatusPanel = ({ flightState }) => {
                         fontSize: '0.85em',
                         color: w.level === 'CRITICAL' ? '#ff4444' : '#ffcc00'
                     }}>
-                        {w.message}
+                        {typeof w.message === 'object' ? t(w.message.key, w.message.params) : t(w.message)}
                     </div>
                 ))
             )}

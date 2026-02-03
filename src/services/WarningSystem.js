@@ -135,9 +135,9 @@ class WarningSystem {
              const ttiSink = agl / sinkRateFtSec; // Seconds to impact
              
              if (ttiSink < PREDICTION_TIME_PULL_UP) {
-                  this.addWarning('GPWS_PULL_UP', 'PULL UP', 'CRITICAL', true);
+                  this.addWarning('GPWS_PULL_UP', 'warnings.gpws.pull_up', 'CRITICAL', true);
              } else if (ttiSink < PREDICTION_TIME_WARN) {
-                  this.addWarning('GPWS_TERRAIN', 'TERRAIN', 'CRITICAL', true);
+                  this.addWarning('GPWS_TERRAIN', 'warnings.gpws.terrain', 'CRITICAL', true);
              }
         }
         
@@ -164,7 +164,7 @@ class WarningSystem {
              const futureTerrainFt10 = terrainRadarService.getTerrainHeight(lat + dLat10, lon + dLon10);
              
              if (futureTerrainFt10 !== null && futureTerrainFt10 > altAMSL) {
-                  this.addWarning('GPWS_PULL_UP', 'PULL UP', 'CRITICAL', true);
+                  this.addWarning('GPWS_PULL_UP', 'warnings.gpws.pull_up', 'CRITICAL', true);
              } else {
                   // Check 20s (TERRAIN)
                   const distNm20 = nmPerSec * PREDICTION_TIME_WARN;
@@ -175,17 +175,17 @@ class WarningSystem {
                   const futureTerrainFt20 = terrainRadarService.getTerrainHeight(lat + dLat20, lon + dLon20);
                   
                   if (futureTerrainFt20 !== null && futureTerrainFt20 > altAMSL) {
-                       this.addWarning('GPWS_TERRAIN', 'TERRAIN', 'CRITICAL', true);
+                       this.addWarning('GPWS_TERRAIN', 'warnings.gpws.terrain', 'CRITICAL', true);
                   }
              }
         }
 
         // Mode 4: Unsafe Terrain Clearance (Legacy Checks)
         if (agl < this.thresholds.gearWarningAlt && !gear && airspeed < 180) {
-            this.addWarning('GPWS_TOO_LOW_GEAR', 'TOO LOW GEAR', 'WARNING');
+            this.addWarning('GPWS_TOO_LOW_GEAR', 'warnings.gpws.too_low_gear', 'WARNING');
         }
         if (agl < this.thresholds.flapsWarningAlt && flaps < 0.1 && gear && airspeed < 160) {
-            this.addWarning('GPWS_TOO_LOW_FLAPS', 'TOO LOW FLAPS', 'WARNING');
+            this.addWarning('GPWS_TOO_LOW_FLAPS', 'warnings.gpws.too_low_flaps', 'WARNING');
         }
     }
 
@@ -194,18 +194,18 @@ class WarningSystem {
 
         // Stall Warning (Disabled on Ground)
         if (!onGround && alpha > this.thresholds.stallAlpha) {
-            this.addWarning('STALL', 'STALL', 'CRITICAL', true);
+            this.addWarning('STALL', 'warnings.stall', 'CRITICAL', true);
         }
 
         // Overspeed
         if (airspeed > this.thresholds.overspeedKnots) {
-            this.addWarning('OVERSPEED', 'OVERSPEED', 'CRITICAL', true);
+            this.addWarning('OVERSPEED', 'warnings.overspeed', 'CRITICAL', true);
         }
 
         // Bank Angle
         // Only trigger if AIRBORNE (not on ground) to prevent nuisance alarms during taxi/pushback
         if (!onGround && Math.abs(roll) > this.thresholds.bankAngleWarn) {
-            this.addWarning('BANK_ANGLE', 'BANK ANGLE', 'WARNING', true);
+            this.addWarning('BANK_ANGLE', 'warnings.bank_angle', 'WARNING', true);
         }
     }
 
@@ -213,28 +213,28 @@ class WarningSystem {
         if (!systems) return;
 
         // Fire
-        if (systems.fire.eng1) this.addWarning('FIRE_ENG1', 'ENGINE 1 FIRE', 'CRITICAL', true);
-        if (systems.fire.eng2) this.addWarning('FIRE_ENG2', 'ENGINE 2 FIRE', 'CRITICAL', true);
-        if (systems.fire.apu) this.addWarning('FIRE_APU', 'APU FIRE', 'CRITICAL', true);
+        if (systems.fire.eng1) this.addWarning('FIRE_ENG1', 'warnings.fire.eng1', 'CRITICAL', true);
+        if (systems.fire.eng2) this.addWarning('FIRE_ENG2', 'warnings.fire.eng2', 'CRITICAL', true);
+        if (systems.fire.apu) this.addWarning('FIRE_APU', 'warnings.fire.apu', 'CRITICAL', true);
 
         // Hydraulics
-        if (systems.hydraulics.sysA.pressure < 1000) this.addWarning('HYD_A_LOW', 'HYD A PRESS LOW', 'ADVISORY');
-        if (systems.hydraulics.sysB.pressure < 1000) this.addWarning('HYD_B_LOW', 'HYD B PRESS LOW', 'ADVISORY');
+        if (systems.hydraulics.sysA.pressure < 1000) this.addWarning('HYD_A_LOW', 'warnings.hydraulics.a_low', 'ADVISORY');
+        if (systems.hydraulics.sysB.pressure < 1000) this.addWarning('HYD_B_LOW', 'warnings.hydraulics.b_low', 'ADVISORY');
 
         // Electrical
         if (!systems.electrical.gen1 && !systems.electrical.gen2 && !systems.electrical.apuGen) {
              // If on battery only in air
-             this.addWarning('ELEC_EMER', 'ELEC EMER CONFIG', 'WARNING');
+             this.addWarning('ELEC_EMER', 'warnings.elec.emer_config', 'WARNING');
         }
 
         // Pressurization
         if (systems.pressurization.cabinAlt > 10000) {
-            this.addWarning('CABIN_ALT', 'CABIN ALTITUDE', 'CRITICAL', true);
+            this.addWarning('CABIN_ALT', 'warnings.cabin_alt', 'CRITICAL', true);
         }
         
         // Fuel
         if (fuel < 500) { // Arbitrary low fuel mass
-             this.addWarning('FUEL_LOW', 'LOW FUEL', 'WARNING');
+             this.addWarning('FUEL_LOW', 'warnings.fuel_low', 'WARNING');
         }
 
         // Engine Failure (In Air)
@@ -248,7 +248,7 @@ class WarningSystem {
                     const n2Val = Array.isArray(engines.n2) ? engines.n2[i] : undefined;
                     const fuelOn = fuelControls[i] !== false;
                     if (fuelOn && n1Val < 10 && (n2Val === undefined || n2Val < 25)) { 
-                        this.addWarning(`ENG_${i+1}_FAIL`, `ENGINE ${i+1} FAIL`, 'CRITICAL', true);
+                        this.addWarning(`ENG_${i+1}_FAIL`, { key: 'warnings.engine_fail', params: { index: i+1 } }, 'CRITICAL', true);
                     }
                 });
             } else if (Array.isArray(engines)) {
@@ -256,7 +256,7 @@ class WarningSystem {
                  engines.forEach((eng, i) => {
                     const fuelOn = fuelControls[i] !== false;
                     if (fuelOn && eng.n1 < 10 && (eng.n2 === undefined || eng.n2 < 25)) {
-                        this.addWarning(`ENG_${i+1}_FAIL`, `ENGINE ${i+1} FAIL`, 'CRITICAL', true);
+                        this.addWarning(`ENG_${i+1}_FAIL`, { key: 'warnings.engine_fail', params: { index: i+1 } }, 'CRITICAL', true);
                     }
                 });
             }
@@ -269,13 +269,13 @@ class WarningSystem {
         const onGround = groundStatus && (groundStatus.status === 'RUNWAY' || groundStatus.status === 'GRASS');
         if (onGround && throttle > 0.7) {
             if (flaps < 0.1) {
-                this.addWarning('CONFIG_FLAPS', 'CONFIG FLAPS', 'WARNING', true);
+                this.addWarning('CONFIG_FLAPS', 'warnings.config.flaps', 'WARNING', true);
             }
             if (airBrakes > 0.1) {
-                this.addWarning('CONFIG_SPOILERS', 'CONFIG SPOILERS', 'WARNING', true);
+                this.addWarning('CONFIG_SPOILERS', 'warnings.config.spoilers', 'WARNING', true);
             }
             if (brakes > 0.1) {
-                this.addWarning('CONFIG_BRAKES', 'CONFIG BRAKES', 'WARNING', true);
+                this.addWarning('CONFIG_BRAKES', 'warnings.config.brakes', 'WARNING', true);
             }
         }
 
@@ -285,7 +285,7 @@ class WarningSystem {
 
         // 3. Tail Strike Risk
         if (altitudeAGL <= 50 && pitch > this.thresholds.tailStrikePitch) {
-            this.addWarning('TAIL_STRIKE', 'TAIL STRIKE RISK', 'CRITICAL', true);
+            this.addWarning('TAIL_STRIKE', 'warnings.tail_strike', 'CRITICAL', true);
         }
     }
 

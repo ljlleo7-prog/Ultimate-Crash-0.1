@@ -2,14 +2,16 @@
 import React, { useState, useEffect } from 'react';
 import './NarrativeScene.css';
 import { generateNarrative } from '../utils/narrativeGenerator';
+import { useLanguage } from '../contexts/LanguageContext';
 
 const NarrativeScene = ({ onComplete, context }) => {
+  const { t } = useLanguage();
   const [narrative, setNarrative] = useState(null);
   const [visibleLines, setVisibleLines] = useState(0);
   const [isReady, setIsReady] = useState(false);
 
   useEffect(() => {
-    setNarrative(generateNarrative(context));
+    setNarrative(generateNarrative(context, t));
   }, []);
 
   useEffect(() => {
@@ -47,24 +49,24 @@ const NarrativeScene = ({ onComplete, context }) => {
     <div className="narrative-container">
       <div className="narrative-content">
         <div className={`narrative-line role ${visibleLines >= 1 ? 'visible' : ''}`}>
-          <span className="label">DESIGNATION:</span> {narrative.role} {context.callsign || 'UNKNOWN'}
+          <span className="label">{t('narrative_scene.designation')}</span> {narrative.role} {context.callsign || 'UNKNOWN'}
         </div>
         
         <div className={`narrative-line experience ${visibleLines >= 2 ? 'visible' : ''}`}>
-          <span className="label">BACKGROUND:</span> You are {narrative.experience}
+          <span className="label">{t('narrative_scene.background')}</span> {t('narrative_scene.you_are')} {narrative.experience}
         </div>
         
         <div className={`narrative-line plan ${visibleLines >= 3 ? 'visible' : ''}`}>
-          <span className="label">MISSION:</span> {narrative.plan}
+          <span className="label">{t('narrative_scene.mission')}</span> {narrative.plan}
         </div>
         
         <div className={`narrative-line difficulty ${visibleLines >= 4 ? 'visible' : ''}`}>
-          <span className="label">INTELLIGENCE:</span> {narrative.potentialDifficulty}
+          <span className="label">{t('narrative_scene.intelligence')}</span> {narrative.potentialDifficulty}
         </div>
 
         <div className={`narrative-action ${isReady ? 'visible' : ''}`}>
           <button className="accept-btn" onClick={onComplete}>
-            ACCEPT ASSIGNMENT
+            {t('narrative_scene.accept')}
           </button>
         </div>
       </div>

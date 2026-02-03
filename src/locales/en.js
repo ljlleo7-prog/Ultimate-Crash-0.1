@@ -1,5 +1,6 @@
 const en = {
   narrative: {
+    awaiting: 'Awaiting instructions...',
     phases: {
       boarding: {
         default: {
@@ -423,9 +424,32 @@ const en = {
     }
   },
   ui: {
+    debug: {
+        title: 'FLIGHT DATA & LNAV',
+        lat: 'Lat:',
+        lon: 'Lon:',
+        alt: 'Alt:',
+        ias: 'IAS:',
+        gs: 'GS:',
+        mode: 'Mode:',
+        engaged: 'ACTIVE',
+        off: 'OFF',
+        tgt_hdg: 'Target Hdg:',
+        hdg_err: 'Hdg Error:',
+        tgt_roll: 'Tgt Roll:',
+        act_roll: 'Act Roll:',
+        ils_status: 'ILS STATUS',
+        dist: 'Dist:',
+        loc_err: 'LOC Err:',
+        gs_err: 'G/S Err:',
+        tgt_alt: 'Tgt Alt:',
+        next_wp: 'Next WP:',
+        wp_index: 'WP Index:'
+    },
     flight: {
         time_zulu: 'Time (Zulu)',
         fuel: 'Fuel',
+        oil: 'Oil',
         pax: 'PAX',
         distance: 'Dist',
         altitude: 'Alt',
@@ -442,6 +466,355 @@ const en = {
             freq_busy: 'Frequency is busy. Please wait.'
         }
     },
+    panels: {
+        overhead_button: 'SYSTEMS [OH PNL]',
+        pfd: 'PRIMARY FLIGHT DISPLAY',
+        nd: 'NAVIGATION DISPLAY',
+        engine_systems: 'ENGINE & SYSTEMS',
+        fuel: 'FUEL',
+        system_status: 'SYSTEM STATUS / ALERTS',
+        controls: 'FLIGHT CONTROLS',
+        flaps: 'FLAPS',
+        gear: 'GEAR',
+        brakes: 'BRAKES',
+        trim: 'TRIM',
+        systems: {
+        status: 'SYSTEM STATUS',
+        hydraulics: 'HYDRAULICS',
+        hydraulics_abbrev: 'HYD',
+        electrics: 'ELECTRICS',
+        electrics_abbrev: 'ELEC',
+        warnings: 'WARNINGS',
+        no_warnings: 'NO ACTIVE WARNINGS',
+        on: 'ON',
+        off: 'OFF'
+    },
+    active_failures: 'ACTIVE FAILURES',
+        no_active_alerts: 'NO ACTIVE ALERTS',
+        next_wp: 'Next WP',
+        wp_index: 'WP Index',
+        tgt_alt: 'Tgt Alt'
+    },
+    flight_computer: {
+        title: 'Flight Computer',
+        tabs: {
+            plan: 'Plan',
+            add: 'Add',
+            nearest: 'Nearest',
+            radio: 'Radio',
+            utils: 'Utils',
+            perf: 'Perf'
+        },
+        plan: {
+            empty: 'No waypoints in flight plan.',
+            end_of_plan: 'End of Flight Plan',
+            hold: 'HOLD',
+            holding: 'HOLDING',
+            active: '(ACTIVE)'
+        },
+        add: {
+            manual_entry: 'Manual Entry',
+            lat_placeholder: 'Lat (e.g. 37.61)',
+            lon_placeholder: 'Lon (e.g. -122.37)',
+            label_placeholder: 'Label (Optional)',
+            add_coordinates: 'Add Coordinates',
+            or: 'OR',
+            airport_search: 'Airport Search',
+            search_placeholder: 'Search ICAO/IATA/Name...',
+            search_types: {
+                all: 'All',
+                normal: 'Normal',
+                emergency: 'Emergency'
+            },
+            search_btn: 'Search',
+            add_to_plan: '+ Add to Plan',
+            no_results: 'No airports found.',
+            alerts: {
+                invalid_coords: 'Please enter valid coordinates',
+                invalid_freq: 'Invalid Frequency. Must be between 108.00 and 117.95 MHz'
+            },
+            searching: 'Searching...'
+        },
+        nearest: {
+            title: 'Nearest Airports (Top 20)',
+            loading: 'Finding nearest airports...',
+            finding: 'Finding airports...',
+            empty: 'No airports found nearby.',
+            no_results: 'No airports found.',
+            add_btn: '+ Add',
+            refresh: 'Refresh',
+            emergency_tag: 'EMERGENCY'
+        },
+        radio: {
+            title: 'Navigation Radio',
+            current_freq: 'Current NAV1 Frequency',
+            set_freq: 'Set Frequency (MHz)',
+            tune: 'TUNE',
+            common_freqs: 'Common ILS Frequencies: 108.10, 108.15, ..., 111.95'
+        },
+        utils: {
+            title: 'Predictions',
+            next_wp: 'Next Waypoint:',
+            distance: 'Distance:',
+            ete: 'ETE to WPT:',
+            fuel_flow: 'Fuel Flow:',
+            time_empty: 'Time to Empty:',
+            target_alt: 'Target Alt (ft):',
+            time_alt: 'Time to Alt:',
+            wrong_vs: 'Wrong VS Direction',
+            stable: 'Stable'
+        },
+        converter: {
+            title: 'Unit Converter',
+            value_placeholder: 'Value',
+            result: 'Result:',
+            units: {
+                ft: 'Feet (ft)',
+                m: 'Meters (m)',
+                kts: 'Knots (kts)',
+                kmh: 'Km/h',
+                inHg: 'inHg',
+                hPa: 'hPa',
+                nm: 'Naut. Miles',
+                km: 'Kilometers'
+            }
+        }
+    },
+    menu: {
+        quit: 'Return to Initialization'
+    },
+    header: {
+        awaiting: 'Awaiting flight instructions...',
+        prepare: 'Prepare for takeoff.',
+        checklist_incomplete: '⚠️ Checklist Incomplete',
+        situation: 'SITUATION'
+    },
+    loading: {
+        starting_simulation: 'Starting Flight Simulation...',
+        initializing_physics: 'Initializing physics engine...'
+    },
+    error: {
+        initialization_error: 'Initialization Error',
+        reload_page: 'Reload Page'
+    },
+    common: {
+        critical: 'CRITICAL'
+    },
+    messages: {
+        cannot_proceed_missing_items: 'Cannot proceed. Missing items: ${items}'
+    },
+    narrative: {
+      phases: {
+        boarding: {
+          0: {
+            title: 'Boarding at ${departure}',
+            content: 'The smell of jet fuel and coffee fills the cabin. Passengers shuffle down the aisle, stowing bags overhead. Outside, the ramp crew is loading the final containers. "Welcome aboard ${callsign}," the flight attendant announces. The ${aircraft} is ready for the journey to ${arrival}.'
+          },
+          1: {
+            title: 'Boarding in Progress',
+            content: 'Rain streaks the windows at ${departure} as passengers settle in. The soft chime of the cabin overheads closing punctuates the low hum of the APU. "Boarding is complete," the gate agent confirms. We are preparing for our flight to ${arrival}.'
+          },
+          2: {
+            title: 'Welcome Aboard',
+            content: 'Sunlight streams through the windows of the ${aircraft}. The cabin crew is conducting final safety checks. "Ladies and gentlemen, welcome to flight ${callsign} service to ${arrival}." The air is cool and crisp from the AC vents.'
+          }
+        },
+        departure_clearance: {
+          0: {
+            title: 'IFR Clearance',
+            content: 'The radio crackles to life. "${callsign}, cleared to ${arrival} via flight plan route. Climb and maintain FL350. Departure frequency 124.7. Squawk 4211." You read back the clearance as the navigation displays align.'
+          },
+          1: {
+            title: 'Receiving Clearance',
+            content: '"${callsign}, advise when ready to copy." You grab your pen. "Cleared to ${arrival}, maintain flight level 350, expect higher 10 minutes after departure." The flight computer is programmed and verified.'
+          },
+          2: {
+            title: 'Pre-Departure Check',
+            content: 'Cockpit preparation complete. Altimeters set. "${callsign}, clearance valid. Contact ground on 121.9 for push." The frequencies are tuned. The crew is ready.'
+          }
+        },
+        pushback: {
+          0: {
+            title: 'Pushback Approved',
+            content: 'A gentle jolt as the tug connects. "Ground to Cockpit, brakes released." The terminal building slowly drifts away. The hum of the APU is replaced by the rising whine of the main turbines starting up.'
+          },
+          1: {
+            title: 'Push and Start',
+            content: '"Commencing pushback, engines clear." The tug groans as it pushes the heavy ${aircraft} back. Engine 2 N1 rising... fuel flow normal. Engine 1 N1 rising. Good start on both.'
+          },
+          2: {
+            title: 'Leaving the Gate',
+            content: 'The marshaller waves his wands. "Brakes released, pushback commencing." You watch the wingwalkers guide the tips. The engines roar to life with a deep vibration felt through the floor.'
+          }
+        },
+        taxiing: {
+          0: {
+            title: 'Taxi to Runway ${departureRunway}',
+            content: '"${callsign}, taxi to runway ${departureRunway} via Alpha, Bravo." You release the parking brake. The tires thump rhythmically over the concrete joints. Sunlight glints off the tarmac as you weave through the taxiways.'
+          },
+          1: {
+            title: 'Taxiing',
+            content: 'The aircraft sways gently as you navigate the taxiways. "${callsign}, give way to the 737 on your right." You hold short, watching the other traffic pass. "Continue to holding point runway ${departureRunway}."'
+          },
+          2: {
+            title: 'Head to Runway',
+            content: 'Taxi lights on. The long line of blue lights guides you toward runway ${departureRunway}. The cabin crew performs the safety demonstration. "Cabin ready for departure," the interphone chimes.'
+          }
+        },
+        takeoff: {
+          0: {
+            title: 'Takeoff Clearance',
+            content: 'Lined up on runway ${departureRunway}. "Wind 130 at 8, runway ${departureRunway} cleared for takeoff." Throttles forward. The engines roar to life, pressing you back into the seat. Rotate at Vr.'
+          },
+          1: {
+            title: 'Rolling',
+            content: '"${callsign}, cleared for takeoff." You advance the thrust levers. TOGA set. The centerline lights blur into a stream of white. Airspeed alive. 80 knots... V1... Rotate. The ground drops away.'
+          },
+          2: {
+            title: 'Departure',
+            content: 'Full power. The engine vibration turns into a smooth hum as speed builds. The runway rushing beneath. Pulling back on the yoke, the nose lifts, and the main wheels leave the ground. Positive rate.'
+          }
+        },
+        initial_climb: {
+          0: {
+            title: 'Positive Rate',
+            content: 'The ground falls away. "Gear up." Punching through the lower cloud layer into the sunlight. The city of ${departure} shrinks into a miniature grid below. Speed increasing to 250 knots.'
+          },
+          1: {
+            title: 'Climbing Out',
+            content: 'Banking left to intercept the departure radial. Flaps retracting. The air is turbulent near the cloud tops. "Contact Departure on 124.7." You switch frequencies. "${callsign} with you passing 3,000 for 5,000."'
+          },
+          2: {
+            title: 'Departure Phase',
+            content: 'The altimeter winds up rapidly. The view outside clears as you break through the haze layer. The engines settle into a climb thrust. "Resume navigation," ATC directs. Direct to the first waypoint.'
+          }
+        },
+        main_climb: {
+          0: {
+            title: 'Climb to Cruise',
+            content: 'Passing 10,000 feet. "Accelerate to cruise speed." The sky darkens to a deeper blue as we ascend. The air is smooth. Climbing steadily to Flight Level 350.'
+          },
+          1: {
+            title: 'Ascending',
+            content: 'The seatbelt sign dings off. Passengers begin to move about. Outside, the horizon stretches endlessly. We are crossing the transition altitude, setting standard pressure 29.92.'
+          },
+          2: {
+            title: 'Enroute Climb',
+            content: 'Climbing through FL240. The engines are efficient at this altitude. "Traffic 2 o\'clock, 10 miles, 1,000 feet above." You spot the contrail of another liner crossing high above.'
+          }
+        },
+        cruise: {
+          0: {
+            title: 'Cruising at FL350',
+            content: 'Level at 35,000 feet. The horizon is a curved line of haze. "Maintain Mach 0.78." The engines hum with a steady, reassuring rhythm. Passengers are settling in for the flight to ${arrival}.'
+          },
+          1: {
+            title: 'Enroute',
+            content: 'Navigation is green. "Systems normal." The autopilot tracks the route precisely. Outside, the clouds form a white blanket far below. "Cabin service has commenced."'
+          },
+          2: {
+            title: 'Steady Course',
+            content: 'The flight computer shows we are on schedule. Fuel burn is within limits. "Contact Center on 132.5." Switching frequencies. The radio chatter is sparse at this altitude.'
+          }
+        },
+        shutoff: {
+          default: {
+            0: {
+              title: 'Flight Terminated',
+              content: 'The aircraft has come to a stop. Systems are shutting down. Thank you for flying.'
+            },
+            1: {
+              title: 'Mission Ended',
+              content: 'You have reached the end of the simulation. Please review your flight performance.'
+            },
+            2: {
+              title: 'Simulation Complete',
+              content: 'Flight concluded. Passengers are disembarking. Ground power connected.'
+            }
+          },
+          crash: {
+            0: {
+              title: 'Critical Failure',
+              content: 'The aircraft has sustained catastrophic damage. Rescue teams are en route.'
+            },
+            1: {
+              title: 'Impact',
+              content: 'Ground contact was outside safety limits. Simulation terminated due to excessive G-force or structural failure.'
+            }
+          }
+        },
+        descent: {
+          0: {
+            title: 'Top of Descent',
+            content: 'Throttles back. The pitch drops slightly as we begin our descent. "Descend and maintain 10,000 feet." The destination ${arrival} lies ahead.'
+          },
+          1: {
+            title: 'Descent Initiation',
+            content: 'The engines spool down to idle. The wind noise increases slightly as the speedbrakes extend to manage speed. "${callsign}, cross WPT at FL240." Descending through the flight levels.'
+          },
+          2: {
+            title: 'Descending',
+            content: 'The clouds below are getting closer. Seatbelt sign back on. "Cabin crew, prepare for landing." We are beginning our arrival into the ${arrival} area. Altimeters reset to local pressure.'
+          }
+        },
+        approach: {
+          0: {
+            title: 'Approach to ${arrival}',
+            content: 'Lined up for runway ${landingRunway}. "Gear down, flaps 30." The runway threshold looms ahead through the haze. Speed checked, localizer captured.'
+          },
+          1: {
+            title: 'Final Approach',
+            content: 'Turning base to final. The runway lights pierce the gloom. "Three green, flaps full." Speed is Vref + 5. The PAPI lights show two white, two red. Perfect profile.'
+          },
+          2: {
+            title: 'On Final',
+            content: '"${callsign}, cleared to land runway ${landingRunway}." Disengaging autopilot. The controls feel heavy and responsive. Crosswind correction applied. The runway numbers expand in the windscreen.'
+          }
+        },
+        landing: {
+          0: {
+            title: 'Touchdown',
+            content: 'Flare... Touchdown. Spoilers deployed. Reverse thrust roaring. "${callsign}, welcome to ${arrival}." Braking to taxi speed.'
+          },
+          1: {
+            title: 'Landing Roll',
+            content: 'The wheels kiss the pavement. A firm landing. Nose gear down. "Decel." Manual braking. You turn off the high-speed exit. "Contact Ground on 121.9."'
+          },
+          2: {
+            title: 'Arrival',
+            content: 'Main gear down... smoke from the tires. Reversers green. 80 knots. 60 knots. We have arrived at ${arrival}. The cabin erupts in the usual shuffling sounds of arrival.'
+          }
+        },
+        after_land_taxiing: {
+          0: {
+            title: 'Taxi to Gate',
+            content: '"Turn left next taxiway, contact Ground." The flight is over. Taxing past other aircraft to our assigned gate.'
+          },
+          1: {
+            title: 'Taxiing In',
+            content: 'Flaps retracting. APU starting up. We navigate the busy apron of ${arrival}. "Hold short of gate B4, waiting for aircraft pushback." Almost there.'
+          },
+          2: {
+            title: 'Arrival Taxi',
+            content: 'The gate guidance system lights up. "Left... left... stop." Parking brake set. Engines spooling down. The jetway starts to move toward the door.'
+          }
+        },
+        shutoff: {
+          0: {
+            title: 'Engine Shutdown',
+            content: 'Parking brake set. Fuel cutoff. The engines spin down into silence. APU off. "Thank you for flying with us." Flight complete.'
+          },
+          1: {
+            title: 'Shutdown Checklist',
+            content: 'Seatbelt sign off. Hydraulics off. The aircraft goes dark as we switch to ground power. The last passengers are deplaning. Another successful flight in the logbook.'
+          },
+          2: {
+            title: 'Post-Flight',
+            content: 'The cockpit becomes quiet. completing the shutdown checklist. Outside, the baggage handlers are already unloading. Time to head to the hotel.'
+          }
+        }
+      }
+    },
     menu: {
         resume: 'Resume Flight',
         restart: 'Restart Scenario',
@@ -451,26 +824,107 @@ const en = {
     },
     systems: {
         engines: 'Engines',
+        engine: 'Engine',
         electrics: 'Electrics',
         hydraulics: 'Hydraulics',
         fuel: 'Fuel',
         apu: 'APU',
         pumps: 'Pumps',
-        generators: 'Gens',
+        generators: 'Generators',
         batteries: 'Batteries',
         on: 'ON',
         off: 'OFF',
         auto: 'AUTO',
         avail: 'AVAIL',
         fault: 'FAULT',
-        low_press: 'LOW PRESS'
+        low_press: 'LOW PRESS',
+        status: 'System Status',
+        warnings: 'Warnings',
+    no_warnings: 'No active warnings'
+  },
+  warnings: {
+    gpws: {
+      pull_up: 'PULL UP',
+      terrain: 'TERRAIN',
+      too_low_gear: 'TOO LOW GEAR',
+      too_low_flaps: 'TOO LOW FLAPS'
     },
-    startup: {
+    stall: 'STALL',
+    overspeed: 'OVERSPEED',
+    bank_angle: 'BANK ANGLE',
+    fire: {
+      eng1: 'ENGINE 1 FIRE',
+      eng2: 'ENGINE 2 FIRE',
+      apu: 'APU FIRE'
+    },
+    hydraulics: {
+      a_low: 'HYD A PRESS LOW',
+      b_low: 'HYD B PRESS LOW'
+    },
+    elec: {
+      emer_config: 'ELEC EMER CONFIG'
+    },
+    cabin_alt: 'CABIN ALTITUDE',
+    fuel_low: 'LOW FUEL',
+    engine_fail: 'ENGINE ${index} FAIL',
+    config: {
+      flaps: 'CONFIG FLAPS',
+      spoilers: 'CONFIG SPOILERS',
+      brakes: 'CONFIG BRAKES'
+    },
+    tail_strike: 'TAIL STRIKE RISK'
+  },
+  startup: {
         checklist_incomplete: 'Startup Checklist Incomplete',
-        missing_items: 'Missing items: ${items}',
-        cant_proceed: 'Cannot proceed to next phase.',
-        continue_anyway: 'Continue Anyway (Disable Safety)',
-        continue: 'Continue'
+        missing_items: 'Missing Items: ${items}',
+        sys_init: 'Systems Initialization',
+        checklist: {
+            systems_not_init: 'Systems not initialized',
+            battery_on: 'Battery must be ON',
+            adirs_nav: 'ADIRS IR switches must be in NAV',
+            adirs_aligning: 'ADIRS aligning (${progress}%)',
+            apu_bleed_on: 'APU Bleed must be ON',
+            apu_gen_on: 'APU Generator must be ON',
+            apu_running: 'APU must be running and stabilized',
+            engine_running: 'Engine ${index} must be running',
+            gen_on: 'Generator ${index} must be ON',
+            apu_shutdown: 'APU must be shutdown after engine start',
+            adirs_complete: 'ADIRS alignment must be complete'
+        }
+    },
+    radio: {
+        cancel: 'Cancel',
+        transmit: 'TRANSMIT',
+        preview: 'PREVIEW',
+        select: 'Select...',
+        enter: 'Enter ${param}...',
+        frequency_type: 'Frequency Type',
+        busy: 'FREQ BUSY',
+        tabs: {
+            READBACK: 'READBACK',
+            REQUEST: 'REQUEST',
+            INFORM: 'INFORM'
+        },
+        template: {
+            ack: { label: 'Acknowledge', text: 'Copy that, ${callsign}.' },
+            wilco: { label: 'Wilco', text: 'Wilco, ${callsign}.' },
+            rb_alt: { label: 'Readback Altitude', text: 'Climb and maintain ${altitude}, ${callsign}.' },
+            rb_hdg: { label: 'Readback Heading', text: 'Turn ${direction} heading ${heading}, ${callsign}.' },
+            rb_freq: { label: 'Readback Frequency', text: 'Contact ${station} on ${frequency}, ${callsign}.' },
+            rb_taxi: { label: 'Readback Taxi', text: 'Taxi via ${route} and hold short of RW ${runway}, ${callsign}.' },
+            req_alt: { label: 'Request Altitude', text: '${station}, ${callsign} requesting climb/descent to ${altitude}.' },
+            req_direct: { label: 'Request Direct', text: '${station}, ${callsign} requesting direct to ${waypoint}.' },
+            req_land: { label: 'Request Landing', text: '${station}, ${callsign} inbound for landing.' },
+            req_startup: { label: 'Request Startup', text: '${station}, ${callsign} ready for startup and pushback.' },
+            req_taxi: { label: 'Request Taxi', text: '${station}, ${callsign} ready for taxi.' },
+            req_takeoff: { label: 'Request Takeoff', text: '${station}, ${callsign} ready for takeoff, runway ${runway}.' },
+            req_atis: { label: 'Request ATIS', text: '${station}, ${callsign} requesting current weather / ATIS.' },
+            req_freq_change: { label: 'Request Freq Change', text: '${station}, ${callsign} requesting frequency change.' },
+            inf_checkin: { label: 'Check In', text: '${station}, ${callsign} with you at ${altitude}.' },
+            inf_pos: { label: 'Position Report', text: '${station}, ${callsign} passing ${waypoint} at ${altitude}.' },
+            inf_mayday: { label: 'Declare Emergency', text: 'MAYDAY MAYDAY MAYDAY, ${station}, ${callsign} declaring emergency due to ${failure}. Requesting immediate return/diversion.' },
+            inf_pan: { label: 'Declare Pan-Pan', text: 'PAN-PAN PAN-PAN PAN-PAN, ${station}, ${callsign} has ${issue}. Requesting priority handling.' }
+        }
     }
   },
   initialization: {
@@ -536,7 +990,112 @@ const en = {
       next_params: 'NEXT: FLIGHT PARAMETERS →',
       next_route: 'NEXT: ROUTE SELECTION →',
       finalize: 'FINALIZE DISPATCH & INITIALIZE'
+    },
+    random: {
+      success: 'Random flight initialized!\nRoute: ${departure} → ${arrival}\nAircraft: ${aircraft}\nDifficulty: ${difficulty}\nFailure: ${failure}\nWeather: ${weather}',
+      error: 'Error initializing random flight. Please try again.'
+    },
+    narrative_generator: {
+      roles: [
+        'Captain', 
+        'Commander', 
+        'Pilot in Command', 
+        'Skipper', 
+        'Chief Pilot'
+      ],
+      experience: {
+        rookie: [
+          'fresh from the flight academy. The ink on your license is barely dry.',
+          'on your first week with the airline. Nerves are high, but so is your ambition.',
+          'still proving yourself to the chief pilot. Every maneuver counts today.',
+          'sitting in the left seat for the first time. Don\'t forget your training.'
+        ],
+        amateur: [
+          'building your flight hours. You know the aircraft, but she still surprises you sometimes.',
+          'gaining confidence with every leg. You\'ve handled calm skies, but today might be different.',
+          'no longer a cadet, but not yet a veteran. The crew looks to you for steady hands.',
+          'starting to feel at home in the cockpit, though the complex systems still demand full attention.'
+        ],
+        intermediate: [
+          'a seasoned First Officer ready for upgrade. You know the procedures by heart.',
+          'an experienced pilot with thousands of hours. Standard operations are second nature.',
+          'reliable and steady. The airline trusts you with their most valuable routes.',
+          'competent and focused. You\'ve seen your share of rough weather and technical glitches.'
+        ],
+        advanced: [
+          'a senior Captain. Your name is whispered with respect in the crew lounge.',
+          'a veteran of the skies. You\'ve flown through hurricanes and landed with engines out.',
+          'an instructor examiner. You wrote the manual that others are struggling to learn.',
+          'the master of this fleet. The aircraft feels like an extension of your own body.'
+        ],
+        pro: [
+          'a legendary aviator. They say you can land on a postage stamp in a crosswind.',
+          'an ace pilot. Systems failures are just an opportunity to show off your skills.',
+          'the best of the best. When others panic, you just check your watch.',
+          'an elite commander. Nothing surprises you anymore, not even total hydraulic loss.'
+        ],
+        devil: [
+          'a test pilot pushing the envelope. Safety margins are just suggestions.',
+          'flying a cursed aircraft. The mechanics crossed themselves when you walked out to the tarmac.',
+          'facing the impossible. The odds are stacked against you, just the way you like it.',
+          'about to experience a simulation designed to break you. Good luck.'
+        ]
+      },
+      flight_plan: [
+        'Today\'s manifest lists ${pax} souls on board for the leg from ${departure} to ${arrival}.',
+        'You are cleared for the route from ${departure} to ${arrival}, carrying ${pax} passengers depending on you.',
+        'The flight plan is filed: ${departure} departure, destination ${arrival}. ${pax} passengers are settling into their seats.',
+        'From the gate at ${departure} to the tarmac at ${arrival}, you are responsible for ${pax} lives today.'
+      ],
+      difficulty: {
+        rookie: [
+          'System reports are normal. Focus on your decision-making and standard procedures.',
+          'Expect a routine flight with minor procedural tasks. Your crew is fully supportive.',
+          'A straightforward mission ahead. Minor issues may arise, but nothing you can\'t handle with basic logic.'
+        ],
+        amateur: [
+          'A single, significant operational challenge is anticipated. Keep it simple and follow the checklist.',
+          'You might encounter an impactful situation today, but your crew is ready to assist with the workload.',
+          'Stay alert for one major event. Direct control requirements remain low, letting you focus on management.'
+        ],
+        intermediate: [
+          'Prepare for dynamic conditions and potential interference. This leg requires hands-on flying.',
+          'Standard flight protocols apply, but be ready for shifting priorities and active control needs.',
+          'Your crew will follow your commands precisely, but the environment is becoming increasingly unpredictable.'
+        ],
+        advanced: [
+          'Multiple critical issues may develop simultaneously. Sharp maneuvers and quick decisions are vital.',
+          'Expect deadly scenarios where hands-on control is non-negotiable. Watch your crew—they may falter under pressure.',
+          'The simulation will test your reflexes today. Dynamic failures require constant attention and manual intervention.'
+        ],
+        pro: [
+          'Systematic failures are imminent. Automation is unreliable; you are the primary control loop.',
+          'Complex CRM and skilled maneuvering are required. Your crew is stressed and prone to significant errors.',
+          'Deadly, interconnected issues will challenge every skill you have. Expect a high workload and nervous support.'
+        ],
+        devil: [
+          'Total chaos is the forecast. No autopilot, no safety nets, and no reliable assistance.',
+          'The aircraft is pushed beyond its limits. Your crew might actively complicate the situation.',
+          'Forget your training—this is about survival. Every system is a potential threat, and your "help" has their own agenda.'
+        ]
+      }
     }
+  },
+  weather: {
+    clear: 'Clear',
+    cloudy: 'Cloudy',
+    rain: 'Rain',
+    storm: 'Storm',
+    fog: 'Fog',
+    snow: 'Snow'
+  },
+  failures: {
+    engine_failure: 'Engine Failure',
+    hydraulic_failure: 'Hydraulic Failure',
+    electrical_failure: 'Electrical Failure',
+    instrument_failure: 'Instrument Failure',
+    fuel_leak: 'Fuel Leak',
+    structural_damage: 'Structural Damage'
   }
 };
 

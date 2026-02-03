@@ -18,6 +18,8 @@ import WarningSystem from './WarningSystem.js';
 import OverheadLogic from './OverheadLogic.js';
 import { airportService } from './airportService.js';
 import { Vector3, Quaternion, calculateDistanceMeters, calculateBearing } from '../utils/flightMath.js';
+import NavigationService from './NavigationService.js';
+import RadioService from './RadioService.js';
 
 // ==========================================
 // Main Service
@@ -25,6 +27,9 @@ import { Vector3, Quaternion, calculateDistanceMeters, calculateBearing } from '
 
 class RealisticFlightPhysicsService {
     constructor(aircraftData, initialLat = 0, initialLon = 0, difficulty = 'rookie') {
+        this.navService = new NavigationService();
+        this.radioService = new RadioService();
+
         this.aircraft = this.validateAndParseAircraft(aircraftData);
         
         // Physical Constants
@@ -479,6 +484,13 @@ class RealisticFlightPhysicsService {
         };
     }
 
+    // --- Navigation Service Delegates ---
+    get flightPlan() { return this.navService.flightPlan; }
+    set flightPlan(val) { this.navService.updateFlightPlan(val); }
+    
+    get currentWaypointIndex() { return this.navService.currentWaypointIndex; }
+    set currentWaypointIndex(val) { this.navService.currentWaypointIndex = val; }
+
     /**
      * Main Physics Loop
      * @param {Object} input - Control inputs
@@ -531,101 +543,17 @@ class RealisticFlightPhysicsService {
         };
 
         // --- Waypoint Sequencing & LNAV ---
-        if (this.flightPlan && this.flightPlan.length > 0) {
-            // Ensure index is valid. If flight plan has multiple points (e.g. Origin -> WP1), start at 1 to avoid targeting origin.
-            if (this.currentWaypointIndex === undefined) {
-                this.currentWaypointIndex = (this.flightPlan.length > 1) ? 1 : 0;
-            }
-            
-            if (this.currentWaypointIndex < this.flightPlan.length) {
-                const nextWaypoint = this.flightPlan[this.currentWaypointIndex];
-                const dist = calculateDistanceMeters(this.state.geo.lat, this.state.geo.lon, nextWaypoint.latitude, nextWaypoint.longitude);
-                
-                // Track distance history for "moving away" detection
-                if (this._lastWaypointIndex !== this.currentWaypointIndex) {
-                    this._prevDistToWaypoint = dist;
-                    this._lastWaypointIndex = this.currentWaypointIndex;
-                }
-                
-                const isMovingAway = (dist > (this._prevDistToWaypoint || dist) + 50); // 50m buffer
-                const wasClose = dist < 4000; // 4km proximity
-                
-                this._prevDistToWaypoint = dist;
-
-                // Switch to next waypoint if:
-                // 1. Within 2km (Fly-over)
-                // 2. Moving away and was close (Fly-by / Passed)
-                // 3. User requested "Auto-delete" -> We simulate this by advancing index and never looking back
-                if ((dist < 2000 || (isMovingAway && wasClose)) && !nextWaypoint.isHold) {
-                    this.currentWaypointIndex++;
-                    this._prevDistToWaypoint = Infinity; 
-                    console.log(`📍 Reached/Passed waypoint ${nextWaypoint.label || this.currentWaypointIndex - 1}. Sequencing to index ${this.currentWaypointIndex}`);
-                }
-
-                // If LNAV is engaged, update target heading to waypoint bearing
-                if (this.autopilot.mode === 'LNAV' && this.currentWaypointIndex < this.flightPlan.length) {
-                    const targetWP = this.flightPlan[this.currentWaypointIndex];
-                    const bearing = calculateBearing(this.state.geo.lat, this.state.geo.lon, targetWP.latitude, targetWP.longitude);
-                    
-                    if (targetWP.isHold) {
-                        // --- HOLD PATTERN LOGIC (Right Turn Orbit) ---
-                        // Target a circular orbit around the waypoint
-                        const HOLD_RADIUS = 3000; // 3km radius (~1.6nm)
-                        const CONVERGENCE_GAIN = 0.001; // Sensitivity of convergence
-                        
-                        // Calculate heading relative to bearing
-                        // If on radius: Bearing + 90
-                        // If outside: Turn In (Bearing + 90 - correction)
-                        // If inside: Turn Out (Bearing + 90 + correction) (Wait, inside means we are closer, we want to widen turn?)
-                        // Let's visualize: Center North. Tangent East. 
-                        // If we are South (Bearing 0), we fly East (90).
-                        // If we are South but Far (Outside), we want to fly North-East (45). (90 - 45).
-                        // If we are South but Close (Inside), we want to fly South-East (135). (90 + 45).
-                        
-                        // Correction should be positive if Inside (Dist < Radius) -> 90 + pos
-                        // Correction should be negative if Outside (Dist > Radius) -> 90 - pos
-                        
-                        // dist - radius > 0 (Outside). We want negative correction.
-                        // So: -1 * (dist - radius) * gain
-                        
-                        const distError = dist - HOLD_RADIUS;
-                        const correction = Math.atan(distError * CONVERGENCE_GAIN); // radians, range -PI/2 to PI/2
-                        
-                        // Target Heading = Bearing + 90 - Correction
-                        // But wait, if we are outside (dist > radius), distError > 0. Correction > 0.
-                        // We want Bearing + 90 - Correction.
-                        // Example: Outside. Bearing 0. Target 90 - 45 = 45. Correct.
-                        // Example: Inside. Bearing 0. DistError < 0. Correction < 0.
-                        // Target 90 - (-45) = 135. Correct.
-                        
-                        let targetHeading = bearing + 90 - (correction * 180 / Math.PI);
-                        
-                        // Normalize to 0-360
-                        targetHeading = (targetHeading + 360) % 360;
-                        
-                        this.autopilot.setTargets({ heading: targetHeading });
-                        // console.log(`🔄 Holding at ${targetWP.label}: Dist ${Math.round(dist)}m, Hdg ${Math.round(targetHeading)}`);
-                    } else {
-                        // Standard Direct-To
-                        this.autopilot.setTargets({ heading: bearing });
-                    }
-                }
-
-                // Update Runway Geometry if target is an airport with a selected runway
-                if (this.currentWaypointIndex < this.flightPlan.length) {
-                    const targetWP = this.flightPlan[this.currentWaypointIndex];
-                    if ((targetWP.type === 'airport' || targetWP.type === 'runway') && targetWP.selectedRunway && targetWP.details) {
-                        const airportCode = targetWP.details.iata || targetWP.details.icao || targetWP.label;
-                        // Check if we need to update (simple check to avoid spamming)
-                        if (!this.runwayGeometry || (this.runwayGeometry.runwayName !== targetWP.selectedRunway && this.runwayGeometry.airportCode !== airportCode)) {
-                             const geom = airportService.getRunwayGeometry(airportCode, targetWP.selectedRunway);
-                             if (geom) {
-                                 this.setRunwayGeometry(geom);
-                                 console.log(`📍 Physics: Auto-selected runway ${targetWP.selectedRunway} at ${airportCode}`);
-                             }
-                        }
-                    }
-                }
+        this.navService.update(this.state.geo, this.autopilot);
+        
+        // Check for Runway Geometry Update from Waypoint (Delegated to airportService via ID)
+        const currentWP = this.navService.getCurrentWaypoint();
+        if (currentWP && (currentWP.type === 'airport' || currentWP.type === 'runway') && currentWP.selectedRunway) {
+            const airportCode = currentWP.details?.iata || currentWP.details?.icao || currentWP.label;
+             if (!this.runwayGeometry || (this.runwayGeometry.runwayName !== currentWP.selectedRunway && this.runwayGeometry.airportCode !== airportCode)) {
+                 const geom = airportService.getRunwayGeometry(airportCode, currentWP.selectedRunway);
+                 if (geom) {
+                     this.setRunwayGeometry(geom);
+                 }
             }
         }
 
@@ -738,9 +666,9 @@ class RealisticFlightPhysicsService {
         }
         
         // Flight Controls (Pitch, Roll, Yaw)
-        this.controls.elevator += (input.pitch - this.controls.elevator) * rate * 2; // Faster response
-        this.controls.aileron += (input.roll - this.controls.aileron) * rate * 3;
-        this.controls.rudder += (input.yaw - this.controls.rudder) * rate * 2;
+        if (input.pitch !== undefined) this.controls.elevator += (input.pitch - this.controls.elevator) * rate * 2;
+        if (input.roll !== undefined) this.controls.aileron += (input.roll - this.controls.aileron) * rate * 3;
+        if (input.yaw !== undefined) this.controls.rudder += (input.yaw - this.controls.rudder) * rate * 2;
         
         // Systems
         if (input.flaps !== undefined) this.controls.flaps = input.flaps;
@@ -1258,17 +1186,14 @@ class RealisticFlightPhysicsService {
              Fy_steering = steeringSideForce;
              
              // Debug log occasionally
-             if (Math.random() < 0.001) {
-                 console.log(`Physics: Ground Steering Active. Torque: ${steeringTorque.toFixed(0)}`);
-             }
-        }
+            if (Math.random() < 0.001) {
+                console.log(`Physics: Ground Steering Active. Torque: ${steeringTorque.toFixed(0)}`);
+            }
+       }
 
-        // Add Steering to Aero Forces/Moments
-        Mz_aero += Mz_steering;
-        // Fy_aero is already defined as const, need to change it or add to it
-        // Fy_aero was: const Fy_aero = F_side;
-        // We can't reassign const. I need to modify the previous code or add it to force summation.
-        // Let's verify where Fy_aero is defined.
+       // Add Steering to Aero Forces/Moments
+       Mz_aero += Mz_steering;
+       Fy_aero += Fy_steering;
         
         // --- Thrust ---
         let F_thrust_body = new Vector3(0, 0, 0);
@@ -1961,109 +1886,12 @@ class RealisticFlightPhysicsService {
      * @param {Object} flightPlan - Current flight plan object
      */
     handleRadioTuning(frequency, flightPlan) {
-        if (!frequency) return;
+        const euler = this.state.quat.toEuler();
+        const headingDeg = (euler.psi * 180 / Math.PI + 360) % 360;
         
-        // console.log(`Physics: Radio tuned to ${frequency.toFixed(3)} MHz`);
-        
-        const airport = airportService.getAirportByFrequency(frequency);
-        
-        if (airport) {
-            const airportCode = airport.iata || airport.icao;
-            // console.log(`Physics: Identified airport ${airportCode} for frequency ${frequency}`);
-            
-            // Determine which runway to use
-            let runwayName = null;
-            
-            // 1. Check Flight Plan (Arrival)
-            if (flightPlan && flightPlan.arrival && (flightPlan.arrival.iata === airportCode || flightPlan.arrival.icao === airportCode)) {
-                // If this is the arrival airport, check for selected runway
-                // Note: flightPlan.arrival.runways is usually an array of available runways, not necessarily the selected one.
-                // However, in this sim, usually the first one is picked or we need to check routeDetails.
-                // But let's look at waypoints first as they are more editable.
-            }
-            
-            // 2. Check Flight Plan Waypoints (Specific Waypoint Selection)
-            // This is the most reliable source for user selection in F-Comp
-            if (flightPlan && flightPlan.waypoints) {
-                 const wp = flightPlan.waypoints.find(w => w.type === 'airport' && (w.label === airport.iata || w.label === airport.icao));
-                 if (wp && wp.selectedRunway) {
-                     runwayName = wp.selectedRunway;
-                 }
-            }
-            
-            // 3. Fallback to Arrival default if listed
-            if (!runwayName && flightPlan && flightPlan.arrival && (flightPlan.arrival.iata === airportCode || flightPlan.arrival.icao === airportCode)) {
-                 if (flightPlan.arrival.runways && flightPlan.arrival.runways.length > 0) {
-                     runwayName = flightPlan.arrival.runways[0].name;
-                 }
-            }
-
-            // 4. Fallback to first runway if no specific selection
-            if (!runwayName) {
-                if (airport.runways && airport.runways.length > 0) {
-                    runwayName = airport.runways[0].name.split('/')[0].trim();
-                } else if (airport.runway) {
-                    runwayName = airport.runway.split('/')[0].trim();
-                } else {
-                    runwayName = "09"; 
-                }
-                console.log(`Physics: No specific runway selected for ${airportCode}, defaulting to ${runwayName}`);
-            }
-            
-            // 5. Smart Runway Selection (Auto-Align)
-            // If the selected/default runway is "behind" us (Reciprocal), swap to the other end.
-            if (runwayName) {
-                // Collect all available runway ends
-                let options = [];
-                if (airport.runways) {
-                    options = airport.runways.flatMap(r => r.name.split('/').map(p => p.trim()));
-                } else if (airport.runway) {
-                    options = airport.runway.split('/').map(p => p.trim());
-                } else {
-                    options = ["09", "27"];
-                }
-
-                const aircraftHeading = this.state.heading || 0;
-                
-                // Parse current selection heading
-                // Handle "09L" -> 09 -> 90
-                const getHeading = (name) => {
-                    const match = name.match(/^(\d{2})/);
-                    return match ? parseInt(match[1]) * 10 : 0;
-                };
-
-                const currentRunwayH = getHeading(runwayName);
-                
-                // Calculate alignment
-                let diff = Math.abs(aircraftHeading - currentRunwayH);
-                if (diff > 180) diff = 360 - diff;
-                
-                // If misalignment is > 90 degrees (Reciprocal Approach), try to find a better end
-                if (diff > 90) {
-                    const betterOption = options.find(opt => {
-                        const optH = getHeading(opt);
-                        let d = Math.abs(aircraftHeading - optH);
-                        if (d > 180) d = 360 - d;
-                        return d <= 90; // Found one facing us
-                    });
-                    
-                    if (betterOption) {
-                        console.log(`Physics: Auto-switching runway from ${runwayName} to ${betterOption} based on approach heading (Hdg: ${aircraftHeading.toFixed(0)} vs Rwy: ${currentRunwayH})`);
-                        runwayName = betterOption;
-                    }
-                }
-            }
-            
-            if (runwayName) {
-                const geom = airportService.getRunwayGeometry(airportCode, runwayName);
-                if (geom) {
-                    this.setRunwayGeometry(geom);
-                    console.log(`Physics: ILS tuned to ${airportCode} RWY ${runwayName}`);
-                    
-                    // Optional: Engage ILS mode if close enough? No, let pilot do that.
-                    // But we ensure the geometry is ready.
-                }
-            }
+        const geom = this.radioService.handleTuning(frequency, flightPlan || this.flightPlan, headingDeg);
+        if (geom) {
+            this.setRunwayGeometry(geom);
         }
     }
 
@@ -2385,7 +2213,9 @@ class RealisticFlightPhysicsService {
         }
 
         // Altitude
-        if (conditions.position && conditions.position.z !== undefined) {
+        if (conditions.altitude !== undefined) {
+             this.state.pos.z = -(conditions.altitude * 0.3048); // Convert ft to m, NED uses Z-down
+        } else if (conditions.position && conditions.position.z !== undefined) {
             this.state.pos.z = -conditions.position.z; // NED uses Z-down
         }
 
@@ -2405,9 +2235,27 @@ class RealisticFlightPhysicsService {
             this.controls.gear = conditions.gear ? 1 : 0;
         }
 
+        // Speed (Velocity)
         // Reset velocities and rates for initial state
         this.state.vel = new Vector3(0, 0, 0);
         this.state.rates = new Vector3(0, 0, 0);
+
+        if (conditions.speed !== undefined) {
+            const speedMs = conditions.speed * 0.514444; // kts to m/s
+            // Decompose into u, v based on heading
+            // Heading is stored in quat, need to extract or use conditions.heading
+            let psi = 0;
+            if (conditions.heading !== undefined) {
+                psi = conditions.heading * Math.PI / 180;
+            } else {
+                // Extract from quaternion if needed, but for now assume 0 if not provided
+                // Or better, don't rely on quat here as it might be complex
+            }
+            
+            // Body frame velocity: u = speed (forward)
+            // If we are setting initial state, we assume aligned with wind/body
+            this.state.vel.x = speedMs;
+        }
         
         // Update autopilot targets if available
         if (conditions.orientation && conditions.orientation.psi !== undefined) {
@@ -2435,51 +2283,160 @@ class RealisticFlightPhysicsService {
     }
     
     updateFlightPlan(newFlightPlan) {
-        console.log('🔄 Updating Flight Plan:', newFlightPlan);
-        
-        let newWaypoints = [];
-        // Extract waypoints array to ensure consistency
-        if (Array.isArray(newFlightPlan)) {
-            newWaypoints = newFlightPlan;
-        } else if (newFlightPlan && Array.isArray(newFlightPlan.waypoints)) {
-            newWaypoints = newFlightPlan.waypoints;
-        } else {
-            console.warn('⚠️ Invalid flight plan format provided to physics service');
-            this.flightPlan = [];
-            return;
-        }
-        
-        // Smart Index Preservation: If length matches, keep index. 
-        // This allows property updates (like 'isHold') without resetting progress.
-        const preserveIndex = (this.flightPlan && this.flightPlan.length === newWaypoints.length);
-        const oldIndex = this.currentWaypointIndex;
+        this.navService.updateFlightPlan(newFlightPlan);
+    }
 
-        this.flightPlan = newWaypoints;
-        
-        if (preserveIndex) {
-            this.currentWaypointIndex = oldIndex;
-        } else {
-            // Reset index to start from the beginning of the new plan
-            this.currentWaypointIndex = 0;
-        }
-        
-        // Optionally reset index if it was invalid, or keep it if within bounds
-        if (this.currentWaypointIndex >= this.flightPlan.length) {
-            this.currentWaypointIndex = Math.max(0, this.flightPlan.length - 1);
-        }
-        
-        // If we want to "Direct To", the UI should have already set the waypoints list appropriately.
-        // If the new plan has waypoints, ensure we are targeting something valid.
+    /**
+     * Get full serializable state of the physics engine and subsystems
+     */
+    getSerializableState() {
+        return {
+            timestamp: this.time,
+            // 1. Core Physics
+            physics: {
+                position: { 
+                    x: this.state.pos.x, 
+                    y: this.state.pos.y, 
+                    z: this.state.pos.z 
+                },
+                velocity: { 
+                    x: this.state.vel.x, 
+                    y: this.state.vel.y, 
+                    z: this.state.vel.z 
+                },
+                orientation: { 
+                    w: this.state.quat.w, 
+                    x: this.state.quat.x, 
+                    y: this.state.quat.y, 
+                    z: this.state.quat.z 
+                },
+                rates: { 
+                    x: this.state.rates.x, 
+                    y: this.state.rates.y, 
+                    z: this.state.rates.z 
+                },
+                mass: this.state.mass,
+                fuel: this.state.fuel
+            },
+            
+            // 2. Geographic Position
+            geo: {
+                lat: this.state.geo.lat,
+                lon: this.state.geo.lon
+            },
+            
+            // 3. Controls & Configuration
+            controls: this.controls,
+            
+            // 4. Subsystems
+            systems: this.systems,
+            
+            // 5. Engines (Individual States)
+            engines: this.engines.map(e => ({
+                n1: e.state.n1,
+                n2: e.state.n2,
+                egt: e.state.egt,
+                fuelFlow: e.state.fuelFlow,
+                oilPressure: e.state.oilPressure,
+                running: e.state.running,
+                throttleCommand: e.state.throttleCommand,
+                failed: e.state.failed
+            })),
+            
+            // 6. Services
+            autopilot: this.autopilot.getState(),
+            navigation: this.navService.getState(),
+            failures: this.failureSystem ? this.failureSystem.getState() : null,
+            
+            // 7. Environment / Context
+            context: {
+                airportElevation: this.airportElevation,
+                motionEnabled: this.motionEnabled,
+                crashed: this.crashed,
+                crashReason: this.crashReason,
+                onGround: this.onGround,
+                groundStatus: this.groundStatus
+            }
+        };
     }
 
     loadFlightState(data) {
         if (!data) return;
         
+        console.log('🔄 Physics Service: Restoring State...', data);
+
+        // Normalize input: Check if we have nested v2 state inside physicsState
+        const state = (data.physicsState && data.physicsState.physics) ? data.physicsState : data;
+
+        // 1. Core Physics (Support both new and legacy formats)
+        if (state.physics) {
+            // New Format
+            const p = state.physics;
+            if (p.position) this.state.pos = new Vector3(p.position.x, p.position.y, p.position.z);
+            if (p.velocity) this.state.vel = new Vector3(p.velocity.x, p.velocity.y, p.velocity.z);
+            if (p.orientation) this.state.quat = new Quaternion(p.orientation.w, p.orientation.x, p.orientation.y, p.orientation.z);
+            if (p.rates) this.state.rates = new Vector3(p.rates.x, p.rates.y, p.rates.z);
+            if (p.mass !== undefined) this.state.mass = p.mass;
+            if (p.fuel !== undefined) this.state.fuel = p.fuel;
+            
+            // 2. Geographic Position
+            if (state.geo) {
+                this.state.geo.lat = state.geo.lat;
+                this.state.geo.lon = state.geo.lon;
+            }
+
+            // 3. Controls
+            if (state.controls) {
+                this.controls = { ...this.controls, ...state.controls };
+            }
+
+            // 4. Systems
+            if (state.systems) {
+                this.systems = JSON.parse(JSON.stringify(state.systems));
+            }
+
+            // 5. Engines
+            if (state.engines && Array.isArray(state.engines)) {
+                state.engines.forEach((engData, i) => {
+                    if (this.engines[i]) {
+                        const e = this.engines[i];
+                        e.state.n1 = engData.n1;
+                        e.state.n2 = engData.n2;
+                        e.state.egt = engData.egt;
+                        e.state.fuelFlow = engData.fuelFlow;
+                        e.state.oilPressure = engData.oilPressure;
+                        e.state.running = engData.running;
+                        e.state.throttleCommand = engData.throttleCommand;
+                        e.state.failed = engData.failed;
+                    }
+                });
+            }
+
+            // 6. Services
+            if (state.autopilot) this.autopilot.loadState(state.autopilot);
+            if (state.navigation) this.navService.loadState(state.navigation);
+            if (this.failureSystem && state.failures) this.failureSystem.loadState(state.failures);
+            
+            // 7. Context
+            if (state.context) {
+                if (state.context.airportElevation !== undefined) this.airportElevation = state.context.airportElevation;
+                if (state.context.motionEnabled !== undefined) this.motionEnabled = state.context.motionEnabled;
+                if (state.context.crashed !== undefined) this.crashed = state.context.crashed;
+                if (state.context.crashReason !== undefined) this.crashReason = state.context.crashReason;
+                if (state.context.onGround !== undefined) this.onGround = state.context.onGround;
+                if (state.context.groundStatus !== undefined) this.groundStatus = state.context.groundStatus;
+            }
+
+            // Timestamp
+            if (state.timestamp) this.time = state.timestamp;
+            
+            return; // Done with new format
+        }
+        
         // console.log('🔄 Loading flight state...', data);
 
         // 1. Restore Physics State
-        if (data.physicsState) {
-            const ps = data.physicsState;
+        if (data.physicsState) {            const ps = data.physicsState;
             
             // Position
             if (ps.position) {
