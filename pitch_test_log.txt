@@ -1,0 +1,39 @@
+
+---------------------------------------------------
+🧪 Running Pitch Stability Test (Cruise Phase)
+Physics Init: Elevation Data { inputFt: undefined, convertedM: 0, gearHeight: 3 }
+📍 Initialized at 30000ft, 250kts
+Pos Z: -9144
+Vel: Vector3 { x: 128.611, y: 0, z: 0 }
+[T+0s] Alt: 30001ft, VS: 256fpm, Pitch: 1.783°, Spd: 250kts
+[T+1s] Alt: 30005ft, VS: -2646fpm, Pitch: 5.186°, Spd: 249kts
+[T+2s] Alt: 29992ft, VS: -5256fpm, Pitch: 9.790°, Spd: 249kts
+[T+3s] Alt: 29974ft, VS: -6693fpm, Pitch: 12.930°, Spd: 249kts
+[T+4s] Alt: 29957ft, VS: -7282fpm, Pitch: 14.734°, Spd: 249kts
+[T+5s] Alt: 29943ft, VS: -7326fpm, Pitch: 15.488°, Spd: 248kts
+[T+6s] Alt: 29934ft, VS: -7068fpm, Pitch: 15.542°, Spd: 248kts
+[T+7s] Alt: 29930ft, VS: -6711fpm, Pitch: 15.261°, Spd: 247kts
+[T+8s] Alt: 29929ft, VS: -6389fpm, Pitch: 14.913°, Spd: 246kts
+[T+9s] Alt: 29929ft, VS: -6178fpm, Pitch: 14.676°, Spd: 245kts
+[T+10s] Alt: 29931ft, VS: -6354fpm, Pitch: 15.250°, Spd: 244kts
+[T+11s] Alt: 29932ft, VS: -5232fpm, Pitch: 12.246°, Spd: 243kts
+[T+12s] Alt: 29931ft, VS: -5683fpm, Pitch: 13.339°, Spd: 242kts
+[T+13s] Alt: 29931ft, VS: -5974fpm, Pitch: 14.307°, Spd: 241kts
+[T+14s] Alt: 29933ft, VS: -5992fpm, Pitch: 14.703°, Spd: 239kts
+[T+15s] Alt: 29937ft, VS: -5807fpm, Pitch: 14.530°, Spd: 238kts
+[T+16s] Alt: 29941ft, VS: -5542fpm, Pitch: 13.994°, Spd: 237kts
+[T+17s] Alt: 29945ft, VS: -5325fpm, Pitch: 13.388°, Spd: 236kts
+[T+18s] Alt: 29948ft, VS: -5245fpm, Pitch: 12.986°, Spd: 235kts
+[T+19s] Alt: 29949ft, VS: -5329fpm, Pitch: 12.954°, Spd: 234kts
+[T+20s] Alt: 29947ft, VS: -5545fpm, Pitch: 13.313°, Spd: 233kts
+[T+21s] Alt: 29945ft, VS: -5820fpm, Pitch: 13.951°, Spd: 232kts
+[T+22s] Alt: 29942ft, VS: -6072fpm, Pitch: 14.679°, Spd: 231kts
+[T+23s] Alt: 29940ft, VS: -6237fpm, Pitch: 15.305°, Spd: 230kts
+[T+24s] Alt: 29939ft, VS: -6287fpm, Pitch: 15.693°, Spd: 229kts
+[T+25s] Alt: 29940ft, VS: -6237fpm, Pitch: 15.806°, Spd: 228kts
+[T+26s] Alt: 29941ft, VS: -6128fpm, Pitch: 15.696°, Spd: 227kts
+[T+27s] Alt: 29943ft, VS: -6016fpm, Pitch: 15.484°, Spd: 226kts
+[T+28s] Alt: 29945ft, VS: -5950fpm, Pitch: 15.303°, Spd: 225kts
+[T+29s] Alt: 29945ft, VS: -5957fpm, Pitch: 15.261°, Spd: 224kts
+[T+30s] Alt: 29945ft, VS: -6037fpm, Pitch: 15.409°, Spd: 223kts
+❌ TEST FAILED: Vertical Speed Divergence (-6043fpm).

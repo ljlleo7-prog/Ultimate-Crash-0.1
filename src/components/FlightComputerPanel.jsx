@@ -257,7 +257,41 @@ const FlightComputerPanel = ({ onClose, flightPlan, onUpdateFlightPlan, flightSt
       runwayOptions.push("27");
     }
 
-    const selectedRunway = runwayOptions.length > 0 ? runwayOptions[0] : null;
+    // Smart Runway Selection: Pick the runway best aligned with our current bearing to the airport
+    let selectedRunway = runwayOptions.length > 0 ? runwayOptions[0] : null;
+    
+    if (flightState && flightState.latitude && flightState.longitude && runwayOptions.length > 1) {
+        // Calculate bearing from Plane to Airport
+        const lat1 = flightState.latitude * Math.PI / 180;
+        const lon1 = flightState.longitude * Math.PI / 180;
+        const lat2 = airport.latitude * Math.PI / 180;
+        const lon2 = airport.longitude * Math.PI / 180;
+        
+        const y = Math.sin(lon2 - lon1) * Math.cos(lat2);
+        const x = Math.cos(lat1) * Math.sin(lat2) - Math.sin(lat1) * Math.cos(lat2) * Math.cos(lon2 - lon1);
+        const bearingRad = Math.atan2(y, x);
+        const bearingDeg = (bearingRad * 180 / Math.PI + 360) % 360; // 0-360
+        
+        // Find runway with heading closest to bearingDeg
+        // e.g. Bearing 360 (North) -> Want Runway 36 (Heading 360)
+        let bestDiff = 360;
+        
+        runwayOptions.forEach(r => {
+            // Parse heading from name (e.g. "36R" -> 360)
+            const match = r.match(/^(\d{2})/);
+            if (match) {
+                const rHdg = parseInt(match[1]) * 10;
+                let diff = Math.abs(bearingDeg - rHdg);
+                if (diff > 180) diff = 360 - diff;
+                
+                if (diff < bestDiff) {
+                    bestDiff = diff;
+                    selectedRunway = r;
+                }
+            }
+        });
+    }
+
     const fix = calculateApproachFix(airport, selectedRunway);
 
     const newWaypoint = {

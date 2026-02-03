@@ -65,7 +65,8 @@ class RealisticAutopilotService {
         // Vertical Speed (VS -> Pitch)
         // CRITICAL: No smoothing to prevent overspeed crashes
         // Increased Max Pitch Down to -15 deg to allow steeper descents if needed
-        this.vsPID = new PIDController(0.00015, 0.00005, 0.00005, -15 * Math.PI/180, 20 * Math.PI/180, 1.0);
+        // Reduced Kp (0.00015 -> 0.00010) to improve stability and prevent diverging oscillations
+        this.vsPID = new PIDController(0.00010, 0.00005, 0.00005, -15 * Math.PI/180, 20 * Math.PI/180, 1.0);
 
         // Altitude Hold (Altitude -> Target VS)
         // Used when not in ILS GS mode but Altitude Target is set.
@@ -74,7 +75,9 @@ class RealisticAutopilotService {
 
         // Pitch Attitude (Target Pitch -> Elevator)
         // Inner Loop: MUST be fast. No smoothing (1.0).
-        this.pitchPID = new PIDController(-4.0, -1.0, -0.2, -1.0, 1.0, 1.0);
+        // Reduced Kp (-4.0 -> -2.5) to prevent over-reaction
+        // Increased Kd (-0.2 -> -0.8) for better damping
+        this.pitchPID = new PIDController(-2.5, -1.0, -0.8, -1.0, 1.0, 1.0);
 
         // Roll Hold (Roll -> Aileron)
         // Inner Loop: MUST be fast. No smoothing (1.0).
@@ -156,6 +159,16 @@ class RealisticAutopilotService {
 
     setTargets(targets) {
         if (targets.mode) {
+            // Auto-tune Logic: If ILS mode is requested and we have a runway geometry, tune the frequency
+            if (targets.mode === 'ILS' && this.runwayGeometry && this.runwayGeometry.ilsFrequency) {
+                // Only auto-tune if we aren't already tuned (or force it? Force is safer for user experience)
+                if (this.nav1Frequency !== this.runwayGeometry.ilsFrequency) {
+                    this.setNavFrequency(this.runwayGeometry.ilsFrequency);
+                    // Update debug message to inform user
+                    this.debugState.ilsMessage = `Auto-tuned ILS ${this.runwayGeometry.ilsFrequency.toFixed(2)}`;
+                }
+            }
+
             this.mode = targets.mode;
         }
         
@@ -264,7 +277,15 @@ class RealisticAutopilotService {
             let deltaFix = inboundCourseDeg - bearingFixDeg;
             if (deltaFix > 180) deltaFix -= 360;
             if (deltaFix < -180) deltaFix += 360;
-            const leadDistance = Math.max(300, Math.min(4000, turnRadius * Math.tan(Math.abs(deltaFix) * Math.PI / 180 / 2))) + (v_ms * 3.0); // Add 3s roll latency buffer
+
+            // Calculate turn execution duration for dynamic buffer
+            // turnRate (rad/s) = (g * tan(bank)) / v
+            const turnRate = (g * Math.tan(bankRad)) / Math.max(v_ms, 1.0);
+            const turnDuration = (Math.abs(deltaFix) * Math.PI / 180) / turnRate;
+            // Dynamic buffer: 25% of turn duration (e.g. 5s for 20s turn), min 3.0s
+            const latencyBuffer = Math.max(3.0, turnDuration * 0.25);
+
+            const leadDistance = Math.max(300, Math.min(4000, turnRadius * Math.tan(Math.abs(deltaFix) * Math.PI / 180 / 2))) + (v_ms * latencyBuffer);
             let headingCorrection = 0;
             let preTurn = false;
             const interceptLimit = 45;
@@ -314,7 +335,8 @@ class RealisticAutopilotService {
                 distCross_m: distCross,
                 dev_deg: deviationDeg,
                 lead_m: leadDistance,
-                preTurn: preTurn
+                preTurn: preTurn,
+                turnDur_s: turnDuration ? turnDuration.toFixed(1) : '0.0'
             };
 
             // Set Altitude Target from Fix if available
@@ -390,13 +412,15 @@ class RealisticAutopilotService {
                  // Do not engage Glideslope dive. Maintain current altitude or safe minimum.
                  let targetAltitude = altitude; // Default to hold current
                  
+                 const runwayElev = thresholdStart.elevation || 0;
+                 
                  // Active Zone: Approaching (dist > 0) and within reasonable range (< 50nm)
                  // and not "behind" the runway (distAlong < 0)
                  if (distToThresholdFt > 0 && distToThresholdFt < 300000) {
-                    targetAltitude = 50 + (distToThresholdFt * Math.tan(3 * Math.PI / 180));
+                    targetAltitude = runwayElev + 50 + (distToThresholdFt * Math.tan(3 * Math.PI / 180));
                  } else if (distToThresholdFt <= 0 && distToThresholdFt > -10000) {
                      // Over runway: Flare / Hold 50ft
-                     targetAltitude = 50;
+                     targetAltitude = runwayElev + 50;
                  }
                  
                  const altError = targetAltitude - altitude;
@@ -554,8 +578,22 @@ class RealisticAutopilotService {
                      driftAngle: driftAngle,
                      message: ilsDebug.message,
                      locCaptured: Math.abs(deviationDeg) <= 2.0,
-                     gsCaptured: glideActive
+                     gsCaptured: glideActive,
+                     locDeviationDeg: deviationDeg, // Export for PFD
+                     gsDeviationDeg: glideActive ? 0 : (altError / (distToThresholdFt || 1)) * 57.29 // Approx angle deg if needed, or just use altError
                  };
+
+                 // Refined GS Deviation (Angular) for PFD
+                 // Standard GS is 3 degrees. 
+                 // Angle = atan(Alt / Dist)
+                 // Deviation = Angle - 3.0
+                 if (distToThresholdMeters > 0) {
+                     const currentAngleRad = Math.atan2(altitude - this.runwayGeometry.thresholdStart.elevation, distToThresholdMeters);
+                     const currentAngleDeg = currentAngleRad * 180 / Math.PI;
+                     ilsDebug.gsDeviationDeg = currentAngleDeg - 3.0;
+                 } else {
+                     ilsDebug.gsDeviationDeg = 0;
+                 }
              }
         }
         

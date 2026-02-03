@@ -48,7 +48,23 @@ const FlightPosePanel = ({ flightState }) => {
 
   // Calculate altitude in 20-foot increments for display text
   const altitude20ft = Math.round(indicatedAltitude / 20) * 20;
+
+  // ILS Deviation Logic
+  const autopilotDebug = flightState.autopilotDebug || {};
+  const ilsData = autopilotDebug.ils || {};
+  // Only show if ILS is active (has message or valid runway)
+  const showILS = ilsData.active || (ilsData.runway && ilsData.runway.length > 0);
   
+  const locDev = ilsData.locDeviationDeg || 0;
+  const gsDev = ilsData.gsDeviationDeg || 0;
+
+  // Map to percentage (-100% to 100% of scale)
+  // LOC: +/- 2.5 degrees full scale. Positive Dev (Right) -> Diamond Left (Negative)
+  const locPercent = Math.max(-100, Math.min(100, (-locDev / 2.5) * 100));
+  
+  // GS: +/- 0.7 degrees full scale. Positive Dev (High) -> Diamond Down (Negative)
+  const gsPercent = Math.max(-100, Math.min(100, (-gsDev / 0.7) * 100));
+
   return React.createElement('div', { className: 'civil-aviation-pose-panel' },
     React.createElement('h3', null, 'Primary Flight Display'),
     
@@ -165,6 +181,49 @@ const FlightPosePanel = ({ flightState }) => {
                 style: { transform: `rotate(${rollValue}deg)` }
               });
             })
+          )
+        ),
+
+        // ILS Deviation Indicators (Diamonds)
+        showILS && React.createElement('div', { className: 'ils-overlay', style: { position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', pointerEvents: 'none', zIndex: 20 } },
+          // Localizer Scale (Horizontal) - Bottom
+          React.createElement('div', { className: 'loc-scale', style: { position: 'absolute', bottom: '15%', left: '50%', transform: 'translateX(-50%)', width: '60%', height: '20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' } },
+             // Scale Dots
+             [-2, -1, 0, 1, 2].map(i => React.createElement('div', { key: i, style: { width: i===0?'6px':'4px', height: i===0?'6px':'4px', borderRadius: '50%', backgroundColor: 'rgba(255,255,255,0.6)', border: i===0?'1px solid black':'none' } })),
+             // Diamond
+             React.createElement('div', { 
+               className: 'loc-diamond',
+               style: {
+                 position: 'absolute',
+                 left: `${50 + (locPercent * 0.5)}%`, 
+                 transform: 'translate(-50%, -50%) rotate(45deg)',
+                 width: '12px',
+                 height: '12px',
+                 backgroundColor: '#ff00ff', // Magenta
+                 border: '1px solid white',
+                 boxShadow: '0 0 4px black'
+               }
+             })
+          ),
+          
+          // Glideslope Scale (Vertical) - Right
+          React.createElement('div', { className: 'gs-scale', style: { position: 'absolute', right: '10%', top: '50%', transform: 'translateY(-50%)', height: '60%', width: '20px', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', alignItems: 'center' } },
+             // Scale Dots
+             [2, 1, 0, -1, -2].map(i => React.createElement('div', { key: i, style: { width: i===0?'6px':'4px', height: i===0?'6px':'4px', borderRadius: '50%', backgroundColor: 'rgba(255,255,255,0.6)', border: i===0?'1px solid black':'none' } })),
+             // Diamond
+             React.createElement('div', { 
+               className: 'gs-diamond',
+               style: {
+                 position: 'absolute',
+                 top: `${50 - (gsPercent * 0.5)}%`,
+                 transform: 'translate(-50%, -50%) rotate(45deg)',
+                 width: '12px',
+                 height: '12px',
+                 backgroundColor: '#ff00ff', // Magenta
+                 border: '1px solid white',
+                 boxShadow: '0 0 4px black'
+               }
+             })
           )
         )
       ),

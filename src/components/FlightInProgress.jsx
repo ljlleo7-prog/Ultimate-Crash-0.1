@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useAircraftPhysics } from '../hooks/useAircraftPhysics';
+import { useLanguage } from '../contexts/LanguageContext';
 import { updateWeather } from '../services/weatherService';
 import { realWeatherService } from '../services/RealWeatherService';
 import { terrainService } from '../services/TerrainService';

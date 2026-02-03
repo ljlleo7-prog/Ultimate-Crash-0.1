@@ -271,13 +271,15 @@ class AirportService {
     // Primary Start (e.g. 06 Threshold) is "behind" the center relative to 06 heading
     const p1 = {
       latitude: airport.latitude - dLat,
-      longitude: airport.longitude - dLon
+      longitude: airport.longitude - dLon,
+      elevation: Number(airport.elevation) || 0
     };
     
     // Primary End (e.g. 24 Threshold) is "ahead" of the center
     const p2 = {
       latitude: airport.latitude + dLat,
-      longitude: airport.longitude + dLon
+      longitude: airport.longitude + dLon,
+      elevation: Number(airport.elevation) || 0
     };
 
     // 4. Decide which point is Start/End based on Requested Heading
@@ -317,12 +319,29 @@ class AirportService {
         },
         "KSFO": {
             "28L": 109.55,
-            "28R": 111.70
+            "28R": 111.70,
+            "19L": 108.90,
+            "19R": 108.70,
+            "01L": 110.50,
+            "01R": 109.30
         },
         "KJFK": {
             "04R": 109.50,
             "22L": 110.90,
-            "13L": 111.50
+            "13L": 111.50,
+            "31R": 112.30
+        },
+        "ZSSS": {
+            "18L": 109.30,
+            "36R": 110.30,
+            "18R": 109.90,
+            "36L": 111.90
+        },
+        "SHA": { // Handle IATA code too
+             "18L": 109.30,
+             "36R": 110.30,
+             "18R": 109.90,
+             "36L": 111.90
         }
     };
 

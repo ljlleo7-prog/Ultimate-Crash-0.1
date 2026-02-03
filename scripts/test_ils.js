@@ -118,10 +118,10 @@ async function runTest(scenario) {
         const fixLon = thresholdLon - (fifteenNmM * Math.sin(inboundRad)) / (R * Math.cos(thresholdLat * toRad)) * (180/Math.PI);
         
         physics.autopilot.setNavigationPlan({
-            fix: { latitude: fixLat, longitude: fixLon, altitude: 4000 },
-            inboundCourseDeg: inbound,
-            leadBankDeg: 25
-        });
+                fix: { latitude: fixLat, longitude: fixLon, altitude: scenario.alt },
+                inboundCourseDeg: inbound,
+                leadBankDeg: 25
+            });
         
         physics.setAutopilot(true, {
             speed: scenario.speed,
@@ -165,9 +165,10 @@ async function runTest(scenario) {
         const along = dx * ux + dy * uy;
         const cross = -dx * uy + dy * ux;
         const distToThresholdFt = -along * 3.28084;
-        let targetAlt = 50;
+        const runwayElev = runwayGeom.thresholdStart.elevation || 0;
+        let targetAlt = runwayElev + 50;
         if (distToThresholdFt > 0 && distToThresholdFt < 90000) {
-            targetAlt = 50 + (distToThresholdFt * Math.tan(3 * Math.PI / 180));
+            targetAlt = runwayElev + 50 + (distToThresholdFt * Math.tan(3 * Math.PI / 180));
         }
         const currentAltFt = -physics.state.pos.z * 3.28084;
         return { distAlongFt: along * 3.28084, distCrossFt: cross * 3.28084, altErrorFt: targetAlt - currentAltFt };
@@ -273,8 +274,8 @@ async function runTest(scenario) {
              const lnavDelta = (debugState && debugState.lnav && typeof debugState.lnav.delta === 'number') ? `, Δ${Math.round(debugState.lnav.delta)}°` : '';
               let modeMsg = '';
               if (physics.autopilot && physics.autopilot.mode === 'ILS') {
-                  const locErr = debugState && debugState.ils ? (debugState.ils.locDeviation || 0).toFixed(2) : '?';
-                  const gsErr = debugState && debugState.ils ? (debugState.ils.gsDeviation || 0).toFixed(2) : '?';
+                  const locErr = debugState && debugState.ils ? (debugState.ils.locDeviationDeg || 0).toFixed(2) : '?';
+                  const gsErr = debugState && debugState.ils ? (debugState.ils.gsDeviationDeg || 0).toFixed(2) : '?';
                   modeMsg = ` | ILS: Loc ${locErr}°, GS ${gsErr}°`;
               } else if (debugState && debugState.lnavMessage) {
                   modeMsg = ` | LNAV: ${debugState.lnavMessage}${lnavDelta}`;
@@ -336,8 +337,8 @@ const scenarios = [
     ,
     // NAV pre-turn → ILS test (random start)
     { name: "KLAX 24R | NAV pre-turn to 15nm → ILS",            airport: "KLAX", runway: "24R", dist: 20, offset: 5.0, alt: 5000, heading: 90,      speed: 180, useNavPreTurn: true, randomStart: false },
-    { name: "KSFO 28R | NAV pre-turn to 15nm → ILS",            airport: "KSFO", runway: "28R", dist: 0,  offset: 0.0, alt: 4200, heading: 120,     speed: 170, useNavPreTurn: true, randomStart: true },
-    { name: "KJFK 22L | NAV pre-turn to 15nm → ILS",            airport: "KJFK", runway: "22L", dist: 0,  offset: 0.0, alt: 4300, heading: 310,     speed: 175, useNavPreTurn: true, randomStart: true }
+    { name: "KSFO 28R | NAV pre-turn to 15nm → ILS",            airport: "KSFO", runway: "28R", dist: 20,  offset: 5.0, alt: 4200, heading: 120,     speed: 170, useNavPreTurn: true, randomStart: false },
+    { name: "KJFK 22L | NAV pre-turn to 15nm → ILS",            airport: "KJFK", runway: "22L", dist: 20,  offset: -5.0, alt: 4300, heading: 310,     speed: 175, useNavPreTurn: true, randomStart: false }
 ];
 
 // Run scenarios
