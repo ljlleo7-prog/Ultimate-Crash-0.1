@@ -10,7 +10,7 @@ class NPCManagerService {
     this.nextId = 1;
     this.spawnRadius = 80; // nm
     this.despawnRadius = 320; // nm
-    this.maxNPCs = 15;
+    this.maxNPCs = 5; // Reduced from 15 to prevent ATC spam
     this.minNPCs = 1;
   }
 
@@ -91,7 +91,7 @@ class NPCManagerService {
       this.spawnNPC(playerPos);
     } 
     // Chance to spawn more up to max
-    else if (nearbyCount < this.maxNPCs && Math.random() < 0.01) { // Low probability per frame/update
+    else if (nearbyCount < this.maxNPCs && Math.random() < 0.002) { // Reduced from 0.01 to 0.002 (0.2% per update)
       this.spawnNPC(playerPos);
     }
 

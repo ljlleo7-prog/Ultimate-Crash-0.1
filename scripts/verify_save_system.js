@@ -225,6 +225,7 @@ async function main() {
     }
 
     console.log(`\n🏁 SUMMARY: ${passed}/${total} Scenarios Passed`);
+    process.exit(passed === total ? 0 : 1);
 }
 
 main().catch(console.error);

@@ -1679,6 +1679,7 @@ class RealisticFlightPhysicsService {
                 oilPressure: this.engines.map(e => e.state.oilPressure),
                 vibration: this.engines.map(e => e.state.vibration)
             },
+            engineThrottles: this.engines.map(e => e.state.throttleCommand * 100),
             systems: this.systems,
             fuel: this.state.fuel,
             currentWaypointIndex: this.currentWaypointIndex || 0,
@@ -1751,7 +1752,9 @@ class RealisticFlightPhysicsService {
                 verticalSpeed: -v_earth.z * 196.85,
                 pitch: euler.theta,
                 roll: euler.phi,
-                altitude: -this.state.pos.z * 3.28084
+                altitude: -this.state.pos.z * 3.28084,
+                heading: (euler.psi * 180 / Math.PI + 360) % 360,
+                throttle: this.controls.throttle // Pass current throttle for bumpless AP engagement
             };
             
             this.autopilot.setEngaged(engaged, currentState);

@@ -13,6 +13,9 @@ export class ATCLogic {
     this.atisTimer = 0;
     this.lastComplianceCheck = 0;
     this.lastReadbackError = 0;
+    
+    // AI Orders
+    this.nextOrderTime = Date.now() + 60000; // Start with 1 min delay
   }
 
   isBusy(frequency) {
@@ -85,6 +88,55 @@ export class ATCLogic {
         }
       }
     }
+    // 3. Random AI Orders (Unsolicited)
+    if (Date.now() > this.nextOrderTime) {
+        // Reset timer (random 2-5 minutes)
+        this.nextOrderTime = Date.now() + 120000 + Math.random() * 180000;
+        
+        // Only if not busy and tuned to a valid station
+        if (!this.isBusy(freqInfo.frequency) && freqInfo.type !== 'UNICOM' && freqInfo.type !== 'ATIS') {
+            this.generateRandomOrder(flightState, freqInfo, onMessage, language);
+        }
+    }
+  }
+
+  generateRandomOrder(flightState, freqInfo, onMessage, language) {
+    // Simple logic to generate context-aware orders
+    const orders = [
+        {
+            text: `${flightState.callsign}, check altimeter setting 29.92.`,
+            condition: () => Math.abs(flightState.altitude) > 18000
+        },
+        {
+            text: `${flightState.callsign}, radar contact, maintain present heading.`,
+            condition: () => true
+        },
+        {
+            text: `${flightState.callsign}, traffic is 2 o'clock, 5 miles, 3000 feet below you, report in sight.`,
+            condition: () => Math.random() > 0.5
+        },
+        {
+            text: `${flightState.callsign}, monitor guard 121.5.`,
+            condition: () => true
+        },
+        {
+            text: `${flightState.callsign}, climb and maintain FL${Math.ceil((flightState.altitude + 2000)/1000)*10}.`,
+            condition: () => flightState.verticalSpeed > 500
+        }
+    ];
+
+    // Filter valid orders
+    const validOrders = orders.filter(o => o.condition());
+    if (validOrders.length === 0) return;
+
+    const order = validOrders[Math.floor(Math.random() * validOrders.length)];
+    
+    onMessage({
+        sender: 'ATC',
+        text: order.text,
+        timestamp: Date.now(),
+        frequency: freqInfo.frequency
+    });
   }
 
   /**

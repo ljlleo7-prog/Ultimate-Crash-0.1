@@ -26,6 +26,27 @@ class PIDController {
         this.prevDerivative = 0;
     }
 
+    /**
+     * Initialize PID with a specific output value.
+     * Useful for seamless engagement (bumpless transfer).
+     * Back-calculates the integral term assuming zero error.
+     */
+    initialize(targetOutput) {
+        this.reset();
+        // If Ki is 0, we can't initialize integral. 
+        // If Ki > 0, Integral = Output / Ki.
+        if (this.ki !== 0) {
+            this.integral = targetOutput / this.ki;
+            
+            // Clamp integral to limits
+            const limit = (this.max / this.ki);
+            const minLimit = (this.min / this.ki);
+            
+            if (this.integral > limit) this.integral = limit;
+            else if (this.integral < minLimit) this.integral = minLimit;
+        }
+    }
+
     update(setpoint, measured, dt) {
         if (dt <= 0) return 0;
 
@@ -253,8 +274,17 @@ class RealisticAutopilotService {
 
             // If we have current state, capture targets if they are currently 0
             if (currentState) {
+                // Initialize Throttle PID to current throttle setting for bumpless transfer
+                if (typeof currentState.throttle === 'number') {
+                    // Current throttle is 0-1 range. PID output is 0-1.
+                    this.speedPID.initialize(currentState.throttle);
+                    this.debugState.throttleCmd = currentState.throttle;
+                }
+
                 if (this.targets.speed === 0) {
-                    this.targets.speed = Math.round(currentState.airspeed);
+                    // User Request: "150KTS lower bound" for initial engagement
+                    // Prevents idle on takeoff/ground engagement
+                    this.targets.speed = Math.max(150, Math.round(currentState.airspeed));
                     this.targets.ias = this.targets.speed;
                 }
                 if (this.targets.vs === 0) this.targets.vs = Math.round(currentState.verticalSpeed / 100) * 100;
@@ -669,6 +699,8 @@ class RealisticAutopilotService {
         // Check if LNAV is handling VS (implied by previous block modification)
         const lnavHandlingVS = (this.mode === 'LNAV' && this.navPlan && this.navPlan.fix && typeof this.navPlan.fix.altitude === 'number');
 
+        let commandVS = this.targets.vs;
+
         if (!ilsDebug.gsCaptured && !lnavHandlingVS && this.targets.altitude > 0) {
              const altError = this.targets.altitude - altitude;
              
@@ -678,8 +710,8 @@ class RealisticAutopilotService {
              if (Math.abs(altError) < 50 && Math.abs(this.targets.vs) < 200) {
                  // Hold Altitude
                  // Use PID to maintain exact altitude (VS small corrections)
-                 let pidVS = this.altitudePID.update(this.targets.altitude, altitude, dt);
-                 this.targets.vs = pidVS;
+                 // NOTE: We do NOT update this.targets.vs to prevent UI fighting/stickiness
+                 commandVS = this.altitudePID.update(this.targets.altitude, altitude, dt);
              } else {
                  // Outside Capture Band: Respect User VS
                  // Reset PID so it's ready for capture
@@ -687,13 +719,14 @@ class RealisticAutopilotService {
              }
         }
 
-        const { speed: targetSpeed, vs: targetVS, heading: targetHeading } = this.targets;
+        const { speed: targetSpeed, heading: targetHeading } = this.targets;
+        const targetVS = commandVS;
 
         // 1. Auto-Throttle (Speed Control)
         const throttleCmd = this.speedPID.update(targetSpeed, airspeed, dt);
 
         // 2. Vertical Speed Control (VS -> Pitch -> Trim)
-        const targetPitch = this.vsPID.update(targetVS, verticalSpeed, dt);
+        const targetPitch = this.vsPID.update(commandVS, verticalSpeed, dt);
         const pitchCmd = this.pitchPID.update(targetPitch, pitch, dt);
         
         // Trim Logic:

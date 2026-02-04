@@ -242,7 +242,8 @@ const FlightInProgress = ({
         frequencyType: freqType,
         language: language, // Pass current language to ATC
         departureRunway: aircraftConfig.departureRunway,
-        arrivalRunway: aircraftConfig.arrivalRunway
+        arrivalRunway: aircraftConfig.arrivalRunway,
+        difficulty: difficulty || 'Intermediate'
     };
 
     atcManager.processMessage(
@@ -460,7 +461,7 @@ const FlightInProgress = ({
         callsign: callsign,
         weather: weatherData
     }, freqInfo, (msg) => {
-        setRadioMessages(prev => [...prev, { ...msg, frequency: freqType }]);
+        setRadioMessages(prev => [...prev, { ...msg, frequency: msg.frequency || freqType }]);
     }, language || 'en');
 
     if (messages.length > 0) {

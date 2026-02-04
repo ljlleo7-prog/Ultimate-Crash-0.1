@@ -125,11 +125,21 @@ const CommunicationModule = ({ flightState, setRadioFreq, flightPlan, radioMessa
   const [viewMode, setViewMode] = useState('LOG'); // 'LOG' or 'SIGNALS'
   const logContainerRef = useRef(null);
   const lastCheckPos = useRef({ lat: null, lon: null });
+  const [hasUnread, setHasUnread] = useState(false);
+  const prevMessagesLength = useRef(0);
 
-  // Auto-scroll log
+  // Auto-scroll log and check for unread messages
   useEffect(() => {
+    if (radioMessages.length > prevMessagesLength.current) {
+        if (viewMode !== 'LOG') {
+            setHasUnread(true);
+        }
+    }
+    prevMessagesLength.current = radioMessages.length;
+
     if (viewMode === 'LOG' && logContainerRef.current) {
       logContainerRef.current.scrollTop = logContainerRef.current.scrollHeight;
+      setHasUnread(false); // Clear unread when viewing log
     }
   }, [radioMessages, viewMode]);
 
@@ -193,6 +203,15 @@ const CommunicationModule = ({ flightState, setRadioFreq, flightPlan, radioMessa
       });
     }
 
+    // Add Universal Emergency Frequency (Always available, top priority)
+    stations.push({
+        name: 'EMERGENCY',
+        type: 'GUARD',
+        frequency: 121.500,
+        desc: 'Universal Emergency',
+        distance: -1 // Top priority
+    });
+
     // Add Airports (Only if low altitude or within very close range)
     if (!isHighAltitude) {
       for (const airport of nearbyAirports) {
@@ -228,13 +247,13 @@ const CommunicationModule = ({ flightState, setRadioFreq, flightPlan, radioMessa
       }
     });
     
-    // Take nearest 3
-    const nearest3 = uniqueStations.slice(0, 3);
+    // Take nearest 10
+    const nearest10 = uniqueStations.slice(0, 10);
     
     // Only update if changed to prevent render loops
     setAvailableStations(prev => {
-        if (JSON.stringify(prev) !== JSON.stringify(nearest3)) {
-            return nearest3;
+        if (JSON.stringify(prev) !== JSON.stringify(nearest10)) {
+            return nearest10;
         }
         return prev;
     });
@@ -320,7 +339,10 @@ const CommunicationModule = ({ flightState, setRadioFreq, flightPlan, radioMessa
         color: '#64748b'
       }
     },
-      React.createElement('div', { style: { fontSize: '9px', fontWeight: 'bold', color: '#94a3b8' } }, 'ACTIVE COMM'),
+      React.createElement('div', { style: { fontSize: '9px', fontWeight: 'bold', color: '#94a3b8', display: 'flex', justifyContent: 'space-between', alignItems: 'center' } }, 
+        'ACTIVE COMM',
+        hasUnread && React.createElement('span', { style: { color: '#ef4444', fontSize: '8px', padding: '1px 3px', background: 'rgba(239,68,68,0.1)', borderRadius: '2px' } }, 'NEW MSG')
+      ),
       React.createElement('div', { 
         style: { 
           fontSize: '11px', 
@@ -363,22 +385,37 @@ const CommunicationModule = ({ flightState, setRadioFreq, flightPlan, radioMessa
         }
       },
         ['LOG', 'SIGNALS'].map(mode => 
-          React.createElement('button', {
-            key: mode,
-            onClick: () => setViewMode(mode),
-            style: {
-              flex: 1,
-              background: viewMode === mode ? 'transparent' : 'rgba(30, 41, 59, 0.5)',
-              border: 'none',
-              borderBottom: viewMode === mode ? '2px solid #38bdf8' : 'none',
-              color: viewMode === mode ? '#38bdf8' : '#64748b',
-              fontSize: '9px',
-              fontWeight: 'bold',
-              padding: '0 4px',
-              cursor: 'pointer'
-            }
-          }, mode)
-        )
+            React.createElement('button', {
+              key: mode,
+              onClick: () => setViewMode(mode),
+              style: {
+                flex: 1,
+                background: viewMode === mode ? 'transparent' : 'rgba(30, 41, 59, 0.5)',
+                border: 'none',
+                borderBottom: viewMode === mode ? '2px solid #38bdf8' : 'none',
+                color: viewMode === mode ? '#38bdf8' : '#64748b',
+                fontSize: '9px',
+                fontWeight: 'bold',
+                padding: '0 4px',
+                cursor: 'pointer',
+                position: 'relative'
+              }
+            }, 
+              mode,
+              mode === 'LOG' && hasUnread && React.createElement('div', {
+                style: {
+                    position: 'absolute',
+                    top: '4px',
+                    right: '8px',
+                    width: '6px',
+                    height: '6px',
+                    borderRadius: '50%',
+                    backgroundColor: '#ef4444',
+                    boxShadow: '0 0 4px #ef4444'
+                }
+              })
+            )
+          )
       ),
 
       // Content
