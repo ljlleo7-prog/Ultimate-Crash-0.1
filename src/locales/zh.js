@@ -720,7 +720,7 @@ const zh = {
         }
     },
     initialization: {
-    title: '终极坠机 - 航班初始化',
+    title: '天际浩劫 - 航班初始化',
     subtitle: '配置您的飞行参数并选择难度等级',
     steps: {
       1: '01. 操作等级与情报',
@@ -869,6 +869,7 @@ const zh = {
         ]
       }
     },
+  },
   weather: {
     clear: '晴朗',
     cloudy: '多云',

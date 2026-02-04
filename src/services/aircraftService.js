@@ -1,4 +1,4 @@
-// Aircraft Service for Ultimate Crash Simulation
+// Aircraft Service for Skyline Tragedy Simulation
 // Provides aircraft-specific performance data for fuel calculations
 
 // Import aircraft database directly

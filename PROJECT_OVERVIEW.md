@@ -1,7 +1,7 @@
-# Ultimate Crash Simulator - Project Overview
+# Skyline Tragedy Simulator - Project Overview
 
 ## 1. Introduction
-**Ultimate Crash** is a high-fidelity, web-based aviation disaster simulator built with React. Unlike standard flight simulators, it focuses on emergency management, system failures, and pilot decision-making under pressure.
+**Skyline Tragedy** is a high-fidelity, web-based aviation disaster simulator built with React. Unlike standard flight simulators, it focuses on emergency management, system failures, and pilot decision-making under pressure.
 
 > **Detailed API Reference**: For a comprehensive breakdown of classes, methods, and functions, please refer to [CODE_REFERENCE.md](./CODE_REFERENCE.md).
 

@@ -1,7 +1,7 @@
 {
-  "name": "ultimate-crash",
+  "name": "skyline-tragedy",
   "version": "0.1.0",
-  "homepage": "https://geeksproductionstudio.com",
+  "homepage": "https://geeksproductionstudio.com/skyline-tragedy/",
   "description": "An aviation-themed React web application",
   "type": "module",
   "scripts": {

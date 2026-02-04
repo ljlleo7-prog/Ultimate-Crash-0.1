@@ -1,9 +1,9 @@
-# Ultimate Crash Simulator
+# Skyline Tragedy Simulator
 
 ![Status](https://img.shields.io/badge/Status-Active-success)
 ![Version](https://img.shields.io/badge/Version-0.1.0-blue)
 
-**Ultimate Crash** is a high-fidelity, web-based aviation disaster simulator. Unlike standard flight simulators that focus on routine operations, Ultimate Crash places you in the cockpit during critical system failures, challenging your decision-making skills under pressure.
+**Skyline Tragedy** is a high-fidelity, web-based aviation disaster simulator. Unlike standard flight simulators that focus on routine operations, Skyline Tragedy places you in the cockpit during critical system failures, challenging your decision-making skills under pressure.
 
 ---
 
