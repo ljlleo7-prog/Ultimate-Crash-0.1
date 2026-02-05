@@ -95,6 +95,24 @@ function App() {
   // Route Selection State
   const [showRouteSelection, setShowRouteSelection] = useState(false);
   const [detailedRoute, setDetailedRoute] = useState(null);
+  
+  // Cloud Save State
+  const [saveData, setSaveData] = useState(null);
+  
+  const handleLoadSave = (data) => {
+      console.log("📂 Loading Cloud Save:", data);
+      
+      // Restore basic metadata to App state (for UI consistency)
+      if (data.aircraftModel) setAircraftModel(data.aircraftModel);
+      if (data.flightData) {
+          if (data.flightData.callsign) setCallsign(data.flightData.callsign);
+          // Add other mappings as needed
+      }
+      
+      setSaveData(data);
+      setFlightInitialized(true);
+      setCinematicPhase('none');
+  };
 
 
 
@@ -318,6 +336,7 @@ function App() {
       React.createElement(LanguageSwitcher, { style: { position: 'fixed', top: '10px', right: '120px', zIndex: 2000 } }),
       React.createElement(FlightInProgress, {
         callsign: callsign,
+        saveData: saveData,
       aircraftModel: aircraftModel,
       difficulty: difficulty,
       selectedDeparture: selectedDeparture,
@@ -402,6 +421,7 @@ function App() {
         aircraftSuggestions: aircraftSuggestions,
         handleInitializeFlight: handleInitializeFlight,
         handleSearch: handleSearch,
+        handleLoadSave: handleLoadSave,
         apiKey: apiKey,
         setApiKey: setApiKey
       })

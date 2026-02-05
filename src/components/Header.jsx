@@ -1,11 +1,52 @@
 import React from 'react';
 import { useLanguage } from '../contexts/LanguageContext';
+import { useAuth } from '../contexts/AuthContext';
 
 const Header = ({ devMode, setDevMode, handleDevStart }) => {
   const { t } = useLanguage();
+  const { user, signInWithSSO, signOut } = useAuth();
 
   return (
     <header className="app-header">
+      <div className="auth-status" style={{ position: 'absolute', top: '20px', left: '20px' }}>
+        {user ? (
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <span style={{ fontSize: '14px', color: '#fff' }}>
+              {user.email}
+            </span>
+            <button
+              onClick={signOut}
+              style={{
+                background: 'transparent',
+                border: '1px solid #fff',
+                color: '#fff',
+                padding: '4px 8px',
+                borderRadius: '4px',
+                cursor: 'pointer',
+                fontSize: '12px'
+              }}
+            >
+              Sign Out
+            </button>
+          </div>
+        ) : (
+          <button
+            onClick={signInWithSSO}
+            style={{
+              backgroundColor: '#333',
+              color: '#fff',
+              border: 'none',
+              padding: '8px 16px',
+              borderRadius: '4px',
+              cursor: 'pointer',
+              fontSize: '14px'
+            }}
+          >
+            Login with SSO
+          </button>
+        )}
+      </div>
+
       <h1>{t('initialization.title')}</h1>
       <p>{t('initialization.subtitle')}</p>
       

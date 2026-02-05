@@ -27,6 +27,7 @@ const FlightInProgress = ({
   selectedDeparture, 
   selectedArrival, 
   initialDeparture, // New prop
+  saveData, // Cloud save data
   flightPlan, 
   airline, 
   pax, 
@@ -334,6 +335,21 @@ const FlightInProgress = ({
         return prev;
     });
   }, [flightPlan]);
+  
+  // Load Cloud Save Data
+  useEffect(() => {
+      if (isInitialized && saveData && physicsService) {
+          console.log("🚀 Loading Saved Flight State into Physics Engine...", saveData);
+          // Small delay to ensure engine is fully ready
+          setTimeout(() => {
+              physicsService.loadFlightState(saveData);
+              // Also restore weather if present
+              if (saveData.weatherData) {
+                  setWeatherData(saveData.weatherData);
+              }
+          }, 500);
+      }
+  }, [isInitialized, saveData, physicsService]);
   
   // Handle Flight Plan Update
    const handleUpdateFlightPlan = (newPlan) => {

@@ -1,10 +1,13 @@
 import React, { useState } from 'react';
 import { encryptFlightData, decryptFlightData } from '../utils/flightDataCrypto';
 import './SaveLoadPanel.css';
+import { cloudSaveService } from '../services/cloudSaveService';
+import { useAuth } from '../contexts/AuthContext';
 
 const SaveLoadPanel = ({ flightData, physicsState, physicsService, flightPlan, weatherData, aircraftModel, onClose, onLoadFlight }) => {
   const [error, setError] = useState(null);
   const [successMsg, setSuccessMsg] = useState(null);
+  const { user } = useAuth();
 
   const generateSaveData = () => {
     // Prefer using the full serializable state from the physics service if available
@@ -44,6 +47,19 @@ const SaveLoadPanel = ({ flightData, physicsState, physicsService, flightPlan, w
       setTimeout(() => setSuccessMsg(null), 3000);
     } catch (err) {
       setError('Failed to save flight: ' + err.message);
+    }
+  };
+
+  const handleCloudSave = async () => {
+    try {
+      const data = generateSaveData();
+      const { error } = await cloudSaveService.saveFlight(data);
+      if (error) throw error;
+      
+      setSuccessMsg('Cloud save successful!');
+      setTimeout(() => setSuccessMsg(null), 3000);
+    } catch (err) {
+      setError('Failed to save to cloud: ' + err.message);
     }
   };
 
@@ -102,6 +118,16 @@ const SaveLoadPanel = ({ flightData, physicsState, physicsService, flightPlan, w
                     💾 Download Save File
                 </button>
             </div>
+
+            {user && (
+                <div className="action-card">
+                    <h5>Cloud Save</h5>
+                    <p>Save to your account ({user.email}).</p>
+                    <button className="action-btn save-btn" onClick={handleCloudSave} style={{ background: '#3b82f6' }}>
+                        ☁️ Save to Cloud
+                    </button>
+                </div>
+            )}
 
             <div className="action-card">
                 <h5>Load Flight</h5>

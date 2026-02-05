@@ -3,6 +3,8 @@ import './FlightInitialization.css';
 import AirportSearchInput from './AirportSearchInput.jsx';
 import { randomFlightService } from '../services/randomFlightService.js';
 import { useLanguage } from '../contexts/LanguageContext';
+import { cloudSaveService } from '../services/cloudSaveService';
+import { useAuth } from '../contexts/AuthContext';
 
 const FlightInitialization = ({
   difficulty, setDifficulty,
@@ -26,9 +28,34 @@ const FlightInitialization = ({
   aircraftSuggestions,
   handleInitializeFlight,
   handleSearch,
+  handleLoadSave, // New prop
   apiKey, setApiKey
 }) => {
   const { t } = useLanguage();
+  const { user } = useAuth();
+  const [foundSave, setFoundSave] = useState(null);
+
+  useEffect(() => {
+    if (user) {
+      cloudSaveService.getLatestFlight().then(({ data }) => {
+        if (data) setFoundSave(data);
+      });
+    }
+  }, [user]);
+
+  const handleDiscardSave = async () => {
+    if (!foundSave) return;
+    if (window.confirm("Are you sure you want to discard this save?")) {
+        await cloudSaveService.discardFlight(foundSave.id);
+        setFoundSave(null);
+    }
+  };
+
+  const onResume = () => {
+      if (foundSave && handleLoadSave) {
+          handleLoadSave(foundSave.data);
+      }
+  };
   
   // Fuel Reserve State (hours)
   const [reserveHours, setReserveHours] = useState(1.0);
@@ -292,6 +319,46 @@ const FlightInitialization = ({
 
   return (
     <div className="flight-initialization">
+      {foundSave && (
+        <div className="save-recovery-banner" style={{
+            background: 'rgba(30, 64, 175, 0.9)',
+            border: '1px solid #60a5fa',
+            padding: '15px',
+            marginBottom: '20px',
+            borderRadius: '8px',
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center'
+        }}>
+            <div>
+                <h3 style={{ margin: 0, color: '#fff' }}>Previous Flight Found</h3>
+                <p style={{ margin: '5px 0 0', fontSize: '14px', color: '#bfdbfe' }}>
+                    Aircraft: {foundSave.data.aircraftModel?.name || 'Unknown'} | 
+                    Last Saved: {new Date(foundSave.updated_at).toLocaleString()}
+                </p>
+            </div>
+            <div style={{ display: 'flex', gap: '10px' }}>
+                <button 
+                    onClick={onResume}
+                    style={{
+                        background: '#3b82f6', color: 'white', border: 'none',
+                        padding: '8px 16px', borderRadius: '4px', cursor: 'pointer'
+                    }}
+                >
+                    Resume Flight
+                </button>
+                <button 
+                    onClick={handleDiscardSave}
+                    style={{
+                        background: 'rgba(239, 68, 68, 0.2)', color: '#fca5a5', border: '1px solid #ef4444',
+                        padding: '8px 16px', borderRadius: '4px', cursor: 'pointer'
+                    }}
+                >
+                    Discard
+                </button>
+            </div>
+        </div>
+      )}
       {/* 01. DIFFICULTY & INTEL */}
       <div 
         className="dispatch-section"
