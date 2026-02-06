@@ -22,6 +22,12 @@ class RandomFlightService {
   // Get random aircraft that can handle the distance
   async getRandomAircraftForDistance(distanceNauticalMiles) {
     const allAircraft = await aircraftService.getAllAircraft();
+    
+    if (!allAircraft || !Array.isArray(allAircraft) || allAircraft.length === 0) {
+        console.error("No aircraft data available for random flight generation.");
+        return null;
+    }
+
     const suitableAircraft = allAircraft.filter(aircraft => {
       const maxRange = aircraft.range || 0;
       // Add 20% safety margin for fuel reserves
@@ -108,6 +114,10 @@ class RandomFlightService {
     const callsign = this.generateRandomCallsign(airline);
     const { departure, arrival, distance } = await this.getRandomAirports();
     const aircraft = await this.getRandomAircraftForDistance(distance.nauticalMiles);
+    
+    if (!aircraft) {
+      throw new Error("Could not find suitable aircraft for the generated route (or aircraft data missing).");
+    }
     
     const maxPax = aircraft.passengers || 180;
     const rawPax = Math.floor(Math.random() * (maxPax * 0.8)) + Math.floor(maxPax * 0.2);

@@ -1,4 +1,37 @@
 const zh = {
+  narrative_scene: {
+    designation: '代号',
+    background: '背景',
+    you_are: '你是',
+    mission: '任务',
+    intelligence: '情报',
+    accept: '接受任务'
+  },
+  narrative_generator: {
+    roles: ['CZ2804', 'UA175', 'AA11', 'BA009', 'AF447', 'MH370', 'SQ006', 'CI611'],
+    experience: {
+      rookie: ['刚从飞行学院毕业。', '第一次飞这条航线。', '还在摸索中。'],
+      amateur: ['已记录几百小时飞行时间。', '熟悉基本操作。', '正在积累经验。'],
+      intermediate: ['经验丰富的副驾驶。', '数千小时的飞行经验。', '见过各种天气。'],
+      advanced: ['资深机长。', '数十年的经验。', '没有什么能让你惊讶。'],
+      pro: ['传奇飞行员。', '编写过飞行动力学教科书。', '精英中的精英。'],
+      devil: ['实验机试飞员。', '你嘲笑危险。', '飞行是你的第二天性。']
+    },
+    flight_plan: [
+      '运送 ${pax} 名乘客从 ${departure} 到 ${arrival}。预计天气晴朗。',
+      '从 ${departure} 到 ${arrival} 的定期航班。途中交通繁忙。',
+      '从 ${departure} 到 ${arrival} 的红眼航班。乘客都在睡觉。',
+      '从 ${departure} 到 ${arrival} 的包机。机上有贵宾。'
+    ],
+    difficulty: {
+      rookie: ['晴空万里，微风。', '标准仪表离场。', '无重大危险。'],
+      amateur: ['预计有中度颠簸。', '空域繁忙。', '可能会有侧风着陆。'],
+      intermediate: ['锋面逼近。', '系统显示轻微波动。', '目的地能见度低。'],
+      advanced: ['严重积冰条件。', '可能发生多重系统故障。', '引擎性能下降。'],
+      pro: ['灾难性天气。', '关键系统故障迫在眉睫。', '零能见度。'],
+      devil: ['物理定律正在考验你。', '所有可能出错的地方都会出错。', '祝你好运。']
+    }
+  },
   narrative: {
     phases: {
       boarding: {
@@ -649,6 +682,11 @@ const zh = {
         tail_strike: '擦尾风险'
     },
     radio: {
+        title: '导航无线电',
+        current_freq: '当前 NAV1 频率',
+        set_freq: '设置频率 (MHz)',
+        tune: '调频',
+        common_freqs: '常用 ILS 频率: 108.10, 108.15, ..., 111.95',
         cancel: '取消',
         transmit: '发送',
         preview: '预览',
@@ -657,29 +695,54 @@ const zh = {
         frequency_type: '频率类型',
         busy: '频率繁忙',
         tabs: {
-            READBACK: '复诵',
-            REQUEST: '请求',
-            INFORM: '通报'
+            DELIVERY: '放行 (Delivery)',
+            GROUND: '地面 (Ground)',
+            TOWER: '塔台 (Tower)',
+            APPROACH: '进近 (Approach)',
+            CENTER: '区调 (Center)',
+            EMERGENCY: '紧急 (Emergency)'
         },
         template: {
-            ack: { label: '收到', text: '收到, ${callsign}.' },
-            wilco: { label: '照办', text: '照办, ${callsign}.' },
-            rb_alt: { label: '复诵高度', text: '上升并保持 ${altitude}, ${callsign}.' },
-            rb_hdg: { label: '复诵航向', text: '${direction}转 航向 ${heading}, ${callsign}.' },
-            rb_freq: { label: '复诵频率', text: '联系 ${station} 频率 ${frequency}, ${callsign}.' },
-            rb_taxi: { label: '复诵滑行', text: '经 ${route} 滑行, 跑道 ${runway} 外等待, ${callsign}.' },
-            req_alt: { label: '请求高度', text: '${station}, ${callsign} 请求上升/下降至 ${altitude}.' },
+            req_clearance: { label: '请求 IFR 放行', text: '${station}, ${callsign} 请求放行至 ${destination}, 经 ${sid}, 高度 ${altitude}, 航路 ${route}.' },
+            req_startup: { label: '请求开车', text: '${station}, ${callsign} 请求开车和推出.' },
+            req_pdc: { label: '请求 PDC', text: '${station}, ${callsign} 请求起飞前放行 (PDC).' },
+            req_alt_brief: { label: '备降机场简报', text: '${station}, ${callsign} 确认备降机场 ${alternate}.' },
+            req_runway_confirm: { label: '确认起飞跑道', text: '${station}, ${callsign} 请求确认起飞跑道.' },
+            ack_clearance: { label: '复诵放行', text: '许可前往 ${destination} 经 ${sid}, 上升 ${altitude}, 应答机 ${squawk}, ${callsign}.' },
+            ack_squawk: { label: '复诵应答机', text: '应答机 ${code}, ${callsign}.' },
+            report_unable: { label: '无法执行', text: '无法执行 ${instruction}, 请求替代方案, ${callsign}.' },
+            req_taxi: { label: '请求滑行', text: '${station}, ${callsign} 准备好滑行至跑道 ${runway}.' },
+            req_pushback: { label: '请求推出', text: '${station}, ${callsign} 请求推出, 机头朝向 ${direction}.' },
+            req_deice: { label: '请求除冰', text: '${station}, ${callsign} 请求原地除冰.' },
+            req_hold_short: { label: '等待指令', text: '${station}, ${callsign} 请求跑道外等待指令.' },
+            req_cross_runway: { label: '请求穿越跑道', text: '${station}, ${callsign} 请求穿越跑道 ${runway}.' },
+            req_return_gate: { label: '返回登机口', text: '${station}, ${callsign} 由于 ${reason} 请求返回登机口.' },
+            report_ground_issue: { label: '报告地面问题', text: '${station}, ${callsign} 报告 ${issue}.' },
+            req_takeoff: { label: '准备好离场', text: '${station}, ${callsign} 跑道 ${runway} 准备好离场.' },
+            req_lineup: { label: '进跑道等待', text: '${station}, ${callsign} 准备好进跑道 ${runway} 等待.' },
+            req_land: { label: '请求着陆', text: '${station}, ${callsign} 进近跑道 ${runway}, 请求着陆.' },
+            req_go_around: { label: '复飞', text: '复飞, ${callsign}.' },
+            req_missed_approach: { label: '错过进近', text: '错过进近, ${callsign}.' },
+            req_short_approach: { label: '请求短五边', text: '${station}, ${callsign} 请求短五边进近.' },
+            abort_takeoff: { label: '中断起飞', text: '停止, ${callsign}. 由于 ${reason} 中断起飞.' },
+            report_windshear: { label: '报告风切变', text: '${location} 报告风切变, ${callsign}.' },
+            inf_checkin: { label: '联系', text: '${station}, ${callsign} 通过 ${altitude} 上升/下降至 ${target_alt}.' },
+            req_alt_change: { label: '请求高度变更', text: '${station}, ${callsign} 请求高度 ${altitude}.' },
+            req_vectors_ils: { label: '请求 ILS 引导', text: '${station}, ${callsign} 请求雷达引导 ILS 进近跑道 ${runway}.' },
+            req_visual: { label: '请求目视进近', text: '${station}, ${callsign} 请求目视进近跑道 ${runway}.' },
+            req_holding: { label: '请求盘旋', text: '${station}, ${callsign} 请求在 ${waypoint} 盘旋.' },
+            req_weather_dev: { label: '天气绕飞', text: '${station}, ${callsign} 由于天气请求向 ${direction} 绕飞.' },
+            req_step_climb: { label: '请求阶梯爬升', text: '${station}, ${callsign} 请求阶梯爬升至 ${altitude}.' },
             req_direct: { label: '请求直飞', text: '${station}, ${callsign} 请求直飞 ${waypoint}.' },
-            req_land: { label: '请求着陆', text: '${station}, ${callsign} 进近, 请求着陆.' },
-            req_startup: { label: '请求开车', text: '${station}, ${callsign} 准备好开车和推出.' },
-            req_taxi: { label: '请求滑行', text: '${station}, ${callsign} 准备好滑行.' },
-            req_takeoff: { label: '请求起飞', text: '${station}, ${callsign} 准备好起飞, 跑道 ${runway}.' },
-            req_atis: { label: '请求通播', text: '${station}, ${callsign} 请求当前天气 / ATIS.' },
-            req_freq_change: { label: '请求换频', text: '${station}, ${callsign} 请求离开频率.' },
-            inf_checkin: { label: '联系', text: '${station}, ${callsign} 听你指挥, 高度 ${altitude}.' },
-            inf_pos: { label: '位置报告', text: '${station}, ${callsign} 过 ${waypoint} 高度 ${altitude}.' },
-            inf_mayday: { label: '宣布紧急', text: 'MAYDAY MAYDAY MAYDAY, ${station}, ${callsign} 宣布紧急情况: ${failure}. 请求立即返航/备降.' },
-            inf_pan: { label: '宣布PanPan', text: 'PAN-PAN PAN-PAN PAN-PAN, ${station}, ${callsign} 遇到 ${issue}. 请求优先着陆.' }
+            req_reroute: { label: '请求改航', text: '${station}, ${callsign} 由于 ${reason} 请求改航.' },
+            req_turbulence: { label: '报告颠簸', text: '${station}, ${callsign} 报告 ${severity} 颠簸.' },
+            inf_mayday: { label: 'MAYDAY', text: 'MAYDAY MAYDAY MAYDAY, ${station}, ${callsign} 宣布紧急情况. ${nature}. 请求立即优先权.' },
+            inf_pan: { label: 'PAN-PAN', text: 'PAN-PAN PAN-PAN PAN-PAN, ${station}, ${callsign}. ${nature}.' },
+            req_priority_landing: { label: '请求优先着陆', text: '${station}, ${callsign} 请求优先着陆跑道 ${runway}.' },
+            req_emergency_descent: { label: '紧急下降', text: '紧急下降, ${callsign}. 下降至 ${altitude}.' },
+            report_failure: { label: '报告故障', text: '${station}, ${callsign} 报告 ${failure} 故障.' },
+            inf_fuel_emergency: { label: '燃油紧急', text: 'MAYDAY, ${callsign}, 燃油紧急. 续航时间 ${minutes} 分钟.' },
+            req_crash_crew: { label: '请求救援', text: '${station}, ${callsign} 请求救援队待命.' }
         }
     },
     narrative: {

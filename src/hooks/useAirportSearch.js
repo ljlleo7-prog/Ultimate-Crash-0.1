@@ -18,7 +18,8 @@ const useAirportSearch = () => {
     setError(null);
 
     try {
-      const filteredAirports = airportData.airports.filter(airport => {
+      const airports = airportData?.airports || [];
+      const filteredAirports = airports.filter(airport => {
         const searchTerm = query.toLowerCase();
         return (
           airport.iata.toLowerCase().includes(searchTerm) ||
@@ -59,7 +60,8 @@ const useAirportSearch = () => {
   }, []);
 
   const getAirportByCode = useCallback((code) => {
-    return airportData.airports.find(airport => 
+    const airports = airportData?.airports || [];
+    return airports.find(airport => 
       airport.iata === code || airport.icao === code
     );
   }, []);

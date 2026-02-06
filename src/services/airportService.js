@@ -2,7 +2,7 @@ import airportDatabase from '../data/airportDatabase.json' with { type: "json" }
 
 class AirportService {
   constructor(apiKey = '') {
-    this.allAirports = airportDatabase.airports;
+    this.allAirports = airportDatabase?.airports || [];
     this.apiKey = apiKey;
     this.useLocalDatabase = !apiKey;
     this.freeTrialUsed = false;

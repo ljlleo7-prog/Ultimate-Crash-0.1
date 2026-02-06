@@ -72,7 +72,7 @@ const AirportSearchInput = ({ placeholder, onSelect, selectedAirport, searchResu
               </div>
               <div className="result-secondary">
                 {(airport.city || airport.country) && (
-                  <span>{[airport.city, airport.country].filter(Boolean).join(', ')}</span>
+                  <span>{[airport.city || '', airport.country || ''].filter(Boolean).join(', ')}</span>
                 )}
                 <span className={`airport-type type-${airport.type}`}>{airport.type}</span>
               </div>

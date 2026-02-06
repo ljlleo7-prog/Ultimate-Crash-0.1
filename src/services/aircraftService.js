@@ -2,16 +2,25 @@
 // Provides aircraft-specific performance data for fuel calculations
 
 // Import aircraft database directly
-import aircraftData from '../data/aircraftDatabase.json' with { type: 'json' };
+import aircraftData from '../data/aircraftDatabase.json';
 
 // Load aircraft database
 let aircraftDatabase = null;
 
 async function loadAircraftData() {
   if (!aircraftDatabase) {
-    aircraftDatabase = aircraftData.aircraft;
+    // Safety check for the imported data
+    if (aircraftData && Array.isArray(aircraftData.aircraft)) {
+      aircraftDatabase = aircraftData.aircraft;
+    } else if (Array.isArray(aircraftData)) {
+        // Handle case where import might be the array directly
+        aircraftDatabase = aircraftData;
+    } else {
+      console.error('Failed to load aircraft data: Invalid format', aircraftData);
+      aircraftDatabase = [];
+    }
   }
-  return aircraftDatabase;
+  return aircraftDatabase || [];
 }
 
 class AircraftService {
@@ -29,7 +38,8 @@ class AircraftService {
     if (!this.aircraftDatabase) {
       this.aircraftDatabase = await loadAircraftData();
     }
-    return this.aircraftDatabase;
+    // Double check to ensure we always return an array
+    return Array.isArray(this.aircraftDatabase) ? this.aircraftDatabase : [];
   }
 
   // Search aircraft by model, manufacturer, or code

@@ -32,30 +32,25 @@ export const AuthProvider = ({ children }) => {
   }, []);
 
   const signInWithSSO = async () => {
-    if (!supabase) {
-      alert("Supabase is not configured.");
-      return;
-    }
+    if (!supabase) return;
     
-    // Try to sign in with SSO for the domain
-    const { data, error } = await supabase.auth.signInWithSSO({
-      domain: 'geeksproductionstudio.com',
+    // Use Google OAuth directly for seamless SSO
+    // This allows the user to sign in using their existing Google session
+    // and sets the shared cookie for cross-subdomain persistence
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: 'google',
       options: {
-        redirectTo: window.location.origin
+        redirectTo: window.location.origin,
+        queryParams: {
+          // Add any specific Google OAuth params if needed
+          // prompt: 'select_account' // Uncomment to force account selection
+        }
       }
     });
 
     if (error) {
-      console.error('SSO Error:', error);
-      alert('SSO Login failed: ' + error.message);
-      return;
-    }
-
-    if (data?.url) {
-      window.location.href = data.url;
-    } else {
-        // Fallback or if domain not found, maybe try standard OAuth or show message
-        alert("SSO configuration for geeksproductionstudio.com not found. Please check Supabase settings.");
+      console.error("SSO Login Error:", error);
+      alert("SSO Login failed: " + error.message);
     }
   };
   

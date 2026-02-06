@@ -39,10 +39,13 @@ const Header = ({ devMode, setDevMode, handleDevStart }) => {
               padding: '8px 16px',
               borderRadius: '4px',
               cursor: 'pointer',
-              fontSize: '14px'
+              fontSize: '14px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px'
             }}
           >
-            Login with SSO
+            <span>🔐</span> SSO Sign in
           </button>
         )}
       </div>
