@@ -1,14 +1,18 @@
 --- Hardcoded UI String Candidates (Heuristic) ---
 Status NEW = not found in en.js values; KNOWN = value exists in en.js
 
-/Users/leolong/Desktop/Air-Crash-Sim/Ultimate-Crash-0.1-legacy/src/components/CinematicComponents.jsx:60: [NEW] ULTIMATE AIR
-/Users/leolong/Desktop/Air-Crash-Sim/Ultimate-Crash-0.1-legacy/src/components/CinematicComponents.jsx:96: [NEW] WIND
-/Users/leolong/Desktop/Air-Crash-Sim/Ultimate-Crash-0.1-legacy/src/components/CinematicComponents.jsx:97: [NEW] VISIBILITY
-/Users/leolong/Desktop/Air-Crash-Sim/Ultimate-Crash-0.1-legacy/src/components/CinematicComponents.jsx:98: [NEW] TURBULENCE
-/Users/leolong/Desktop/Air-Crash-Sim/Ultimate-Crash-0.1-legacy/src/components/CinematicComponents.jsx:99: [NEW] CLOUD COVER
-/Users/leolong/Desktop/Air-Crash-Sim/Ultimate-Crash-0.1-legacy/src/components/CinematicComponents.jsx:107: [NEW] DIFFICULTY
-/Users/leolong/Desktop/Air-Crash-Sim/Ultimate-Crash-0.1-legacy/src/components/CinematicComponents.jsx:108: [NEW] FAILURE MODE
-/Users/leolong/Desktop/Air-Crash-Sim/Ultimate-Crash-0.1-legacy/src/components/CommunicationModule.jsx:250: [NEW] Math.abs(s.frequency - currentFreq)
+/Users/leolong/Desktop/Air-Crash-Sim/Ultimate-Crash-0.1-legacy/src/components/CinematicComponents.jsx:66: [NEW] ULTIMATE AIR
+/Users/leolong/Desktop/Air-Crash-Sim/Ultimate-Crash-0.1-legacy/src/components/CinematicComponents.jsx:102: [NEW] WIND
+/Users/leolong/Desktop/Air-Crash-Sim/Ultimate-Crash-0.1-legacy/src/components/CinematicComponents.jsx:103: [NEW] VISIBILITY
+/Users/leolong/Desktop/Air-Crash-Sim/Ultimate-Crash-0.1-legacy/src/components/CinematicComponents.jsx:104: [NEW] TURBULENCE
+/Users/leolong/Desktop/Air-Crash-Sim/Ultimate-Crash-0.1-legacy/src/components/CinematicComponents.jsx:105: [NEW] CLOUD COVER
+/Users/leolong/Desktop/Air-Crash-Sim/Ultimate-Crash-0.1-legacy/src/components/CinematicComponents.jsx:113: [NEW] DIFFICULTY
+/Users/leolong/Desktop/Air-Crash-Sim/Ultimate-Crash-0.1-legacy/src/components/CinematicComponents.jsx:114: [NEW] FAILURE MODE
+/Users/leolong/Desktop/Air-Crash-Sim/Ultimate-Crash-0.1-legacy/src/components/CircuitBreakerPanel.jsx:144: [NEW] CIRCUIT BREAKERS
+/Users/leolong/Desktop/Air-Crash-Sim/Ultimate-Crash-0.1-legacy/src/components/CircuitBreakerPanel.jsx:150: [NEW] OVERHEAD P18-1
+/Users/leolong/Desktop/Air-Crash-Sim/Ultimate-Crash-0.1-legacy/src/components/CircuitBreakerPanel.jsx:159: [NEW] MAIN P18-2
+/Users/leolong/Desktop/Air-Crash-Sim/Ultimate-Crash-0.1-legacy/src/components/CircuitBreakerPanel.jsx:168: [NEW] PEDESTAL P18-3
+/Users/leolong/Desktop/Air-Crash-Sim/Ultimate-Crash-0.1-legacy/src/components/CommunicationModule.jsx:220: [NEW] Math.abs(s.frequency - currentFreq)
 /Users/leolong/Desktop/Air-Crash-Sim/Ultimate-Crash-0.1-legacy/src/components/ControlSurfacePanel.jsx:242: [NEW] TRIM
 /Users/leolong/Desktop/Air-Crash-Sim/Ultimate-Crash-0.1-legacy/src/components/ControlSurfacePanel.jsx:339: [NEW] Loading Aircraft Data...
 /Users/leolong/Desktop/Air-Crash-Sim/Ultimate-Crash-0.1-legacy/src/components/ControlSurfacePanel.jsx:430: [NEW] SYSTEMS
@@ -36,24 +40,24 @@ Status NEW = not found in en.js values; KNOWN = value exists in en.js
 /Users/leolong/Desktop/Air-Crash-Sim/Ultimate-Crash-0.1-legacy/src/components/FailureDebugPanel.jsx:205: [NEW] FLAPS
 /Users/leolong/Desktop/Air-Crash-Sim/Ultimate-Crash-0.1-legacy/src/components/FailureDebugPanel.jsx:212: [NEW] ACTIVE ALERTS
 /Users/leolong/Desktop/Air-Crash-Sim/Ultimate-Crash-0.1-legacy/src/components/FailureDebugPanel.jsx:221: [NEW] System Nominal
-/Users/leolong/Desktop/Air-Crash-Sim/Ultimate-Crash-0.1-legacy/src/components/FlightComputerPanel.jsx:572: [NEW] MHz
-/Users/leolong/Desktop/Air-Crash-Sim/Ultimate-Crash-0.1-legacy/src/components/FlightComputerPanel.jsx:663: [KNOWN] Time to Alt:
-/Users/leolong/Desktop/Air-Crash-Sim/Ultimate-Crash-0.1-legacy/src/components/FlightComputerPanel.jsx:687: [NEW] Feet (ft)
-/Users/leolong/Desktop/Air-Crash-Sim/Ultimate-Crash-0.1-legacy/src/components/FlightComputerPanel.jsx:688: [NEW] Meters (m)
-/Users/leolong/Desktop/Air-Crash-Sim/Ultimate-Crash-0.1-legacy/src/components/FlightComputerPanel.jsx:689: [NEW] Knots (kts)
-/Users/leolong/Desktop/Air-Crash-Sim/Ultimate-Crash-0.1-legacy/src/components/FlightComputerPanel.jsx:690: [NEW] Km/h
-/Users/leolong/Desktop/Air-Crash-Sim/Ultimate-Crash-0.1-legacy/src/components/FlightComputerPanel.jsx:691: [NEW] inHg
-/Users/leolong/Desktop/Air-Crash-Sim/Ultimate-Crash-0.1-legacy/src/components/FlightComputerPanel.jsx:692: [NEW] hPa
-/Users/leolong/Desktop/Air-Crash-Sim/Ultimate-Crash-0.1-legacy/src/components/FlightComputerPanel.jsx:693: [NEW] Naut. Miles
-/Users/leolong/Desktop/Air-Crash-Sim/Ultimate-Crash-0.1-legacy/src/components/FlightComputerPanel.jsx:694: [NEW] Kilometers
-/Users/leolong/Desktop/Air-Crash-Sim/Ultimate-Crash-0.1-legacy/src/components/FlightComputerPanel.jsx:704: [NEW] Feet (ft)
-/Users/leolong/Desktop/Air-Crash-Sim/Ultimate-Crash-0.1-legacy/src/components/FlightComputerPanel.jsx:705: [NEW] Meters (m)
-/Users/leolong/Desktop/Air-Crash-Sim/Ultimate-Crash-0.1-legacy/src/components/FlightComputerPanel.jsx:706: [NEW] Knots (kts)
-/Users/leolong/Desktop/Air-Crash-Sim/Ultimate-Crash-0.1-legacy/src/components/FlightComputerPanel.jsx:707: [NEW] Km/h
-/Users/leolong/Desktop/Air-Crash-Sim/Ultimate-Crash-0.1-legacy/src/components/FlightComputerPanel.jsx:708: [NEW] inHg
-/Users/leolong/Desktop/Air-Crash-Sim/Ultimate-Crash-0.1-legacy/src/components/FlightComputerPanel.jsx:709: [NEW] hPa
-/Users/leolong/Desktop/Air-Crash-Sim/Ultimate-Crash-0.1-legacy/src/components/FlightComputerPanel.jsx:710: [NEW] Naut. Miles
-/Users/leolong/Desktop/Air-Crash-Sim/Ultimate-Crash-0.1-legacy/src/components/FlightComputerPanel.jsx:711: [NEW] Kilometers
+/Users/leolong/Desktop/Air-Crash-Sim/Ultimate-Crash-0.1-legacy/src/components/FlightComputerPanel.jsx:574: [NEW] MHz
+/Users/leolong/Desktop/Air-Crash-Sim/Ultimate-Crash-0.1-legacy/src/components/FlightComputerPanel.jsx:665: [KNOWN] Time to Alt:
+/Users/leolong/Desktop/Air-Crash-Sim/Ultimate-Crash-0.1-legacy/src/components/FlightComputerPanel.jsx:689: [NEW] Feet (ft)
+/Users/leolong/Desktop/Air-Crash-Sim/Ultimate-Crash-0.1-legacy/src/components/FlightComputerPanel.jsx:690: [NEW] Meters (m)
+/Users/leolong/Desktop/Air-Crash-Sim/Ultimate-Crash-0.1-legacy/src/components/FlightComputerPanel.jsx:691: [NEW] Knots (kts)
+/Users/leolong/Desktop/Air-Crash-Sim/Ultimate-Crash-0.1-legacy/src/components/FlightComputerPanel.jsx:692: [NEW] Km/h
+/Users/leolong/Desktop/Air-Crash-Sim/Ultimate-Crash-0.1-legacy/src/components/FlightComputerPanel.jsx:693: [NEW] inHg
+/Users/leolong/Desktop/Air-Crash-Sim/Ultimate-Crash-0.1-legacy/src/components/FlightComputerPanel.jsx:694: [NEW] hPa
+/Users/leolong/Desktop/Air-Crash-Sim/Ultimate-Crash-0.1-legacy/src/components/FlightComputerPanel.jsx:695: [NEW] Naut. Miles
+/Users/leolong/Desktop/Air-Crash-Sim/Ultimate-Crash-0.1-legacy/src/components/FlightComputerPanel.jsx:696: [NEW] Kilometers
+/Users/leolong/Desktop/Air-Crash-Sim/Ultimate-Crash-0.1-legacy/src/components/FlightComputerPanel.jsx:706: [NEW] Feet (ft)
+/Users/leolong/Desktop/Air-Crash-Sim/Ultimate-Crash-0.1-legacy/src/components/FlightComputerPanel.jsx:707: [NEW] Meters (m)
+/Users/leolong/Desktop/Air-Crash-Sim/Ultimate-Crash-0.1-legacy/src/components/FlightComputerPanel.jsx:708: [NEW] Knots (kts)
+/Users/leolong/Desktop/Air-Crash-Sim/Ultimate-Crash-0.1-legacy/src/components/FlightComputerPanel.jsx:709: [NEW] Km/h
+/Users/leolong/Desktop/Air-Crash-Sim/Ultimate-Crash-0.1-legacy/src/components/FlightComputerPanel.jsx:710: [NEW] inHg
+/Users/leolong/Desktop/Air-Crash-Sim/Ultimate-Crash-0.1-legacy/src/components/FlightComputerPanel.jsx:711: [NEW] hPa
+/Users/leolong/Desktop/Air-Crash-Sim/Ultimate-Crash-0.1-legacy/src/components/FlightComputerPanel.jsx:712: [NEW] Naut. Miles
+/Users/leolong/Desktop/Air-Crash-Sim/Ultimate-Crash-0.1-legacy/src/components/FlightComputerPanel.jsx:713: [NEW] Kilometers
 /Users/leolong/Desktop/Air-Crash-Sim/Ultimate-Crash-0.1-legacy/src/components/FlightInProgress.jsx:393: [NEW] Math.abs(f - freqObj.frequency)
 /Users/leolong/Desktop/Air-Crash-Sim/Ultimate-Crash-0.1-legacy/src/components/FlightInProgress.jsx:751: [NEW] Initializing physics engine...
 /Users/leolong/Desktop/Air-Crash-Sim/Ultimate-Crash-0.1-legacy/src/components/FlightInProgress.jsx:782: [NEW] Reload Page
@@ -88,6 +92,14 @@ Status NEW = not found in en.js values; KNOWN = value exists in en.js
 /Users/leolong/Desktop/Air-Crash-Sim/Ultimate-Crash-0.1-legacy/src/components/FlightPosePanel.jsx:298: [NEW] HDG
 /Users/leolong/Desktop/Air-Crash-Sim/Ultimate-Crash-0.1-legacy/src/components/FlightPosePanel.jsx:302: [NEW] GS
 /Users/leolong/Desktop/Air-Crash-Sim/Ultimate-Crash-0.1-legacy/src/components/FlightPosePanel.jsx:306: [NEW] TAS
+/Users/leolong/Desktop/Air-Crash-Sim/Ultimate-Crash-0.1-legacy/src/components/MasterWarningPanel.jsx:51: [NEW] setMasterCaution(false);
+
+    return (
+/Users/leolong/Desktop/Air-Crash-Sim/Ultimate-Crash-0.1-legacy/src/components/MasterWarningPanel.jsx:59: [NEW] MASTER
+/Users/leolong/Desktop/Air-Crash-Sim/Ultimate-Crash-0.1-legacy/src/components/MasterWarningPanel.jsx:60: [NEW] WARNING
+/Users/leolong/Desktop/Air-Crash-Sim/Ultimate-Crash-0.1-legacy/src/components/MasterWarningPanel.jsx:65: [NEW] MASTER
+/Users/leolong/Desktop/Air-Crash-Sim/Ultimate-Crash-0.1-legacy/src/components/MasterWarningPanel.jsx:66: [NEW] CAUTION
+/Users/leolong/Desktop/Air-Crash-Sim/Ultimate-Crash-0.1-legacy/src/components/MasterWarningPanel.jsx:72: [KNOWN] NO ACTIVE ALERTS
 /Users/leolong/Desktop/Air-Crash-Sim/Ultimate-Crash-0.1-legacy/src/components/ModernAutopilotModule.jsx:161: [NEW] SPD (KTS)
 /Users/leolong/Desktop/Air-Crash-Sim/Ultimate-Crash-0.1-legacy/src/components/ModernAutopilotModule.jsx:205: [NEW] HDG
 /Users/leolong/Desktop/Air-Crash-Sim/Ultimate-Crash-0.1-legacy/src/components/ModernAutopilotModule.jsx:241: [NEW] V/S (FPM)

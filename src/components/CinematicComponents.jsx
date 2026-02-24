@@ -8,10 +8,10 @@ const FadeOverlay = ({ phase, children }) => {
   return React.createElement('div', { className: `fade-overlay ${phase}` }, children);
 };
 
-CinematicReview && (FadeOverlay.propTypes = {
+FadeOverlay.propTypes = {
   phase: PropTypes.string,
   children: PropTypes.node
-});
+};
 
 const CinematicReview = ({ callsign, selectedDeparture, selectedArrival, aircraftModel, weatherData, crewCount, failureType, difficulty, pax, payload, routeDetails, onComplete }) => {
   const { t } = useLanguage();

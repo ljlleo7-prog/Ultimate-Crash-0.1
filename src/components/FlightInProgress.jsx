@@ -12,7 +12,7 @@ import DebugPhysicsPanel from './DebugPhysicsPanel';
 import FailureDebugPanel from './FailureDebugPanel';
 import commandDatabase from '../commandDatabase.json';
 import sceneManager from '../services/sceneManager.js';
-import eventBus from '../services/eventBus.js';
+import eventBus from '../services/eventBus';
 import { getRunwayHeading } from '../utils/routeGenerator';
 import RadioActionPanel from './RadioActionPanel';
 import { atcManager } from '../services/ATCLogic';

@@ -1,4 +1,3 @@
-
 const EnvironmentFailures = {
     RAPID_DEPRESSURIZATION: {
         id: 'rapid_depressurization',
@@ -7,7 +6,12 @@ const EnvironmentFailures = {
         stages: {
             inactive: { next: 'active' },
             active: {
-                description: (ctx) => `CABIN PRESSURE WARNING. HULL INTEGRITY COMPROMISED.`,
+                description: (ctx) => ({
+                    text: "CABIN ALTITUDE UNCONTROLLABLE. OXYGEN MASKS DROPPED.",
+                    system_alert: "CABIN ALTITUDE",
+                    sound: "hissing_loud",
+                    visual: "fog_cockpit"
+                }),
                 effect: (sys) => {
                     sys.systems.pressurization.breach = true;
                 }
@@ -22,7 +26,12 @@ const EnvironmentFailures = {
         stages: {
             inactive: { next: 'active' },
             active: {
-                description: (ctx) => `STRUCTURAL DAMAGE. DECOMPRESSION.`,
+                description: (ctx) => ({
+                    text: "EXPLOSIVE DECOMPRESSION. STRUCTURAL FAILURE DETECTED.",
+                    system_alert: "DOOR OPEN",
+                    sound: "explosion_dull",
+                    visual: "shake_violent"
+                }),
                 effect: (sys) => {
                     sys.systems.pressurization.breach = true;
                     // Drag increase?
@@ -38,7 +47,10 @@ const EnvironmentFailures = {
         stages: {
             inactive: { next: 'active' },
             active: {
-                description: (ctx) => `Encountering Severe Turbulence.`,
+                description: (ctx) => ({
+                    text: "Encountering Severe Turbulence.",
+                    visual: "shake_heavy"
+                }),
                 effect: (sys, intensity) => {
                     sys.setEnvironment({
                         turbulence: 5.0 * intensity
@@ -55,7 +67,12 @@ const EnvironmentFailures = {
         stages: {
             inactive: { next: 'active' },
             active: {
-                description: (ctx) => `WINDSHEAR AHEAD.`,
+                description: (ctx) => ({
+                    text: "WINDSHEAR AHEAD.",
+                    system_alert: "WINDSHEAR",
+                    sound: "windshear_alert",
+                    visual: "shake_medium"
+                }),
                 effect: (sys, intensity) => {
                     // Sudden airspeed loss/gain logic in physics
                     // sys.applyWindShear(intensity);
@@ -73,13 +90,20 @@ const EnvironmentFailures = {
             accumulating: {
                 duration: 30.0,
                 next: 'critical',
-                description: (ctx) => `Ice Accumulation Detected.`,
+                description: (ctx) => ({
+                    text: "Ice accumulation detected on airframe.",
+                    visual: "ice_buildup_window"
+                }),
                 effect: (sys, intensity) => {
                     // Reduce lift slightly
                 }
             },
             critical: {
-                description: (ctx) => `Severe Icing. Stall Speed Increased.`,
+                description: (ctx) => ({
+                    text: "Severe Icing. Aerodynamic stall risk high.",
+                    system_alert: "STALL WARN",
+                    visual: "ice_heavy"
+                }),
                 effect: (sys) => {
                     // Degrade aerodynamic coeffs
                 }
@@ -94,7 +118,11 @@ const EnvironmentFailures = {
         stages: {
             inactive: { next: 'active' },
             active: {
-                description: (ctx) => `Fuel Filter Bypass. Engine Roughness.`,
+                description: (ctx) => ({
+                    text: "Engine roughness detected. Fuel filter bypass.",
+                    system_alert: "FUEL FILTER",
+                    sound: "engine_roughness"
+                }),
                 effect: (sys) => {
                     // Random thrust fluctuations
                     sys.engines.forEach(e => {
@@ -114,13 +142,20 @@ const EnvironmentFailures = {
             impact: {
                 next: 'damage',
                 duration: 0.5,
-                description: (ctx) => `IMPACT DETECTED.`,
+                description: (ctx) => ({
+                    text: "LOUD BANG. IMPACT DETECTED.",
+                    sound: "bang_loud",
+                    visual: "shake_jolt"
+                }),
                 effect: (sys, intensity, ctx) => {
                     // Loud bang
                 }
             },
             damage: {
-                description: (ctx) => `Bird Ingestion: Engine Damage.`,
+                description: (ctx) => ({
+                    text: "Multiple bird ingestion. Engine damage.",
+                    system_alert: "ENG VIB HIGH"
+                }),
                 effect: (sys, intensity, ctx) => {
                     const idx = ctx.engineIndex !== undefined ? ctx.engineIndex : 0;
                     if (sys.engines[idx]) sys.engines[idx].setFailed(true);
@@ -136,7 +171,12 @@ const EnvironmentFailures = {
         stages: {
             inactive: { next: 'active' },
             active: {
-                description: (ctx) => `EXPLOSION ENGINE ${ctx.engineIndex + 1}. STRUCTURAL DAMAGE.`,
+                description: (ctx) => ({
+                    text: `EXPLOSION ENGINE ${ctx.engineIndex + 1}. STRUCTURAL DAMAGE.`,
+                    system_alert: "ENG FAIL",
+                    sound: "explosion_loud",
+                    visual: "shake_violent"
+                }),
                 effect: (sys, intensity, ctx) => {
                     const idx = ctx.engineIndex !== undefined ? ctx.engineIndex : 0;
                     if (sys.engines[idx]) sys.engines[idx].setFailed(true);
@@ -153,7 +193,12 @@ const EnvironmentFailures = {
         stages: {
             inactive: { next: 'active' },
             active: {
-                description: (ctx) => `CATASTROPHIC FAILURE.`,
+                description: (ctx) => ({
+                    text: "BOMB DETONATION DETECTED.",
+                    system_alert: "HULL BREACH",
+                    sound: "explosion_massive",
+                    visual: "flash_white"
+                }),
                 effect: (sys) => {
                     sys.engines.forEach(e => e.setFailed(true));
                     sys.systems.pressurization.breach = true;

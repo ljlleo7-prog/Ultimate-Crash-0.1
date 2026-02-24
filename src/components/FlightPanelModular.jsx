@@ -19,6 +19,9 @@ import TimerPanel from './TimerPanel';
 import FlightComputerPanel from './FlightComputerPanel';
 import ChecklistPanel from './ChecklistPanel';
 import SystemStatusPanel from './SystemStatusPanel';
+import CircuitBreakerPanel from './CircuitBreakerPanel';
+import MasterWarningPanel from './MasterWarningPanel';
+import SensoryFeedback from './SensoryFeedback';
 import { useLanguage } from '../contexts/LanguageContext';
 import './FlightPanel.css';
 
@@ -26,6 +29,7 @@ const FlightPanelModular = ({ flightData, physicsState, weatherData, onActionReq
   const { t } = useLanguage();
   // Use flightData from parent component instead of creating own physics service
   const [showOverhead, setShowOverhead] = useState(false);
+  const [showCircuitBreakers, setShowCircuitBreakers] = useState(false);
   const [activeSidebarPanel, setActiveSidebarPanel] = useState(null);
 
   const [flightState, setFlightState] = useState({
@@ -537,7 +541,8 @@ const FlightPanelModular = ({ flightData, physicsState, weatherData, onActionReq
         // Central Panel (Right)
         React.createElement(CentralPanel, { 
           flightState,
-          onToggleSystems: () => setShowOverhead(prev => !prev)
+          onToggleSystems: () => setShowOverhead(prev => !prev),
+          onToggleBreakers: () => setShowCircuitBreakers(prev => !prev)
         })
       ),
       
@@ -661,6 +666,17 @@ const FlightPanelModular = ({ flightData, physicsState, weatherData, onActionReq
         onSystemAction: handleSystemAction,
         aircraftModel: aircraftModel // Pass model for styling
       }),
+
+      // Circuit Breaker Panel Overlay
+      showCircuitBreakers && React.createElement(CircuitBreakerPanel, {
+        onClose: () => setShowCircuitBreakers(false)
+      }),
+      
+      // Master Warning Panel (Always visible in PHY-ON)
+      React.createElement(MasterWarningPanel),
+
+      // Sensory Feedback Overlay (Always active for effects)
+      React.createElement(SensoryFeedback),
 
       // Crash warning flash
       React.createElement(CrashWarningFlash, { flashActive, flashText, onAlertComplete: handleAlertComplete }),

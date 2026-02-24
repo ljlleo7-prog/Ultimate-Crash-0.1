@@ -2,7 +2,7 @@ import React from 'react';
 import { useLanguage } from '../contexts/LanguageContext';
 
 // Central Panel Component - Compact design for variable engine counts
-const CentralPanel = ({ flightState, onToggleSystems }) => {
+const CentralPanel = ({ flightState, onToggleSystems, onToggleBreakers }) => {
   const { t } = useLanguage();
   // FIXED: Add safety checks for all properties
   const alarms = flightState.alarms || [];
@@ -60,20 +60,36 @@ const CentralPanel = ({ flightState, onToggleSystems }) => {
         flex: 1,
         textAlign: 'center'
       } }, t('ui.systems.engine_and_systems')),
-      React.createElement('button', {
-        onClick: onToggleSystems,
-        style: {
-          background: '#4a90e2',
-          border: 'none',
-          borderRadius: '4px',
-          color: 'white',
-          padding: '4px 8px',
-          fontSize: '10px',
-          fontWeight: 'bold',
-          cursor: 'pointer',
-          boxShadow: '0 2px 4px rgba(0,0,0,0.3)'
-        }
-      }, t('ui.systems.overhead_panel_short'))
+      React.createElement('div', { style: { display: 'flex', gap: '5px' } },
+        React.createElement('button', {
+          onClick: onToggleBreakers,
+          style: {
+            background: '#ffaa00',
+            border: 'none',
+            borderRadius: '4px',
+            color: '#000',
+            padding: '4px 8px',
+            fontSize: '10px',
+            fontWeight: 'bold',
+            cursor: 'pointer',
+            boxShadow: '0 2px 4px rgba(0,0,0,0.3)'
+          }
+        }, 'CB'),
+        React.createElement('button', {
+          onClick: onToggleSystems,
+          style: {
+            background: '#4a90e2',
+            border: 'none',
+            borderRadius: '4px',
+            color: 'white',
+            padding: '4px 8px',
+            fontSize: '10px',
+            fontWeight: 'bold',
+            cursor: 'pointer',
+            boxShadow: '0 2px 4px rgba(0,0,0,0.3)'
+          }
+        }, t('ui.systems.overhead_panel_short'))
+      )
     ),
     
     // Compact Engine Parameters with variable engine support

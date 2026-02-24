@@ -4,11 +4,12 @@
  * Handles stages, progression, and state management.
  */
 class BaseFailure {
-    constructor(def, context = {}) {
+    constructor(def, context = {}, onTransition = null) {
         this.id = def.id;
         this.name = def.name;
         this.category = def.category;
         this.stages = def.stages || { inactive: { next: 'active' }, active: {} };
+        this.onTransitionCallback = onTransition;
         
         // State
         this.currentStage = 'inactive';
@@ -76,15 +77,26 @@ class BaseFailure {
             message: desc
         });
 
+        if (this.onTransitionCallback) {
+            this.onTransitionCallback(this, desc);
+        }
+
         console.log(`[Failure] ${this.name} transitioned: ${oldStage} -> ${stageName}`);
     }
 
     getDescription() {
         const stageDef = this.stages[this.currentStage];
+        let desc = stageDef?.description || `${this.name} is ${this.currentStage}`;
+
         if (typeof stageDef?.description === 'function') {
-            return stageDef.description(this.variation.context);
+            desc = stageDef.description(this.variation.context);
         }
-        return stageDef?.description || `${this.name} is ${this.currentStage}`;
+        
+        // Normalize to object
+        if (typeof desc === 'string') {
+            return { text: desc };
+        }
+        return desc;
     }
 
     // To be overridden or defined in definition
