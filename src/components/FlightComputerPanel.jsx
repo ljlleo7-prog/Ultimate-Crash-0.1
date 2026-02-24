@@ -1,8 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
+import PropTypes from 'prop-types';
 import { airportService } from '../services/airportService';
+import { useLanguage } from '../contexts/LanguageContext';
 import './FlightComputerPanel.css';
 
-const FlightComputerPanel = ({ onClose, flightPlan, onUpdateFlightPlan, flightState }) => {
+const FlightComputerPanel = ({ onClose, flightPlan, onUpdateFlightPlan, flightState, onActionRequest }) => {
+  const { t } = useLanguage();
   const [activeTab, setActiveTab] = useState('waypoints'); // 'waypoints', 'add', 'nearest'
   const [waypoints, setWaypoints] = useState([]);
   
@@ -26,6 +29,7 @@ const FlightComputerPanel = ({ onClose, flightPlan, onUpdateFlightPlan, flightSt
   const [convertFrom, setConvertFrom] = useState('ft');
   const [convertTo, setConvertTo] = useState('m');
   const [convertResult, setConvertResult] = useState(null);
+  const [nav1FreqInput, setNav1FreqInput] = useState('');
 
   // Auto-convert when inputs change
   useEffect(() => {
@@ -160,7 +164,7 @@ const FlightComputerPanel = ({ onClose, flightPlan, onUpdateFlightPlan, flightSt
     const lon = parseFloat(manualLon);
     
     if (isNaN(lat) || isNaN(lon)) {
-      alert('Please enter valid coordinates');
+      alert(t('ui.flight_computer.errors.invalid_coordinates'));
       return;
     }
     
@@ -362,22 +366,22 @@ const FlightComputerPanel = ({ onClose, flightPlan, onUpdateFlightPlan, flightSt
   return (
     <div className="flight-computer-panel">
       <div className="fc-header">
-        <h3>Flight Computer</h3>
+        <h3>{t('ui.flight_computer.title')}</h3>
         <button className="close-btn" onClick={onClose}>×</button>
       </div>
       
       <div className="fc-tabs">
-        <button className={activeTab === 'waypoints' ? 'active' : ''} onClick={() => setActiveTab('waypoints')}>Plan</button>
-        <button className={activeTab === 'add' ? 'active' : ''} onClick={() => setActiveTab('add')}>Add</button>
-        <button className={activeTab === 'nearest' ? 'active' : ''} onClick={() => setActiveTab('nearest')}>Nearest</button>
-        <button className={activeTab === 'utils' ? 'active' : ''} onClick={() => setActiveTab('utils')}>Perf</button>
+        <button className={activeTab === 'waypoints' ? 'active' : ''} onClick={() => setActiveTab('waypoints')}>{t('ui.flight_computer.tabs.plan')}</button>
+        <button className={activeTab === 'add' ? 'active' : ''} onClick={() => setActiveTab('add')}>{t('ui.flight_computer.tabs.add')}</button>
+        <button className={activeTab === 'nearest' ? 'active' : ''} onClick={() => setActiveTab('nearest')}>{t('ui.flight_computer.tabs.nearest')}</button>
+        <button className={activeTab === 'utils' ? 'active' : ''} onClick={() => setActiveTab('utils')}>{t('ui.flight_computer.tabs.perf')}</button>
       </div>
       
       <div className="fc-content">
         {activeTab === 'waypoints' && (
           <div className="waypoints-list">
             {waypoints.length === 0 ? (
-              <div className="empty-state">No waypoints in flight plan.</div>
+              <div className="empty-state">{t('ui.flight_computer.empty.no_waypoints')}</div>
             ) : (
               <ul>
                 {waypoints.map((wp, index) => {
@@ -395,7 +399,7 @@ const FlightComputerPanel = ({ onClose, flightPlan, onUpdateFlightPlan, flightSt
                         <span className="wp-index" style={{ color: isActive ? '#4facfe' : '#666' }}>{index + 1}</span>
                         <div className="wp-info">
                         <span className="wp-label" style={{ color: isActive ? '#fff' : (isPassed ? '#888' : '#e0e0e0') }}>
-                            {wp.label} {isActive && <small style={{color: '#4facfe', marginLeft: '5px'}}>(ACTIVE)</small>}
+                            {wp.label} {isActive && <small style={{color: '#4facfe', marginLeft: '5px'}}>({t('ui.flight_computer.tags.active')})</small>}
                         </span>
                         <span className="wp-coords">{wp.latitude.toFixed(4)}, {wp.longitude.toFixed(4)}</span>
                         {wp.type === 'airport' && (wp.availableRunways || wp.details?.runways) && (
@@ -435,9 +439,9 @@ const FlightComputerPanel = ({ onClose, flightPlan, onUpdateFlightPlan, flightSt
                         fontWeight: 'bold',
                         transition: 'all 0.2s'
                       }}
-                      title="Toggle Hold Pattern (Orbit)"
+                      title={t('ui.flight_computer.actions.toggle_hold_title')}
                     >
-                      {wp.isHold ? 'HOLDING' : 'HOLD'}
+                      {wp.isHold ? t('ui.flight_computer.actions.holding') : t('ui.flight_computer.actions.hold')}
                     </button>
                     <button className="delete-btn" onClick={() => handleDeleteWaypoint(index)}>🗑️</button>
                   </li>
@@ -451,39 +455,39 @@ const FlightComputerPanel = ({ onClose, flightPlan, onUpdateFlightPlan, flightSt
         {activeTab === 'add' && (
           <div className="add-waypoint-section">
             <div className="manual-input">
-              <h4>Manual Entry</h4>
+              <h4>{t('ui.flight_computer.add.manual_entry')}</h4>
               <div className="input-group">
                 <input 
                   type="text" 
-                  placeholder="Lat (e.g. 37.61)" 
+                  placeholder={t('ui.flight_computer.add.placeholders.lat')} 
                   value={manualLat} 
                   onChange={(e) => setManualLat(e.target.value)} 
                 />
                 <input 
                   type="text" 
-                  placeholder="Lon (e.g. -122.37)" 
+                  placeholder={t('ui.flight_computer.add.placeholders.lon')} 
                   value={manualLon} 
                   onChange={(e) => setManualLon(e.target.value)} 
                 />
               </div>
               <input 
                 type="text" 
-                placeholder="Label (Optional)" 
+                placeholder={t('ui.flight_computer.add.placeholders.label')} 
                 value={manualLabel} 
                 onChange={(e) => setManualLabel(e.target.value)} 
                 className="label-input"
               />
-              <button className="action-btn" onClick={handleAddManual}>Add Coordinates</button>
+              <button className="action-btn" onClick={handleAddManual}>{t('ui.flight_computer.add.add_coordinates')}</button>
             </div>
             
-            <div className="divider">OR</div>
+            <div className="divider">{t('ui.flight_computer.add.or')}</div>
             
             <div className="search-input">
-              <h4>Airport Search</h4>
+              <h4>{t('ui.flight_computer.search.title')}</h4>
               <form onSubmit={handleSearch}>
                 <input 
                   type="text" 
-                  placeholder="Search ICAO/IATA/Name..." 
+                  placeholder={t('ui.flight_computer.search.placeholder')} 
                   value={searchQuery} 
                   onChange={(e) => setSearchQuery(e.target.value)} 
                 />
@@ -493,24 +497,24 @@ const FlightComputerPanel = ({ onClose, flightPlan, onUpdateFlightPlan, flightSt
                        type="radio" 
                        checked={searchType === 'all'} 
                        onChange={() => setSearchType('all')} 
-                     /> All
+                     /> {t('ui.flight_computer.search.options.all')}
                    </label>
                    <label>
                      <input 
                        type="radio" 
                        checked={searchType === 'normal'} 
                        onChange={() => setSearchType('normal')} 
-                     /> Normal
+                     /> {t('ui.flight_computer.search.options.normal')}
                    </label>
                    <label>
                      <input 
                        type="radio" 
                        checked={searchType === 'emergency'} 
                        onChange={() => setSearchType('emergency')} 
-                     /> Emergency
+                     /> {t('ui.flight_computer.search.options.emergency')}
                    </label>
                 </div>
-                <button type="submit" className="action-btn secondary">Search</button>
+                <button type="submit" className="action-btn secondary">{t('ui.flight_computer.search.submit')}</button>
               </form>
               
               <div className="search-results">
@@ -531,9 +535,9 @@ const FlightComputerPanel = ({ onClose, flightPlan, onUpdateFlightPlan, flightSt
         {activeTab === 'nearest' && (
           <div className="nearest-section">
             {loadingNearest ? (
-              <div>Finding airports...</div>
+              <div>{t('ui.flight_computer.nearest.finding')}</div>
             ) : nearestAirports.length === 0 ? (
-              <div>No airports found.</div>
+              <div>{t('ui.flight_computer.nearest.none')}</div>
             ) : (
               <ul className="nearest-list">
                 {nearestAirports.map(airport => {
@@ -547,25 +551,25 @@ const FlightComputerPanel = ({ onClose, flightPlan, onUpdateFlightPlan, flightSt
                         <span className="code">{airport.iata || airport.icao}</span>
                         <span className="name">{airport.name}</span>
                         <span className="dist">{dist} nm</span>
-                        {airport.type === 'emergency' && <span className="tag emergency">EMERGENCY</span>}
+                        {airport.type === 'emergency' && <span className="tag emergency">{t('ui.flight_computer.nearest.emergency_tag')}</span>}
                       </div>
-                      <button className="direct-btn" onClick={() => handleAddAirport(airport)}>Add</button>
+                      <button className="direct-btn" onClick={() => handleAddAirport(airport)}>{t('ui.flight_computer.nearest.add')}</button>
                     </li>
                    );
                 })}
               </ul>
             )}
-            <button className="refresh-btn" onClick={findNearestAirports}>Refresh</button>
+            <button className="refresh-btn" onClick={findNearestAirports}>{t('ui.flight_computer.nearest.refresh')}</button>
           </div>
         )}
 
         {activeTab === 'radio' && (
           <div className="radio-section" style={{ padding: '10px', color: '#e2e8f0' }}>
             <div className="utils-block" style={{ marginBottom: '20px', background: 'rgba(0,0,0,0.2)', padding: '10px', borderRadius: '4px' }}>
-              <h4 style={{ margin: '0 0 10px 0', borderBottom: '1px solid #475569', paddingBottom: '5px' }}>Navigation Radio</h4>
+              <h4 style={{ margin: '0 0 10px 0', borderBottom: '1px solid #475569', paddingBottom: '5px' }}>{t('ui.flight_computer.radio.nav_title')}</h4>
               
               <div style={{ marginBottom: '15px' }}>
-                <div style={{ color: '#94a3b8', fontSize: '12px', marginBottom: '5px' }}>Current NAV1 Frequency</div>
+                <div style={{ color: '#94a3b8', fontSize: '12px', marginBottom: '5px' }}>{t('ui.flight_computer.radio.current_nav1')}</div>
                 <div style={{ fontSize: '24px', fontWeight: 'bold', color: '#4ade80', fontFamily: 'monospace' }}>
                   {flightState?.autopilotDebug?.nav1Frequency ? flightState.autopilotDebug.nav1Frequency.toFixed(2) : '---'} <span style={{fontSize: '14px', color: '#64748b'}}>MHz</span>
                 </div>
@@ -573,7 +577,7 @@ const FlightComputerPanel = ({ onClose, flightPlan, onUpdateFlightPlan, flightSt
 
               <div style={{ display: 'flex', gap: '10px', alignItems: 'flex-end' }}>
                 <div style={{ flex: 1 }}>
-                  <label style={{ display: 'block', color: '#94a3b8', fontSize: '12px', marginBottom: '5px' }}>Set Frequency (MHz)</label>
+                  <label style={{ display: 'block', color: '#94a3b8', fontSize: '12px', marginBottom: '5px' }}>{t('ui.flight_computer.radio.set_freq')}</label>
                   <input 
                     type="number" 
                     step="0.05"
@@ -600,7 +604,7 @@ const FlightComputerPanel = ({ onClose, flightPlan, onUpdateFlightPlan, flightSt
                         setNav1FreqInput(''); // Clear input on success
                       }
                     } else {
-                      alert('Invalid Frequency. Must be between 108.00 and 117.95 MHz');
+                      alert(t('ui.flight_computer.radio.invalid_freq'));
                     }
                   }}
                   style={{
@@ -614,12 +618,10 @@ const FlightComputerPanel = ({ onClose, flightPlan, onUpdateFlightPlan, flightSt
                     height: '38px' // Match input height roughly
                   }}
                 >
-                  TUNE
+                  {t('ui.flight_computer.radio.tune')}
                 </button>
               </div>
-              <div style={{ marginTop: '10px', fontSize: '11px', color: '#64748b' }}>
-                Common ILS Frequencies: 108.10, 108.15, ..., 111.95
-              </div>
+              <div style={{ marginTop: '10px', fontSize: '11px', color: '#64748b' }}>{t('ui.flight_computer.radio.common_ils')}</div>
             </div>
           </div>
         )}
@@ -628,29 +630,29 @@ const FlightComputerPanel = ({ onClose, flightPlan, onUpdateFlightPlan, flightSt
           <div className="utils-section" style={{ padding: '10px', color: '#e2e8f0' }}>
             
             <div className="utils-block" style={{ marginBottom: '20px', background: 'rgba(0,0,0,0.2)', padding: '10px', borderRadius: '4px' }}>
-              <h4 style={{ margin: '0 0 10px 0', borderBottom: '1px solid #475569', paddingBottom: '5px' }}>Predictions</h4>
+              <h4 style={{ margin: '0 0 10px 0', borderBottom: '1px solid #475569', paddingBottom: '5px' }}>{t('ui.flight_computer.utils.predictions')}</h4>
               
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', fontSize: '12px' }}>
-                <div style={{ color: '#94a3b8' }}>Next Waypoint:</div>
+                <div style={{ color: '#94a3b8' }}>{t('ui.flight_computer.utils.next_wp')}</div>
                 <div style={{ textAlign: 'right', fontWeight: 'bold' }}>{preds.nextWpLabel}</div>
                 
-                <div style={{ color: '#94a3b8' }}>Distance:</div>
+                <div style={{ color: '#94a3b8' }}>{t('ui.flight_computer.utils.distance')}</div>
                 <div style={{ textAlign: 'right' }}>{preds.distToWpt}</div>
                 
-                <div style={{ color: '#94a3b8' }}>ETE to WPT:</div>
+                <div style={{ color: '#94a3b8' }}>{t('ui.flight_computer.utils.ete_to_wpt')}</div>
                 <div style={{ textAlign: 'right', color: '#4ade80' }}>{preds.timeToWpt}</div>
                 
                 <div style={{ borderTop: '1px solid #334155', gridColumn: '1/-1', margin: '4px 0' }}></div>
                 
-                <div style={{ color: '#94a3b8' }}>Fuel Flow:</div>
+                <div style={{ color: '#94a3b8' }}>{t('ui.flight_computer.utils.fuel_flow')}</div>
                 <div style={{ textAlign: 'right' }}>{preds.totalFlow.toFixed(0)} kg/h</div>
                 
-                <div style={{ color: '#94a3b8' }}>Time to Empty:</div>
+                <div style={{ color: '#94a3b8' }}>{t('ui.flight_computer.utils.time_to_empty')}</div>
                 <div style={{ textAlign: 'right', color: '#f59e0b' }}>{preds.timeFuel}</div>
                 
                 <div style={{ borderTop: '1px solid #334155', gridColumn: '1/-1', margin: '4px 0' }}></div>
                 
-                <div style={{ color: '#94a3b8', alignSelf: 'center' }}>Target Alt (ft):</div>
+                <div style={{ color: '#94a3b8', alignSelf: 'center' }}>{t('ui.flight_computer.utils.target_alt')}</div>
                 <div style={{ textAlign: 'right' }}>
                   <input 
                     type="number" 
@@ -661,19 +663,19 @@ const FlightComputerPanel = ({ onClose, flightPlan, onUpdateFlightPlan, flightSt
                 </div>
                 
                 <div style={{ color: '#94a3b8' }}>Time to Alt:</div>
-                <div style={{ textAlign: 'right', color: '#60a5fa' }}>{preds.timeAlt}</div>
+                <div style={{ color: '#94a3b8' }}>{t('ui.flight_computer.utils.time_to_alt')}</div>
               </div>
             </div>
 
             <div className="utils-block" style={{ background: 'rgba(0,0,0,0.2)', padding: '10px', borderRadius: '4px' }}>
-              <h4 style={{ margin: '0 0 10px 0', borderBottom: '1px solid #475569', paddingBottom: '5px' }}>Unit Converter</h4>
+              <h4 style={{ margin: '0 0 10px 0', borderBottom: '1px solid #475569', paddingBottom: '5px' }}>{t('ui.flight_computer.utils.converter.title')}</h4>
               
               <div style={{ display: 'flex', gap: '8px', marginBottom: '8px' }}>
                 <input 
                   type="number" 
                   value={convertVal} 
                   onChange={(e) => setConvertVal(e.target.value)}
-                  placeholder="Value"
+                  placeholder={t('ui.flight_computer.utils.converter.value')}
                   style={{ flex: 1, background: '#1e293b', border: '1px solid #475569', color: 'white', padding: '4px' }}
                 />
               </div>
@@ -713,7 +715,7 @@ const FlightComputerPanel = ({ onClose, flightPlan, onUpdateFlightPlan, flightSt
               </div>
               
               <div style={{ textAlign: 'center', padding: '10px', background: '#0f172a', borderRadius: '4px', border: '1px solid #334155' }}>
-                <span style={{ color: '#94a3b8', fontSize: '12px' }}>Result: </span>
+                <span style={{ color: '#94a3b8', fontSize: '12px' }}>{t('ui.flight_computer.utils.converter.result_label')} </span>
                 <span style={{ fontSize: '16px', fontWeight: 'bold', color: '#fff' }}>
                   {convertResult !== null ? convertResult.toFixed(2) : '---'}
                 </span>
@@ -725,6 +727,45 @@ const FlightComputerPanel = ({ onClose, flightPlan, onUpdateFlightPlan, flightSt
       </div>
     </div>
   );
+};
+
+FlightComputerPanel.propTypes = {
+  onClose: PropTypes.func.isRequired,
+  flightPlan: PropTypes.oneOfType([
+    PropTypes.arrayOf(
+      PropTypes.shape({
+        latitude: PropTypes.number.isRequired,
+        longitude: PropTypes.number.isRequired,
+        label: PropTypes.string,
+        type: PropTypes.string
+      })
+    ),
+    PropTypes.shape({
+      waypoints: PropTypes.arrayOf(
+        PropTypes.shape({
+          latitude: PropTypes.number.isRequired,
+          longitude: PropTypes.number.isRequired,
+          label: PropTypes.string,
+          type: PropTypes.string
+        })
+      )
+    })
+  ]),
+  onUpdateFlightPlan: PropTypes.func,
+  flightState: PropTypes.shape({
+    latitude: PropTypes.number,
+    longitude: PropTypes.number,
+    groundSpeed: PropTypes.number,
+    currentWaypointIndex: PropTypes.number,
+    verticalSpeed: PropTypes.number,
+    altitude: PropTypes.number,
+    engineFuelFlow: PropTypes.arrayOf(PropTypes.number),
+    fuel: PropTypes.number,
+    autopilotDebug: PropTypes.shape({
+      nav1Frequency: PropTypes.number
+    })
+  }),
+  onActionRequest: PropTypes.func
 };
 
 export default FlightComputerPanel;

@@ -1,9 +1,12 @@
 
-import React, { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo } from 'react';
+import PropTypes from 'prop-types';
 import { Checklists, ChecklistCategories } from '../services/ChecklistData';
+import { useLanguage } from '../contexts/LanguageContext';
 import './ChecklistPanel.css';
 
 const ChecklistPanel = ({ onClose, physicsState, flightState }) => {
+  const { t } = useLanguage();
   const [activeTab, setActiveTab] = useState(ChecklistCategories.PREFLIGHT);
   const [checkedItems, setCheckedItems] = useState({});
   const [isFolding, setIsFolding] = useState(false);
@@ -81,7 +84,7 @@ const ChecklistPanel = ({ onClose, physicsState, flightState }) => {
   return (
     <div className="checklist-panel">
       <div className="checklist-header">
-        <h3>CHECKLIST</h3>
+        <h3>{t('ui.checklist.title')}</h3>
         <button className="checklist-close" onClick={onClose}>×</button>
       </div>
 
@@ -112,7 +115,7 @@ const ChecklistPanel = ({ onClose, physicsState, flightState }) => {
         ))}
         {currentItems.length === 0 && (
           <div style={{ padding: '20px', textAlign: 'center', color: '#64748b', fontSize: '12px' }}>
-            No items in this checklist.
+            {t('ui.checklist.empty')}
           </div>
         )}
       </div>
@@ -125,7 +128,7 @@ const ChecklistPanel = ({ onClose, physicsState, flightState }) => {
           />
         </div>
         <div className="progress-text">
-          {completedCount} / {currentItems.length} COMPLETED
+          {completedCount} / {currentItems.length} {t('ui.checklist.completed_suffix')}
         </div>
       </div>
     </div>
@@ -133,3 +136,11 @@ const ChecklistPanel = ({ onClose, physicsState, flightState }) => {
 };
 
 export default ChecklistPanel;
+
+ChecklistPanel.propTypes = {
+  onClose: PropTypes.func.isRequired,
+  physicsState: PropTypes.shape({
+    systems: PropTypes.object
+  }),
+  flightState: PropTypes.object
+};

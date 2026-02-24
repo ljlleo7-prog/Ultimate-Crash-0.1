@@ -1,6 +1,9 @@
 import React from 'react';
+import PropTypes from 'prop-types';
+import { useLanguage } from '../contexts/LanguageContext';
 
 const CrashPanel = ({ showCrashPanel, resetFlight }) => {
+  const { t } = useLanguage();
   if (!showCrashPanel) return null;
   
   return React.createElement('div', {
@@ -22,9 +25,9 @@ const CrashPanel = ({ showCrashPanel, resetFlight }) => {
       fontWeight: 'bold'
     }
   },
-    React.createElement('h1', { style: { fontSize: '5rem', marginBottom: '2rem' } }, 'CRASHED'),
-    React.createElement('div', { style: { fontSize: '2rem', marginBottom: '1rem' } }, 'Final Score: 0'),
-    React.createElement('div', { style: { fontSize: '1.5rem', marginBottom: '2rem' } }, 'You failed to maintain control of the aircraft'),
+    React.createElement('h1', { style: { fontSize: '5rem', marginBottom: '2rem' } }, t('ui.crash.crashed')),
+    React.createElement('div', { style: { fontSize: '2rem', marginBottom: '1rem' } }, t('ui.crash.final_score', { score: 0 })),
+    React.createElement('div', { style: { fontSize: '1.5rem', marginBottom: '2rem' } }, t('ui.crash.failed_control')),
     React.createElement('button', {
       onClick: resetFlight,
       style: {
@@ -36,8 +39,13 @@ const CrashPanel = ({ showCrashPanel, resetFlight }) => {
         borderRadius: '5px',
         cursor: 'pointer'
       }
-    }, 'Try Again')
+    }, t('ui.crash.try_again'))
   );
 };
 
 export default CrashPanel;
+
+CrashPanel.propTypes = {
+  showCrashPanel: PropTypes.bool,
+  resetFlight: PropTypes.func.isRequired
+};

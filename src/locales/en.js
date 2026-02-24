@@ -450,6 +450,7 @@ const en = {
         language: 'Language / 语言'
     },
     systems: {
+        status: 'System Status',
         engines: 'Engines',
         electrics: 'Electrics',
         hydraulics: 'Hydraulics',
@@ -458,12 +459,23 @@ const en = {
         pumps: 'Pumps',
         generators: 'Gens',
         batteries: 'Batteries',
+        engine_and_systems: 'ENGINE & SYSTEMS',
+        overhead_panel_short: 'OH PNL',
+        system_status_alerts: 'SYSTEM STATUS / ALERTS',
+        no_active_alerts: 'NO ACTIVE ALERTS',
         on: 'ON',
         off: 'OFF',
         auto: 'AUTO',
         avail: 'AVAIL',
         fault: 'FAULT',
-        low_press: 'LOW PRESS'
+        low_press: 'LOW PRESS',
+        open: 'OPEN',
+        valve: 'VALVE',
+        off_bus: 'OFF BUS',
+        discharge: 'DISCHARGE',
+        disch: 'DISCH',
+        maint: 'MAINT',
+        inop: 'INOP'
     },
     startup: {
         checklist_incomplete: 'Startup Checklist Incomplete',
@@ -471,6 +483,143 @@ const en = {
         cant_proceed: 'Cannot proceed to next phase.',
         continue_anyway: 'Continue Anyway (Disable Safety)',
         continue: 'Continue'
+    },
+    checklist: {
+        title: 'CHECKLIST',
+        empty: 'No items in this checklist.',
+        completed_suffix: 'COMPLETED'
+    },
+    flight_computer: {
+        title: 'Flight Computer',
+        tabs: {
+            plan: 'Plan',
+            add: 'Add',
+            nearest: 'Nearest',
+            perf: 'Perf'
+        },
+        empty: {
+            no_waypoints: 'No waypoints in flight plan.'
+        },
+        add: {
+            manual_entry: 'Manual Entry',
+            placeholders: {
+                lat: 'Lat (e.g. 37.61)',
+                lon: 'Lon (e.g. -122.37)',
+                label: 'Label (Optional)'
+            },
+            add_coordinates: 'Add Coordinates',
+            or: 'OR'
+        },
+        search: {
+            title: 'Airport Search',
+            placeholder: 'Search ICAO/IATA/Name...',
+            options: {
+                all: 'All',
+                normal: 'Normal',
+                emergency: 'Emergency'
+            },
+            submit: 'Search'
+        },
+        nearest: {
+            finding: 'Finding airports...',
+            none: 'No airports found.',
+            emergency_tag: 'EMERGENCY',
+            add: 'Add',
+            refresh: 'Refresh'
+        },
+        actions: {
+            hold: 'HOLD',
+            holding: 'HOLDING',
+            toggle_hold_title: 'Toggle Hold Pattern (Orbit)'
+        },
+        tags: {
+            active: 'ACTIVE'
+        },
+        radio: {
+            nav_title: 'Navigation Radio',
+            current_nav1: 'Current NAV1 Frequency',
+            set_freq: 'Set Frequency (MHz)',
+            tune: 'TUNE',
+            common_ils: 'Common ILS Frequencies: 108.10, 108.15, ..., 111.95',
+            invalid_freq: 'Invalid Frequency. Must be between 108.00 and 117.95 MHz'
+        },
+        utils: {
+            predictions: 'Predictions',
+            next_wp: 'Next Waypoint:',
+            distance: 'Distance:',
+            ete_to_wpt: 'ETE to WPT:',
+            fuel_flow: 'Fuel Flow:',
+            time_to_empty: 'Time to Empty:',
+            target_alt: 'Target Alt (ft):',
+            time_to_alt: 'Time to Alt:',
+            converter: {
+                title: 'Unit Converter',
+                value: 'Value',
+                result_label: 'Result:'
+            }
+        },
+        errors: {
+            invalid_coordinates: 'Please enter valid coordinates'
+        }
+    },
+    cinematic: {
+        confidential: 'CONFIDENTIAL',
+        manifest_title: 'FLIGHT MANIFEST',
+        official_dispatch: 'OFFICIAL DISPATCH DOCUMENT // ${callsign}',
+        date: 'DATE',
+        time: 'TIME',
+        page: 'PAGE: ${page}',
+        sections: {
+            flight_data: '01. FLIGHT DATA',
+            route_logistics: '02. ROUTE LOGISTICS',
+            metar_env: '03. METAR & ENV',
+            operational_risk: '04. OPERATIONAL RISK'
+        },
+        labels: {
+            operator: 'OPERATOR',
+            aircraft: 'AIRCRAFT',
+            origin: 'ORIGIN',
+            destination: 'DESTINATION',
+            pax_crew: 'PAX/CREW',
+            payload: 'PAYLOAD',
+            departure_gate: 'DEPARTURE GATE',
+            arrival_gate: 'ARRIVAL GATE',
+            taxi_out: 'TAXIWAY OUT',
+            taxi_in: 'TAXIWAY IN',
+            departure_rwy: 'DEPARTURE RWY',
+            landing_rwy: 'LANDING RWY',
+            sid: 'SID',
+            star: 'STAR',
+            waypoints: 'WAYPOINTS:'
+        },
+        buttons: {
+            acknowledge: 'ACKNOWLEDGE DISPATCH'
+        }
+    },
+    narrative_ui: {
+        designation: 'DESIGNATION:',
+        background: 'BACKGROUND:',
+        mission: 'MISSION:',
+        intelligence: 'INTELLIGENCE:',
+        accept_assignment: 'ACCEPT ASSIGNMENT'
+    },
+    crash: {
+        crashed: 'CRASHED',
+        final_score: 'Final Score: ${score}',
+        failed_control: 'You failed to maintain control of the aircraft',
+        try_again: 'Try Again'
+    },
+    comm: {
+        active_comm: 'ACTIVE COMM',
+        no_signal: 'No Signal',
+        searching: 'Searching...',
+        tabs: {
+            log: 'LOG',
+            signals: 'SIGNALS'
+        },
+        no_signals: 'No signals detected',
+        radio_silent: 'Radio silent',
+        connected: 'Connected'
     }
   },
   initialization: {
@@ -522,6 +671,9 @@ const en = {
     route: {
       departure: 'DEPARTURE AIRPORT',
       arrival: 'ARRIVAL AIRPORT',
+      search_placeholder: 'SEARCH ICAO/IATA...',
+      clear_selection: 'Clear selection',
+      results_count: '${count} airports found',
       summary: {
         route: 'ROUTE:',
         distance: 'DISTANCE:',
@@ -535,7 +687,10 @@ const en = {
     buttons: {
       next_params: 'NEXT: FLIGHT PARAMETERS →',
       next_route: 'NEXT: ROUTE SELECTION →',
-      finalize: 'FINALIZE DISPATCH & INITIALIZE'
+      finalize: 'FINALIZE DISPATCH & INITIALIZE',
+      randomize_difficulty: 'Randomize Difficulty',
+      randomize_parameters: 'Randomize Parameters',
+      randomize_route: 'Randomize Route'
     }
   }
 };

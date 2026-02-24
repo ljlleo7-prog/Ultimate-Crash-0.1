@@ -1,9 +1,12 @@
 
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
+import PropTypes from 'prop-types';
+import { useLanguage } from '../contexts/LanguageContext';
 import './NarrativeScene.css';
 import { generateNarrative } from '../utils/narrativeGenerator';
 
 const NarrativeScene = ({ onComplete, context }) => {
+  const { t } = useLanguage();
   const [narrative, setNarrative] = useState(null);
   const [visibleLines, setVisibleLines] = useState(0);
   const [isReady, setIsReady] = useState(false);
@@ -47,29 +50,36 @@ const NarrativeScene = ({ onComplete, context }) => {
     <div className="narrative-container">
       <div className="narrative-content">
         <div className={`narrative-line role ${visibleLines >= 1 ? 'visible' : ''}`}>
-          <span className="label">DESIGNATION:</span> {narrative.role} {context.callsign || 'UNKNOWN'}
+          <span className="label">{t('ui.narrative_ui.designation')}</span> {narrative.role} {context.callsign || 'UNKNOWN'}
         </div>
         
         <div className={`narrative-line experience ${visibleLines >= 2 ? 'visible' : ''}`}>
-          <span className="label">BACKGROUND:</span> You are {narrative.experience}
+          <span className="label">{t('ui.narrative_ui.background')}</span> You are {narrative.experience}
         </div>
         
         <div className={`narrative-line plan ${visibleLines >= 3 ? 'visible' : ''}`}>
-          <span className="label">MISSION:</span> {narrative.plan}
+          <span className="label">{t('ui.narrative_ui.mission')}</span> {narrative.plan}
         </div>
         
         <div className={`narrative-line difficulty ${visibleLines >= 4 ? 'visible' : ''}`}>
-          <span className="label">INTELLIGENCE:</span> {narrative.potentialDifficulty}
+          <span className="label">{t('ui.narrative_ui.intelligence')}</span> {narrative.potentialDifficulty}
         </div>
 
         <div className={`narrative-action ${isReady ? 'visible' : ''}`}>
           <button className="accept-btn" onClick={onComplete}>
-            ACCEPT ASSIGNMENT
+            {t('ui.narrative_ui.accept_assignment')}
           </button>
         </div>
       </div>
     </div>
   );
+};
+
+NarrativeScene.propTypes = {
+  onComplete: PropTypes.func,
+  context: PropTypes.shape({
+    callsign: PropTypes.string
+  })
 };
 
 export default NarrativeScene;

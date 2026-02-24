@@ -450,6 +450,7 @@ const zh = {
         language: 'Language / 语言'
     },
     systems: {
+        status: '系统状态',
         engines: '引擎',
         electrics: '电力',
         hydraulics: '液压',
@@ -458,12 +459,23 @@ const zh = {
         pumps: '泵',
         generators: '发电机',
         batteries: '电池',
+        engine_and_systems: '引擎与系统',
+        overhead_panel_short: '顶板',
+        system_status_alerts: '系统状态 / 警报',
+        no_active_alerts: '无活动警报',
         on: '开启',
         off: '关闭',
         auto: '自动',
         avail: '可用',
         fault: '故障',
-        low_press: '低压'
+        low_press: '低压',
+        open: '打开',
+        valve: '阀门',
+        off_bus: '离线',
+        discharge: '放电',
+        disch: '放电',
+        maint: '维护',
+        inop: '失效'
     },
     startup: {
         checklist_incomplete: '启动检查单未完成',
@@ -471,6 +483,143 @@ const zh = {
         cant_proceed: '无法进入下一阶段。',
         continue_anyway: '强制继续 (禁用安全保护)',
         continue: '继续'
+    },
+    checklist: {
+        title: '检查单',
+        empty: '此检查单中没有项目。',
+        completed_suffix: '已完成'
+    },
+    flight_computer: {
+        title: '飞行计算机',
+        tabs: {
+            plan: '航线',
+            add: '添加',
+            nearest: '最近',
+            perf: '性能'
+        },
+        empty: {
+            no_waypoints: '飞行计划中没有航点。'
+        },
+        add: {
+            manual_entry: '手动输入',
+            placeholders: {
+                lat: '纬度 (如 37.61)',
+                lon: '经度 (如 -122.37)',
+                label: '标签 (可选)'
+            },
+            add_coordinates: '添加坐标',
+            or: '或'
+        },
+        search: {
+            title: '机场搜索',
+            placeholder: '搜索 ICAO/IATA/名称...',
+            options: {
+                all: '全部',
+                normal: '普通',
+                emergency: '应急'
+            },
+            submit: '搜索'
+        },
+        nearest: {
+            finding: '正在搜索机场...',
+            none: '未找到机场。',
+            emergency_tag: '应急',
+            add: '添加',
+            refresh: '刷新'
+        },
+        actions: {
+            hold: '盘旋',
+            holding: '盘旋中',
+            toggle_hold_title: '切换等待航线（盘旋）'
+        },
+        tags: {
+            active: '活动'
+        },
+        radio: {
+            nav_title: '导航电台',
+            current_nav1: '当前 NAV1 频率',
+            set_freq: '设置频率 (MHz)',
+            tune: '调谐',
+            common_ils: '常见 ILS 频率: 108.10, 108.15, ..., 111.95',
+            invalid_freq: '频率无效。必须在 108.00 到 117.95 MHz 之间'
+        },
+        utils: {
+            predictions: '预测',
+            next_wp: '下一个航点:',
+            distance: '距离:',
+            ete_to_wpt: '到航点预计时间:',
+            fuel_flow: '燃油流量:',
+            time_to_empty: '耗尽时间:',
+            target_alt: '目标高度 (英尺):',
+            time_to_alt: '到达目标高度时间:',
+            converter: {
+                title: '单位换算',
+                value: '数值',
+                result_label: '结果:'
+            }
+        },
+        errors: {
+            invalid_coordinates: '请输入有效的坐标'
+        }
+    },
+    cinematic: {
+        confidential: '机密',
+        manifest_title: '航班清单',
+        official_dispatch: '官方签派文件 // ${callsign}',
+        date: '日期',
+        time: '时间',
+        page: '页: ${page}',
+        sections: {
+            flight_data: '01. 航班数据',
+            route_logistics: '02. 航线与保障',
+            metar_env: '03. 天气与环境',
+            operational_risk: '04. 运行风险'
+        },
+        labels: {
+            operator: '运营方',
+            aircraft: '机型',
+            origin: '起点',
+            destination: '终点',
+            pax_crew: '乘员/机组',
+            payload: '载重',
+            departure_gate: '出发登机口',
+            arrival_gate: '到达登机口',
+            taxi_out: '滑行道 (出)',
+            taxi_in: '滑行道 (入)',
+            departure_rwy: '起飞跑道',
+            landing_rwy: '降落跑道',
+            sid: 'SID',
+            star: 'STAR',
+            waypoints: '航点:'
+        },
+        buttons: {
+            acknowledge: '确认签派'
+        }
+    },
+    narrative_ui: {
+        designation: '代号:',
+        background: '背景:',
+        mission: '任务:',
+        intelligence: '情报:',
+        accept_assignment: '接受任务'
+    },
+    crash: {
+        crashed: '已坠毁',
+        final_score: '最终得分: ${score}',
+        failed_control: '未能保持对飞机的控制',
+        try_again: '重试'
+    },
+    comm: {
+        active_comm: '当前通信',
+        no_signal: '无信号',
+        searching: '搜索中...',
+        tabs: {
+            log: '日志',
+            signals: '信号'
+        },
+        no_signals: '未检测到信号',
+        radio_silent: '无线电静默',
+        connected: '已连接'
     }
   },
   initialization: {
@@ -522,6 +671,9 @@ const zh = {
     route: {
       departure: '起飞机场',
       arrival: '到达机场',
+      search_placeholder: '搜索 ICAO/IATA...',
+      clear_selection: '清除选择',
+      results_count: '找到 ${count} 个机场',
       summary: {
         route: '航线:',
         distance: '距离:',
@@ -535,7 +687,10 @@ const zh = {
     buttons: {
       next_params: '下一步: 飞行参数 →',
       next_route: '下一步: 航线选择 →',
-      finalize: '完成签派并初始化'
+      finalize: '完成签派并初始化',
+      randomize_difficulty: '随机化难度',
+      randomize_parameters: '随机化参数',
+      randomize_route: '随机化航线'
     }
   }
 };

@@ -1,12 +1,20 @@
 
 import React from 'react';
+import PropTypes from 'prop-types';
+import { useLanguage } from '../contexts/LanguageContext';
 import './CinematicComponents.css';
 
 const FadeOverlay = ({ phase, children }) => {
   return React.createElement('div', { className: `fade-overlay ${phase}` }, children);
 };
 
+CinematicReview && (FadeOverlay.propTypes = {
+  phase: PropTypes.string,
+  children: PropTypes.node
+});
+
 const CinematicReview = ({ callsign, selectedDeparture, selectedArrival, aircraftModel, weatherData, crewCount, failureType, difficulty, pax, payload, routeDetails, onComplete }) => {
+  const { t } = useLanguage();
   // Safe access to weather data with fallbacks
   const safeWeatherData = weatherData || {
     windSpeed: 0,
@@ -35,17 +43,17 @@ const CinematicReview = ({ callsign, selectedDeparture, selectedArrival, aircraf
   return (
     <div className="cinematic-review">
       <div className="fax-paper">
-        <div className="stamp-box">CONFIDENTIAL</div>
+        <div className="stamp-box">{t('ui.cinematic.confidential')}</div>
         
         <div className="fax-header">
           <div className="fax-title-group">
-            <h1 className="fax-title">FLIGHT MANIFEST</h1>
-            <div style={{ fontSize: '0.8rem', letterSpacing: '2px' }}>OFFICIAL DISPATCH DOCUMENT // {safeCallsign}</div>
+            <h1 className="fax-title">{t('ui.cinematic.manifest_title')}</h1>
+            <div style={{ fontSize: '0.8rem', letterSpacing: '2px' }}>{t('ui.cinematic.official_dispatch', { callsign: safeCallsign })}</div>
           </div>
           <div className="fax-meta">
-            <div>DATE: {currentDate}</div>
-            <div>TIME: {currentTime}</div>
-            <div>PAGE: 1 OF 1</div>
+            <div>{t('ui.cinematic.date')}: {currentDate}</div>
+            <div>{t('ui.cinematic.time')}: {currentTime}</div>
+            <div>{t('ui.cinematic.page', { page: '1 OF 1' })}</div>
           </div>
         </div>
 
@@ -53,33 +61,33 @@ const CinematicReview = ({ callsign, selectedDeparture, selectedArrival, aircraf
           
           {/* Section 1: Flight Data */}
           <div className="fax-section">
-            <div className="fax-section-title">01. FLIGHT DATA</div>
+            <div className="fax-section-title">{t('ui.cinematic.sections.flight_data')}</div>
             <div className="fax-grid">
-              <div className="fax-row"><span className="fax-label">OPERATOR</span> <span className="fax-value">ULTIMATE AIR</span></div>
-              <div className="fax-row"><span className="fax-label">AIRCRAFT</span> <span className="fax-value">{safeAircraftModel}</span></div>
-              <div className="fax-row"><span className="fax-label">ORIGIN</span> <span className="fax-value">{safeDepartureIata}</span></div>
-              <div className="fax-row"><span className="fax-label">DESTINATION</span> <span className="fax-value">{safeArrivalIata}</span></div>
-              <div className="fax-row"><span className="fax-label">PAX/CREW</span> <span className="fax-value">{safePax}/{safeCrewCount}</span></div>
-              <div className="fax-row"><span className="fax-label">PAYLOAD</span> <span className="fax-value">{safePayload} KG</span></div>
+              <div className="fax-row"><span className="fax-label">{t('ui.cinematic.labels.operator')}</span> <span className="fax-value">ULTIMATE AIR</span></div>
+              <div className="fax-row"><span className="fax-label">{t('ui.cinematic.labels.aircraft')}</span> <span className="fax-value">{safeAircraftModel}</span></div>
+              <div className="fax-row"><span className="fax-label">{t('ui.cinematic.labels.origin')}</span> <span className="fax-value">{safeDepartureIata}</span></div>
+              <div className="fax-row"><span className="fax-label">{t('ui.cinematic.labels.destination')}</span> <span className="fax-value">{safeArrivalIata}</span></div>
+              <div className="fax-row"><span className="fax-label">{t('ui.cinematic.labels.pax_crew')}</span> <span className="fax-value">{safePax}/{safeCrewCount}</span></div>
+              <div className="fax-row"><span className="fax-label">{t('ui.cinematic.labels.payload')}</span> <span className="fax-value">{safePayload} KG</span></div>
             </div>
           </div>
 
           {/* Section 2: Detailed Route */}
           <div className="fax-section">
-            <div className="fax-section-title">02. ROUTE LOGISTICS</div>
+            <div className="fax-section-title">{t('ui.cinematic.sections.route_logistics')}</div>
             <div className="fax-grid">
-              <div className="fax-row"><span className="fax-label">DEPARTURE GATE</span> <span className="fax-value">{routeDetails?.departureGate || 'AUTO'}</span></div>
-              <div className="fax-row"><span className="fax-label">ARRIVAL GATE</span> <span className="fax-value">{routeDetails?.arrivalGate || 'AUTO'}</span></div>
-              <div className="fax-row"><span className="fax-label">TAXIWAY OUT</span> <span className="fax-value">{routeDetails?.departureTaxiway || 'AUTO'}</span></div>
-              <div className="fax-row"><span className="fax-label">TAXIWAY IN</span> <span className="fax-value">{routeDetails?.landingTaxiway || 'AUTO'}</span></div>
-              <div className="fax-row"><span className="fax-label">DEPARTURE RWY</span> <span className="fax-value">{routeDetails?.departureRunway || 'DEFAULT'}</span></div>
-              <div className="fax-row"><span className="fax-label">LANDING RWY</span> <span className="fax-value">{routeDetails?.landingRunway || 'DEFAULT'}</span></div>
-              <div className="fax-row"><span className="fax-label">SID</span> <span className="fax-value">{routeDetails?.sid || 'N/A'}</span></div>
-              <div className="fax-row"><span className="fax-label">STAR</span> <span className="fax-value">{routeDetails?.star || 'N/A'}</span></div>
+              <div className="fax-row"><span className="fax-label">{t('ui.cinematic.labels.departure_gate')}</span> <span className="fax-value">{routeDetails?.departureGate || 'AUTO'}</span></div>
+              <div className="fax-row"><span className="fax-label">{t('ui.cinematic.labels.arrival_gate')}</span> <span className="fax-value">{routeDetails?.arrivalGate || 'AUTO'}</span></div>
+              <div className="fax-row"><span className="fax-label">{t('ui.cinematic.labels.taxi_out')}</span> <span className="fax-value">{routeDetails?.departureTaxiway || 'AUTO'}</span></div>
+              <div className="fax-row"><span className="fax-label">{t('ui.cinematic.labels.taxi_in')}</span> <span className="fax-value">{routeDetails?.landingTaxiway || 'AUTO'}</span></div>
+              <div className="fax-row"><span className="fax-label">{t('ui.cinematic.labels.departure_rwy')}</span> <span className="fax-value">{routeDetails?.departureRunway || 'DEFAULT'}</span></div>
+              <div className="fax-row"><span className="fax-label">{t('ui.cinematic.labels.landing_rwy')}</span> <span className="fax-value">{routeDetails?.landingRunway || 'DEFAULT'}</span></div>
+              <div className="fax-row"><span className="fax-label">{t('ui.cinematic.labels.sid')}</span> <span className="fax-value">{routeDetails?.sid || 'N/A'}</span></div>
+              <div className="fax-row"><span className="fax-label">{t('ui.cinematic.labels.star')}</span> <span className="fax-value">{routeDetails?.star || 'N/A'}</span></div>
             </div>
             {routeDetails?.waypoints && routeDetails.waypoints.length > 0 && (
               <div className="fax-row" style={{ marginTop: '1rem', borderBottom: 'none' }}>
-                <span className="fax-label">WAYPOINTS:</span>
+                <span className="fax-label">{t('ui.cinematic.labels.waypoints')}</span>
                 <span className="fax-value" style={{ textAlign: 'right', fontSize: '0.8rem' }}>
                   {routeDetails.waypoints.map(wp => typeof wp === 'string' ? wp : (wp.name || 'WPT')).join(' > ')}
                 </span>
@@ -89,7 +97,7 @@ const CinematicReview = ({ callsign, selectedDeparture, selectedArrival, aircraf
 
           {/* Section 3: METAR */}
           <div className="fax-section">
-            <div className="fax-section-title">03. METAR & ENV</div>
+            <div className="fax-section-title">{t('ui.cinematic.sections.metar_env')}</div>
             <div className="fax-grid">
               <div className="fax-row"><span className="fax-label">WIND</span> <span className="fax-value">{safeWeatherData.windSpeed} KTS</span></div>
               <div className="fax-row"><span className="fax-label">VISIBILITY</span> <span className="fax-value">{safeWeatherData.visibility} MI</span></div>
@@ -100,7 +108,7 @@ const CinematicReview = ({ callsign, selectedDeparture, selectedArrival, aircraf
 
           {/* Section 4: Risk Assessment */}
           <div className="fax-section">
-            <div className="fax-section-title">04. OPERATIONAL RISK</div>
+            <div className="fax-section-title">{t('ui.cinematic.sections.operational_risk')}</div>
             <div className="fax-grid">
               <div className="fax-row"><span className="fax-label">DIFFICULTY</span> <span className="fax-value">{safeDifficulty.toUpperCase()}</span></div>
               <div className="fax-row"><span className="fax-label">FAILURE MODE</span> <span className="fax-value">{safeFailureType.toUpperCase()}</span></div>
@@ -125,13 +133,47 @@ const CinematicReview = ({ callsign, selectedDeparture, selectedArrival, aircraf
                 letterSpacing: '2px'
               }}
             >
-              ACKNOWLEDGE DISPATCH
+              {t('ui.cinematic.buttons.acknowledge')}
             </button>
           </div>
         )}
       </div>
     </div>
   );
+};
+
+CinematicReview.propTypes = {
+  callsign: PropTypes.string,
+  selectedDeparture: PropTypes.shape({
+    iata: PropTypes.string
+  }),
+  selectedArrival: PropTypes.shape({
+    iata: PropTypes.string
+  }),
+  aircraftModel: PropTypes.string,
+  weatherData: PropTypes.shape({
+    windSpeed: PropTypes.number,
+    visibility: PropTypes.number,
+    cloudCover: PropTypes.number,
+    turbulence: PropTypes.string
+  }),
+  crewCount: PropTypes.number,
+  failureType: PropTypes.string,
+  difficulty: PropTypes.string,
+  pax: PropTypes.number,
+  payload: PropTypes.number,
+  routeDetails: PropTypes.shape({
+    departureGate: PropTypes.string,
+    arrivalGate: PropTypes.string,
+    departureTaxiway: PropTypes.string,
+    landingTaxiway: PropTypes.string,
+    departureRunway: PropTypes.string,
+    landingRunway: PropTypes.string,
+    sid: PropTypes.string,
+    star: PropTypes.string,
+    waypoints: PropTypes.array
+  }),
+  onComplete: PropTypes.func
 };
 
 export { FadeOverlay, CinematicReview };

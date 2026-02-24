@@ -1,50 +1,17 @@
 import React, { useState, useEffect, useRef } from 'react';
+import PropTypes from 'prop-types';
+import { useLanguage } from '../contexts/LanguageContext';
 import { airportService } from '../services/airportService';
 
 // Knob Component
-const FrequencyKnob = ({ label, size, innerSize, onChange, sensitivity = 1, color = '#cbd5e1' }) => {
+const FrequencyKnob = ({ label, size, onChange, color = '#cbd5e1' }) => {
   const [rotation, setRotation] = useState(0);
-  const [isDragging, setIsDragging] = useState(false);
-  const startYRef = useRef(0);
-  const startRotationRef = useRef(0);
-
-  const handleMouseDown = (e) => {
-    e.preventDefault();
-    setIsDragging(true);
-    startYRef.current = e.clientY;
-    startRotationRef.current = rotation;
-    document.body.style.cursor = 'ns-resize';
-  };
-
-  const handleMouseUp = () => {
-    setIsDragging(false);
-    document.body.style.cursor = 'default';
-  };
-
-  const handleMouseMove = (e) => {
-    if (!isDragging) return;
-    
-    const deltaY = startYRef.current - e.clientY;
-    const newRotation = startRotationRef.current + deltaY * 2; // 2 degrees per pixel
-    setRotation(newRotation);
-    
-    // Calculate steps based on sensitivity
-    // Trigger change every X degrees
-    const stepDeg = 20;
-    const steps = Math.floor(deltaY / 10); // Every 10 pixels
-    
-    if (steps !== 0) {
-      // We only want to trigger on the transition, but this is continuous.
-      // Better: Store last emitted value or use delta since last emit.
-    }
-  };
 
   // Simplified approach: just use delta movement to trigger increments
   const lastYRef = useRef(0);
   
   const handleDragStart = (e) => {
     e.preventDefault();
-    setIsDragging(true);
     lastYRef.current = e.clientY;
     document.addEventListener('mousemove', handleDragMove);
     document.addEventListener('mouseup', handleDragEnd);
@@ -64,7 +31,6 @@ const FrequencyKnob = ({ label, size, innerSize, onChange, sensitivity = 1, colo
   };
   
   const handleDragEnd = () => {
-    setIsDragging(false);
     document.removeEventListener('mousemove', handleDragMove);
     document.removeEventListener('mouseup', handleDragEnd);
     document.body.style.cursor = 'default';
@@ -116,7 +82,14 @@ const FrequencyKnob = ({ label, size, innerSize, onChange, sensitivity = 1, colo
   );
 };
 
+FrequencyKnob.propTypes = {
+  label: PropTypes.string.isRequired,
+  size: PropTypes.number.isRequired,
+  onChange: PropTypes.func.isRequired,
+  color: PropTypes.string
+};
 const CommunicationModule = ({ flightState, setRadioFreq, flightPlan, radioMessages = [], frequencyContext, currentRegion }) => {
+  const { t } = useLanguage();
   const currentFreq = flightState?.radioFreq || 121.500;
   const [connectionStatus, setConnectionStatus] = useState({ name: 'No Signal', type: '', connected: false });
   const [availableStations, setAvailableStations] = useState([]);
@@ -180,7 +153,6 @@ const CommunicationModule = ({ flightState, setRadioFreq, flightPlan, radioMessa
     if (currentRegion) console.log('CommunicationModule: currentRegion available:', currentRegion);
     
     const stations = [];
-    const currentPos = referencePos || { lat: flightState?.latitude, lon: flightState?.longitude };
 
     // Add Region Control (Always available, priority at high altitude)
     if (currentRegion) {
@@ -258,7 +230,7 @@ const CommunicationModule = ({ flightState, setRadioFreq, flightPlan, radioMessa
     if (found) {
       setConnectionStatus(found);
     } else {
-      setConnectionStatus({ name: 'No Signal', type: '', connected: false });
+      setConnectionStatus({ name: t('ui.comm.no_signal'), type: '', connected: false });
     }
     
   }, [currentFreq, availableStations]);
@@ -320,7 +292,7 @@ const CommunicationModule = ({ flightState, setRadioFreq, flightPlan, radioMessa
         color: '#64748b'
       }
     },
-      React.createElement('div', { style: { fontSize: '9px', fontWeight: 'bold', color: '#94a3b8' } }, 'ACTIVE COMM'),
+      React.createElement('div', { style: { fontSize: '9px', fontWeight: 'bold', color: '#94a3b8' } }, t('ui.comm.active_comm')),
       React.createElement('div', { 
         style: { 
           fontSize: '11px', 
@@ -337,7 +309,7 @@ const CommunicationModule = ({ flightState, setRadioFreq, flightPlan, radioMessa
           marginTop: '2px',
           color: connectionStatus.connected ? '#4ade80' : '#64748b'
         } 
-      }, connectionStatus.connected ? `${connectionStatus.type} - Connected` : 'Searching...')
+      }, connectionStatus.connected ? `${connectionStatus.type} - ${t('ui.comm.connected')}` : t('ui.comm.searching'))
     ),
 
     // Middle: Communication Log & Nearby Signals
@@ -377,7 +349,7 @@ const CommunicationModule = ({ flightState, setRadioFreq, flightPlan, radioMessa
               padding: '0 4px',
               cursor: 'pointer'
             }
-          }, mode)
+          }, mode === 'LOG' ? t('ui.comm.tabs.log') : t('ui.comm.tabs.signals'))
         )
       ),
 
@@ -420,7 +392,7 @@ const CommunicationModule = ({ flightState, setRadioFreq, flightPlan, radioMessa
               React.createElement('span', { style: { whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', marginRight: '8px' } }, station.desc),
               React.createElement('span', { style: { fontFamily: 'monospace' } }, station.frequency.toFixed(3))
             )
-          ) : React.createElement('div', { style: { fontSize: '10px', color: '#475569', fontStyle: 'italic', padding: '4px' } }, 'No signals detected')
+          ) : React.createElement('div', { style: { fontSize: '10px', color: '#475569', fontStyle: 'italic', padding: '4px' } }, t('ui.comm.no_signals'))
         )
       ) : (
         // LOG VIEW
@@ -466,7 +438,7 @@ const CommunicationModule = ({ flightState, setRadioFreq, flightPlan, radioMessa
               ),
               msg.text
             )
-          ) : React.createElement('div', { style: { fontSize: '10px', color: '#475569', fontStyle: 'italic', textAlign: 'center', marginTop: '4px' } }, 'Radio silent')
+          ) : React.createElement('div', { style: { fontSize: '10px', color: '#475569', fontStyle: 'italic', textAlign: 'center', marginTop: '4px' } }, t('ui.comm.radio_silent'))
         )
       )
     ),
@@ -526,3 +498,27 @@ const CommunicationModule = ({ flightState, setRadioFreq, flightPlan, radioMessa
 };
 
 export default CommunicationModule;
+
+CommunicationModule.propTypes = {
+  flightState: PropTypes.shape({
+    radioFreq: PropTypes.number,
+    altitude: PropTypes.number,
+    latitude: PropTypes.number,
+    longitude: PropTypes.number
+  }),
+  setRadioFreq: PropTypes.func.isRequired,
+  flightPlan: PropTypes.any,
+  radioMessages: PropTypes.arrayOf(
+    PropTypes.shape({
+      sender: PropTypes.string,
+      type: PropTypes.string,
+      text: PropTypes.string,
+      frequency: PropTypes.oneOfType([PropTypes.number, PropTypes.string])
+    })
+  ),
+  frequencyContext: PropTypes.oneOfType([PropTypes.number, PropTypes.string]),
+  currentRegion: PropTypes.shape({
+    name: PropTypes.string,
+    frequency: PropTypes.oneOfType([PropTypes.number, PropTypes.string])
+  })
+};

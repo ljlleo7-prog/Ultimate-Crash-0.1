@@ -296,7 +296,7 @@ const FlightInitialization = ({
       >
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', borderBottom: '2px solid #30363d' }}>
           <h2 className="section-header" style={{ borderBottom: 'none', marginBottom: 0 }}>{t('initialization.steps.1')}</h2>
-          <button className="dispatch-btn random" onClick={randomizeStep1} title="Randomize Difficulty">
+          <button className="dispatch-btn random" onClick={randomizeStep1} title={t('initialization.buttons.randomize_difficulty')}>
             🎲
           </button>
         </div>
@@ -348,7 +348,7 @@ const FlightInitialization = ({
       >
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', borderBottom: '2px solid #30363d' }}>
           <h2 className="section-header" style={{ borderBottom: 'none', marginBottom: 0 }}>{t('initialization.steps.2')}</h2>
-          <button className="dispatch-btn random" onClick={randomizeStep2} title="Randomize Parameters">
+          <button className="dispatch-btn random" onClick={randomizeStep2} title={t('initialization.buttons.randomize_parameters')}>
             🎲
           </button>
         </div>
@@ -527,7 +527,7 @@ const FlightInitialization = ({
       >
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', borderBottom: '2px solid #30363d' }}>
           <h2 className="section-header" style={{ borderBottom: 'none', marginBottom: 0 }}>{t('initialization.steps.3')}</h2>
-          <button className="dispatch-btn random" onClick={randomizeStep3} title="Randomize Route">
+          <button className="dispatch-btn random" onClick={randomizeStep3} title={t('initialization.buttons.randomize_route')}>
             🎲
           </button>
         </div>
@@ -536,7 +536,7 @@ const FlightInitialization = ({
           <div className="parameter-group">
             <label>{t('initialization.route.departure')}</label>
             <AirportSearchInput
-              placeholder="SEARCH ICAO/IATA..."
+              placeholder={t('initialization.route.search_placeholder')}
               searchResults={searchResults}
               handleSearch={handleSearch}
               onSelect={selectDeparture}
@@ -547,7 +547,7 @@ const FlightInitialization = ({
           <div className="parameter-group">
             <label>{t('initialization.route.arrival')}</label>
             <AirportSearchInput
-              placeholder="SEARCH ICAO/IATA..."
+              placeholder={t('initialization.route.search_placeholder')}
               searchResults={searchResults}
               handleSearch={handleSearch}
               onSelect={selectArrival}

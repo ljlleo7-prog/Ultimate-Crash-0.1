@@ -1,8 +1,10 @@
 
 import React, { useState, useEffect } from 'react';
+import { useLanguage } from '../contexts/LanguageContext.jsx';
 import './FlightPanel.css';
 
 const OverheadPanel = ({ onClose, flightState, onSystemAction, aircraftModel }) => {
+  const { t } = useLanguage();
   const modelLower = (aircraftModel || '').toLowerCase();
   const isAirbus = modelLower.includes('a3') || modelLower.includes('airbus');
   const is737 = modelLower.includes('737') || modelLower.includes('b73');
@@ -111,8 +113,8 @@ const OverheadPanel = ({ onClose, flightState, onSystemAction, aircraftModel }) 
     const isTopLit = hasPower && active; 
     const isBottomLit = hasPower && (fault || (annunciator && annunciator.active));
     
-    const topText = specialLabel || subLabel || 'ON';
-    const bottomText = fault ? 'FAULT' : (annunciator ? annunciator.label : '');
+    const topText = specialLabel || subLabel || t('ui.systems.on');
+    const bottomText = fault ? t('ui.systems.fault') : (annunciator ? annunciator.label : '');
     const bottomColor = fault ? '#ff9900' : (annunciator ? (annunciator.color === 'blue' ? '#00ffff' : '#ff9900') : '#ff9900');
 
     return (
@@ -202,7 +204,7 @@ const OverheadPanel = ({ onClose, flightState, onSystemAction, aircraftModel }) 
         } else {
             // Standard: Inactive = Light ON (OFF white)
             if (!active) {
-                statusText = 'OFF';
+                statusText = t('ui.systems.off');
                 statusColor = '#ffffff'; // White
                 isLit = true;
             }
@@ -350,7 +352,7 @@ const OverheadPanel = ({ onClose, flightState, onSystemAction, aircraftModel }) 
 
     return (
         <div className="panel-section" style={{ position: 'relative', display: 'flex', flexDirection: 'column' }}>
-            <h4 className="panel-title">FUEL</h4>
+            <h4 className="panel-title">{t('ui.systems.fuel')}</h4>
             
             {/* Qty Display */}
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '4px', marginBottom: '15px', background: '#000', padding: '4px', border: '2px solid #555' }}>
@@ -381,38 +383,38 @@ const OverheadPanel = ({ onClose, flightState, onSystemAction, aircraftModel }) 
                  {/* Row 1: FWD/Center Pumps */}
                  <div style={{ justifySelf: 'center', alignSelf: 'center', zIndex: 1 }}>
                     <Switch label="L PUMP 1" active={getSys('fuel.leftPumps')} onClick={() => onSystemAction('fuel', 'leftPumps')} 
-                        annunciator={{ label: 'LOW PRESS', active: pressL < 10, color: 'amber' }} enabled={hasPower} />
+                        annunciator={{ label: t('ui.systems.low_press'), active: pressL < 10, color: 'amber' }} enabled={hasPower} />
                  </div>
                  <div style={{ justifySelf: 'center', alignSelf: 'center', zIndex: 1 }}>
                     <Switch label="CTR L" active={getSys('fuel.centerPumps')} onClick={() => onSystemAction('fuel', 'centerPumps')} 
-                        annunciator={{ label: 'LOW PRESS', active: getSys('fuel.centerPumps') && pressC < 10, color: 'amber' }} enabled={hasPower} />
+                        annunciator={{ label: t('ui.systems.low_press'), active: getSys('fuel.centerPumps') && pressC < 10, color: 'amber' }} enabled={hasPower} />
                  </div>
                  <div style={{ justifySelf: 'center', alignSelf: 'center', zIndex: 1 }}>
                     <Switch label="CTR R" active={getSys('fuel.centerPumps')} onClick={() => onSystemAction('fuel', 'centerPumps')} 
-                        annunciator={{ label: 'LOW PRESS', active: getSys('fuel.centerPumps') && pressC < 10, color: 'amber' }} enabled={hasPower} />
+                        annunciator={{ label: t('ui.systems.low_press'), active: getSys('fuel.centerPumps') && pressC < 10, color: 'amber' }} enabled={hasPower} />
                  </div>
                  <div style={{ justifySelf: 'center', alignSelf: 'center', zIndex: 1 }}>
                     <Switch label="R PUMP 1" active={getSys('fuel.rightPumps')} onClick={() => onSystemAction('fuel', 'rightPumps')} 
-                        annunciator={{ label: 'LOW PRESS', active: pressR < 10, color: 'amber' }} enabled={hasPower} />
+                        annunciator={{ label: t('ui.systems.low_press'), active: pressR < 10, color: 'amber' }} enabled={hasPower} />
                  </div>
 
                  {/* Row 2: AFT Pumps & Crossfeed */}
                  <div style={{ justifySelf: 'center', alignSelf: 'center', zIndex: 1 }}>
                     <Switch label="L PUMP 2" active={getSys('fuel.leftPumps')} onClick={() => onSystemAction('fuel', 'leftPumps')} 
-                        annunciator={{ label: 'LOW PRESS', active: pressL < 10, color: 'amber' }} enabled={hasPower} />
+                        annunciator={{ label: t('ui.systems.low_press'), active: pressL < 10, color: 'amber' }} enabled={hasPower} />
                  </div>
                  
                  {/* Crossfeed spans middle 2 cols */}
                  <div style={{ gridColumn: '2 / span 2', justifySelf: 'center', alignSelf: 'center', zIndex: 2 }}>
-                     <RotarySelector label="CROSSFEED" active={getSys('fuel.crossfeed')} onClick={() => onSystemAction('fuel', 'crossfeed')} subLabel="VALVE" />
+                     <RotarySelector label="CROSSFEED" active={getSys('fuel.crossfeed')} onClick={() => onSystemAction('fuel', 'crossfeed')} subLabel={t('ui.systems.valve')} />
                      <div style={{ fontSize: '8px', color: '#0af', textAlign: 'center', marginTop: '2px', background: '#000', padding: '1px' }}>
-                         {getSys('fuel.crossfeed') ? 'OPEN' : ''}
+                         {getSys('fuel.crossfeed') ? t('ui.systems.open') : ''}
                      </div>
                  </div>
 
                  <div style={{ justifySelf: 'center', alignSelf: 'center', zIndex: 1 }}>
                     <Switch label="R PUMP 2" active={getSys('fuel.rightPumps')} onClick={() => onSystemAction('fuel', 'rightPumps')} 
-                        annunciator={{ label: 'LOW PRESS', active: pressR < 10, color: 'amber' }} enabled={hasPower} />
+                        annunciator={{ label: t('ui.systems.low_press'), active: pressR < 10, color: 'amber' }} enabled={hasPower} />
                  </div>
             </div>
         </div>
@@ -432,7 +434,7 @@ const OverheadPanel = ({ onClose, flightState, onSystemAction, aircraftModel }) 
 
     return (
         <div className="panel-section" style={{ position: 'relative', display: 'flex', flexDirection: 'column' }}>
-             <h4 className="panel-title">ELECTRICAL</h4>
+             <h4 className="panel-title">{t('ui.systems.electrics')}</h4>
              
              {/* Meters */}
              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr auto 1fr 1fr', gap: '5px', marginBottom: '15px', background: '#111', padding: '5px', border: '1px solid #444' }}>
@@ -479,8 +481,8 @@ const OverheadPanel = ({ onClose, flightState, onSystemAction, aircraftModel }) 
                  {/* Row 1: Battery & Standby */}
                  <div style={{ justifySelf: 'center', zIndex: 1 }}>
                      <Switch label="BAT" active={bat} onClick={() => onSystemAction('electrical', 'battery')} 
-                        subLabel="ON"
-                        annunciator={{ label: 'DISCHARGE', active: !getSys('electrical.gen1') && bat, color: 'amber' }} 
+                        subLabel={t('ui.systems.on')}
+                        annunciator={{ label: t('ui.systems.discharge'), active: !getSys('electrical.gen1') && bat, color: 'amber' }} 
                      />
                  </div>
                  
@@ -490,27 +492,27 @@ const OverheadPanel = ({ onClose, flightState, onSystemAction, aircraftModel }) 
 
                  <div style={{ justifySelf: 'center', zIndex: 1 }}>
                      <RotarySelector label="STBY PWR" active={getSys('electrical.stbyPower')} onClick={() => onSystemAction('electrical', 'stbyPower')} 
-                        subLabel="AUTO" 
+                        subLabel={t('ui.systems.auto')} 
                      />
                  </div>
 
                  {/* Row 2: Generators */}
                  <div style={{ justifySelf: 'center', zIndex: 1 }}>
                      <Switch label="GEN 1" active={getSys('electrical.gen1')} onClick={() => onSystemAction('electrical', 'gen1')}
-                         annunciator={{ label: 'OFF BUS', active: getSys('electrical.sourceOff1'), color: 'blue' }}
-                         subLabel="ON"
+                        annunciator={{ label: t('ui.systems.off_bus'), active: getSys('electrical.sourceOff1'), color: 'blue' }}
+                        subLabel={t('ui.systems.on')}
                      />
                  </div>
                  <div style={{ justifySelf: 'center', zIndex: 1 }}>
                      <Switch label="APU GEN" active={getSys('electrical.apuGen')} onClick={() => onSystemAction('electrical', 'apuGen')}
-                         annunciator={{ label: 'OFF BUS', active: getSys('electrical.apuGenOff'), color: 'blue' }}
-                         subLabel="ON"
+                        annunciator={{ label: t('ui.systems.off_bus'), active: getSys('electrical.apuGenOff'), color: 'blue' }}
+                        subLabel={t('ui.systems.on')}
                      />
                  </div>
                  <div style={{ justifySelf: 'center', zIndex: 1 }}>
                      <Switch label="GEN 2" active={getSys('electrical.gen2')} onClick={() => onSystemAction('electrical', 'gen2')}
-                         annunciator={{ label: 'OFF BUS', active: getSys('electrical.sourceOff2'), color: 'blue' }}
-                         subLabel="ON"
+                        annunciator={{ label: t('ui.systems.off_bus'), active: getSys('electrical.sourceOff2'), color: 'blue' }}
+                        subLabel={t('ui.systems.on')}
                      />
                  </div>
              </div>
@@ -538,7 +540,7 @@ const OverheadPanel = ({ onClose, flightState, onSystemAction, aircraftModel }) 
 
     return (
       <div className="panel-section">
-        <h4 className="panel-title">ELECTRICAL</h4>
+        <h4 className="panel-title">{t('ui.systems.electrics')}</h4>
         
         {/* Meters */}
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '5px', marginBottom: '10px' }}>
@@ -576,10 +578,10 @@ const OverheadPanel = ({ onClose, flightState, onSystemAction, aircraftModel }) 
              <div style={{ display: 'flex', justifyContent: 'space-evenly', marginBottom: '20px', position: 'relative', zIndex: 1 }}>
                  <div style={{ width: '20%' }}></div> {/* Spacer to push BAT to 30% approx */}
                  <Switch label="BAT" active={bat} onClick={() => onSystemAction('electrical', 'battery')} 
-                    annunciator={{ label: 'DISCH', active: !getSys('electrical.gen1') && !getSys('electrical.gen2') && bat, color: 'amber' }} 
+                    annunciator={{ label: t('ui.systems.disch'), active: !getSys('electrical.gen1') && !getSys('electrical.gen2') && bat, color: 'amber' }} 
                  />
-                 <Switch label="STBY PWR" active={getSys('electrical.stbyPower')} onClick={() => onSystemAction('electrical', 'stbyPower')} subLabel="AUTO" 
-                    annunciator={{ label: 'OFF', active: !getSys('electrical.stbyPower'), color: 'amber' }}
+                 <Switch label="STBY PWR" active={getSys('electrical.stbyPower')} onClick={() => onSystemAction('electrical', 'stbyPower')} subLabel={t('ui.systems.auto')} 
+                    annunciator={{ label: t('ui.systems.off'), active: !getSys('electrical.stbyPower'), color: 'amber' }}
                  />
                  <div style={{ width: '20%' }}></div>
              </div>
@@ -589,13 +591,13 @@ const OverheadPanel = ({ onClose, flightState, onSystemAction, aircraftModel }) 
                  {/* Gen 1 */}
                  {genKeys.includes('gen1') && (
                       <Switch label="GEN 1" active={elecSys['gen1']} onClick={() => onSystemAction('electrical', 'gen1')}
-                         annunciator={{ label: 'OFF BUS', active: getSys('electrical.sourceOff1'), color: 'blue' }}
+                         annunciator={{ label: t('ui.systems.off_bus'), active: getSys('electrical.sourceOff1'), color: 'blue' }}
                       />
                  )}
                  
                  {/* APU Gen */}
                  <Switch label="APU GEN" active={getSys('electrical.apuGen')} onClick={() => onSystemAction('electrical', 'apuGen')}
-                    annunciator={{ label: 'OFF BUS', active: getSys('electrical.apuGenOff'), color: 'blue' }}
+                    annunciator={{ label: t('ui.systems.off_bus'), active: getSys('electrical.apuGenOff'), color: 'blue' }}
                     fault={getSys('electrical.apuGenOff')}
                  />
                  
@@ -609,7 +611,7 @@ const OverheadPanel = ({ onClose, flightState, onSystemAction, aircraftModel }) 
                  {/* Other Gens (if any, e.g. A380) - just dump them here without lines for now */}
                  {genKeys.filter(k => k !== 'gen1' && k !== 'gen2').map((key, i) => (
                       <Switch key={key} label={`GEN ${key.replace('gen', '')}`} active={elecSys[key]} onClick={() => onSystemAction('electrical', key)}
-                         annunciator={{ label: 'OFF BUS', active: getSys(`electrical.sourceOff${key.replace('gen', '')}`), color: 'blue' }}
+                         annunciator={{ label: t('ui.systems.off_bus'), active: getSys(`electrical.sourceOff${key.replace('gen', '')}`), color: 'blue' }}
                       />
                  ))}
              </div>
@@ -626,22 +628,22 @@ const OverheadPanel = ({ onClose, flightState, onSystemAction, aircraftModel }) 
     
     return (
       <div className="panel-section">
-        <h4 className="panel-title">APU</h4>
+        <h4 className="panel-title">{t('ui.systems.apu')}</h4>
         <div style={{ display: 'flex', justifyContent: 'center', gap: '10px', marginBottom: '10px' }}>
             <Gauge label="EGT" value={Math.round(egt)} unit="°C" max={800} color={egt > 700 ? '#f00' : '#0f0'} />
             <Gauge label="RPM" value={Math.round(n2)} unit="%" max={110} />
         </div>
         <div style={{ display: 'flex', justifyContent: 'center', gap: '10px' }}>
             <Switch label="MASTER" active={getSys('apu.master')} onClick={() => onSystemAction('apu', 'master')} 
-               annunciator={{ label: 'FAULT', active: false, color: 'amber' }}
+               annunciator={{ label: t('ui.systems.fault'), active: false, color: 'amber' }}
                invertLight={true} // Blue ON when Active
-               subLabel="ON"
+               subLabel={t('ui.systems.on')}
             />
             <Switch label="START" active={getSys('apu.start')} onClick={() => onSystemAction('apu', 'start')} 
-               subLabel={running ? "AVAIL" : (starting ? "ON" : "")} 
-               annunciator={{ label: 'MAINT', active: false, color: 'blue' }}
+               subLabel={running ? t('ui.systems.avail') : (starting ? t('ui.systems.on') : "")} 
+               annunciator={{ label: t('ui.systems.maint'), active: false, color: 'blue' }}
                invertLight={true}
-               specialLabel={running ? "AVAIL" : (starting ? "ON" : null)}
+               specialLabel={running ? t('ui.systems.avail') : (starting ? t('ui.systems.on') : null)}
             />
         </div>
       </div>

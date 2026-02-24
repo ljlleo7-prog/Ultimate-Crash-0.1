@@ -1,7 +1,9 @@
 import React from 'react';
+import { useLanguage } from '../contexts/LanguageContext';
 
 // Central Panel Component - Compact design for variable engine counts
 const CentralPanel = ({ flightState, onToggleSystems }) => {
+  const { t } = useLanguage();
   // FIXED: Add safety checks for all properties
   const alarms = flightState.alarms || [];
   const crashWarning = flightState.crashWarning || '';
@@ -57,7 +59,7 @@ const CentralPanel = ({ flightState, onToggleSystems }) => {
         color: '#fff',
         flex: 1,
         textAlign: 'center'
-      } }, 'ENGINE & SYSTEMS'),
+      } }, t('ui.systems.engine_and_systems')),
       React.createElement('button', {
         onClick: onToggleSystems,
         style: {
@@ -71,7 +73,7 @@ const CentralPanel = ({ flightState, onToggleSystems }) => {
           cursor: 'pointer',
           boxShadow: '0 2px 4px rgba(0,0,0,0.3)'
         }
-      }, 'OH PNL')
+      }, t('ui.systems.overhead_panel_short'))
     ),
     
     // Compact Engine Parameters with variable engine support
@@ -162,7 +164,7 @@ const CentralPanel = ({ flightState, onToggleSystems }) => {
       React.createElement('span', { 
         className: 'label', 
         style: { fontSize: '12px', color: '#888', fontWeight: 'bold' } 
-      }, 'FUEL'),
+      }, t('ui.systems.fuel')),
       React.createElement('span', { 
         className: 'value', 
         style: { fontSize: '18px', fontWeight: 'bold', color: '#ffaa00' } 
@@ -192,7 +194,7 @@ const CentralPanel = ({ flightState, onToggleSystems }) => {
           borderBottom: '1px solid #555',
           paddingBottom: '4px'
         } 
-      }, 'SYSTEM STATUS / ALERTS'),
+      }, t('ui.systems.system_status_alerts')),
       
       React.createElement('div', { 
         className: 'status-items',
@@ -249,7 +251,7 @@ const CentralPanel = ({ flightState, onToggleSystems }) => {
                 fontStyle: 'italic',
                 fontFamily: 'monospace'
               }
-            }, 'NO ACTIVE ALERTS')
+            }, t('ui.systems.no_active_alerts'))
       ),
     )
   );

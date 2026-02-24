@@ -1,4 +1,4 @@
-import React from 'react';
+import PropTypes from 'prop-types';
 import { useLanguage } from '../contexts/LanguageContext';
 import './LanguageSwitcher.css';
 
@@ -10,7 +10,7 @@ const LanguageSwitcher = ({ style }) => {
       className="language-switcher" 
       onClick={toggleLanguage}
       style={style}
-      title="Switch Language / 切换语言"
+      title={t('ui.menu.language')}
     >
       <span className="lang-icon">🌐</span>
       <span className="lang-text">{language === 'en' ? 'EN' : '中文'}</span>
@@ -19,3 +19,7 @@ const LanguageSwitcher = ({ style }) => {
 };
 
 export default LanguageSwitcher;
+
+LanguageSwitcher.propTypes = {
+  style: PropTypes.object
+};
