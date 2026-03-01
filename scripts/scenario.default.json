@@ -1,0 +1,54 @@
+{
+  "name": "takeoff_engine_failure",
+  "aircraftModel": "Boeing 737-800",
+  "difficulty": "rookie",
+  "dt": 0.05,
+  "duration": 20,
+  "terminateOnCrash": true,
+  "initial": {
+    "conditions": {
+      "latitude": 37.6188,
+      "longitude": -122.375,
+      "position": { "z": 0 },
+      "heading": 0,
+      "fuel": 15000,
+      "coldStart": false,
+      "gear": true,
+      "brakes": 0,
+      "throttle": 0
+    },
+    "powered": true,
+    "velocityKts": 150
+  },
+  "environment": {
+    "season": "summer",
+    "useTerrainFetch": true
+  },
+  "controls": {
+    "throttle": 0.98,
+    "pitch": 0,
+    "roll": 0,
+    "yaw": 0,
+    "trim": 0,
+    "flaps": 0.15,
+    "gear": 1,
+    "brakes": 0
+  },
+  "autopilot": {
+    "enabled": false
+  },
+  "actions": [
+    {
+      "time": 5,
+      "type": "failure",
+      "failureId": "engine_failure",
+      "stage": "active",
+      "context": { "engineIndex": 0 }
+    },
+    {
+      "time": 6,
+      "type": "controls",
+      "inputs": { "pitch": 1 }
+    }
+  ]
+}

@@ -74,8 +74,9 @@ const EnvironmentFailures = {
                     visual: "shake_medium"
                 }),
                 effect: (sys, intensity) => {
-                    // Sudden airspeed loss/gain logic in physics
-                    // sys.applyWindShear(intensity);
+                    if (typeof sys.applyWindShear === 'function') {
+                        sys.applyWindShear(intensity);
+                    }
                 }
             }
         }

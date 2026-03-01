@@ -21,9 +21,10 @@ export const LanguageProvider = ({ children }) => {
   const t = (key, params = {}) => {
     if (!key || typeof key !== 'string') return key || '';
     
+    const useEnglishOnly = key.startsWith('ui.systems') || key.startsWith('ui.flight');
     // Handle nested keys (e.g., "narrative.phases.boarding.title")
     const keys = key.split('.');
-    let value = translations;
+    let value = useEnglishOnly ? en : translations;
     
     for (const k of keys) {
       if (value && value[k] !== undefined) {

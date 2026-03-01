@@ -87,6 +87,15 @@ class FailureHandler {
                  this.triggerFailure('avionics_overheat', { reason: 'cooling_loss' });
              }
         }
+
+        if (this.activeFailures.has('circuit_arc')) {
+            const arc = this.activeFailures.get('circuit_arc');
+            if (arc.currentStage === 'active' && arc.timeInStage > 15.0) {
+                if (!this.activeFailures.has('electrical_fire') && Math.random() < 0.01) {
+                    this.triggerFailure('electrical_fire', { reason: 'arc_damage' });
+                }
+            }
+        }
     }
 
     applyImpact(physicsService) {

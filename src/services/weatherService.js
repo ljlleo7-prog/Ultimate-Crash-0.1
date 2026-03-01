@@ -125,6 +125,10 @@ export function generateInitialWeather(latitude, longitude, season, zuluTime) {
   weather.latitude = latitude;
   weather.longitude = longitude;
   weather.weatherCondition = getRandomWeatherCondition(regionalAdjustments.typicalPhenomena); // Assign a random initial condition
+  if (weather.windGust !== undefined) {
+    const base = weather.windSpeed || 0;
+    weather.windShear = Math.max(0, weather.windGust - base) * 0.6;
+  }
 
   return /** @type {WeatherData} */ (weather);
 }
@@ -187,6 +191,10 @@ export function updateWeather(currentWeather, timeDeltaMinutes) {
   const currentZuluDate = new Date(newWeather.zuluTime);
   currentZuluDate.setMinutes(currentZuluDate.getMinutes() + timeDeltaMinutes);
   newWeather.zuluTime = currentZuluDate.toISOString();
+  if (newWeather.windGust !== undefined) {
+    const base = newWeather.windSpeed || 0;
+    newWeather.windShear = Math.max(0, newWeather.windGust - base) * 0.6;
+  }
 
   return newWeather;
 }

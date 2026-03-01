@@ -231,6 +231,10 @@ class WarningSystem {
         if (systems.pressurization.cabinAlt > 10000) {
             this.addWarning('CABIN_ALT', 'CABIN ALTITUDE', 'CRITICAL', true);
         }
+
+        if (systems.ice && systems.ice.deicingRequired) {
+            this.addWarning('DEICE_REQUIRED', 'DE-ICE REQUIRED', 'ADVISORY');
+        }
         
         // Fuel
         if (fuel < 500) { // Arbitrary low fuel mass

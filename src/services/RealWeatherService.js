@@ -68,6 +68,7 @@ class RealWeatherService {
         windSpeed: current.wind_speed_10m, // knots
         windDirection: current.wind_direction_10m, // degrees
         windGust: current.wind_gusts_10m, // knots
+        windShear: Math.max(0, current.wind_gusts_10m - current.wind_speed_10m) * 0.6, // knots
         cloudCover: current.cloud_cover, // %
         precipitation: current.precipitation, // mm
         weatherCode: current.weather_code, // WMO code
@@ -91,6 +92,7 @@ class RealWeatherService {
         windSpeed: 0,
         windDirection: 0,
         windGust: 0,
+        windShear: 0,
         cloudCover: 0,
         precipitation: 0,
         weatherCode: 0,

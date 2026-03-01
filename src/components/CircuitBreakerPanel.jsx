@@ -11,6 +11,10 @@ const CircuitBreakerPanel = ({ onClose }) => {
         { id: 'cb_gen2', label: 'GEN 2', system: 'ELEC', section: 'OVERHEAD', failureId: 'generator_drive_disconnect' },
         { id: 'cb_apu_gen', label: 'APU GEN', system: 'ELEC', section: 'OVERHEAD', failureId: 'electrical_bus_failure' },
         { id: 'cb_batt', label: 'BATTERY', system: 'ELEC', section: 'OVERHEAD', failureId: 'battery_overheat' },
+        { id: 'cb_cabin_svc', label: 'CABIN SVC', system: 'CABIN', section: 'OVERHEAD', failureId: 'electrical_fire' },
+        { id: 'cb_cabin_lights', label: 'CABIN LIGHTS', system: 'CABIN', section: 'OVERHEAD', failureId: 'circuit_arc' },
+        { id: 'cb_galley', label: 'GALLEY', system: 'CABIN', section: 'OVERHEAD', failureId: 'electrical_fire' },
+        { id: 'cb_ife', label: 'IFE', system: 'CABIN', section: 'OVERHEAD', failureId: 'circuit_arc' },
         
         // OVERHEAD - FUEL
         { id: 'cb_fuel_l_fwd', label: 'L FWD PUMP', system: 'FUEL', section: 'OVERHEAD', failureId: 'fuel_pump_fail' },

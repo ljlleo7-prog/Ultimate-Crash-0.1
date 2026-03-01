@@ -20,7 +20,6 @@ import FlightComputerPanel from './FlightComputerPanel';
 import ChecklistPanel from './ChecklistPanel';
 import SystemStatusPanel from './SystemStatusPanel';
 import CircuitBreakerPanel from './CircuitBreakerPanel';
-import MasterWarningPanel from './MasterWarningPanel';
 import SensoryFeedback from './SensoryFeedback';
 import { useLanguage } from '../contexts/LanguageContext';
 import './FlightPanel.css';
@@ -672,9 +671,6 @@ const FlightPanelModular = ({ flightData, physicsState, weatherData, onActionReq
         onClose: () => setShowCircuitBreakers(false)
       }),
       
-      // Master Warning Panel (Always visible in PHY-ON)
-      React.createElement(MasterWarningPanel),
-
       // Sensory Feedback Overlay (Always active for effects)
       React.createElement(SensoryFeedback),
 

@@ -565,6 +565,7 @@ const FlightInProgress = ({
         interval = setInterval(() => {
           setWeatherData(prevWeatherData => {
             const updated = updateWeather(prevWeatherData, weatherConfig.atisUpdateIntervalMinutes);
+            if (setEnvironment) setEnvironment(updated);
             return updated;
           });
         }, weatherConfig.atisUpdateIntervalMinutes * 60 * 1000);

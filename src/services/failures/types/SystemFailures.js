@@ -108,7 +108,9 @@ const SystemFailures = {
                 effect: (sys) => {
                     // Random breaker pop
                     // Potential fire trigger
-                    if (Math.random() < 0.05) sys.triggerFailure('cockpit_fire');
+                    if (Math.random() < 0.08 && typeof sys.triggerFailure === 'function') {
+                        sys.triggerFailure('electrical_fire');
+                    }
                 }
             }
         }
@@ -299,6 +301,47 @@ const SystemFailures = {
                 effect: (sys) => {
                     sys.systems.fire.apu = true;
                     sys.systems.apu.running = false;
+                }
+            }
+        }
+    },
+
+    ELECTRICAL_FIRE: {
+        id: 'electrical_fire',
+        name: 'Electrical Fire',
+        category: 'systems',
+        stages: {
+            inactive: { next: 'incipient' },
+            incipient: {
+                duration: 12.0,
+                next: 'active',
+                description: (ctx) => ({
+                    text: "Electrical smoke reported from cabin ceiling panels.",
+                    system_alert: "ELEC SMOKE",
+                    smell: "burning_ozone",
+                    visual: "smoke_cockpit",
+                    sound: "electrical_spark"
+                })
+            },
+            active: {
+                description: (ctx) => ({
+                    text: "Electrical fire spreading along service wiring.",
+                    system_alert: "ELEC FIRE",
+                    smell: "burning_plastic",
+                    visual: "smoke_cockpit",
+                    sound: "fire_bell"
+                }),
+                effect: (sys, intensity) => {
+                    const scale = 1.0 - (intensity * 0.6);
+                    sys.systems.electrical.acVolts *= scale;
+                    sys.systems.electrical.dcVolts *= scale;
+                    sys.systems.electrical.acAmps *= scale;
+                    if (Math.random() < 0.05) {
+                        sys.systems.electrical.gen1 = false;
+                    }
+                    if (Math.random() < 0.05) {
+                        sys.systems.electrical.gen2 = false;
+                    }
                 }
             }
         }
