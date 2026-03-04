@@ -54,7 +54,7 @@ const OverheadPanel = ({ onClose, flightState, onSystemAction, aircraftModel }) 
   );
 
   // 737 Style: Metallic Round Toggle Switch
-  const MetallicToggleSwitch = ({ label, active, onClick, annunciator, subLabel, enabled = true }) => (
+  const MetallicToggleSwitch = ({ label, active, onClick, annunciator, subLabel, enabled = true, id }) => (
     <div className="metallic-switch-wrapper" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', margin: '8px' }}>
       {/* 737 Lights are usually above the switch */}
       {annunciator && (
@@ -64,6 +64,7 @@ const OverheadPanel = ({ onClose, flightState, onSystemAction, aircraftModel }) 
       )}
       
       <div 
+        id={id}
         onClick={enabled ? onClick : undefined}
         style={{ 
           width: '40px', 
@@ -105,7 +106,7 @@ const OverheadPanel = ({ onClose, flightState, onSystemAction, aircraftModel }) 
   );
 
   // 7X7 Style: Square Button (Top Green ON, Bottom Amber FAULT)
-  const BoeingSquareButton = ({ label, active, onClick, fault = false, subLabel = "ON", invertLight = false, specialLabel = null, enabled = true, annunciator }) => {
+  const BoeingSquareButton = ({ label, active, onClick, fault = false, subLabel = "ON", invertLight = false, specialLabel = null, enabled = true, annunciator, id }) => {
     // Logic:
     // Top Half: ON (Green) - Active state
     // Bottom Half: FAULT (Amber) or OFF/PRESS (Amber) - Fault state or Annunciator state
@@ -121,6 +122,7 @@ const OverheadPanel = ({ onClose, flightState, onSystemAction, aircraftModel }) 
         <div className="boeing-btn-wrapper" style={{ margin: '6px', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
             <div style={{ fontSize: '10px', color: '#ccc', marginBottom: '4px', fontWeight: 'bold' }}>{label}</div>
             <div 
+                id={id}
                 onClick={enabled ? onClick : undefined}
                 style={{ 
                     width: '40px', 
@@ -169,7 +171,7 @@ const OverheadPanel = ({ onClose, flightState, onSystemAction, aircraftModel }) 
   };
 
   // A3XX Style: Airbus Square Button (Bottom Boxed)
-  const AirbusButton = ({ label, active, onClick, fault = false, subLabel = "ON", invertLight = false, specialLabel = null, enabled = true, annunciator }) => {
+  const AirbusButton = ({ label, active, onClick, fault = false, subLabel = "ON", invertLight = false, specialLabel = null, enabled = true, annunciator, id }) => {
     // "Lights Out" Philosophy:
     // Top: System Label (always visible? Or hidden? User said "bottom boxed on/off") -> usually printed on button
     // Bottom: Status Light (Boxed)
@@ -214,6 +216,7 @@ const OverheadPanel = ({ onClose, flightState, onSystemAction, aircraftModel }) 
     return (
         <div className="airbus-button-container" style={{ margin: '6px' }}>
           <div 
+            id={id}
             onClick={onClick}
             style={{ 
               width: '45px', 
@@ -362,7 +365,7 @@ const OverheadPanel = ({ onClose, flightState, onSystemAction, aircraftModel }) 
             </div>
 
             {/* Main Grid for Pumps & Lines */}
-            <div style={{ position: 'relative', display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gridTemplateRows: '80px 80px', padding: '10px 0' }}>
+            <div id="panel-fuel-pumps" style={{ position: 'relative', display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gridTemplateRows: '80px 80px', padding: '10px 0' }}>
                  
                  {/* SVG Overlay - Dynamic Green Lines */}
                  <svg style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', pointerEvents: 'none', opacity: 0.8, zIndex: 0 }}>
@@ -480,7 +483,7 @@ const OverheadPanel = ({ onClose, flightState, onSystemAction, aircraftModel }) 
 
                  {/* Row 1: Battery & Standby */}
                  <div style={{ justifySelf: 'center', zIndex: 1 }}>
-                     <Switch label="BAT" active={bat} onClick={() => onSystemAction('electrical', 'battery')} 
+                     <Switch id="sw-battery" label="BAT" active={bat} onClick={() => onSystemAction('electrical', 'battery')} 
                         subLabel={t('ui.systems.on')}
                         annunciator={{ label: t('ui.systems.discharge'), active: !getSys('electrical.gen1') && bat, color: 'amber' }} 
                      />
@@ -504,7 +507,7 @@ const OverheadPanel = ({ onClose, flightState, onSystemAction, aircraftModel }) 
                      />
                  </div>
                  <div style={{ justifySelf: 'center', zIndex: 1 }}>
-                     <Switch label="APU GEN" active={getSys('electrical.apuGen')} onClick={() => onSystemAction('electrical', 'apuGen')}
+                     <Switch id="sw-apu-gen" label="APU GEN" active={getSys('electrical.apuGen')} onClick={() => onSystemAction('electrical', 'apuGen')}
                         annunciator={{ label: t('ui.systems.off_bus'), active: getSys('electrical.apuGenOff'), color: 'blue' }}
                         subLabel={t('ui.systems.on')}
                      />
@@ -639,7 +642,7 @@ const OverheadPanel = ({ onClose, flightState, onSystemAction, aircraftModel }) 
                invertLight={true} // Blue ON when Active
                subLabel={t('ui.systems.on')}
             />
-            <Switch label="START" active={getSys('apu.start')} onClick={() => onSystemAction('apu', 'start')} 
+            <Switch id="sw-apu-start" label="START" active={getSys('apu.start')} onClick={() => onSystemAction('apu', 'start')} 
                subLabel={running ? t('ui.systems.avail') : (starting ? t('ui.systems.on') : "")} 
                annunciator={{ label: t('ui.systems.maint'), active: false, color: 'blue' }}
                invertLight={true}
@@ -777,7 +780,7 @@ const OverheadPanel = ({ onClose, flightState, onSystemAction, aircraftModel }) 
                 />
             ))}
             
-            <Switch label="APU BLEED" active={getSys('apu.bleed')} onClick={() => onSystemAction('apu', 'bleed')} 
+            <Switch id="sw-apu-bleed" label="APU BLEED" active={getSys('apu.bleed')} onClick={() => onSystemAction('apu', 'bleed')} 
                 annunciator={{ label: 'VALVE OPEN', active: getSys('apu.bleed') && getSys('apu.running'), color: 'blue' }}
                 enabled={apuRunning}
             />
@@ -806,9 +809,10 @@ const OverheadPanel = ({ onClose, flightState, onSystemAction, aircraftModel }) 
     const engines = getSys('engines', {});
     const engineKeys = Object.keys(engines).filter(k => k.startsWith('eng')).sort();
     
-    const StartSwitch = ({ label, value, onClick, enabled }) => (
+    const StartSwitch = ({ label, value, onClick, enabled, id }) => (
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', margin: '5px' }}>
             <div 
+                id={id}
                 onClick={enabled ? onClick : undefined}
                 style={{ 
                     width: '40px', height: '40px', borderRadius: '50%', 
@@ -852,12 +856,13 @@ const OverheadPanel = ({ onClose, flightState, onSystemAction, aircraftModel }) 
             </div>
 
             {/* Start Switches */}
-            <div style={{ display: 'flex', justifyContent: 'space-around', borderTop: '1px solid #444', paddingTop: '10px', flexWrap: 'wrap' }}>
+            <div id="panel-engine-start" style={{ display: 'flex', justifyContent: 'space-around', borderTop: '1px solid #444', paddingTop: '10px', flexWrap: 'wrap' }}>
                 {engineKeys.map((key, i) => {
                      const eng = engines[key];
                      return (
                         <StartSwitch
                           key={key}
+                          id={`sw-engine-start-${i+1}`}
                           label={`ENG ${i+1} START`}
                           value={eng.startSwitch || 'OFF'}
                           onClick={() => onSystemAction('engines', `${key}_start_toggle`)}
@@ -874,6 +879,7 @@ const OverheadPanel = ({ onClose, flightState, onSystemAction, aircraftModel }) 
                      return (
                         <Switch
                           key={key}
+                          id={`sw-fuel-control-${i+1}`}
                           label={`ENG ${i+1}`}
                           active={eng.fuelControl}
                           onClick={() => onSystemAction('engines', `${key}_fuel`)}
@@ -1403,7 +1409,7 @@ const OverheadPanel = ({ onClose, flightState, onSystemAction, aircraftModel }) 
   return (
     <div className="overhead-overlay">
       <div className="overhead-container">
-        <button className="close-btn" onClick={onClose}>X</button>
+        <button id="btn-close-overhead" className="close-btn" onClick={onClose}>X</button>
 
         <div className="overhead-grid">
             {isAirbus && (

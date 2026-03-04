@@ -76,6 +76,7 @@ const CentralPanel = ({ flightState, onToggleSystems, onToggleBreakers }) => {
           }
         }, 'CB'),
         React.createElement('button', {
+          id: 'btn-systems',
           onClick: onToggleSystems,
           style: {
             background: '#4a90e2',

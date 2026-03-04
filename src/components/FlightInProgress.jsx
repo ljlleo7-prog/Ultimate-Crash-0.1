@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAircraftPhysics } from '../hooks/useAircraftPhysics';
 import { useLanguage } from '../contexts/LanguageContext';
+import { useTutorial } from '../contexts/TutorialContext';
 import { updateWeather } from '../services/weatherService';
 import { realWeatherService } from '../services/RealWeatherService';
 import { terrainService } from '../services/TerrainService';
@@ -268,6 +269,20 @@ const FlightInProgress = ({
   
   // Dynamic Flight Plan State
   const [activeFlightPlan, setActiveFlightPlan] = useState(flightPlan);
+  const { updateGameContext } = useTutorial();
+  const [parkingBrake, setParkingBrake] = useState(true); // Default to engaged
+
+  // Sync flight data to TutorialContext
+  useEffect(() => {
+    if (updateGameContext) {
+        updateGameContext({ 
+            flightState: {
+                ...flightData,
+                parkingBrake: parkingBrake
+            } 
+        });
+    }
+  }, [flightData, parkingBrake, updateGameContext]);
 
   // Startup Checklist Logic (Pro/Devil)
   const [startupStatus, setStartupStatus] = useState(() => {
@@ -962,7 +977,8 @@ const FlightInProgress = ({
               ...flightData,
               physicsActive: sceneState.physicsActive,
               narrativeHistory: sceneState.narrativeHistory,
-              phaseName: sceneState.phase?.name
+              phaseName: sceneState.phase?.name,
+              parkingBrake: parkingBrake // Pass parking brake state
             }}
             physicsState={physicsState}
             weatherData={weatherData}
@@ -1014,6 +1030,14 @@ const FlightInProgress = ({
                 case 'yaw':
                   setYaw(payload);
                   console.log(`📡 FlightPanel Action: ${action} = ${payload}`);
+                  break;
+                case 'parking-brake':
+                  setParkingBrake(payload);
+                  console.log(`📡 FlightPanel Action: ${action} = ${payload}`);
+                  // Optionally inform physics engine if it supports it
+                  if (performSystemAction) {
+                      performSystemAction('brakes', 'parking', payload);
+                  }
                   break;
                 case 'toggle-autopilot': {
                   if (physicsService && typeof physicsService.setAutopilot === 'function') {

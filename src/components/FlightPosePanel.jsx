@@ -72,7 +72,7 @@ const FlightPosePanel = ({ flightState }) => {
     React.createElement('div', { className: 'pfd-compressed-3col' },
       
       // Left: IAS Vertical Bar (compressed)
-      React.createElement('div', { className: 'ias-vertical-bar compressed' },
+      React.createElement('div', { className: 'ias-vertical-bar compressed', id: 'pfd-speed-tape' },
         React.createElement('div', { className: 'ias-label' }, 'IAS'),
         React.createElement('div', { className: 'vertical-scale-container' },
           // IAS scale from 0 to 400 knots

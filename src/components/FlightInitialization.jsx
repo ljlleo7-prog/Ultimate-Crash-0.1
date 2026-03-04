@@ -3,6 +3,7 @@ import './FlightInitialization.css';
 import AirportSearchInput from './AirportSearchInput.jsx';
 import { randomFlightService } from '../services/randomFlightService.js';
 import { useLanguage } from '../contexts/LanguageContext';
+import { useTutorial } from '../contexts/TutorialContext';
 
 const FlightInitialization = ({
   difficulty, setDifficulty,
@@ -29,6 +30,7 @@ const FlightInitialization = ({
   apiKey, setApiKey
 }) => {
   const { t } = useLanguage();
+  const { updateGameContext } = useTutorial();
   
   // Fuel Reserve State (hours)
   const [reserveHours, setReserveHours] = useState(1.0);
@@ -36,6 +38,18 @@ const FlightInitialization = ({
   // Step Management
   const [currentStep, setCurrentStep] = useState(1);
   
+  // Update Tutorial Context
+  useEffect(() => {
+    updateGameContext({
+        difficulty,
+        currentStep,
+        aircraftModel,
+        selectedDeparture,
+        selectedArrival,
+        flightInitialized: false // It becomes true in App.jsx
+    });
+  }, [difficulty, currentStep, aircraftModel, selectedDeparture, selectedArrival, updateGameContext]);
+
   // Input validation helper
   const isValidNumber = (val, min, max) => {
     if (val === '' || val === null || val === undefined) return false;
@@ -306,6 +320,7 @@ const FlightInitialization = ({
             {['rookie', 'amateur', 'intermediate', 'advanced', 'pro', 'devil'].map((level) => (
               <button
                 key={level}
+                id={`difficulty-${level}`}
                 className={`difficulty-btn ${level} ${difficulty === level ? 'active' : ''}`}
                 onClick={() => setDifficulty(level)}
               >
@@ -327,6 +342,7 @@ const FlightInitialization = ({
         {currentStep === 1 && (
           <div style={{ marginTop: '1.5rem', display: 'flex', justifyContent: 'flex-end' }}>
             <button 
+              id="btn-next-params"
               className="dispatch-btn primary" 
               onClick={handleNextStep}
               disabled={!isStep1Valid()}
@@ -379,6 +395,7 @@ const FlightInitialization = ({
           <div className="parameter-group">
             <label>{t('initialization.params.aircraft_type')}</label>
             <select
+              id="input-aircraft"
               value={aircraftModel}
               onChange={(e) => setAircraftModel(e.target.value)}
               className="dispatch-select"
@@ -506,6 +523,7 @@ const FlightInitialization = ({
         {currentStep === 2 && (
           <div style={{ marginTop: '1.5rem', display: 'flex', justifyContent: 'flex-end' }}>
              <button 
+              id="btn-next-route"
               className="dispatch-btn primary" 
               onClick={handleNextStep}
               disabled={!isStep2Valid()}
@@ -533,7 +551,7 @@ const FlightInitialization = ({
         </div>
 
         <div className="airport-selection-grid">
-          <div className="parameter-group">
+          <div className="parameter-group" id="input-departure">
             <label>{t('initialization.route.departure')}</label>
             <AirportSearchInput
               placeholder={t('initialization.route.search_placeholder')}
@@ -544,7 +562,7 @@ const FlightInitialization = ({
             />
           </div>
 
-          <div className="parameter-group">
+          <div className="parameter-group" id="input-arrival">
             <label>{t('initialization.route.arrival')}</label>
             <AirportSearchInput
               placeholder={t('initialization.route.search_placeholder')}
@@ -587,6 +605,7 @@ const FlightInitialization = ({
       {currentStep === 3 && (
         <div className="dispatch-actions" style={{ borderTop: 'none', paddingTop: 0 }}>
           <button
+            id="btn-finalize"
             className="dispatch-btn primary"
             onClick={handleInitializeFlight}
             disabled={!isStep3Valid()}

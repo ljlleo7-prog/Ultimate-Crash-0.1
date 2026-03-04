@@ -449,6 +449,57 @@ const zh = {
         quit: '退出到主菜单',
         language: 'Language / 语言'
     },
+    main_menu: {
+        title: '终极坠机',
+        subtitle: '飞行模拟',
+        single_player: '单人游戏',
+        multi_player: '多人游戏',
+        tutorial: '新手教程',
+        continue_save: '继续存档',
+        settings: '设置',
+        back: '返回',
+        coming_soon: '即将推出',
+        select_mode: '选择模式'
+    },
+    tutorial: {
+        title: '飞行教程',
+        skip: '跳过教程',
+        next: '下一步',
+        finish: '完成',
+        steps: {
+            init_difficulty: '第一步：选择“菜鸟”难度以获得最简单的飞行体验。',
+            init_next_params: '点击“下一步：飞行参数”继续。',
+            init_aircraft: '选择您的机型。建议初学者使用 B737-800。',
+            init_next_route: '点击“下一步：航线选择”选择您的飞行路线。',
+            init_departure: '搜索并选择起飞机场（例如 KSFO）。',
+            init_arrival: '搜索并选择到达机场（例如 KLAX）。',
+            init_finalize: '点击“完成签派”开始模拟。',
+            cockpit_welcome: '欢迎来到驾驶舱！本教程将指导您完成一次完整的飞行。',
+            open_overhead: '点击“系统 [顶板]”打开顶板。',
+            battery_on: '打开电池开关 (BATTERY) 为飞机供电。',
+            apu_start: '启动 APU（辅助动力装置）以产生独立电源。',
+            apu_gen_on: '打开 APU 发电机 (APU GEN) 为电气汇流条供电。',
+            fuel_pumps_on: '打开所有燃油泵 (FUEL PUMPS) 以确保引擎燃油供应。',
+            apu_bleed_on: '打开 APU 引气 (APU BLEED) 为引擎启动提供气源。',
+            engine_start: '将引擎启动开关设置为“GRD”（地面）以启动引擎。',
+            fuel_control_run: '当 N2 > 20% 时，将燃油控制开关设置为“RUN”以引入燃油。',
+            close_overhead: '关闭顶板以查看主飞行显示器。',
+            flaps_set: '将襟翼 (FLAPS) 设置为 5 进行起飞。',
+            parking_brake_release: '松开停留刹车 (PARKING BRAKE)。',
+            throttle_up: '将油门 (THROTTLE) 推至 90% (TOGA) 进行起飞。',
+            rotate: '当速度达到 Vr（约 140 节）时，轻轻向后拉杆进行抬轮 (ROTATE)。',
+            gear_up: '升空并确认正上升率后，收起起落架 (GEAR)。',
+            autopilot_engage: '接通自动驾驶 (AUTOPILOT) 以保持航向和高度。',
+            complete: '教程完成！您现在正在飞行。祝您好运！'
+        }
+    },
+    settings: {
+        title: '设置',
+        audio: '音频',
+        graphics: '图形',
+        controls: '控制',
+        language: '语言'
+    },
     systems: {
         status: '系统状态',
         engines: '引擎',
@@ -620,6 +671,38 @@ const zh = {
         no_signals: '未检测到信号',
         radio_silent: '无线电静默',
         connected: '已连接'
+    }
+  },
+  tutorial: {
+    title: '飞行教程',
+    skip: '跳过教程',
+    next: '下一步',
+    finish: '完成',
+    steps: {
+      init_difficulty: '第一步：选择“菜鸟”难度以获得最简单的飞行体验。',
+      init_next_params: '点击“下一步：飞行参数”继续。',
+      init_aircraft: '选择您的机型。建议初学者使用 B737-800。',
+      init_next_route: '点击“下一步：航线选择”选择您的飞行路线。',
+      init_departure: '搜索并选择起飞机场（例如 KSFO）。',
+      init_arrival: '搜索并选择到达机场（例如 KLAX）。',
+      init_finalize: '点击“完成签派”开始模拟。',
+      cockpit_welcome: '欢迎来到驾驶舱！本教程将指导您完成一次完整的飞行。',
+      open_overhead: '点击“系统 [顶板]”打开顶板。',
+      battery_on: '打开电池开关 (BATTERY) 为飞机供电。',
+      apu_start: '启动 APU（辅助动力装置）以产生独立电源。',
+      apu_gen_on: '打开 APU 发电机 (APU GEN) 为电气汇流条供电。',
+      fuel_pumps_on: '打开所有燃油泵 (FUEL PUMPS) 以确保引擎燃油供应。',
+      apu_bleed_on: '打开 APU 引气 (APU BLEED) 为引擎启动提供气源。',
+      engine_start: '将引擎启动开关设置为“GRD”（地面）以启动引擎。',
+      fuel_control_run: '当 N2 > 20% 时，将燃油控制开关设置为“RUN”以引入燃油。',
+      close_overhead: '关闭顶板以查看主飞行显示器。',
+      flaps_set: '将襟翼 (FLAPS) 设置为 5 进行起飞。',
+      parking_brake_release: '松开停留刹车 (PARKING BRAKE)。',
+      throttle_up: '将油门 (THROTTLE) 推至 90% (TOGA) 进行起飞。',
+      rotate: '当速度达到 Vr（约 140 节）时，轻轻向后拉杆进行抬轮 (ROTATE)。',
+      gear_up: '升空并确认正上升率后，收起起落架 (GEAR)。',
+      autopilot_engage: '接通自动驾驶 (AUTOPILOT) 以保持航向和高度。',
+      complete: '教程完成！您现在正在飞行。祝您好运！'
     }
   },
   initialization: {

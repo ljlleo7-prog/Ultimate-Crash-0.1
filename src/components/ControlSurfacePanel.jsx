@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import aircraftService from '../services/aircraftService';
 
-const ControlSurfacePanel = ({ controlFlaps, controlGear, controlAirBrakes, controlTrim, flightState, aircraftModel }) => {
+const ControlSurfacePanel = ({ controlFlaps, controlGear, controlAirBrakes, controlTrim, flightState, aircraftModel, controlParkingBrake }) => {
   const [flapProfile, setFlapProfile] = useState(null);
   const [airbrakeProfile, setAirbrakeProfile] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -26,12 +26,13 @@ const ControlSurfacePanel = ({ controlFlaps, controlGear, controlAirBrakes, cont
   }, [aircraftModel]);
 
   // Lever control component (compact version)
-  const LeverControl = ({ label, position, maxPosition, onToggle, positionLabels, colorMap, height = 90 }) => {
+  const LeverControl = ({ label, position, maxPosition, onToggle, positionLabels, colorMap, height = 90, id }) => {
     const percentage = (position / maxPosition) * 100;
     const currentLabel = positionLabels[position] || position;
     const currentColor = colorMap[position] || '#f59e0b';
 
     return React.createElement('div', { 
+      id: id,
       style: { 
         display: 'flex',
         flexDirection: 'column',
@@ -381,6 +382,7 @@ const ControlSurfacePanel = ({ controlFlaps, controlGear, controlAirBrakes, cont
     React.createElement('div', { style: { display: 'flex', flexDirection: 'row', gap: '15px' } },
       // Flaps
       React.createElement(LeverControl, {
+        id: 'lever-flaps',
         label: 'FLAPS',
         position: flightState.flapsValue || 0,
         maxPosition: flapMax,
@@ -391,6 +393,7 @@ const ControlSurfacePanel = ({ controlFlaps, controlGear, controlAirBrakes, cont
       
       // Gear
       React.createElement(LeverControl, {
+        id: 'lever-gear',
         label: 'GEAR',
         position: flightState.gearValue ? 1 : 0,
         maxPosition: 1,

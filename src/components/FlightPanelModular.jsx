@@ -492,7 +492,7 @@ const FlightPanelModular = ({ flightData, physicsState, weatherData, onActionReq
     }
 
     // PHY-ON INTERFACE (Simulation Mode)
-    return React.createElement('div', { className: 'modern-cockpit' },
+    return React.createElement('div', { className: 'modern-cockpit', id: 'flight-panel-main' },
       // Narrative Overlay REMOVED as requested (using Head Bar instead)
 
       // Top Row: Autopilot + Comm
@@ -563,6 +563,7 @@ const FlightPanelModular = ({ flightData, physicsState, weatherData, onActionReq
           controlGear,
           controlAirBrakes,
           controlTrim: (payload) => onActionRequest('trim', payload),
+          controlParkingBrake: (val) => onActionRequest('parking-brake', val),
           flightState,
           aircraftModel
         })

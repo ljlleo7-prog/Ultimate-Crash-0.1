@@ -449,6 +449,57 @@ const en = {
         quit: 'Quit to Main Menu',
         language: 'Language / 语言'
     },
+    main_menu: {
+        title: 'ULTIMATE CRASH',
+        subtitle: 'FLIGHT SIMULATION',
+        single_player: 'SINGLE PLAYER',
+        multi_player: 'MULTI PLAYER',
+        tutorial: 'TUTORIAL',
+        continue_save: 'CONTINUE SAVE',
+        settings: 'SETTINGS',
+        back: 'BACK',
+        coming_soon: 'COMING SOON',
+        select_mode: 'SELECT MODE'
+    },
+    tutorial: {
+        title: 'FLIGHT TUTORIAL',
+        skip: 'SKIP TUTORIAL',
+        next: 'NEXT',
+        finish: 'FINISH',
+        steps: {
+            init_difficulty: 'Step 1: Select "ROOKIE" difficulty for the easiest flight experience.',
+            init_next_params: 'Click "NEXT: FLIGHT PARAMETERS" to proceed.',
+            init_aircraft: 'Choose your aircraft. The B737-800 is recommended for beginners.',
+            init_next_route: 'Click "NEXT: ROUTE SELECTION" to choose your flight path.',
+            init_departure: 'Search and select a Departure Airport (e.g., KSFO).',
+            init_arrival: 'Search and select an Arrival Airport (e.g., KLAX).',
+            init_finalize: 'Click "FINALIZE DISPATCH" to start the simulation.',
+            cockpit_welcome: 'Welcome to the cockpit! This tutorial will guide you through a complete flight.',
+            open_overhead: 'Click "SYSTEMS [OH PNL]" to open the Overhead Panel.',
+            battery_on: 'Turn on the BATTERY switch to power the aircraft.',
+            apu_start: 'Start the APU (Auxiliary Power Unit) to generate independent power.',
+            apu_gen_on: 'Turn on the APU GENERATOR to supply power to the electrical buses.',
+            fuel_pumps_on: 'Turn on all FUEL PUMPS to ensure engine fuel supply.',
+            apu_bleed_on: 'Turn on APU BLEED AIR to provide air for engine start.',
+            engine_start: 'Set Engine Start Switches to "GRD" (Ground) to start the engines.',
+            fuel_control_run: 'Once N2 > 20%, set Fuel Control Switches to "RUN" to introduce fuel.',
+            close_overhead: 'Close the Overhead Panel to view the main flight displays.',
+            flaps_set: 'Set FLAPS to 5 for takeoff.',
+            parking_brake_release: 'Release the PARKING BRAKE.',
+            throttle_up: 'Advance THROTTLE to 90% (TOGA) for takeoff.',
+            rotate: 'When speed reaches Vr (approx 140kts), pull back gently to ROTATE.',
+            gear_up: 'Once airborne with positive rate, raise the LANDING GEAR.',
+            autopilot_engage: 'Engage the AUTOPILOT (AP) to maintain course and altitude.',
+            complete: 'Tutorial Complete! You are now flying. Good luck!'
+        }
+    },
+    settings: {
+        title: 'SETTINGS',
+        audio: 'AUDIO',
+        graphics: 'GRAPHICS',
+        controls: 'CONTROLS',
+        language: 'LANGUAGE'
+    },
     systems: {
         status: 'System Status',
         engines: 'Engines',
@@ -620,6 +671,38 @@ const en = {
         no_signals: 'No signals detected',
         radio_silent: 'Radio silent',
         connected: 'Connected'
+    }
+  },
+  tutorial: {
+    title: 'FLIGHT TUTORIAL',
+    skip: 'SKIP TUTORIAL',
+    next: 'NEXT',
+    finish: 'FINISH',
+    steps: {
+      init_difficulty: 'Step 1: Select "ROOKIE" difficulty for the easiest flight experience.',
+      init_next_params: 'Click "NEXT: FLIGHT PARAMETERS" to proceed.',
+      init_aircraft: 'Choose your aircraft. The B737-800 is recommended for beginners.',
+      init_next_route: 'Click "NEXT: ROUTE SELECTION" to choose your flight path.',
+      init_departure: 'Search and select a Departure Airport (e.g., KSFO).',
+      init_arrival: 'Search and select an Arrival Airport (e.g., KLAX).',
+      init_finalize: 'Click "FINALIZE DISPATCH" to start the simulation.',
+      cockpit_welcome: 'Welcome to the cockpit! This tutorial will guide you through a complete flight.',
+      open_overhead: 'Click "SYSTEMS [OH PNL]" to open the Overhead Panel.',
+      battery_on: 'Turn on the BATTERY switch to power the aircraft.',
+      apu_start: 'Start the APU (Auxiliary Power Unit) to generate independent power.',
+      apu_gen_on: 'Turn on the APU GENERATOR to supply power to the electrical buses.',
+      fuel_pumps_on: 'Turn on all FUEL PUMPS to ensure engine fuel supply.',
+      apu_bleed_on: 'Turn on APU BLEED AIR to provide air for engine start.',
+      engine_start: 'Set Engine Start Switches to "GRD" (Ground) to start the engines.',
+      fuel_control_run: 'Once N2 > 20%, set Fuel Control Switches to "RUN" to introduce fuel.',
+      close_overhead: 'Close the Overhead Panel to view the main flight displays.',
+      flaps_set: 'Set FLAPS to 5 for takeoff.',
+      parking_brake_release: 'Release the PARKING BRAKE.',
+      throttle_up: 'Advance THROTTLE to 90% (TOGA) for takeoff.',
+      rotate: 'When speed reaches Vr (approx 140kts), pull back gently to ROTATE.',
+      gear_up: 'Once airborne with positive rate, raise the LANDING GEAR.',
+      autopilot_engage: 'Engage the AUTOPILOT (AP) to maintain course and altitude.',
+      complete: 'Tutorial Complete! You are now flying. Good luck!'
     }
   },
   initialization: {

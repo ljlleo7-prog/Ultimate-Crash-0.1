@@ -80,6 +80,7 @@ const ModernAutopilotModule = ({ flightState, setAutopilotTargets, toggleAutopil
     },
       React.createElement('div', { style: { display: 'flex', gap: '8px', alignItems: 'center' } },
         React.createElement('button', {
+          id: 'btn-autopilot',
           style: {
             padding: '4px 12px',
             fontSize: '11px',

@@ -164,6 +164,7 @@ const ThrustManager = ({ controlThrust, flightState }) => {
     
     return React.createElement('div', {
       key: index,
+      id: index === 0 ? 'lever-throttle' : undefined,
       style: {
         background: 'rgba(0, 0, 0, 0.3)',
         padding: '8px',
