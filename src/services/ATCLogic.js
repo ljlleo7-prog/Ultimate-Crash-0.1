@@ -42,7 +42,7 @@ export class ATCLogic {
       this.atisTimer -= dt;
       if (this.atisTimer <= 0) {
         this.atisTimer = 60; // Reset to 60s
-        const msg = getATCResponse('req_atis', {}, { weather: flightState.weather, callsign: 'ALL STATIONS' });
+        const msg = getATCResponse('req_atis', {}, { weather: flightState.weather, callsign: 'ALL STATIONS', frequencyType: 'ATIS', language: flightState.language });
         onMessage({
           sender: 'ATIS',
           text: msg,
@@ -68,9 +68,14 @@ export class ATCLogic {
           
           if (!isCorrecting) {
             const action = diff > 0 ? 'descend and maintain' : 'climb and maintain';
+            const autoMsg = getATCResponse('inf_altitude_alert', { action, altitude: this.assignedAltitude }, {
+              callsign: flightState.callsign || 'Station',
+              frequencyType: freqInfo.type || 'CENTER',
+              language: flightState.language
+            });
             onMessage({
               sender: 'ATC',
-              text: `${flightState.callsign || 'Station'}, traffic alert. Check altitude. Immediately ${action} ${this.assignedAltitude}.`,
+              text: autoMsg || `${flightState.callsign || 'Station'}, traffic alert. Check altitude. Immediately ${action} ${this.assignedAltitude}.`,
               timestamp: Date.now(),
               frequency: freqInfo.frequency
             });

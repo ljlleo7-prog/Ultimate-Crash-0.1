@@ -1,36 +1,166 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
+import { failureGraphManager } from '../services/skylinetragedy/FailureGraphManager.js';
 
 const FailureDebugPanel = ({ physicsService, onClose }) => {
     const [activeFailures, setActiveFailures] = useState([]);
-    const [registry, setRegistry] = useState(new Map());
-    const [settings, setSettings] = useState(null);
-    const [lastUpdate, setLastUpdate] = useState(Date.now());
+    const [graphFailures, setGraphFailures] = useState([]);
+    const [graphEdges, setGraphEdges] = useState([]);
+    const [nodePositions, setNodePositions] = useState({});
+    const [isLoading, setIsLoading] = useState(true);
+    const [mapSize, setMapSize] = useState({ width: 1200, height: 680 });
+    const mapRef = useRef(null);
+    const draggingRef = useRef(null);
 
     useEffect(() => {
         if (!physicsService || !physicsService.failureSystem) return;
-
-        // Initial Load of Registry
-        if (physicsService.failureSystem.registry) {
-            setRegistry(new Map(physicsService.failureSystem.registry));
-        }
-
         const interval = setInterval(() => {
             const fs = physicsService.failureSystem;
             if (!fs) return;
-
-            // Sync Active Failures
-            // fs.activeFailures is a Map<id, FailureInstance>
-            const failures = Array.from(fs.activeFailures.values());
-            setActiveFailures(failures);
-            
-            // Sync Settings
-            if (fs.settings) setSettings(fs.settings);
-            
-            setLastUpdate(Date.now());
-        }, 200); // 5Hz update for UI
-
+            setActiveFailures(Array.from(fs.activeFailures.values()));
+        }, 250);
         return () => clearInterval(interval);
     }, [physicsService]);
+
+    useEffect(() => {
+        let isMounted = true;
+        const loadGraph = async () => {
+            setIsLoading(true);
+            await failureGraphManager.initialize();
+            if (!isMounted) return;
+            setGraphFailures(failureGraphManager.getAllFailures());
+            setGraphEdges(failureGraphManager.getAllEdges());
+            setIsLoading(false);
+        };
+        loadGraph();
+        return () => {
+            isMounted = false;
+        };
+    }, []);
+
+    useEffect(() => {
+        if (!mapRef.current) return;
+        const updateSize = () => {
+            if (!mapRef.current) return;
+            const nextWidth = mapRef.current.clientWidth;
+            const nextHeight = mapRef.current.clientHeight;
+            setMapSize(prev => {
+                if (prev.width === nextWidth && prev.height === nextHeight) {
+                    return prev;
+                }
+                return { width: nextWidth, height: nextHeight };
+            });
+        };
+        updateSize();
+        window.addEventListener('resize', updateSize);
+        return () => window.removeEventListener('resize', updateSize);
+    }, []);
+
+    const failureById = useMemo(() => new Map(graphFailures.map(f => [f.id, f])), [graphFailures]);
+
+    const initialPositions = useMemo(() => {
+        const padding = 40;
+        const rowGap = 90;
+        const systems = Array.from(new Set(graphFailures.map(f => f.system || 'OTHER'))).sort();
+        const columnCount = Math.max(1, systems.length);
+        const columnWidth = Math.max(240, (mapSize.width - padding * 2) / columnCount);
+        const grouped = systems.reduce((acc, system) => {
+            acc[system] = [];
+            return acc;
+        }, {});
+        graphFailures.forEach(failure => {
+            const system = failure.system || 'OTHER';
+            if (!grouped[system]) grouped[system] = [];
+            grouped[system].push(failure);
+        });
+        Object.values(grouped).forEach(items => {
+            items.sort((a, b) => (b.severity || 0) - (a.severity || 0) || String(a.failure_code || a.id).localeCompare(String(b.failure_code || b.id)));
+        });
+        const positions = {};
+        systems.forEach((system, columnIndex) => {
+            const items = grouped[system] || [];
+            items.forEach((failure, rowIndex) => {
+                positions[failure.id] = {
+                    x: padding + columnIndex * columnWidth,
+                    y: padding + rowIndex * rowGap
+                };
+            });
+        });
+        return positions;
+    }, [graphFailures, mapSize.width]);
+
+    useEffect(() => {
+        if (graphFailures.length === 0) return;
+        setNodePositions(prev => {
+            const next = { ...prev };
+            Object.entries(initialPositions).forEach(([id, pos]) => {
+                if (!next[id]) next[id] = pos;
+            });
+            return next;
+        });
+    }, [graphFailures, initialPositions]);
+
+    useEffect(() => {
+        const handleMove = (event) => {
+            if (!draggingRef.current || !mapRef.current) return;
+            const dragData = draggingRef.current;
+            const rect = mapRef.current.getBoundingClientRect();
+            const nodeWidth = 190;
+            const nodeHeight = 64;
+            const x = event.clientX - rect.left - dragData.offsetX;
+            const y = event.clientY - rect.top - dragData.offsetY;
+            const clampedX = Math.max(10, Math.min(x, mapSize.width - nodeWidth - 10));
+            const clampedY = Math.max(10, Math.min(y, mapSize.height - nodeHeight - 10));
+            setNodePositions(prev => ({
+                ...prev,
+                [dragData.id]: { x: clampedX, y: clampedY }
+            }));
+        };
+        const handleUp = () => {
+            draggingRef.current = null;
+        };
+        window.addEventListener('mousemove', handleMove);
+        window.addEventListener('mouseup', handleUp);
+        return () => {
+            window.removeEventListener('mousemove', handleMove);
+            window.removeEventListener('mouseup', handleUp);
+        };
+    }, [mapSize]);
+
+    const getEdgeDelay = (edge) => {
+        if (typeof edge.delay_seconds === 'number') return edge.delay_seconds;
+        const target = failureById.get(edge.effect_failure);
+        const timeScale = target?.time_scale;
+        if (timeScale === 'immediate') return 2;
+        if (timeScale === 'fast') return 6;
+        if (timeScale === 'medium') return 12;
+        if (timeScale === 'slow') return 20;
+        if (timeScale === 'very_slow') return 35;
+        return 15;
+    };
+
+    const delayValues = useMemo(() => {
+        const values = graphEdges.map(getEdgeDelay).filter(val => Number.isFinite(val));
+        return values.sort((a, b) => a - b);
+    }, [graphEdges, failureById]);
+
+    const speedThresholds = useMemo(() => {
+        if (delayValues.length === 0) {
+            return { fast: 5, mid: 15 };
+        }
+        const fastIndex = Math.floor(delayValues.length * 0.33);
+        const midIndex = Math.floor(delayValues.length * 0.66);
+        return {
+            fast: delayValues[Math.max(0, fastIndex)],
+            mid: delayValues[Math.max(0, midIndex)]
+        };
+    }, [delayValues]);
+
+    const getSpeedColor = (edge) => {
+        const delay = getEdgeDelay(edge);
+        if (delay <= speedThresholds.fast) return '#ff4d4d';
+        if (delay <= speedThresholds.mid) return '#4ade80';
+        return '#4b82f2';
+    };
 
     const handleTrigger = (id) => {
         if (physicsService && physicsService.failureSystem) {
@@ -38,26 +168,12 @@ const FailureDebugPanel = ({ physicsService, onClose }) => {
         }
     };
 
-    const handleReset = () => {
-        if (physicsService && physicsService.failureSystem) {
-            physicsService.failureSystem.reset();
-        }
-    };
-
-    // Group failures by system/category
-    const categories = useMemo(() => {
-        const groups = {};
-        registry.forEach((def, id) => {
-            const cat = def.system || 'OTHER'; // e.g., 'ENGINE', 'SYSTEMS'
-            if (!groups[cat]) groups[cat] = [];
-            groups[cat].push(def);
-        });
-        return groups;
-    }, [registry]);
-
     if (!physicsService || !physicsService.failureSystem) {
         return null;
     }
+
+    const nodeWidth = 190;
+    const nodeHeight = 64;
 
     return (
         <div style={{
@@ -69,55 +185,59 @@ const FailureDebugPanel = ({ physicsService, onClose }) => {
             color: '#e0e0e0',
             fontFamily: '"JetBrains Mono", monospace',
             fontSize: '12px',
-            padding: '20px',
+            padding: '22px',
             borderRadius: '12px',
             zIndex: 9999,
             border: '1px solid #334455',
-            width: '900px',
-            height: '700px',
+            width: '1300px',
+            height: '860px',
             display: 'flex',
             flexDirection: 'column',
             boxShadow: '0 0 80px rgba(0, 0, 0, 0.8)'
         }}>
-            {/* Header */}
-            <div style={{ 
-                display: 'flex', 
-                justifyContent: 'space-between', 
+            <div style={{
+                display: 'flex',
+                justifyContent: 'space-between',
                 alignItems: 'center',
-                marginBottom: '20px',
+                marginBottom: '18px',
                 borderBottom: '1px solid #334455',
-                paddingBottom: '15px'
+                paddingBottom: '12px'
             }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                    <div style={{ 
-                        width: '12px', height: '12px', 
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                    <div style={{
+                        width: '12px',
+                        height: '12px',
                         background: activeFailures.length > 0 ? '#ff3333' : '#4ade80',
                         borderRadius: '50%',
                         boxShadow: activeFailures.length > 0 ? '0 0 10px #ff3333' : '0 0 10px #4ade80'
                     }} />
-                    <span style={{ fontSize: '18px', fontWeight: 'bold', color: '#fff' }}>FAILURE INJECTION CONSOLE</span>
-                </div>
-                
-                <div style={{ display: 'flex', gap: '10px' }}>
-                    <div style={{ fontSize: '11px', color: '#8899aa', display: 'flex', alignItems: 'center', marginRight: '15px' }}>
-                        DIFFICULTY: <span style={{ color: '#fff', marginLeft: '5px' }}>{(physicsService.difficulty || 'ROOKIE').toUpperCase()}</span>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                        <span style={{ fontSize: '18px', fontWeight: 'bold', color: '#fff' }}>FAILURE CASCADE MAP</span>
+                        <span style={{ fontSize: '10px', color: '#6b7c90' }}>
+                            Nodes: {graphFailures.length} · Links: {graphEdges.length} · Active: {activeFailures.length}
+                        </span>
                     </div>
-                    <button 
-                        onClick={handleReset}
-                        style={{
-                            background: '#2d1b1b',
-                            border: '1px solid #552222',
-                            color: '#ff6666',
-                            cursor: 'pointer',
-                            fontSize: '11px',
-                            padding: '6px 12px',
-                            borderRadius: '4px',
-                            transition: 'all 0.2s'
-                        }}
-                    >
-                        RESET ALL
-                    </button>
-                    <button 
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '18px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '10px', color: '#99a7b6' }}>
+                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                            <span style={{ width: '16px', height: '3px', background: '#ff4d4d', display: 'inline-block' }} />
+                            FAST
+                        </span>
+                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                            <span style={{ width: '16px', height: '3px', background: '#4ade80', display: 'inline-block' }} />
+                            MID
+                        </span>
+                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                            <span style={{ width: '16px', height: '3px', background: '#4b82f2', display: 'inline-block' }} />
+                            SLOW
+                        </span>
+                        <span style={{ color: '#667788' }}>THICK = HIGH PROB</span>
+                    </div>
+                    <div style={{ fontSize: '11px', color: '#8899aa', display: 'flex', alignItems: 'center' }}>
+                        DIFFICULTY: <span style={{ color: '#fff', marginLeft: '6px' }}>{(physicsService.difficulty || 'ROOKIE').toUpperCase()}</span>
+                    </div>
+                    <button
                         onClick={onClose}
                         style={{
                             background: 'transparent',
@@ -132,142 +252,110 @@ const FailureDebugPanel = ({ physicsService, onClose }) => {
                 </div>
             </div>
 
-            <div style={{ display: 'flex', flex: 1, gap: '20px', overflow: 'hidden' }}>
-                
-                {/* Left Column: Library */}
-                <div style={{ flex: 2, overflowY: 'auto', paddingRight: '10px' }}>
-                    {Object.entries(categories).map(([catName, items]) => (
-                        <div key={catName} style={{ marginBottom: '25px' }}>
-                            <div style={{ 
-                                fontSize: '11px', 
-                                fontWeight: 'bold', 
-                                color: '#66aaee', 
-                                borderBottom: '1px solid #223344',
-                                paddingBottom: '5px',
-                                marginBottom: '10px',
+            <div
+                ref={mapRef}
+                style={{
+                    position: 'relative',
+                    flex: 1,
+                    borderRadius: '10px',
+                    border: '1px solid #223344',
+                    overflow: 'auto',
+                    background: 'radial-gradient(circle at 20% 20%, rgba(40, 60, 80, 0.25), transparent 45%), linear-gradient(0deg, rgba(20, 28, 36, 0.95), rgba(12, 18, 26, 0.95))',
+                    boxShadow: 'inset 0 0 40px rgba(0,0,0,0.5)'
+                }}
+            >
+                <svg
+                    width={mapSize.width}
+                    height={mapSize.height}
+                    style={{ position: 'absolute', top: 0, left: 0, pointerEvents: 'none' }}
+                >
+                    {graphEdges.map(edge => {
+                        const fromPos = nodePositions[edge.cause_failure] || initialPositions[edge.cause_failure];
+                        const toPos = nodePositions[edge.effect_failure] || initialPositions[edge.effect_failure];
+                        if (!fromPos || !toPos) return null;
+                        const x1 = fromPos.x + nodeWidth / 2;
+                        const y1 = fromPos.y + nodeHeight / 2;
+                        const x2 = toPos.x + nodeWidth / 2;
+                        const y2 = toPos.y + nodeHeight / 2;
+                        const dx = Math.max(60, Math.abs(x2 - x1) / 2);
+                        const probability = typeof edge.probability === 'number' ? edge.probability : 0.5;
+                        const strokeWidth = 1.5 + probability * 5;
+                        const strokeOpacity = 0.35 + probability * 0.65;
+                        const color = getSpeedColor(edge);
+                        return (
+                            <path
+                                key={edge.id}
+                                d={`M ${x1} ${y1} C ${x1 + dx} ${y1}, ${x2 - dx} ${y2}, ${x2} ${y2}`}
+                                stroke={color}
+                                strokeWidth={strokeWidth}
+                                strokeOpacity={strokeOpacity}
+                                fill="none"
+                            />
+                        );
+                    })}
+                </svg>
+
+                {graphFailures.map(failure => {
+                    const pos = nodePositions[failure.id] || initialPositions[failure.id] || { x: 0, y: 0 };
+                    const isActive = activeFailures.some(active => active.id === failure.id);
+                    return (
+                        <div
+                            key={failure.id}
+                            onMouseDown={(event) => {
+                                if (!mapRef.current) return;
+                                const rect = mapRef.current.getBoundingClientRect();
+                                draggingRef.current = {
+                                    id: failure.id,
+                                    offsetX: event.clientX - rect.left - pos.x,
+                                    offsetY: event.clientY - rect.top - pos.y
+                                };
+                            }}
+                            onDoubleClick={() => handleTrigger(failure.id)}
+                            style={{
+                                position: 'absolute',
+                                left: `${pos.x}px`,
+                                top: `${pos.y}px`,
+                                width: `${nodeWidth}px`,
+                                height: `${nodeHeight}px`,
+                                background: isActive ? 'linear-gradient(135deg, rgba(80, 30, 30, 0.9), rgba(30, 15, 15, 0.95))' : 'rgba(22, 30, 40, 0.92)',
+                                border: isActive ? '1px solid #ff4d4d' : '1px solid #2a3b4c',
+                                borderRadius: '8px',
+                                padding: '10px 12px',
+                                cursor: 'grab',
                                 display: 'flex',
-                                justifyContent: 'space-between'
-                            }}>
-                                <span>{catName}</span>
-                                <span style={{ opacity: 0.5 }}>{items.length}</span>
+                                flexDirection: 'column',
+                                justifyContent: 'space-between',
+                                boxShadow: isActive ? '0 0 18px rgba(255, 77, 77, 0.4)' : '0 0 12px rgba(0, 0, 0, 0.4)',
+                                userSelect: 'none'
+                            }}
+                        >
+                            <div style={{ fontSize: '11px', fontWeight: 'bold', color: '#e8edf2' }}>
+                                {failure.description || failure.failure_code || failure.id}
                             </div>
-                            
-                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: '8px' }}>
-                                {items.map(def => {
-                                    const isActive = activeFailures.some(f => f.id === def.id);
-                                    return (
-                                        <button
-                                            key={def.id}
-                                            onClick={() => handleTrigger(def.id)}
-                                            disabled={isActive}
-                                            style={{
-                                                background: isActive ? 'linear-gradient(45deg, #331111, #220000)' : '#1a222a',
-                                                border: isActive ? '1px solid #ff3333' : '1px solid #2a3b4c',
-                                                color: isActive ? '#ff9999' : '#ccddee',
-                                                padding: '10px',
-                                                cursor: isActive ? 'default' : 'pointer',
-                                                textAlign: 'left',
-                                                fontSize: '11px',
-                                                borderRadius: '4px',
-                                                display: 'flex',
-                                                flexDirection: 'column',
-                                                gap: '4px',
-                                                transition: 'all 0.2s',
-                                                opacity: isActive ? 0.8 : 1
-                                            }}
-                                        >
-                                            <span style={{ fontWeight: 'bold' }}>{def.label || def.name || def.id}</span>
-                                            {isActive && <span style={{ fontSize: '9px', color: '#ff3333' }}>ACTIVE</span>}
-                                        </button>
-                                    );
-                                })}
+                            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '9px', color: '#8fa1b5' }}>
+                                <span>{(failure.system || 'OTHER').toUpperCase()}</span>
+                                <span>{(failure.time_scale || 'unknown').toUpperCase()}</span>
                             </div>
                         </div>
-                    ))}
-                </div>
+                    );
+                })}
 
-                {/* Right Column: Active Status */}
-                <div style={{ flex: 1.2, display: 'flex', flexDirection: 'column', gap: '15px', borderLeft: '1px solid #334455', paddingLeft: '20px' }}>
-                    
-                    {/* System Monitor */}
-                    <div style={{ background: '#11161b', padding: '15px', borderRadius: '6px', border: '1px solid #223344' }}>
-                        <div style={{ fontSize: '11px', fontWeight: 'bold', color: '#8899aa', marginBottom: '10px', textTransform: 'uppercase' }}>
-                            Vitals Monitor
-                        </div>
-                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', fontSize: '11px' }}>
-                            <StatusIndicator label="ENG 1" status={physicsService.engines[0]?.failed ? 'FAIL' : 'OK'} />
-                            <StatusIndicator label="ENG 2" status={physicsService.engines[1]?.failed ? 'FAIL' : 'OK'} />
-                            <StatusIndicator label="HYD A" status={physicsService.systems.hydraulics?.sysA?.pressure > 2000 ? 'OK' : 'LOW'} />
-                            <StatusIndicator label="HYD B" status={physicsService.systems.hydraulics?.sysB?.pressure > 2000 ? 'OK' : 'LOW'} />
-                            <StatusIndicator label="ELEC" status={physicsService.systems.electrical?.dcVolts > 20 ? 'OK' : 'FAIL'} />
-                            <StatusIndicator label="CABIN" status={physicsService.systems.pressurization?.breach ? 'BREACH' : 'OK'} />
-                            <StatusIndicator label="GEAR" status={physicsService.controls.gear === 1 ? 'DOWN' : 'UP'} />
-                            <StatusIndicator label="FLAPS" status={`${(physicsService.controls.flaps * 100).toFixed(0)}%`} color="#aaa" />
-                        </div>
+                {isLoading && (
+                    <div style={{
+                        position: 'absolute',
+                        inset: 0,
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        background: 'rgba(8, 12, 16, 0.75)',
+                        color: '#cbd5e1',
+                        fontSize: '12px',
+                        letterSpacing: '1px'
+                    }}>
+                        LOADING FAILURE GRAPH...
                     </div>
-
-                    {/* Active Failures List */}
-                    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-                        <div style={{ fontSize: '11px', fontWeight: 'bold', color: '#ff6666', marginBottom: '10px', display: 'flex', justifyContent: 'space-between' }}>
-                            <span>ACTIVE ALERTS</span>
-                            <span>{activeFailures.length}</span>
-                        </div>
-                        
-                        <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '8px', paddingRight: '5px' }}>
-                            {activeFailures.length === 0 ? (
-                                <div style={{ 
-                                    flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', 
-                                    color: '#334455', fontStyle: 'italic', border: '1px dashed #223344', borderRadius: '6px' 
-                                }}>
-                                    System Nominal
-                                </div>
-                            ) : (
-                                activeFailures.map((failure, idx) => (
-                                    <div key={failure.id + idx} style={{ 
-                                        background: 'linear-gradient(90deg, rgba(60, 20, 20, 0.5), rgba(40, 10, 10, 0.2))', 
-                                        borderLeft: '3px solid #ff3333',
-                                        padding: '10px',
-                                        borderRadius: '0 4px 4px 0'
-                                    }}>
-                                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
-                                            <span style={{ fontWeight: 'bold', color: '#ffaaaa' }}>{failure.name || failure.id}</span>
-                                            <span style={{ fontSize: '10px', color: '#ff6666', border: '1px solid #552222', padding: '0 4px', borderRadius: '2px' }}>
-                                                {(failure.currentStage || 'UNKNOWN').toUpperCase()}
-                                            </span>
-                                        </div>
-                                        
-                                        <div style={{ fontSize: '10px', color: '#998888', marginBottom: '4px', lineHeight: '1.4' }}>
-                                            {failure.getDescription()}
-                                        </div>
-
-                                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '9px', color: '#665555', marginTop: '6px' }}>
-                                            <span>T+{failure.timeInStage.toFixed(1)}s</span>
-                                            {failure.context && Object.keys(failure.context).length > 0 && (
-                                                <span style={{ fontFamily: 'monospace' }}>
-                                                    {Object.keys(failure.context).join(', ')}
-                                                </span>
-                                            )}
-                                        </div>
-                                    </div>
-                                ))
-                            )}
-                        </div>
-                    </div>
-
-                </div>
+                )}
             </div>
-        </div>
-    );
-};
-
-const StatusIndicator = ({ label, status, color }) => {
-    const isOk = status === 'OK' || status === 'DOWN' || status === 'UP';
-    const displayColor = color || (isOk ? '#4ade80' : '#ef4444');
-    
-    return (
-        <div style={{ display: 'flex', justifyContent: 'space-between', padding: '4px', background: 'rgba(255,255,255,0.03)', borderRadius: '3px' }}>
-            <span style={{ color: '#667788' }}>{label}</span>
-            <span style={{ fontWeight: 'bold', color: displayColor }}>{status}</span>
         </div>
     );
 };

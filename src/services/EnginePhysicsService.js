@@ -46,6 +46,21 @@ class EnginePhysicsService {
         };
         
         this._prevFuelFlow = 0;
+
+        // Failure Parameters
+        this.failureParams = {
+            thrust_efficiency: 1.0,
+            fuel_flow_efficiency: 1.0,
+            n1_decel: null, // If set, overrides default spool down
+            egt_rate: 0,
+            vibration_level: 0
+        };
+    }
+
+    setFailureParams(params) {
+        this.failureParams = { ...this.failureParams, ...params };
+        if (params.vibration_level !== undefined) this.state.vibration = params.vibration_level;
+        if (params.failed !== undefined) this.state.failed = params.failed;
     }
 
     /**
@@ -213,7 +228,14 @@ class EnginePhysicsService {
         const altitudeFactor = Math.pow(airDensityRatio, 0.7);
         const machFactor = Math.max(0, 1 - 0.2 * mach); 
 
-        this.state.thrust = this.config.maxThrust * thrustFactor * altitudeFactor * machFactor;
+        let finalThrust = this.config.maxThrust * thrustFactor * altitudeFactor * machFactor;
+        
+        // Apply Failure Efficiency
+        if (this.failureParams.thrust_efficiency !== 1.0) {
+            finalThrust *= this.failureParams.thrust_efficiency;
+        }
+
+        this.state.thrust = finalThrust;
 
         // Fuel Flow (N2 based mostly for core, but N1 is good proxy)
         // Using N1 for consistency with existing TSFC methods
@@ -221,8 +243,13 @@ class EnginePhysicsService {
         const idleFlow = this.computeIdleFuelFlow(this.config.tsfc, airDensityRatio, this.state.n1);
         
         const thrustDemandAbs = Math.abs(this.state.thrust);
-        const rawFuelFlow = idleFlow + tsfcEff * thrustDemandAbs;
+        let rawFuelFlow = idleFlow + tsfcEff * thrustDemandAbs;
         
+        // Apply Failure Efficiency
+        if (this.failureParams.fuel_flow_efficiency !== 1.0) {
+            rawFuelFlow *= this.failureParams.fuel_flow_efficiency;
+        }
+
         const alpha = 0.35; 
         const smoothed = this._prevFuelFlow * (1 - alpha) + rawFuelFlow * alpha;
         this.state.fuelFlow = Math.max(idleFlow, smoothed);
@@ -233,6 +260,11 @@ class EnginePhysicsService {
         const runningEGT = 400 + (this.state.n2 * 4); // EGT correlates well with N2 (Core)
         const totalEGT = runningEGT + (this.state.egtOffset || 0);
         this.state.egt = this.state.running ? totalEGT : baseEGT + (this.state.egt - baseEGT) * 0.99;
+
+        // Apply EGT Rate from failure
+        if (this.failureParams.egt_rate !== 0) {
+            this.state.egtOffset = (this.state.egtOffset || 0) + this.failureParams.egt_rate * dt;
+        }
 
         return this.getOutput();
     }
@@ -266,8 +298,11 @@ class EnginePhysicsService {
     }
 
     spoolDown(dt) {
-        this.state.n1 *= (1 - 0.1 * dt);
-        this.state.n2 *= (1 - 0.1 * dt);
+        // Use custom decel rate if available
+        const rate = (this.failureParams.n1_decel !== null) ? Math.abs(this.failureParams.n1_decel) : 0.1;
+        
+        this.state.n1 *= (1 - rate * dt);
+        this.state.n2 *= (1 - rate * dt);
         this.state.thrust = 0;
         this.state.fuelFlow = 0;
         this.state.running = false;

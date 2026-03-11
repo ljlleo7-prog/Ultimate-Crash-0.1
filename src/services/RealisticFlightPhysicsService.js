@@ -75,9 +75,21 @@ class RealisticFlightPhysicsService {
         };
 
         // Failure Simulation State
-        this.controlLag = { aileron: 1.0, elevator: 1.0, rudder: 1.0, gear: 1.0 }; // 1.0 = normal, >1.0 = slower
-        this.controlEffectiveness = { aileron: 1.0, elevator: 1.0, rudder: 1.0, gear: 1.0 }; // 0.0 to 1.0
+        this.controlLag = { aileron: 1.0, elevator: 1.0, rudder: 1.0, gear: 1.0, flaps: 1.0 }; // 1.0 = normal, >1.0 = slower
+        this.controlEffectiveness = { aileron: 1.0, elevator: 1.0, rudder: 1.0, gear: 1.0, flaps: 1.0 }; // 0.0 to 1.0
         this.vibrationLevel = 0; // Global vibration level
+
+        // Failure Parameters (Generic)
+        this.failureParams = {
+            movement_restricted: { aileron: false, elevator: false, rudder: false, flaps: false, gear: false },
+            control_sensitivity: { aileron: 1.0, elevator: 1.0, rudder: 1.0, flaps: 1.0, gear: 1.0 },
+            structural_health: 1.0,
+            stress_limit_reduction: 0,
+            aerodynamic_efficiency: 1.0,
+            friction_increase: 0,
+            quantity_rate: {}, // e.g. { hydraulicA: 0.1, fuel: 0.5 } (units per second)
+            data_integrity: 1.0 // 1.0 = perfect, <1.0 = noise/errors
+        };
 
         // Engine State
         this.engines = Array(this.aircraft.engineCount).fill(0).map(() => {
@@ -151,7 +163,14 @@ class RealisticFlightPhysicsService {
             engineCount: this.aircraft.engineCount
         });
         this.warningSystem = new WarningSystem();
-        this.sensors = { pitotBlocked: false };
+        this.sensors = { 
+            pitotBlocked: false,
+            staticBlocked: false,
+            radAlt: null, // null means valid/auto, -1 means failed
+            aoaFrozen: false,
+            ilsDeviation: 0,
+            data_integrity: 1.0 // 1.0 = perfect, <1.0 = noise/errors
+        };
 
         // Motion control flag (allows disabling physics integration while keeping systems active)
         // Start DISABLED to prevent initial settling/sliding until scene is fully ready
@@ -795,6 +814,41 @@ class RealisticFlightPhysicsService {
 
         // Delegate logic to OverheadLogic service
         OverheadLogic.update(this.systems, context, dt);
+
+        if (this.failureParams.quantity_rate) {
+            const rates = this.failureParams.quantity_rate;
+            
+            if (rates.fuel) {
+                const leak = rates.fuel * dt;
+                if (this.systems.fuel && this.systems.fuel.tanks) {
+                    const tanks = this.systems.fuel.tanks;
+                    const total = (tanks.left + tanks.right + tanks.center) || 1;
+                    if (tanks.left > 0) tanks.left = Math.max(0, tanks.left - leak * (tanks.left / total));
+                    if (tanks.right > 0) tanks.right = Math.max(0, tanks.right - leak * (tanks.right / total));
+                    if (tanks.center > 0) tanks.center = Math.max(0, tanks.center - leak * (tanks.center / total));
+                }
+            }
+            
+            if (this.systems.hydraulics) {
+                Object.keys(this.systems.hydraulics).forEach(sysName => {
+                    let rate = rates.hydraulics || 0;
+                    
+                    if (rates[sysName]) rate += rates[sysName];
+                    
+                    if (rate > 0) {
+                        const sys = this.systems.hydraulics[sysName];
+                        if (sys && sys.qty > 0) {
+                            sys.qty = Math.max(0, sys.qty - rate * dt);
+                            if (sys.qty <= 0) {
+                                sys.pressure = 0;
+                                sys.engPump = false;
+                                sys.elecPump = false;
+                            }
+                        }
+                    }
+                });
+            }
+        }
         
         // Update Control Effectiveness based on Hydraulics
         this.updateControlEffectiveness(dt);
@@ -888,6 +942,79 @@ class RealisticFlightPhysicsService {
         this.controlLag.aileron = lagFactor;
         this.controlLag.rudder = lagFactor;
         this.controlLag.gear = lagFactor;
+
+        // Apply specific failure parameter overrides
+        ['aileron', 'elevator', 'rudder', 'gear', 'flaps'].forEach(axis => {
+            // Sensitivity
+            if (this.failureParams.control_sensitivity[axis] !== undefined) {
+                 this.controlEffectiveness[axis] = (this.controlEffectiveness[axis] || 1.0) * this.failureParams.control_sensitivity[axis];
+            }
+            
+            // Movement Restriction (Stuck/Jammed)
+            // If restricted, clamp effectiveness to near zero (or specific value if we had one)
+            if (this.failureParams.movement_restricted[axis]) {
+                this.controlEffectiveness[axis] = Math.min(this.controlEffectiveness[axis] || 1.0, 0.05); // Almost stuck
+            }
+        });
+    }
+
+    /**
+     * Set generic failure parameters
+     */
+    setFailureParams(params) {
+        if (params.movement_restricted !== undefined) {
+            if (typeof params.movement_restricted === 'boolean') {
+                this.failureParams.movement_restricted = {
+                    aileron: params.movement_restricted,
+                    elevator: params.movement_restricted,
+                    rudder: params.movement_restricted,
+                    flaps: params.movement_restricted,
+                    gear: params.movement_restricted
+                };
+            } else {
+                this.failureParams.movement_restricted = { ...this.failureParams.movement_restricted, ...params.movement_restricted };
+            }
+        }
+        if (params.control_sensitivity !== undefined) {
+            if (typeof params.control_sensitivity === 'number') {
+                this.failureParams.control_sensitivity = {
+                    aileron: params.control_sensitivity,
+                    elevator: params.control_sensitivity,
+                    rudder: params.control_sensitivity,
+                    flaps: params.control_sensitivity,
+                    gear: params.control_sensitivity
+                };
+            } else {
+                this.failureParams.control_sensitivity = { ...this.failureParams.control_sensitivity, ...params.control_sensitivity };
+            }
+        }
+        if (params.structural_health !== undefined) this.failureParams.structural_health = params.structural_health;
+        if (params.structural_integrity !== undefined) this.failureParams.structural_health = params.structural_integrity;
+        if (params.stress_limit_reduction !== undefined) this.failureParams.stress_limit_reduction = params.stress_limit_reduction;
+        if (params.aerodynamic_efficiency !== undefined) this.failureParams.aerodynamic_efficiency = params.aerodynamic_efficiency;
+        if (params.friction_increase !== undefined) this.failureParams.friction_increase = params.friction_increase;
+        if (params.vibration_level !== undefined) this.vibrationLevel = params.vibration_level;
+        if (params.quantity_rate !== undefined) {
+            if (typeof params.quantity_rate === 'number') {
+                this.failureParams.quantity_rate = { ...this.failureParams.quantity_rate, fuel: params.quantity_rate };
+            } else {
+                this.failureParams.quantity_rate = { ...this.failureParams.quantity_rate, ...params.quantity_rate };
+            }
+        }
+        if (params.surface_deflection_locked) {
+            this.failureParams.movement_restricted = {
+                aileron: true,
+                elevator: true,
+                rudder: true,
+                flaps: true,
+                gear: true
+            };
+        }
+        if (params.data_integrity !== undefined || params.data_validity !== undefined) {
+            const value = params.data_integrity !== undefined ? params.data_integrity : params.data_validity;
+            this.failureParams.data_integrity = value;
+            if (this.sensors) this.sensors.data_integrity = value;
+        }
     }
 
     calculateEnvironment(z_down) {
@@ -1226,6 +1353,10 @@ class RealisticFlightPhysicsService {
              }
 
              // 3. Update Physics
+             engine.setFailureParams({
+                 quantity_rate: this.failureParams.quantity_rate.fuel || 0,
+                 data_integrity: this.failureParams.data_integrity
+             });
              engine.update(dt, engineThrottle, mach, -this.state.pos.z, airDensityRatio, env.temp);
              
              // 4. Sync Back to Systems (for UI and Logic)
@@ -1267,6 +1398,11 @@ class RealisticFlightPhysicsService {
         // CL = CL0 + CLa * alpha + CL_flaps + CL_elevator + CL_brakes
         const CL_stall_drop = Math.abs(alpha) > 0.3 ? -0.5 * Math.sin((Math.abs(alpha) - 0.3) * 5) : 0; // Simple stall drop
         let CL = this.aircraft.CL0 + this.aircraft.CLa * alpha + CL_flaps + CL_brakes + (effElevator * 0.3) + CL_stall_drop;
+        
+        if (this.failureParams.aerodynamic_efficiency !== 1.0) {
+            CL *= this.failureParams.aerodynamic_efficiency;
+        }
+
         const icingLevel = this.icingState?.level || 0;
         if (icingLevel > 0) {
             CL *= 1 - (0.3 * icingLevel);
@@ -1605,6 +1741,12 @@ class RealisticFlightPhysicsService {
                 const brakingData = this.groundStatus && this.groundStatus.status === 'RUNWAY'
                     ? this.getRunwayBrakingData()
                     : null;
+                
+                if (this.failureParams.friction_increase > 0) {
+                    mu_roll += this.failureParams.friction_increase;
+                    mu_slide += this.failureParams.friction_increase * 0.5;
+                }
+
                 if (brakingData) {
                     const rollScale = isBraking ? brakingData.brakeScale : Math.max(0.6, brakingData.gripScale);
                     mu_roll *= rollScale;
@@ -1938,11 +2080,18 @@ class RealisticFlightPhysicsService {
 
         const autopilotStatus = this.getAutopilotStatus ? this.getAutopilotStatus() : { engaged: false, targets: {} };
         
+        const integrity = this.failureParams.data_integrity;
+        const applyNoise = (val) => {
+            if (integrity >= 1.0 || !Number.isFinite(val)) return val;
+            const noiseFactor = (1 - integrity) * 0.1; 
+            return val * (1 + (Math.random() - 0.5) * noiseFactor);
+        };
+
         const outputState = {
             position: {
                 x: this.state.pos.x, // North
                 y: this.state.pos.y, // East
-                z: altitude,         // Altitude (Relative Up)
+                z: applyNoise(altitude),         // Altitude (Relative Up)
                 latitude: this.state.geo.lat,
                 longitude: this.state.geo.lon
             },
@@ -1952,14 +2101,14 @@ class RealisticFlightPhysicsService {
                 w: this.state.vel.z
             },
             orientation: {
-                phi: euler.phi,
-                theta: euler.theta,
-                psi: euler.psi
+                phi: applyNoise(euler.phi),
+                theta: applyNoise(euler.theta),
+                psi: applyNoise(euler.psi)
             },
             angularRates: {
-                p: this.state.rates.x,
-                q: this.state.rates.y,
-                r: this.state.rates.z
+                p: applyNoise(this.state.rates.x),
+                q: applyNoise(this.state.rates.y),
+                r: applyNoise(this.state.rates.z)
             },
             controls: {
                 throttle: this.controls.throttle,
@@ -1971,19 +2120,19 @@ class RealisticFlightPhysicsService {
             flaps: this.controls.flaps,
             gear: this.controls.gear > 0.5,
             airBrakes: this.controls.brakes, // Mapping brakes to airbrakes for now
-            verticalSpeed: vs * 196.85, // m/s -> ft/min
+            verticalSpeed: applyNoise(vs * 196.85), // m/s -> ft/min
             hasCrashed: this.crashed,
             crashWarning: this.crashReason,
             autopilot: autopilotStatus,
             autopilotTargets: autopilotStatus.targets,
             autopilotDebug: this.autopilot.debugState,
             engineParams: {
-                n1: this.engines.map(e => e.state.n1),
-                n2: this.engines.map(e => e.state.n2), 
-                egt: this.engines.map(e => e.state.egt),
-                fuelFlow: this.engines.map(e => e.state.fuelFlow),
-                oilPressure: this.engines.map(e => e.state.oilPressure),
-                vibration: this.engines.map(e => e.state.vibration)
+                n1: this.engines.map(e => applyNoise(e.state.n1)),
+                n2: this.engines.map(e => applyNoise(e.state.n2)), 
+                egt: this.engines.map(e => applyNoise(e.state.egt)),
+                fuelFlow: this.engines.map(e => applyNoise(e.state.fuelFlow)),
+                oilPressure: this.engines.map(e => applyNoise(e.state.oilPressure)),
+                vibration: this.engines.map(e => applyNoise(e.state.vibration))
             },
             systems: this.systems,
             fuel: this.state.fuel,

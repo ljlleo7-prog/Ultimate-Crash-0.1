@@ -102,7 +102,18 @@ class BaseFailure {
     // To be overridden or defined in definition
     apply(physicsService) {
         const stageDef = this.stages[this.currentStage];
-        if (stageDef && typeof stageDef.effect === 'function') {
+        if (!stageDef) return;
+        if (typeof physicsService?.setFailureParams === 'function') {
+            const params = typeof stageDef.params === 'function'
+                ? stageDef.params(this.variation.context, this.intensity)
+                : stageDef.params;
+            const parameters = typeof stageDef.parameters === 'function'
+                ? stageDef.parameters(this.variation.context, this.intensity)
+                : stageDef.parameters;
+            if (params) physicsService.setFailureParams(params);
+            if (parameters) physicsService.setFailureParams(parameters);
+        }
+        if (typeof stageDef.effect === 'function') {
             stageDef.effect(physicsService, this.intensity, this.variation.context);
         }
     }

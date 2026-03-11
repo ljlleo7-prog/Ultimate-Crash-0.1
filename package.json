@@ -10,11 +10,22 @@
     "preview": "vite preview",
     "lint": "eslint src --ext js,jsx --report-unused-disable-directives --max-warnings 0",
     "test": "node --test",
+    "generate:failure-descriptions": "node scripts/generate_failure_descriptions.js",
+    "update:failure-graph": "node scripts/update_failure_graph.js",
+    "apply:failure-graph": "node scripts/update_failure_graph.js --apply-approved",
+    "generate:narratives": "node scripts/generate_narratives.js",
+    "fetch:authoritative-sources": "NODE_TLS_REJECT_UNAUTHORIZED=0 node scripts/fetch_authoritative_sources.js",
+    "process:failure-graph": "node scripts/process_failure_graph.js",
+    "build:failure-pipeline": "npm run fetch:authoritative-sources && npm run process:failure-graph",
+    "build:atc-phraseology": "NODE_TLS_REJECT_UNAUTHORIZED=0 node scripts/build_atc_phraseology_pipeline.js",
     "predeploy": "npm run build",
     "deploy": "gh-pages -d dist"
   },
   "dependencies": {
+    "@supabase/supabase-js": "^2.98.0",
+    "dotenv": "^16.6.1",
     "framer-motion": "^12.24.11",
+    "pdf-parse": "^1.1.1",
     "react": "^18.2.0",
     "react-dom": "^18.2.0"
   },

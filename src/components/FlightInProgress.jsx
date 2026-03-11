@@ -16,9 +16,11 @@ import eventBus from '../services/eventBus';
 import { getRunwayHeading } from '../utils/routeGenerator';
 import RadioActionPanel from './RadioActionPanel';
 import { atcManager } from '../services/ATCLogic';
+import { initializeATCPhraseologyTemplates } from '../data/atcResponseDatabase';
 import { npcService } from '../services/NPCService';
 import { regionControlService } from '../services/RegionControlService';
 import { checkStartupRequirements, StartupPhases } from '../services/StartupChecklist';
+import { skylinetragedyService } from '../services/skylinetragedy/SkylinetragedyService.js';
 
 const FlightInProgress = ({ 
   callsign, 
@@ -153,6 +155,7 @@ const FlightInProgress = ({
   } = useAircraftPhysics(aircraftConfig, false, physicsModel);
 
   // Control state for UI components
+  const { language } = useLanguage();
   const [throttleControl, setThrottleControl] = useState(0); // Initialize at IDLE
   const [commandInput, setCommandInput] = useState('');
   const [radioMessages, setRadioMessages] = useState([]);
@@ -160,6 +163,9 @@ const FlightInProgress = ({
   const [useRealWeather, setUseRealWeather] = useState(true); // Enable Real Weather by default
   const [sceneState, setSceneState] = useState(sceneManager.getState());
   const [narrative, setNarrative] = useState(null);
+  useEffect(() => {
+    initializeATCPhraseologyTemplates();
+  }, []);
 
   // Control Physics Motion based on Phase (Narrative vs Active)
   useEffect(() => {
@@ -238,7 +244,9 @@ const FlightInProgress = ({
         altitude: Math.round(flightData.altitude),
         heading: Math.round(flightData.heading),
         weather: weatherData, // Pass weather data to ATC context
-        frequencyType: freqType
+        frequencyType: freqType,
+        language,
+        phaseOfFlight: sceneState.currentPhase?.type
     };
 
     atcManager.processMessage(
@@ -454,7 +462,8 @@ const FlightInProgress = ({
         altitude: flightData.altitude,
         verticalSpeed: flightData.verticalSpeed,
         callsign: callsign,
-        weather: weatherData
+        weather: weatherData,
+        language
     }, freqInfo, (msg) => {
         setRadioMessages(prev => [...prev, { ...msg, frequency: freqType }]);
     });
@@ -645,6 +654,11 @@ const FlightInProgress = ({
     }
   }, [currentFreq, isInitialized, physicsService, routeDetails, flightPlan, selectedDeparture, selectedArrival]);
 
+  // Initialize SkylineTragedy Service
+  useEffect(() => {
+    skylinetragedyService.initialize();
+  }, []);
+
   // Main update loop
   useEffect(() => {
     sceneManager.start();
@@ -666,6 +680,11 @@ const FlightInProgress = ({
         // Use real elapsed time (safeDt) instead of hardcoded 1/60
         // This fixes the "doubled update speed" on high refresh rate monitors (e.g. 120Hz)
         physicsState = updatePhysics(safeDt, now);
+        
+        // Update SkylineTragedy Service
+        if (physicsService) {
+             skylinetragedyService.update(safeDt, physicsService);
+        }
       }
       sceneManager.update(dt, physicsState);
       const state = sceneManager.getState();
@@ -678,7 +697,7 @@ const FlightInProgress = ({
         cancelAnimationFrame(animationId);
       }
     };
-  }, [isInitialized, updatePhysics]);
+  }, [isInitialized, updatePhysics, physicsService]);
 
   // ✅ CLEAN ARCHITECTURE: Throttle control handler
   const handleThrustControl = (engineIndex, throttleValue) => {
