@@ -21,6 +21,8 @@ import { npcService } from '../services/NPCService';
 import { regionControlService } from '../services/RegionControlService';
 import { checkStartupRequirements, StartupPhases } from '../services/StartupChecklist';
 import { skylinetragedyService } from '../services/skylinetragedy/SkylinetragedyService.js';
+import { npcCrewService } from '../services/NPCCrewService';
+import CrewPanel from './CrewPanel';
 
 const FlightInProgress = ({ 
   callsign, 
@@ -657,7 +659,8 @@ const FlightInProgress = ({
   // Initialize SkylineTragedy Service
   useEffect(() => {
     skylinetragedyService.initialize();
-  }, []);
+    npcCrewService.initialize(difficulty);
+  }, [difficulty]);
 
   // Main update loop
   useEffect(() => {
@@ -974,6 +977,8 @@ const FlightInProgress = ({
             onClose={() => setShowFailurePanel(false)}
           />
         )}
+
+        <CrewPanel difficulty={difficulty} />
 
         <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', zIndex: 10 }}>
           <FlightPanelModular

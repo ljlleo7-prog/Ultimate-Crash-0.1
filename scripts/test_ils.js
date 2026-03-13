@@ -2,6 +2,8 @@
 import RealisticFlightPhysicsService from '../src/services/RealisticFlightPhysicsService.js';
 import { loadAircraftData } from '../src/services/aircraftService.js';
 import { airportService } from '../src/services/airportService.js';
+import { terrainService } from '../src/services/TerrainService.js';
+import fs from 'node:fs/promises';
 
 // Configuration
 // Defaults used when scenario does not specify airport/runway
@@ -10,6 +12,33 @@ const DEFAULT_RUNWAY = '24R';
 const AIRCRAFT_MODEL = "Boeing 737-800";
 const SIM_DT = 0.05; // 20Hz
 const SIM_DURATION = 500; // Seconds (Increased to allow 15nm approaches to complete)
+const args = process.argv.slice(2);
+const metricsOutIndex = args.indexOf('--metrics-out');
+const metricsOut = metricsOutIndex >= 0 ? args[metricsOutIndex + 1] : null;
+
+const computeStats = (rows, keys) => {
+    const stats = {};
+    keys.forEach(key => {
+        const values = rows.map(r => r[key]).filter(v => Number.isFinite(v));
+        if (!values.length) {
+            stats[key] = null;
+            return;
+        }
+        const sorted = [...values].sort((a, b) => a - b);
+        const sum = values.reduce((acc, v) => acc + v, 0);
+        const mean = sum / values.length;
+        const variance = values.reduce((acc, v) => acc + ((v - mean) ** 2), 0) / values.length;
+        const idx95 = Math.floor(0.95 * (sorted.length - 1));
+        stats[key] = {
+            min: sorted[0],
+            max: sorted[sorted.length - 1],
+            mean,
+            stdev: Math.sqrt(variance),
+            p95: sorted[idx95]
+        };
+    });
+    return stats;
+};
 
 async function runTest(scenario) {
     console.log(`\n---------------------------------------------------`);
@@ -95,8 +124,8 @@ async function runTest(scenario) {
     });
     
     // Force Set Latitude/Longitude just in case constructor didn't stick or setInitialConditions reset something (unlikely but safe)
-    physics.state.latitude = startLat;
-    physics.state.longitude = startLon;
+    physics.state.geo.lat = startLat;
+    physics.state.geo.lon = startLon;
     
     // Set Velocity (Body frame approximation)
     const velMs = scenario.speed * 0.514444;
@@ -107,6 +136,25 @@ async function runTest(scenario) {
 
     // Enable Motion (Fix for speed=0 issue)
     physics.setMotionEnabled(true);
+
+    const terrainElevation = await terrainService.getElevation(startLat, startLon);
+    if (Number.isFinite(terrainElevation)) {
+        physics.terrainElevation = terrainElevation;
+        if (physics.airportElevation === 0) physics.airportElevation = terrainElevation;
+    }
+    const weather = scenario.weather || {
+        windSpeed: 10,
+        windDirection: runwayHeading,
+        windGust: 16,
+        windShear: 4,
+        turbulence: 0.2,
+        precipitation: 0,
+        temperature: 15,
+        cloudCover: 0.2,
+        latitude: startLat,
+        longitude: startLon
+    };
+    physics.setEnvironment(weather);
     
     // Phase 1: Use LNAV with pre-turn to intercept a 15nm localizer inbound
     if (scenario.useNavPreTurn && physics.autopilot && physics.autopilot.setNavigationPlan) {
@@ -177,6 +225,20 @@ async function runTest(scenario) {
     let prevDist = 9999;
     let thresholdState = null;
     let passedThreshold = false;
+    const samples = [];
+    const sampleKeys = [
+        'dist_nm',
+        'cross_ft',
+        'alt_err_ft',
+        'heading_err_deg',
+        'loc_dev_deg',
+        'gs_dev_deg',
+        'target_roll_deg',
+        'target_pitch_deg',
+        'target_vs_fpm',
+        'airspeed_kts',
+        'verticalSpeed_fpm'
+    ];
     
     const ilsSwitchTime = scenario.useNavPreTurn ? Infinity : SIM_DURATION + 1;
     for (let i = 0; i < steps; i++) {
@@ -236,6 +298,7 @@ async function runTest(scenario) {
         const metrics = computeRunwayMetrics();
         finalCrossTrack = metrics.distCrossFt;
         finalAltError = metrics.altErrorFt;
+        const headingError = Math.abs(((currentHeading - runwayHeading + 540) % 360) - 180);
         if (debugState && debugState.ils && debugState.ils.active) {
             finalCrossTrack = debugState.ils.distCross;
             finalAltError = debugState.ils.altError;
@@ -249,7 +312,7 @@ async function runTest(scenario) {
                     thresholdState = {
                         lateral: finalCrossTrack,
                         vertical: finalAltError,
-                        headingError: Math.abs(((currentHeading - runwayHeading + 540) % 360) - 180),
+                        headingError: headingError,
                         alt: alt,
                         dist: distNm
                     };
@@ -261,6 +324,27 @@ async function runTest(scenario) {
                     }
                 }
             }
+        }
+        if (i % (1 / SIM_DT) === 0) {
+            const distIlsNm = (debugState && debugState.ils && debugState.ils.active) ? debugState.ils.distAlong / 6076 : null;
+            const distLnavNm = (debugState && debugState.lnav && typeof debugState.lnav.dist_m === 'number') ? (debugState.lnav.dist_m / 1852) : null;
+            const dist = distIlsNm !== null ? distIlsNm : (distLnavNm !== null ? distLnavNm : null);
+            const speed = physics.state.vel ? physics.state.vel.magnitude() * 1.94384 : 0;
+            const verticalSpeed = physics.state.vel ? (-physics.state.vel.z * 3.28084 * 60) : 0;
+            samples.push({
+                time_s: t,
+                dist_nm: dist,
+                cross_ft: finalCrossTrack,
+                alt_err_ft: finalAltError,
+                heading_err_deg: headingError,
+                loc_dev_deg: debugState && debugState.ils ? debugState.ils.locDeviationDeg : null,
+                gs_dev_deg: debugState && debugState.ils ? debugState.ils.gsDeviationDeg : null,
+                target_roll_deg: debugState ? debugState.targetRoll : null,
+                target_pitch_deg: debugState ? debugState.targetPitch : null,
+                target_vs_fpm: physics.autopilot ? physics.autopilot.targets.vs : null,
+                airspeed_kts: speed,
+                verticalSpeed_fpm: verticalSpeed
+            });
         }
         
         // Log periodically
@@ -306,15 +390,30 @@ async function runTest(scenario) {
     const isOnGlide = Math.abs(evalState.vertical) < 30;
     const isHeadingAligned = evalState.headingError < 1.0;
     
+    const stats = computeStats(samples, sampleKeys);
+    const scenarioMeta = {
+        name: scenario.name,
+        airport: airportCode,
+        runway: runwayId,
+        dist_nm: scenario.dist,
+        offset_nm: scenario.offset,
+        alt_ft: scenario.alt,
+        heading_deg: scenario.heading,
+        speed_kts: scenario.speed,
+        useNavPreTurn: !!scenario.useNavPreTurn,
+        randomStart: !!scenario.randomStart
+    };
+    console.log(`METRICS_JSON ${JSON.stringify({ scenario: scenarioMeta, evaluation: evalState, stats })}`);
+
     if (isAligned && isOnGlide && isHeadingAligned) {
         console.log(`✅ TEST PASSED: Successfully guided to runway.`);
-        return { success: true, name: scenario.name, lateral: evalState.lateral, vertical: evalState.vertical, headingError: evalState.headingError };
+        return { success: true, name: scenario.name, lateral: evalState.lateral, vertical: evalState.vertical, headingError: evalState.headingError, stats, samples, scenario: scenarioMeta };
     } else {
         console.log(`❌ TEST FAILED: Failed to align or hold glideslope.`);
         if (!isAligned) console.log(`   -> Lateral Deviation too high.`);
         if (!isOnGlide) console.log(`   -> Vertical Deviation too high.`);
         if (!isHeadingAligned) console.log(`   -> Heading Misalignment too high.`);
-        return { success: false, name: scenario.name, lateral: evalState.lateral, vertical: evalState.vertical, headingError: evalState.headingError };
+        return { success: false, name: scenario.name, lateral: evalState.lateral, vertical: evalState.vertical, headingError: evalState.headingError, stats, samples, scenario: scenarioMeta };
     }
 }
 
@@ -348,6 +447,11 @@ const scenarios = [
         for (const s of scenarios) {
             const res = await runTest(s);
             if (res) results.push(res);
+        }
+
+        if (metricsOut) {
+            await fs.writeFile(metricsOut, JSON.stringify(results, null, 2));
+            console.log(`METRICS_OUT ${metricsOut}`);
         }
         
         console.log(`\n===================================================`);

@@ -136,6 +136,15 @@ class RealisticAutopilotService {
         
         this.navPlan = null;
         this.navState = { preTurnEngaged: false };
+        this.filteredState = null;
+        this.outputState = null;
+        this.inputFilterTau = 0.4;
+        this.outputRateLimits = {
+            throttle: 0.6,
+            elevator: 1.2,
+            aileron: 1.5,
+            rudder: 1.5
+        };
     }
 
     setRunwayGeometry(geometry) {
@@ -196,6 +205,8 @@ class RealisticAutopilotService {
             this.localizerPID.reset();
             this.finalApproachDrift = null;
             this.prevTargetRoll = 0; // Reset rate limiter state
+            this.filteredState = null;
+            this.outputState = null;
 
             // If we have current state, capture targets if they are currently 0
             if (currentState) {
@@ -214,6 +225,57 @@ class RealisticAutopilotService {
         this.engaged = engaged;
     }
 
+    smoothValue(prev, next, dt, tau) {
+        if (!isFinite(next)) return prev ?? 0;
+        if (prev === null || prev === undefined) return next;
+        const alpha = dt / (tau + dt);
+        return prev + (next - prev) * alpha;
+    }
+
+    smoothAngle(prev, next, dt, tau) {
+        if (!isFinite(next)) return prev ?? 0;
+        if (prev === null || prev === undefined) return (next + 360) % 360;
+        const alpha = dt / (tau + dt);
+        let delta = ((next - prev + 540) % 360) - 180;
+        return (prev + delta * alpha + 360) % 360;
+    }
+
+    rateLimit(prev, next, rate, dt) {
+        if (prev === null || prev === undefined) return next;
+        const maxDelta = rate * dt;
+        let delta = next - prev;
+        if (delta > maxDelta) delta = maxDelta;
+        if (delta < -maxDelta) delta = -maxDelta;
+        return prev + delta;
+    }
+
+    filterState(state, dt) {
+        if (!this.filteredState) {
+            this.filteredState = {
+                airspeed: state.airspeed,
+                verticalSpeed: state.verticalSpeed,
+                pitch: state.pitch,
+                roll: state.roll,
+                heading: state.heading,
+                track: state.track,
+                beta: state.beta || 0
+            };
+            return this.filteredState;
+        }
+        const prev = this.filteredState;
+        const next = {
+            airspeed: this.smoothValue(prev.airspeed, state.airspeed, dt, this.inputFilterTau),
+            verticalSpeed: this.smoothValue(prev.verticalSpeed, state.verticalSpeed, dt, this.inputFilterTau),
+            pitch: this.smoothValue(prev.pitch, state.pitch, dt, this.inputFilterTau),
+            roll: this.smoothValue(prev.roll, state.roll, dt, this.inputFilterTau),
+            heading: this.smoothAngle(prev.heading, state.heading, dt, this.inputFilterTau),
+            track: this.smoothAngle(prev.track, state.track, dt, this.inputFilterTau),
+            beta: this.smoothValue(prev.beta, state.beta || 0, dt, this.inputFilterTau)
+        };
+        this.filteredState = next;
+        return next;
+    }
+
     /**
      * Calculate Control Outputs
      * @param {Object} state - Current aircraft state { airspeed (kts), verticalSpeed (ft/min), pitch (rad), roll (rad), altitude (ft), heading (deg), latitude, longitude }
@@ -226,19 +288,27 @@ class RealisticAutopilotService {
 
         const { airspeed, verticalSpeed, pitch, roll, heading, track, latitude, longitude, altitude } = state;
         const beta = state.beta || 0;
+        const filtered = this.filterState({ airspeed, verticalSpeed, pitch, roll, heading, track, beta }, dt);
+        const fAirspeed = filtered.airspeed;
+        const fVerticalSpeed = filtered.verticalSpeed;
+        const fPitch = filtered.pitch;
+        const fRoll = filtered.roll;
+        const fHeading = filtered.heading;
+        const fTrack = filtered.track;
+        const fBeta = filtered.beta;
         
         // Ensure targets are initialized if they were somehow left at 0
         if (this.targets.speed === 0) {
-            this.targets.speed = Math.round(airspeed);
+            this.targets.speed = Math.round(fAirspeed);
             this.targets.ias = this.targets.speed;
         } else if (this.targets.ias === undefined) {
              this.targets.ias = this.targets.speed;
         }
-        if (this.targets.vs === 0 && Math.abs(verticalSpeed) > 100) {
-             this.targets.vs = Math.round(verticalSpeed / 100) * 100;
+        if (this.targets.vs === 0 && Math.abs(fVerticalSpeed) > 100) {
+             this.targets.vs = Math.round(fVerticalSpeed / 100) * 100;
         }
         if (this.targets.heading === 0) {
-            this.targets.heading = heading === 0 ? 360 : heading;
+            this.targets.heading = fHeading === 0 ? 360 : fHeading;
         }
 
         // --- LNAV with Pre-Turn Logic ---
@@ -259,12 +329,12 @@ class RealisticAutopilotService {
             const distCross = -dx * uy + dy * ux;
             const effectiveDist = Math.max(Math.abs(distAlong), 500);
             const deviationDeg = Math.atan2(distCross, effectiveDist) * 180 / Math.PI;
-            let deltaTrack = inboundCourseDeg - (typeof track === 'number' ? track : heading);
+            let deltaTrack = inboundCourseDeg - (typeof fTrack === 'number' ? fTrack : fHeading);
             if (deltaTrack > 180) deltaTrack -= 360;
             if (deltaTrack < -180) deltaTrack += 360;
             const g = 9.80665;
             const bankRad = (leadBankDeg || 25) * Math.PI / 180;
-            const v_ms = airspeed * 0.514444;
+            const v_ms = fAirspeed * 0.514444;
             const turnRadius = (v_ms * v_ms) / (g * Math.tan(bankRad));
             const crossLead = Math.max(300, Math.min(4000, turnRadius));
             const fixLatRad = fix.latitude * Math.PI / 180;
@@ -319,8 +389,8 @@ class RealisticAutopilotService {
                 headingCorrection = correction;
                 targetHdg = inboundCourseDeg + headingCorrection;
             }
-            if (typeof track === 'number' && typeof heading === 'number') {
-                let drift = track - heading;
+            if (typeof fTrack === 'number' && typeof fHeading === 'number') {
+                let drift = fTrack - fHeading;
                 if (drift > 180) drift -= 360;
                 if (drift < -180) drift += 360;
                 targetHdg = targetHdg + drift;
@@ -446,7 +516,7 @@ class RealisticAutopilotService {
                      vsCorrection = this.glideslopePID.update(altError, 0, dt);
                      
                      // Feed Forward: Base Descent Rate for 3 degree slope
-                     const groundSpeedKts = airspeed; // Using IAS as proxy for GS
+                     const groundSpeedKts = fAirspeed; // Using IAS as proxy for GS
                      baseDescentRate = -groundSpeedKts * 5.2; 
                      
                      // If not in active approach zone, disable base descent
@@ -490,8 +560,8 @@ class RealisticAutopilotService {
                  
                  // Calculate Drift Angle (Track - Heading)
                  let driftAngle = 0;
-                 if (typeof track === 'number') {
-                     let rawDrift = track - heading;
+                if (typeof fTrack === 'number') {
+                    let rawDrift = fTrack - fHeading;
                      if (rawDrift > 180) rawDrift -= 360;
                      if (rawDrift < -180) rawDrift += 360;
                      driftAngle = rawDrift - (beta * 180 / Math.PI);
@@ -628,16 +698,16 @@ class RealisticAutopilotService {
         const { speed: targetSpeed, vs: targetVS, heading: targetHeading } = this.targets;
 
         // 1. Auto-Throttle (Speed Control)
-        const throttleCmd = this.speedPID.update(targetSpeed, airspeed, dt);
+        const throttleCmd = this.speedPID.update(targetSpeed, fAirspeed, dt);
 
         // 2. Vertical Speed Control (VS -> Pitch -> Trim)
-        const targetPitch = this.vsPID.update(targetVS, verticalSpeed, dt);
-        const pitchCmd = this.pitchPID.update(targetPitch, pitch, dt);
+        const targetPitch = this.vsPID.update(targetVS, fVerticalSpeed, dt);
+        const pitchCmd = this.pitchPID.update(targetPitch, fPitch, dt);
         
         // Trim Logic:
         // "Make the trim wheel rotate faster" - User Request
         // Increased trim rate from 0.1 to 0.5 to offload elevator faster.
-        const trimRate = 0.5;
+        const trimRate = 0.25;
         // Robustness: Handle undefined currentControls.trim
         const currentTrim = typeof currentControls.trim === 'number' ? currentControls.trim : 0;
         let newTrim = currentTrim + (pitchCmd * trimRate * dt);
@@ -657,7 +727,7 @@ class RealisticAutopilotService {
         let headingError = 0;
         if (this.mode === 'HDG' || this.mode === 'LNAV' || this.mode === 'ILS') {
             // Calculate heading error with wrap-around
-            headingError = targetHeading - heading;
+            headingError = targetHeading - fHeading;
             if (headingError > 180) headingError -= 360;
             if (headingError < -180) headingError += 360;
             
@@ -688,7 +758,7 @@ class RealisticAutopilotService {
             }
         }
 
-        const aileronCmd = this.rollPID.update(targetRoll, roll, dt);
+        const aileronCmd = this.rollPID.update(targetRoll, fRoll, dt);
 
         // 5. Beta -> Rudder (Turn Coordination)
         // We want Beta to be 0.
@@ -700,21 +770,33 @@ class RealisticAutopilotService {
         // If error = -Beta, then output is negative.
         // So we should feed (Beta, 0) -> Error = Beta - 0 = Beta.
         // Then Output = Kp * Beta. Positive Beta -> Positive Rudder.
-        const rudderCmd = this.rudderPID.update(beta, 0, dt);
+        const rudderCmd = this.rudderPID.update(fBeta, 0, dt);
+
+        const limitedThrottle = this.rateLimit(this.outputState?.throttle, throttleCmd, this.outputRateLimits.throttle, dt);
+        const limitedElevator = this.rateLimit(this.outputState?.elevator, elevatorCmd, this.outputRateLimits.elevator, dt);
+        const limitedAileron = this.rateLimit(this.outputState?.aileron, aileronCmd, this.outputRateLimits.aileron, dt);
+        const limitedRudder = this.rateLimit(this.outputState?.rudder, rudderCmd, this.outputRateLimits.rudder, dt);
+
+        this.outputState = {
+            throttle: limitedThrottle,
+            elevator: limitedElevator,
+            aileron: limitedAileron,
+            rudder: limitedRudder
+        };
 
         // Update Debug State
         this.debugState = {
             headingError,
             targetRoll: targetRoll * 180 / Math.PI, // Convert to deg for display
-            pitchError: (targetPitch - pitch) * 180 / Math.PI,
+            pitchError: (targetPitch - fPitch) * 180 / Math.PI,
             targetPitch: targetPitch * 180 / Math.PI,
-            speedError: targetSpeed - airspeed,
-            throttleCmd,
-            vsError: targetVS - verticalSpeed,
-            aileronCmd,
-            elevatorCmd,
-            rudderCmd,
-            beta,
+            speedError: targetSpeed - fAirspeed,
+            throttleCmd: limitedThrottle,
+            vsError: targetVS - fVerticalSpeed,
+            aileronCmd: limitedAileron,
+            elevatorCmd: limitedElevator,
+            rudderCmd: limitedRudder,
+            beta: fBeta,
             mode: this.mode,
             engaged: this.engaged,
             ils: ilsDebug,
@@ -723,11 +805,11 @@ class RealisticAutopilotService {
         };
 
         return {
-            throttle: isFinite(throttleCmd) ? throttleCmd : 0,
-            elevator: isFinite(elevatorCmd) ? elevatorCmd : 0,
+            throttle: isFinite(limitedThrottle) ? limitedThrottle : 0,
+            elevator: isFinite(limitedElevator) ? limitedElevator : 0,
             trim: isFinite(newTrim) ? newTrim : 0,
-            aileron: isFinite(aileronCmd) ? aileronCmd : 0,
-            rudder: isFinite(rudderCmd) ? rudderCmd : 0
+            aileron: isFinite(limitedAileron) ? limitedAileron : 0,
+            rudder: isFinite(limitedRudder) ? limitedRudder : 0
         };
     }
 }
