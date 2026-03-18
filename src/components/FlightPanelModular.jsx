@@ -161,6 +161,7 @@ const FlightPanelModular = ({ flightData, physicsState, weatherData, onActionReq
         autopilot: flightData.autopilotEngaged || false, // ✅ Use physics service status
         autopilotMode: flightData.autopilotMode || prevState.autopilotMode || 'LNAV',
         autopilotDebug: flightData.autopilotDebug || {}, // Pass debug state
+        approachTelemetry: flightData.approachTelemetry || null,
         flightDirector: prevState.flightDirector,
         altitudeHold: prevState.altitudeHold,
         headingHold: prevState.headingHold,

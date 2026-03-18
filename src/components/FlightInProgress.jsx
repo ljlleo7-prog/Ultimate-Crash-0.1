@@ -14,6 +14,11 @@ import commandDatabase from '../commandDatabase.json';
 import sceneManager from '../services/sceneManager.js';
 import eventBus from '../services/eventBus';
 import { getRunwayHeading } from '../utils/routeGenerator';
+import {
+  appendApproachTelemetrySample,
+  buildApproachTelemetrySample,
+  summarizeApproachTelemetry
+} from '../utils/approachTelemetry.js';
 import RadioActionPanel from './RadioActionPanel';
 import { atcManager } from '../services/ATCLogic';
 import { initializeATCPhraseologyTemplates } from '../data/atcResponseDatabase';
@@ -23,6 +28,7 @@ import { checkStartupRequirements, StartupPhases } from '../services/StartupChec
 import { skylinetragedyService } from '../services/skylinetragedy/SkylinetragedyService.js';
 import { npcCrewService } from '../services/NPCCrewService';
 import CrewPanel from './CrewPanel';
+import TutorialOverlay from './TutorialOverlay';
 
 const FlightInProgress = ({ 
   callsign, 
@@ -50,7 +56,9 @@ const FlightInProgress = ({
   failureType, 
   crewCount, 
   physicsModel = 'realistic',
-  routeDetails
+  routeDetails,
+  isTutorial = false,
+  onTutorialClose
 }) => {
 
 
@@ -115,12 +123,12 @@ const FlightInProgress = ({
     windSpeedKts: weatherData && typeof weatherData.windSpeed === 'number'
       ? weatherData.windSpeed
       : 0,
-    // Fallback to KSFO if latitude/longitude are missing (prevents 0,0 initialization)
     initialLatitude: initialLat,
     initialLongitude: initialLon,
-    // Pass heading in degrees, as useAircraftPhysics converts it to radians
     initialHeading: runwayHeadingDeg,
     airportElevation: initialDeparture?.elevation || 0,
+    initialAltitude: isTutorial ? 10000 : undefined,
+    initialSpeed: isTutorial ? 250 : undefined,
     flightPlan: (routeDetails?.waypoints || flightPlan?.waypoints || []),
     departure: selectedDeparture,
     arrival: selectedArrival,
@@ -187,7 +195,7 @@ const FlightInProgress = ({
     // Conversely, if we force 'takeoff' phase but clearance logic hasn't fired, this might keep it frozen (safety).
     // However, for non-ground phases (Cruise, etc), we always enable motion.
     
-    const shouldFreeze = isGroundPhase && !sceneState.takeoffClearanceReceived;
+    const shouldFreeze = !isTutorial && isGroundPhase && !sceneState.takeoffClearanceReceived;
     
     if (shouldFreeze) {
          // Force zero velocity and lock integration
@@ -282,11 +290,13 @@ const FlightInProgress = ({
   // Startup Checklist Logic (Pro/Devil)
   const [startupStatus, setStartupStatus] = useState(() => {
     const isHardcore = difficulty === 'pro' || difficulty === 'devil';
-    return { 
-      canContinue: !isHardcore, 
-      missingItems: isHardcore ? ['System Initialization...'] : [] 
+    return {
+      canContinue: !isHardcore,
+      missingItems: isHardcore ? ['System Initialization...'] : []
     };
   });
+  const [approachTelemetrySamples, setApproachTelemetrySamples] = useState([]);
+  const approachTelemetry = summarizeApproachTelemetry(approachTelemetrySamples);
 
   useEffect(() => {
     if (!physicsState || !physicsState.systems) return;
@@ -328,6 +338,15 @@ const FlightInProgress = ({
         }
     }
   }, [physicsState, sceneState.currentPhase, difficulty]);
+
+  useEffect(() => {
+    setApproachTelemetrySamples([]);
+  }, [callsign, aircraftModel, selectedArrival?.iata, selectedArrival?.icao, routeDetails?.landingRunway, flightPlan?.arrival?.runways?.[0]?.name]);
+
+  useEffect(() => {
+    const sample = buildApproachTelemetrySample({ ils: flightData?.autopilotDebug?.ils, timestamp: Date.now() });
+    setApproachTelemetrySamples(prev => appendApproachTelemetrySample(prev, sample));
+  }, [flightData?.autopilotDebug?.ils]);
 
   // Sync prop flightPlan to state if it changes (e.g. reset)
   useEffect(() => {
@@ -986,7 +1005,8 @@ const FlightInProgress = ({
               ...flightData,
               physicsActive: sceneState.physicsActive,
               narrativeHistory: sceneState.narrativeHistory,
-              phaseName: sceneState.phase?.name
+              phaseName: sceneState.phase?.name,
+              approachTelemetry
             }}
             physicsState={physicsState}
             weatherData={weatherData}
@@ -1210,22 +1230,51 @@ const FlightInProgress = ({
               <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: '4px 8px' }}>
                 <span style={{ color: '#f59e0b', fontWeight: 'bold' }}>ILS STATUS</span>
                 <span style={{ color: '#f59e0b', fontWeight: 'bold', textAlign: 'right' }}>{flightData.autopilotDebug.ils.runway}</span>
-                
+
                 <span style={{ color: '#9ca3af' }}>Dist:</span>
-                <span>{(flightData.autopilotDebug.ils.distAlong / 6076).toFixed(1)} nm</span>
-                
+                <span>{flightData.autopilotDebug.ils.distAlong !== null ? (flightData.autopilotDebug.ils.distAlong / 6076).toFixed(1) : '---'} nm</span>
+
                 <span style={{ color: '#9ca3af' }}>LOC Err:</span>
-                <span style={{ color: Math.abs(flightData.autopilotDebug.ils.distCross) > 50 ? '#ef4444' : '#4ade80' }}>
-                  {flightData.autopilotDebug.ils.distCross.toFixed(0)} ft
+                <span style={{ color: Math.abs(flightData.autopilotDebug.ils.distCross ?? 0) > 50 ? '#ef4444' : '#4ade80' }}>
+                  {flightData.autopilotDebug.ils.distCross !== null ? flightData.autopilotDebug.ils.distCross.toFixed(0) : '---'} ft
                 </span>
+
+                <span style={{ color: '#9ca3af' }}>LOC Dev:</span>
+                <span>{flightData.autopilotDebug.ils.locDeviationDeg !== null ? flightData.autopilotDebug.ils.locDeviationDeg.toFixed(2) : '---'}°</span>
 
                 <span style={{ color: '#9ca3af' }}>G/S Err:</span>
-                <span style={{ color: Math.abs(flightData.autopilotDebug.ils.altError) > 50 ? '#ef4444' : '#4ade80' }}>
-                  {flightData.autopilotDebug.ils.altError.toFixed(0)} ft
+                <span style={{ color: Math.abs(flightData.autopilotDebug.ils.altError ?? 0) > 50 ? '#ef4444' : '#4ade80' }}>
+                  {flightData.autopilotDebug.ils.altError !== null ? flightData.autopilotDebug.ils.altError.toFixed(0) : '---'} ft
                 </span>
 
+                <span style={{ color: '#9ca3af' }}>G/S Dev:</span>
+                <span>{flightData.autopilotDebug.ils.gsDeviationDeg !== null ? flightData.autopilotDebug.ils.gsDeviationDeg.toFixed(2) : '---'}°</span>
+
                 <span style={{ color: '#9ca3af' }}>Tgt Alt:</span>
-                <span>{flightData.autopilotDebug.ils.targetAltitude.toFixed(0)} ft</span>
+                <span>{flightData.autopilotDebug.ils.targetAltitude !== null ? flightData.autopilotDebug.ils.targetAltitude.toFixed(0) : '---'} ft</span>
+
+                <span style={{ color: '#9ca3af' }}>Trend:</span>
+                <span style={{
+                  color: approachTelemetry?.trend === 'improving'
+                    ? '#4ade80'
+                    : approachTelemetry?.trend === 'worsening'
+                      ? '#ef4444'
+                      : '#f59e0b'
+                }}>
+                  {(approachTelemetry?.trend || 'stable').toUpperCase()}
+                </span>
+
+                <span style={{ color: '#9ca3af' }}>Capture:</span>
+                <span>
+                  LOC {approachTelemetry?.locCaptured ? `@ ${approachTelemetry.locCaptureTimeSec?.toFixed(1) ?? '0.0'}s` : 'ARM'} / GS {approachTelemetry?.gsCaptured ? `@ ${approachTelemetry.gsCaptureTimeSec?.toFixed(1) ?? '0.0'}s` : 'ARM'}
+                </span>
+
+                <span style={{ color: '#9ca3af' }}>Final:</span>
+                <span>
+                  {approachTelemetry?.final?.distCross !== null && approachTelemetry?.final?.distCross !== undefined
+                    ? `${Math.abs(approachTelemetry.final.distCross).toFixed(0)} ft / ${approachTelemetry?.final?.altError !== null && approachTelemetry?.final?.altError !== undefined ? `${Math.abs(approachTelemetry.final.altError).toFixed(0)} ft` : '---'}`
+                    : '---'}
+                </span>
               </div>
             </>
           )}
@@ -1275,6 +1324,12 @@ const FlightInProgress = ({
             </button>
           </div>
         </div>
+      )}
+      {isTutorial && flightData && (
+        <TutorialOverlay 
+          physicsState={flightData} 
+          onClose={onTutorialClose} 
+        />
       )}
     </div>
   );

@@ -1,6 +1,8 @@
 
 import eventBus from '../eventBus.js';
 import BaseFailure from './BaseFailure.js';
+import { createCanonicalFailureGraph } from './CanonicalFailureGraph.js';
+import FailureGraphExecutor from './FailureGraphExecutor.js';
 
 // Registry of all failure definitions (will be populated)
 import EngineFailures from './types/EngineFailures.js';
@@ -15,7 +17,9 @@ class FailureHandler {
         this.engineCount = config.engineCount || 2;
         this.activeFailures = new Map(); // id -> failureInstance
         this.registry = new Map();
-        
+        this.graph = createCanonicalFailureGraph();
+        this.graphExecutor = new FailureGraphExecutor(this.graph);
+
         // Register definitions
         this.registerGroup(EngineFailures);
         this.registerGroup(SystemFailures);
@@ -26,10 +30,11 @@ class FailureHandler {
         this.settings = this.getDifficultySettings(this.difficulty);
         this.time = 0;
         this.nextCheckTime = 10.0;
-        
+
         // Bind callback
         this.handleTransition = this.handleTransition.bind(this);
     }
+
 
     registerGroup(group) {
         if (!group) return;
@@ -58,9 +63,12 @@ class FailureHandler {
         this.activeFailures.forEach(failure => {
             failure.update(dt, flightState);
         });
-        
-        // Cascade Logic: Check if active failures trigger others
-        this.checkCascades(flightState);
+
+        this.graphExecutor.update(dt, {
+            activeFailures: this.activeFailures,
+            flightState,
+            triggerFailure: (id, context) => this.triggerFailure(id, context)
+        });
 
         // Random triggering logic
         if (this.time > this.nextCheckTime) {
@@ -69,34 +77,7 @@ class FailureHandler {
         }
     }
 
-    checkCascades(state) {
-        // Cascade: Engine Fire -> Hydraulic Failure
-        if (this.activeFailures.has('engine_fire')) {
-            const fire = this.activeFailures.get('engine_fire');
-            if (fire.currentStage === 'active' && fire.timeInStage > 30.0) {
-                 // Fire burns through hydraulic lines
-                 if (!this.activeFailures.has('hydraulic_failure') && Math.random() < 0.005) {
-                     this.triggerFailure('hydraulic_failure', { reason: 'fire_damage' });
-                 }
-            }
-        }
-        
-        // Cascade: Electrical Bus -> Avionics Overheat (if fan stops)
-        if (this.activeFailures.has('electrical_bus_failure')) {
-             if (!this.activeFailures.has('avionics_overheat') && Math.random() < 0.001) {
-                 this.triggerFailure('avionics_overheat', { reason: 'cooling_loss' });
-             }
-        }
 
-        if (this.activeFailures.has('circuit_arc')) {
-            const arc = this.activeFailures.get('circuit_arc');
-            if (arc.currentStage === 'active' && arc.timeInStage > 15.0) {
-                if (!this.activeFailures.has('electrical_fire') && Math.random() < 0.01) {
-                    this.triggerFailure('electrical_fire', { reason: 'arc_damage' });
-                }
-            }
-        }
-    }
 
     applyImpact(physicsService) {
         this.activeFailures.forEach(failure => {
@@ -203,6 +184,7 @@ class FailureHandler {
     reset() {
         this.activeFailures.clear();
         this.time = 0;
+        this.graphExecutor.reset();
     }
 }
 

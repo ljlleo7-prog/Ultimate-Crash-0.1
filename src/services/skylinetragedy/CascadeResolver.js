@@ -11,38 +11,32 @@ class CascadeResolver {
         this.time += dt;
         const newFailures = [];
 
-        // Check pending cascades
         this.pendingCascades = this.pendingCascades.filter(cascade => {
             if (this.time >= cascade.triggerTime) {
                 newFailures.push(cascade.failureId);
-                return false; // Remove from pending
+                return false;
             }
-            return true; // Keep in pending
+            return true;
         });
 
-        // Process newly active failures
         activeFailures.forEach(failureId => {
             if (this.processedFailures.has(failureId)) return;
 
             const edges = failureGraphManager.getEdgesFrom(failureId);
             edges.forEach(edge => {
-                // Ignore PHYSICS propagation
-                if (edge.propagation_type === 'PHYSICS') return;
+                if ((edge.propagation_type || edge.propagationType) === 'PHYSICS') return;
+                if (Math.random() > (edge.probability ?? 1)) return;
 
-                // Apply probability
-                if (Math.random() > edge.probability) return;
-
-                // Schedule cascade
-                const delay = edge.delay_seconds || 0;
+                const effectFailure = edge.effect_failure || edge.targetRuntimeId || edge.targetId;
+                const delay = edge.delay_seconds ?? edge.delaySeconds ?? 0;
                 const triggerTime = this.time + delay;
-                
-                // Avoid duplicates in pending or already active
-                if (activeFailures.has(edge.effect_failure)) return;
-                if (this.pendingCascades.some(c => c.failureId === edge.effect_failure)) return;
+
+                if (activeFailures.has(effectFailure)) return;
+                if (this.pendingCascades.some(c => c.failureId === effectFailure)) return;
 
                 this.pendingCascades.push({
-                    failureId: edge.effect_failure,
-                    triggerTime: triggerTime,
+                    failureId: effectFailure,
+                    triggerTime,
                     sourceId: failureId
                 });
             });
@@ -50,7 +44,6 @@ class CascadeResolver {
             this.processedFailures.add(failureId);
         });
 
-        // Cleanup processedFailures that are no longer active
         this.processedFailures.forEach(id => {
             if (!activeFailures.has(id)) {
                 this.processedFailures.delete(id);

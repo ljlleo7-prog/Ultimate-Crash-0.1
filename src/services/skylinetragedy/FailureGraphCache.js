@@ -1,4 +1,4 @@
-const CACHE_KEY = 'skylinetragedy_failure_graph_cache_v1';
+const CACHE_KEY = 'skylinetragedy_failure_graph_cache_v2';
 
 class FailureGraphCache {
     load() {

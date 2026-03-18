@@ -2,6 +2,8 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
 import RealisticFlightPhysicsService from '../src/services/RealisticFlightPhysicsService.js';
+import { createCanonicalFailureGraph } from '../src/services/failures/CanonicalFailureGraph.js';
+import { failureGraphManager } from '../src/services/skylinetragedy/FailureGraphManager.js';
 
 const require = createRequire(import.meta.url);
 const aircraftDatabase = require('../src/data/aircraftDatabase.json');
@@ -68,12 +70,42 @@ test('control jam overrides elevator with AP off and on', () => {
   });
 });
 
-test('circuit arc cascades to electrical fire after active phase', () => {
+test('canonical failure graph normalizes runtime and legacy identifiers', () => {
+  const graph = createCanonicalFailureGraph();
+  const engineFire = graph.nodes.find(node => node.runtimeId === 'engine_fire');
+
+  assert.ok(engineFire);
+  assert.equal(engineFire.canonicalCode, 'ENGINE_FIRE');
+  assert.equal(graph.aliasToRuntimeId.get('ENG_FIRE'), 'engine_fire');
+  assert.equal(graph.aliasToRuntimeId.get('ENGINE_FIRE'), 'engine_fire');
+});
+
+test('failure graph manager exposes canonical runtime fallback artifact', () => {
+  failureGraphManager.loadRuntimeFallback();
+  const artifact = failureGraphManager.getGraphArtifact();
+  const failure = failureGraphManager.getFailureByCode('ENGINE_FIRE');
+  const edges = failureGraphManager.getEdgesFrom('engine_fire');
+
+  assert.equal(artifact.version, 'canonical-runtime-v1');
+  assert.equal(failure.runtime_id, 'engine_fire');
+  assert.equal(edges.some(edge => edge.effect_failure === 'hydraulic_failure'), true);
+});
+
+test('engine fire cascade reaches hydraulic failure after stage/time guard', () => {
   withFixedRandom(0.0, () => {
     const service = new RealisticFlightPhysicsService(aircraft);
-    service.failureSystem.triggerFailure('circuit_arc');
-    service.failureSystem.update(16, service.getOutputState());
-    service.failureSystem.applyImpact(service);
-    assert.equal(service.failureSystem.activeFailures.has('electrical_fire'), true);
+    service.failureSystem.triggerFailure('engine_fire', { engineIndex: 0 });
+    runFailureTicks(service, 43);
+    assert.equal(service.failureSystem.activeFailures.has('hydraulic_failure'), true);
   });
 });
+
+test('electrical bus failure cascade requires low bus power before avionics overheat', () => {
+  withFixedRandom(0.0, () => {
+    const service = new RealisticFlightPhysicsService(aircraft);
+    service.failureSystem.triggerFailure('electrical_bus_failure');
+    runFailureTicks(service, 30);
+    assert.equal(service.failureSystem.activeFailures.has('avionics_overheat'), true);
+  });
+});
+

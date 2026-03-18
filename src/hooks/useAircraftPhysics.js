@@ -3,6 +3,31 @@ import RealisticFlightPhysicsService from '../services/RealisticFlightPhysicsSer
 import { loadAircraftData } from '../services/aircraftService.js';
 import { airportService } from '../services/airportService.js';
 
+const normalizeAutopilotDebug = (autopilotDebug) => {
+  if (!autopilotDebug || typeof autopilotDebug !== 'object') return null;
+
+  const ils = autopilotDebug.ils && typeof autopilotDebug.ils === 'object'
+    ? {
+        ...autopilotDebug.ils,
+        active: !!autopilotDebug.ils.active,
+        distAlong: Number.isFinite(autopilotDebug.ils.distAlong) ? autopilotDebug.ils.distAlong : null,
+        distCross: Number.isFinite(autopilotDebug.ils.distCross) ? autopilotDebug.ils.distCross : null,
+        altError: Number.isFinite(autopilotDebug.ils.altError) ? autopilotDebug.ils.altError : null,
+        locDeviationDeg: Number.isFinite(autopilotDebug.ils.locDeviationDeg) ? autopilotDebug.ils.locDeviationDeg : null,
+        gsDeviationDeg: Number.isFinite(autopilotDebug.ils.gsDeviationDeg) ? autopilotDebug.ils.gsDeviationDeg : null,
+        driftAngle: Number.isFinite(autopilotDebug.ils.driftAngle) ? autopilotDebug.ils.driftAngle : null,
+        targetAltitude: Number.isFinite(autopilotDebug.ils.targetAltitude) ? autopilotDebug.ils.targetAltitude : null,
+        locCaptured: autopilotDebug.ils.locCaptured === true,
+        gsCaptured: autopilotDebug.ils.gsCaptured === true
+      }
+    : null;
+
+  return {
+    ...autopilotDebug,
+    ils
+  };
+};
+
 export function useAircraftPhysics(config = {}, autoStart = true, model = 'realistic') {
   console.log('🎮 useAircraftPhysics: HOOK CALLED', {
     config,
@@ -165,12 +190,13 @@ export function useAircraftPhysics(config = {}, autoStart = true, model = 'reali
         
         // Apply initial conditions from config
         if (service && typeof service.setInitialConditions === 'function') {
-           // Convert initialHeading (degrees) to radians for psi
            const headingRad = (config.initialHeading || 0) * Math.PI / 180;
-           
+
            service.setInitialConditions({
                latitude: initialLatitude,
                longitude: initialLongitude,
+               altitude: config.initialAltitude,
+               speed: config.initialSpeed,
                orientation: {
                    psi: headingRad,
                    theta: 0,
@@ -393,6 +419,7 @@ export function useAircraftPhysics(config = {}, autoStart = true, model = 'reali
       const alarms = Array.isArray(newState.alarms) ? newState.alarms : [];
       const hasCrashed = !!newState.hasCrashed;
       const autopilotTargets = newState.autopilotTargets || autopilotStatus.targets || null;
+      const autopilotDebug = normalizeAutopilotDebug(newState.autopilotDebug);
 
       const newFlightData = {
         altitude: altitude,
@@ -440,6 +467,7 @@ export function useAircraftPhysics(config = {}, autoStart = true, model = 'reali
         autopilotEngaged,
         autopilotMode,
         autopilotTargets,
+        autopilotDebug,
         debugPhysics: newState.debugPhysics,
         systems: newState.systems || {}
       };

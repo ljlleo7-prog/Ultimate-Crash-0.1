@@ -16,43 +16,16 @@ import { FadeOverlay, CinematicReview } from './components/CinematicComponents.j
 import { LanguageProvider } from './contexts/LanguageContext';
 import LanguageSwitcher from './components/LanguageSwitcher';
 import Header from './components/Header';
+import HomePage from './components/HomePage';
 
 function App() {
   // Add development mode flag
   const [devMode, setDevMode] = useState(false);
   
-  // Development mode bypass - directly initialize flight
-  const handleDevStart = () => {
-    console.log('🚀 Development Mode: Starting flight simulation directly');
-    
-    // Set default airports for dev mode (KSFO -> KLAX)
-    const devDeparture = getAirportByCode('KSFO') || getAirportByCode('KATL');
-    const devArrival = getAirportByCode('KLAX') || getAirportByCode('KJFK');
-    
-    if (devDeparture && devArrival) {
-      console.log('📍 Dev Mode: Using default airports', devDeparture.iata, '->', devArrival.iata);
-      selectDeparture(devDeparture);
-      selectArrival(devArrival);
-      
-      // We need to wait for state update or force it through props
-      // Since setState is async, we can't rely on selectedDeparture being set immediately for FlightInProgress
-      // But FlightInProgress uses the selectedDeparture from the hook which will update
-      
-      // However, we set flightInitialized to true immediately. 
-      // This might cause a race condition where FlightInProgress renders before selectedDeparture updates.
-      // To be safe, we'll delay the initialization slightly
-      
-      setTimeout(() => {
-        setFlightInitialized(true);
-        setCinematicPhase('none');
-      }, 100);
-    } else {
-      console.warn('⚠️ Dev Mode: Could not find default airports');
-      setFlightInitialized(true);
-      setCinematicPhase('none');
-    }
-  };
-  
+  // App Mode State
+  const [appMode, setAppMode] = useState('home'); // 'home', 'init', 'simulation'
+  const [isTutorial, setIsTutorial] = useState(false);
+
   // Flight initialization state
   const [difficulty, setDifficulty] = useState('rookie');
   const [airline, setAirline] = useState('Test Airline');
@@ -96,7 +69,31 @@ function App() {
   const [showRouteSelection, setShowRouteSelection] = useState(false);
   const [detailedRoute, setDetailedRoute] = useState(null);
 
-
+  // Development mode bypass - directly initialize flight
+  const handleDevStart = () => {
+    console.log('🚀 Development Mode: Starting flight simulation directly');
+    
+    // Set default airports for dev mode (KSFO -> KLAX)
+    const devDeparture = getAirportByCode('KSFO') || getAirportByCode('KATL');
+    const devArrival = getAirportByCode('KLAX') || getAirportByCode('KJFK');
+    
+    if (devDeparture && devArrival) {
+      console.log('📍 Dev Mode: Using default airports', devDeparture.iata, '->', devArrival.iata);
+      selectDeparture(devDeparture);
+      selectArrival(devArrival);
+      
+      setTimeout(() => {
+        setFlightInitialized(true);
+        setAppMode('simulation');
+        setCinematicPhase('none');
+      }, 100);
+    } else {
+      console.warn('⚠️ Dev Mode: Could not find default airports');
+      setFlightInitialized(true);
+      setAppMode('simulation');
+      setCinematicPhase('none');
+    }
+  };
 
   // Load popular aircraft models
   useEffect(() => {
@@ -143,20 +140,18 @@ function App() {
   };
 
   const handleRouteConfirm = (routeData) => {
-    // Insert 10nm approach fix
+    // Insert 10nm approach fix logic
     if (routeData.landingRunway && selectedArrival && selectedDeparture) {
        const isEastward = selectedArrival.longitude > selectedDeparture.longitude;
        const runwayHdg = getRunwayHeading(routeData.landingRunway, isEastward);
-       console.log(`✈️ Approach for ${routeData.landingRunway}: Heading ${runwayHdg} (Eastward: ${isEastward})`);
-       const approachHdg = (runwayHdg + 180) % 360; // Reciprocal
-       const distance = 10; // NM
+       const approachHdg = (runwayHdg + 180) % 360; 
+       const distance = 10; 
        
-       // Calculate coordinate
        const lat1 = selectedArrival.latitude * Math.PI / 180;
        const lon1 = selectedArrival.longitude * Math.PI / 180;
        const brng = approachHdg * Math.PI / 180;
        const d = distance;
-       const R = 3440.065; // Earth radius in NM
+       const R = 3440.065; 
        
        const lat2 = Math.asin(Math.sin(lat1)*Math.cos(d/R) + Math.cos(lat1)*Math.sin(d/R)*Math.cos(brng));
        const lon2 = lon1 + Math.atan2(Math.sin(brng)*Math.sin(d/R)*Math.cos(lat1), Math.cos(d/R)-Math.sin(lat1)*Math.sin(lat2));
@@ -173,11 +168,9 @@ function App() {
           longitude: selectedArrival.longitude
        };
        
-       // Append approach fix then runway to waypoints
        if (!routeData.waypoints) routeData.waypoints = [];
        routeData.waypoints.push(approachFix);
        routeData.waypoints.push(runwayFix);
-       console.log('✅ Added 10nm approach fix and runway:', approachFix, runwayFix);
     }
 
     setDetailedRoute(routeData);
@@ -213,9 +206,7 @@ function App() {
 
   const startSimulation = (routeData) => {
     const fadeDuration = 2500;
-    const reviewDuration = 5000;
-
-    // Determine season
+    
     let currentSeason = season;
     if (useRandomSeason) {
       const seasons = ['spring', 'summer', 'autumn', 'winter'];
@@ -223,7 +214,6 @@ function App() {
       setSeason(currentSeason);
     }
 
-    // Determine Zulu time
     let currentTimeZulu = timeZulu;
     if (useRandomTime) {
       const now = new Date();
@@ -231,7 +221,6 @@ function App() {
       setTimeZulu(currentTimeZulu);
     }
 
-    // Generate initial weather data
     const initialWeather = generateInitialWeather(
       selectedDeparture.latitude,
       selectedDeparture.longitude,
@@ -244,7 +233,6 @@ function App() {
 
     setTimeout(() => {
       setCinematicPhase('cinematic_review');
-      // No auto-transition to narrative_scene
     }, fadeDuration);
   };
 
@@ -256,161 +244,244 @@ function App() {
     setCinematicPhase('fade_in');
     setTimeout(() => {
       setFlightInitialized(true);
+      setAppMode('simulation'); // Ensure appMode syncs
       setCinematicPhase('none');
-    }, 2500); // fadeDuration
+    }, 2500);
   };
 
   const handleResetFlight = () => {
     setFlightInitialized(false);
+    setAppMode('init'); // Go back to init
     setFlightPlan(null);
   };
+  
+  // HomePage Handlers
+  const handleStartSinglePlayer = () => {
+    setAppMode('init');
+    setIsTutorial(false);
+  };
 
-  // Cinematic UI components
-  if (cinematicPhase !== 'none') {
-    return React.createElement(LanguageProvider, null,
-      React.createElement('div', { className: `cinematic-container ${cinematicPhase}` },
-        React.createElement(LanguageSwitcher, { style: { position: 'absolute', top: '20px', right: '20px', zIndex: 2000 } }),
-        cinematicPhase === 'fade_out' && React.createElement(FadeOverlay, { phase: 'fade-out' },
-        React.createElement('div', { className: 'fade-content' },
-          React.createElement('h1', null, 'Initializing Flight Simulation'),
-          React.createElement('p', null, 'Preparing for takeoff...')
-        )
-      ),
-      
-      cinematicPhase === 'cinematic_review' && React.createElement(CinematicReview, {
-        callsign: callsign,
-        selectedDeparture: selectedDeparture,
-        selectedArrival: selectedArrival,
-        aircraftModel: aircraftModel,
-        weatherData: weatherData,
-        setWeatherData: setWeatherData,
-        crewCount: crewCount,
-        failureType: failureType,
-        difficulty: difficulty,
-        pax: pax,
-        payload: payload,
-        routeDetails: detailedRoute,
-        onComplete: handleCinematicReviewComplete
-      }),
-
-      cinematicPhase === 'narrative_scene' && React.createElement(NarrativeScene, {
-        onComplete: handleNarrativeComplete,
-        context: {
-          difficulty,
-          departure: selectedDeparture,
-          arrival: selectedArrival,
-          pax,
-          callsign
-        }
-      }),
-      
-      cinematicPhase === 'fade_in' && React.createElement(FadeOverlay, { phase: 'fade-in' },
-        React.createElement('div', { className: 'fade-content' },
-          React.createElement('h1', null, 'Simulation Active'),
-          React.createElement('p', null, 'Flight controls are now available')
-        )
-      )
-    ));
-  }
-
-  if (flightInitialized) {
-    return React.createElement(LanguageProvider, null,
-      React.createElement(LanguageSwitcher, { style: { position: 'fixed', top: '10px', right: '120px', zIndex: 2000 } }),
-      React.createElement(FlightInProgress, {
-        callsign: callsign,
-      aircraftModel: aircraftModel,
-      difficulty: difficulty,
-      selectedDeparture: selectedDeparture,
-      selectedArrival: selectedArrival,
-      initialDeparture: selectedDeparture,
-      flightPlan: flightPlan,
-      airline: airline,
-      pax: pax,
-      payload: payload,
-      fuelReserve: fuelReserve,
-      cruiseHeight: cruiseHeight,
-      useRandomTime: useRandomTime,
-      timeZulu: timeZulu,
-      useRandomSeason: useRandomSeason,
-      season: season,
-      handleResetFlight: handleResetFlight,
-      formatDistance: formatDistance,
-      formatFlightTime: formatFlightTime,
-      formatFuel: formatFuel,
-      weatherData: weatherData,
-      setWeatherData: setWeatherData,
-      failureType: failureType,
-      crewCount: crewCount,
-      routeDetails: detailedRoute
-    }));
-  }
-
-  return React.createElement(LanguageProvider, null,
-    React.createElement('div', { className: 'App' },
-      React.createElement(LanguageSwitcher, { style: { position: 'absolute', top: '20px', right: '20px' } }),
-      React.createElement(Header, { devMode, setDevMode, handleDevStart }),
-
-      React.createElement('main', { className: 'app-main' },
-      showRouteSelection ? React.createElement(RouteSelectionFrame, {
-        isOpen: showRouteSelection,
-        onConfirm: handleRouteConfirm,
-        onSkip: handleRouteSkip,
-        difficulty: difficulty,
-        departure: selectedDeparture,
-        arrival: selectedArrival
-      }) : React.createElement(FlightInitialization, {
-        difficulty: difficulty,
-        setDifficulty: setDifficulty,
-        airline: airline,
-        setAirline: setAirline,
-        callsign: callsign,
-        setCallsign: setCallsign,
-        aircraftModel: aircraftModel,
-        setAircraftModel: setAircraftModel,
-        pax: pax,
-        setPax: setPax,
-        payload: payload,
-        setPayload: setPayload,
-        fuelReserve: fuelReserve,
-        setFuelReserve: setFuelReserve,
-        cruiseHeight: cruiseHeight,
-        setCruiseHeight: setCruiseHeight,
-        timeZulu: timeZulu,
-        setTimeZulu: setTimeZulu,
-        useRandomTime: useRandomTime,
-        setUseRandomTime: setUseRandomTime,
-        season: season,
-        setSeason: setSeason,
-        useRandomSeason: useRandomSeason,
-        setUseRandomSeason: setUseRandomSeason,
-        selectedDeparture: selectedDeparture,
-        selectedArrival: selectedArrival,
-        searchResults: searchResults,
-        searchAirports: searchAirports,
-        selectDeparture: selectDeparture,
-        selectArrival: selectArrival,
-        flightPlan: flightPlan,
-        formatDistance: formatDistance,
-        formatFlightTime: formatFlightTime,
-        formatFuel: formatFuel,
-        failureType: failureType,
-        setFailureType: setFailureType,
-        weatherData: weatherData,
-        setWeatherData: setWeatherData,
-        crewCount: crewCount,
-        setCrewCount: setCrewCount,
-        aircraftSuggestions: aircraftSuggestions,
-        handleInitializeFlight: handleInitializeFlight,
-        handleSearch: handleSearch,
-        apiKey: apiKey,
-        setApiKey: setApiKey
-      })
-    ),
+  const handleStartTutorial = () => {
+    setIsTutorial(true);
     
-    React.createElement('footer', { className: 'app-footer' },
-      React.createElement('p', null, '©2026, GeeksProductionStudio. All Rights Reserved.')
-    )
-  ));
+    // Setup Tutorial Flight (KSFO -> KLAX)
+    const dep = getAirportByCode('KSFO');
+    const arr = getAirportByCode('KLAX');
+    
+    if (dep && arr) {
+        selectDeparture(dep);
+        selectArrival(arr);
+        setCinematicPhase('none');
+        
+        // Slight delay to ensure state updates
+        setTimeout(() => {
+            setFlightInitialized(true);
+            setAppMode('simulation');
+        }, 100);
+    } else {
+        alert("Could not load tutorial airports. Please try again.");
+    }
+  };
+
+  const handleOpenSettings = () => {
+      // Placeholder
+      alert("Settings menu is under construction.");
+  };
+
+  const handleTutorialClose = () => {
+      setIsTutorial(false);
+      setFlightInitialized(false);
+      setAppMode('home');
+      setFlightPlan(null);
+  };
+
+  // Render Logic
+  
+  // 1. Cinematic Phase (Overrides everything if active)
+  if (cinematicPhase !== 'none') {
+    return (
+      <LanguageProvider>
+        <div className={`cinematic-container ${cinematicPhase}`}>
+          <LanguageSwitcher style={{ position: 'absolute', top: '20px', right: '20px', zIndex: 2000 }} />
+          
+          {cinematicPhase === 'fade_out' && (
+            <FadeOverlay phase="fade-out">
+              <div className="fade-content">
+                <h1>Initializing Flight Simulation</h1>
+                <p>Preparing for takeoff...</p>
+              </div>
+            </FadeOverlay>
+          )}
+          
+          {cinematicPhase === 'cinematic_review' && (
+            <CinematicReview
+              callsign={callsign}
+              selectedDeparture={selectedDeparture}
+              selectedArrival={selectedArrival}
+              aircraftModel={aircraftModel}
+              weatherData={weatherData}
+              setWeatherData={setWeatherData}
+              crewCount={crewCount}
+              failureType={failureType}
+              difficulty={difficulty}
+              pax={pax}
+              payload={payload}
+              routeDetails={detailedRoute}
+              onComplete={handleCinematicReviewComplete}
+            />
+          )}
+
+          {cinematicPhase === 'narrative_scene' && (
+            <NarrativeScene
+              onComplete={handleNarrativeComplete}
+              context={{
+                difficulty,
+                departure: selectedDeparture,
+                arrival: selectedArrival,
+                pax,
+                callsign
+              }}
+            />
+          )}
+          
+          {cinematicPhase === 'fade_in' && (
+            <FadeOverlay phase="fade-in">
+              <div className="fade-content">
+                <h1>Simulation Active</h1>
+                <p>Flight controls are now available</p>
+              </div>
+            </FadeOverlay>
+          )}
+        </div>
+      </LanguageProvider>
+    );
+  }
+
+  // 2. Simulation Mode (Tutorial or Regular)
+  if (appMode === 'simulation' && flightInitialized) {
+    return (
+      <LanguageProvider>
+        <LanguageSwitcher style={{ position: 'fixed', top: '10px', right: '120px', zIndex: 2000 }} />
+        <FlightInProgress
+          callsign={callsign}
+          aircraftModel={aircraftModel}
+          difficulty={difficulty}
+          selectedDeparture={selectedDeparture}
+          selectedArrival={selectedArrival}
+          initialDeparture={selectedDeparture}
+          flightPlan={flightPlan}
+          airline={airline}
+          pax={pax}
+          payload={payload}
+          fuelReserve={fuelReserve}
+          cruiseHeight={cruiseHeight}
+          useRandomTime={useRandomTime}
+          timeZulu={timeZulu}
+          useRandomSeason={useRandomSeason}
+          season={season}
+          handleResetFlight={handleResetFlight}
+          formatDistance={formatDistance}
+          formatFlightTime={formatFlightTime}
+          formatFuel={formatFuel}
+          weatherData={weatherData}
+          setWeatherData={setWeatherData}
+          failureType={failureType}
+          crewCount={crewCount}
+          routeDetails={detailedRoute}
+          isTutorial={isTutorial}
+          onTutorialClose={handleTutorialClose}
+        />
+      </LanguageProvider>
+    );
+  }
+
+  // 3. Initialization Mode
+  if (appMode === 'init') {
+    return (
+      <LanguageProvider>
+        <div className="App">
+          <LanguageSwitcher style={{ position: 'absolute', top: '20px', right: '20px' }} />
+          <Header devMode={devMode} setDevMode={setDevMode} handleDevStart={handleDevStart} />
+
+          <main className="app-main">
+            {showRouteSelection ? (
+              <RouteSelectionFrame
+                isOpen={showRouteSelection}
+                onConfirm={handleRouteConfirm}
+                onSkip={handleRouteSkip}
+                difficulty={difficulty}
+                departure={selectedDeparture}
+                arrival={selectedArrival}
+              />
+            ) : (
+              <FlightInitialization
+                difficulty={difficulty}
+                setDifficulty={setDifficulty}
+                airline={airline}
+                setAirline={setAirline}
+                callsign={callsign}
+                setCallsign={setCallsign}
+                aircraftModel={aircraftModel}
+                setAircraftModel={setAircraftModel}
+                pax={pax}
+                setPax={setPax}
+                payload={payload}
+                setPayload={setPayload}
+                fuelReserve={fuelReserve}
+                setFuelReserve={setFuelReserve}
+                cruiseHeight={cruiseHeight}
+                setCruiseHeight={setCruiseHeight}
+                timeZulu={timeZulu}
+                setTimeZulu={setTimeZulu}
+                useRandomTime={useRandomTime}
+                setUseRandomTime={setUseRandomTime}
+                season={season}
+                setSeason={setSeason}
+                useRandomSeason={useRandomSeason}
+                setUseRandomSeason={setUseRandomSeason}
+                selectedDeparture={selectedDeparture}
+                selectedArrival={selectedArrival}
+                searchResults={searchResults}
+                searchAirports={searchAirports}
+                selectDeparture={selectDeparture}
+                selectArrival={selectArrival}
+                flightPlan={flightPlan}
+                formatDistance={formatDistance}
+                formatFlightTime={formatFlightTime}
+                formatFuel={formatFuel}
+                failureType={failureType}
+                setFailureType={setFailureType}
+                weatherData={weatherData}
+                setWeatherData={setWeatherData}
+                crewCount={crewCount}
+                setCrewCount={setCrewCount}
+                aircraftSuggestions={aircraftSuggestions}
+                handleInitializeFlight={handleInitializeFlight}
+                handleSearch={handleSearch}
+                apiKey={apiKey}
+                setApiKey={setApiKey}
+              />
+            )}
+          </main>
+          
+          <footer className="app-footer">
+            <p>©2026, GeeksProductionStudio. All Rights Reserved.</p>
+          </footer>
+        </div>
+      </LanguageProvider>
+    );
+  }
+
+  // 4. Default: Home Page
+  return (
+    <LanguageProvider>
+        <HomePage 
+            onStartSinglePlayer={handleStartSinglePlayer}
+            onStartTutorial={handleStartTutorial}
+            onOpenSettings={handleOpenSettings}
+        />
+    </LanguageProvider>
+  );
 }
 
 export default App;

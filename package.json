@@ -9,7 +9,7 @@
     "build": "vite build",
     "preview": "vite preview",
     "lint": "eslint src --ext js,jsx --report-unused-disable-directives --max-warnings 0",
-    "test": "node --test",
+    "test": "node --test --test-force-exit",
     "generate:failure-descriptions": "node scripts/generate_failure_descriptions.js",
     "update:failure-graph": "node scripts/update_failure_graph.js",
     "apply:failure-graph": "node scripts/update_failure_graph.js --apply-approved",

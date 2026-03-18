@@ -10,7 +10,7 @@ class SymptomFilter {
                 let suppress = false;
 
                 // Check instrument visibility
-                if (symptom.instrument_related) {
+                if (symptom.instrument_related || symptom.instrumentRelated) {
                     // Check if instruments are powered/visible
                     // This is a simplification. Ideally we'd check specific instruments.
                     // Assuming if electrical main bus is active, instruments are visible.
@@ -23,7 +23,7 @@ class SymptomFilter {
                 }
 
                 // Check physics perceptibility
-                if (symptom.physics_related) {
+                if (symptom.physics_related || symptom.physicsRelated) {
                     // If physics engine handles it (e.g., vibration, sound, motion), suppress text.
                     // Assuming physics engine always handles physics-related symptoms when active.
                     suppress = true;

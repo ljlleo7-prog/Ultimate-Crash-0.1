@@ -21,6 +21,7 @@ const ModernAutopilotModule = ({ flightState, setAutopilotTargets, toggleAutopil
   // and differ from our local state. We remove current airspeed/alt/vs from dependencies
   // to prevent the target from "following" the current state.
   const currentMode = flightState.autopilotMode || 'LNAV';
+  const approachTelemetry = flightState.approachTelemetry;
 
   useEffect(() => {
     if (flightState?.autopilotTargets) {
@@ -154,7 +155,32 @@ const ModernAutopilotModule = ({ flightState, setAutopilotTargets, toggleAutopil
           fontWeight: 'bold',
           letterSpacing: '0.05em'
         }
-      }, flightState.autopilot ? '● ACTIVE' : '○ STANDBY')
+      }, flightState.autopilot ? '● ACTIVE' : '○ STANDBY'),
+
+      currentMode === 'ILS' && approachTelemetry && React.createElement('div', {
+        style: {
+          display: 'grid',
+          gridTemplateColumns: 'repeat(4, auto)',
+          gap: '4px 10px',
+          fontSize: '10px',
+          color: '#cbd5e1',
+          borderTop: '1px solid #334155',
+          paddingTop: '6px'
+        }
+      },
+        React.createElement('span', { style: { color: '#94a3b8' } }, 'LOC'),
+        React.createElement('span', null, `${Number.isFinite(approachTelemetry.current?.distCross) ? approachTelemetry.current.distCross.toFixed(0) : '---'}ft`),
+        React.createElement('span', { style: { color: '#94a3b8' } }, 'GS'),
+        React.createElement('span', null, `${Number.isFinite(approachTelemetry.current?.altError) ? approachTelemetry.current.altError.toFixed(0) : '---'}ft`),
+        React.createElement('span', { style: { color: '#94a3b8' } }, 'Trend'),
+        React.createElement('span', {
+          style: {
+            color: approachTelemetry.trend === 'improving' ? '#22c55e' : approachTelemetry.trend === 'worsening' ? '#ef4444' : '#f59e0b'
+          }
+        }, approachTelemetry.trend.toUpperCase()),
+        React.createElement('span', { style: { color: '#94a3b8' } }, 'Final'),
+        React.createElement('span', null, `${Number.isFinite(approachTelemetry.final?.distCross) ? Math.abs(approachTelemetry.final.distCross).toFixed(0) : '---'}/${Number.isFinite(approachTelemetry.final?.altError) ? Math.abs(approachTelemetry.final.altError).toFixed(0) : '---'}`)
+      )
     ),
     
     // Controls Row: IAS, VS, ALT, HDG in a compact row

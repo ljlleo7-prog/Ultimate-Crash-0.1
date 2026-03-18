@@ -560,17 +560,22 @@ class RealisticFlightPhysicsService {
         // Avoid division by zero
         const beta = (Math.abs(vx) > 1) ? Math.atan2(vy, vx) : 0;
 
+        const altitudeAGL = (this.currentGroundZ - this.state.pos.z) * 3.28084;
         const apState = {
             airspeed: currentAirspeed,
             verticalSpeed: currentVS,
             pitch: euler.theta,
             roll: euler.phi,
             altitude: -this.state.pos.z * 3.28084,
+            altitudeAGL,
             heading: currentHeading,
             track: track,
             latitude: this.state.geo.lat,
             longitude: this.state.geo.lon,
-            beta: beta // Radians
+            beta: beta, // Radians
+            groundSpeed: airspeedsForAP.groundSpeed,
+            onGround: this.onGround,
+            time: this.time
         };
 
         // --- Waypoint Sequencing & LNAV ---
@@ -764,37 +769,42 @@ class RealisticFlightPhysicsService {
     processInputs(input, dt) {
         // Smooth inputs to simulate actuator dynamics
         const rate = 5.0 * dt;
-        
+        const throttleInput = Number.isFinite(input.throttle) ? input.throttle : this.controls.throttle;
+        const pitchInput = Number.isFinite(input.pitch) ? input.pitch : this.controls.elevator;
+        const rollInput = Number.isFinite(input.roll) ? input.roll : this.controls.aileron;
+        const yawInput = Number.isFinite(input.yaw) ? input.yaw : this.controls.rudder;
+
         // Throttle (Master)
-        this.controls.throttle += (input.throttle - this.controls.throttle) * rate;
-        
+        this.controls.throttle += (throttleInput - this.controls.throttle) * rate;
+
         // Individual Throttles
         if (input.throttles && Array.isArray(input.throttles)) {
             // If individual inputs provided, smooth them independently
             for (let i = 0; i < this.controls.engineThrottles.length; i++) {
-                const target = input.throttles[i] !== undefined ? input.throttles[i] : input.throttle;
+                const rawTarget = input.throttles[i];
+                const target = Number.isFinite(rawTarget) ? rawTarget : throttleInput;
                 this.controls.engineThrottles[i] += (target - this.controls.engineThrottles[i]) * rate;
             }
         } else {
             // Sync to master if no individual inputs
             for (let i = 0; i < this.controls.engineThrottles.length; i++) {
-                this.controls.engineThrottles[i] += (input.throttle - this.controls.engineThrottles[i]) * rate;
+                this.controls.engineThrottles[i] += (throttleInput - this.controls.engineThrottles[i]) * rate;
             }
         }
-        
+
         // Flight Controls (Pitch, Roll, Yaw)
-        this.controls.elevator += (input.pitch - this.controls.elevator) * rate * 2; // Faster response
-        this.controls.aileron += (input.roll - this.controls.aileron) * rate * 3;
-        this.controls.rudder += (input.yaw - this.controls.rudder) * rate * 2;
-        
+        this.controls.elevator += (pitchInput - this.controls.elevator) * rate * 2; // Faster response
+        this.controls.aileron += (rollInput - this.controls.aileron) * rate * 3;
+        this.controls.rudder += (yawInput - this.controls.rudder) * rate * 2;
+
         // Systems
         if (input.flaps !== undefined) this.controls.flaps = input.flaps;
         if (input.gear !== undefined) this.controls.gear = input.gear ? 1 : 0;
-        
+
         // Trim smoothing
         const targetTrim = input.trim !== undefined ? input.trim : this.controls.trim;
         this.controls.trim += (targetTrim - this.controls.trim) * rate;
-        
+
         // Brakes (simple logic: low throttle + on ground)
         if (this.onGround && this.controls.throttle < 0.1) {
             // this.controls.brakes = 1.0; // Auto brakes for now? No, let's assume user wants to roll unless stopped
@@ -1277,7 +1287,9 @@ class RealisticFlightPhysicsService {
 
         this.engines.forEach((engine, index) => {
              // 1. Get Control Inputs
-             const engineThrottle = this.controls.engineThrottles[index];
+             const engineThrottle = Number.isFinite(this.controls.engineThrottles[index])
+                 ? this.controls.engineThrottles[index]
+                 : (Number.isFinite(this.controls.throttle) ? this.controls.throttle : 0);
              
              // 2. Feed System State to Engine Physics
              const sysEng = this.systems.engines[`eng${index + 1}`];
@@ -1591,37 +1603,40 @@ class RealisticFlightPhysicsService {
         }
         
         // --- Ground Steering (Nose Wheel) ---
-        // User Request: "control the plane's yaw output on the ground (its effect will diminish as soon as I am 10ft+)"
-        // Modified: Use onGround flag instead of CG altitude to prevent premature fade-out on large aircraft.
-        
+        // Keep some artificial anti-drift support on runway, but make it speed-faded and bounded
+        // so it behaves more like nosewheel steering plus tire alignment than a raw yaw torque hack.
         let Mz_steering = 0;
         let Fy_steering = 0;
-        
-        if (this.onGround) { 
-             // Fade factor: Based on weight on wheels or just 1.0 if on ground.
-             // User wants fade out as they lift off. onGround handles the binary state.
-             // We can add a transition if needed, but onGround is robust.
-             let steerFactor = 1.0;
-             
-             // Grass Damping
+
+        if (this.onGround) {
+             const rudderInput = Number.isFinite(this.controls.rudder) ? this.controls.rudder : 0;
+             const groundSpeed = Math.max(0, this.state.vel.magnitude());
+
              let damping = 1.0;
              if (this.groundStatus && this.groundStatus.status === 'GRASS') {
-                 damping = 0.3; // User requested "damped on grass"
+                 damping = 0.3;
              }
-             
-             // Steering Force Calculation
-             // Apply mass-based torque for consistent handling across aircraft types
-             // INCREASED: Stronger nose wheel authority (Torque 30->80, Side 15->40)
-             const steeringTorque = this.state.mass * 80 * this.controls.rudder * steerFactor * damping;
-             Mz_steering = steeringTorque;
-             
-             // Side force to initiate turn
-             const steeringSideForce = this.state.mass * 40 * this.controls.rudder * steerFactor * damping;
-             Fy_steering = steeringSideForce;
-             
-             // Debug log occasionally
+
+             // Stronger nosewheel authority at taxi speed, fading quickly as speed builds.
+             const lowSpeedFactor = Math.max(0, Math.min(1, 1 - (groundSpeed / 45)));
+             const steeringForceScale = this.state.mass * 18 * lowSpeedFactor * damping;
+             const steeringMomentScale = this.state.mass * 28 * lowSpeedFactor * damping;
+
+             Fy_steering = steeringForceScale * rudderInput;
+             Mz_steering = steeringMomentScale * rudderInput;
+
+             // Runway anti-drift helper: damp lateral motion and yaw while on paved runway.
+             if (this.groundStatus && this.groundStatus.status === 'RUNWAY') {
+                 const sideVel = Number.isFinite(this.state.vel.y) ? this.state.vel.y : 0;
+                 const yawRate = Number.isFinite(this.state.rates.z) ? this.state.rates.z : 0;
+                 const driftDampingFactor = Math.max(0, Math.min(1, 1 - (groundSpeed / 80)));
+
+                 Fy_steering += -sideVel * this.state.mass * 2.5 * driftDampingFactor;
+                 Mz_steering += -yawRate * (this.aircraft.Iz || 3000000) * 0.35 * driftDampingFactor;
+             }
+
              if (Math.random() < 0.001) {
-                 console.log(`Physics: Ground Steering Active. Torque: ${steeringTorque.toFixed(0)}`);
+                 console.log(`Physics: Ground Steering Active. Torque: ${Mz_steering.toFixed(0)}`);
              }
         }
 
@@ -2259,10 +2274,9 @@ class RealisticFlightPhysicsService {
         } 
         else if (system === 'apu') {
             if (action === 'bleed') {
-                if (!this.systems.apu.running) {
-                    return;
-                }
                 this.systems.apu.bleed = toggle(this.systems.apu.bleed);
+            } else if (action === 'start') {
+                this.systems.apu.start = value !== undefined ? !!value : true;
             } else if (this.systems.apu[action] !== undefined) {
                 this.systems.apu[action] = toggle(this.systems.apu[action]);
             } else {
@@ -2749,12 +2763,21 @@ class RealisticFlightPhysicsService {
         // Position
         if (conditions.latitude !== undefined) this.state.geo.lat = conditions.latitude;
         if (conditions.longitude !== undefined) this.state.geo.lon = conditions.longitude;
-        
+        if (conditions.altitude !== undefined) {
+            this.state.pos.z = -conditions.altitude / 3.28084;
+            if (conditions.altitude > 100) {
+                this.onGround = false;
+            }
+        }
+        if (conditions.speed !== undefined) {
+            const speedMs = conditions.speed * 0.514444;
+            this.state.vel.x = speedMs;
+        }
+
         // Orientation (psi = yaw in radians)
         if (conditions.orientation && conditions.orientation.psi !== undefined) {
             this.state.quat = Quaternion.fromEuler(0, 0, conditions.orientation.psi);
         } else if (conditions.heading !== undefined) {
-            // Handle simple heading (degrees)
             const psi = conditions.heading * Math.PI / 180;
             this.state.quat = Quaternion.fromEuler(0, 0, psi);
         }
@@ -2772,6 +2795,21 @@ class RealisticFlightPhysicsService {
         } else if (conditions.coldStart) {
             // Explicit override
             this.setColdStart();
+        }
+
+        // Tutorial airborne spawn: start engines and set cruise throttle
+        if (conditions.altitude > 100 && conditions.speed !== undefined) {
+            this.engines.forEach(engine => {
+                engine.n1 = 85;
+                engine.n2 = 90;
+                engine.egt = 650;
+                engine.running = true;
+            });
+            this.controls.throttle = 0.65;
+            this.controls.engineThrottles.fill(0.65);
+            this.controls.gear = 0;
+            this.controls.flaps = 0;
+            this.controls.brakes = 0;
         }
 
         // Flight Plan

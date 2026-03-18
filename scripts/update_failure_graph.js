@@ -1,6 +1,13 @@
 import { createClient } from '@supabase/supabase-js';
 import dotenv from 'dotenv';
 import fs from 'node:fs/promises';
+import {
+    FAILURE_GRAPH_ARTIFACT_FILE,
+    buildArtifactFromCompatibilityRows,
+    createArtifactVersion,
+    readJson,
+    writeJson
+} from './failure_graph_artifact_pipeline.js';
 
 dotenv.config();
 
@@ -23,7 +30,8 @@ const options = {
     perSiteLimit: 2,
     sourceLimit: 6,
     ollamaUrl: 'http://localhost:11434/api/generate',
-    model: 'llama3'
+    model: 'llama3',
+    publishChannel: null
 };
 
 for (let i = 0; i < args.length; i += 1) {
@@ -37,6 +45,11 @@ for (let i = 0; i < args.length; i += 1) {
         options.applyApproved = true;
         continue;
     }
+    if (arg === '--publish-channel' && args[i + 1]) {
+        options.publishChannel = args[i + 1];
+        i += 1;
+        continue;
+    }
     if (arg === '--auto-sources') {
         options.autoSources = true;
         continue;
@@ -46,7 +59,7 @@ for (let i = 0; i < args.length; i += 1) {
         continue;
     }
     if (arg === '--source-sites' && args[i + 1]) {
-        options.sourceSites = args[i + 1].split(',').map(site => site.trim()).filter(Boolean);
+        options.sourceSites = args[i + 1].split(',').map((site) => site.trim()).filter(Boolean);
         i += 1;
         continue;
     }
@@ -77,21 +90,13 @@ if (!supabaseUrl || !supabaseKey) {
 
 const supabase = createClient(supabaseUrl, supabaseKey);
 
-async function readJson(path) {
-    try {
-        const raw = await fs.readFile(path, 'utf-8');
-        return JSON.parse(raw);
-    } catch (error) {
-        if (error && error.code === 'ENOENT') {
-            console.warn(`Gap log file not found at ${path}. Create it or pass --gaps <path>.`);
-            return [];
-        }
-        throw error;
-    }
-}
-
 async function writeProposal(proposal) {
-    const { error } = await supabase
+    const canonicalPatch = {
+        addNodes: proposal.proposed_node ? [proposal.proposed_node] : [],
+        addEdges: Array.isArray(proposal.proposed_edges) ? proposal.proposed_edges : []
+    };
+
+    const { error: legacyError } = await supabase
         .from('skylinetragedy_revision_proposals')
         .insert({
             proposed_node: proposal.proposed_node,
@@ -99,8 +104,19 @@ async function writeProposal(proposal) {
             source_document: proposal.source_document,
             status: 'pending'
         });
+    if (legacyError) throw legacyError;
 
-    if (error) throw error;
+    const { error: artifactProposalError } = await supabase
+        .from('failure_graph_proposals')
+        .insert({
+            title: proposal.proposed_node?.failure_code || 'failure-graph-proposal',
+            patch_payload: canonicalPatch,
+            source_document: proposal.source_document,
+            status: 'pending'
+        });
+    if (artifactProposalError) {
+        console.warn('Artifact proposal write failed.', artifactProposalError.message);
+    }
 }
 
 function extractUrlFromDuckDuckGoLink(link) {
@@ -108,7 +124,7 @@ function extractUrlFromDuckDuckGoLink(link) {
     if (!match) return link;
     try {
         return decodeURIComponent(match[1]);
-    } catch (error) {
+    } catch {
         return link;
     }
 }
@@ -133,15 +149,13 @@ async function fetchSearchResults(site, query, limit) {
                 if (resolved.includes(site)) {
                     links.push(resolved);
                 }
-            } else if (raw.startsWith('http')) {
-                if (raw.includes(site)) {
-                    links.push(raw);
-                }
+            } else if (raw.startsWith('http') && raw.includes(site)) {
+                links.push(raw);
             }
             match = regex.exec(html);
         }
         return links;
-    } catch (error) {
+    } catch {
         return [];
     }
 }
@@ -220,12 +234,11 @@ function extractJson(text) {
     if (start === -1 || end === -1 || end <= start) {
         throw new Error('No JSON object found in LLM response.');
     }
-    const candidate = text.slice(start, end + 1);
-    return candidate;
+    return text.slice(start, end + 1);
 }
 
 async function processGaps() {
-    const logs = await readJson(options.gapsPath);
+    const logs = await readJson(options.gapsPath, []);
     if (!Array.isArray(logs) || logs.length === 0) {
         console.log('No gap logs found.');
         return;
@@ -249,7 +262,7 @@ async function processGaps() {
                 console.log('Saved proposal for', log.failure_triggered);
                 saved = true;
                 break;
-            } catch (error) {
+            } catch {
                 console.warn(`Failed to parse proposal for ${log.failure_triggered} (attempt ${attempt}/3).`);
             }
         }
@@ -259,32 +272,91 @@ async function processGaps() {
     }
 }
 
-async function loadFailureMap() {
-    const { data, error } = await supabase.from('skylinetragedy_failures').select('*');
-    if (error) throw error;
-    const map = new Map();
-    (data || []).forEach(f => map.set(f.failure_code, f));
-    return map;
+async function fetchCurrentDraftArtifact() {
+    const localArtifact = await readJson(FAILURE_GRAPH_ARTIFACT_FILE, null);
+    if (localArtifact) {
+        return localArtifact;
+    }
+
+    const failures = await readJson('scripts/skylinetragedy_failures.json', []);
+    const edges = await readJson('scripts/skylinetragedy_edges.json', []);
+    const effects = await readJson('scripts/skylinetragedy_effects.json', []);
+    return buildArtifactFromCompatibilityRows({
+        failures,
+        edges,
+        effects,
+        version: `draft-${new Date().toISOString()}`,
+        generatedAt: new Date().toISOString(),
+        provenance: {
+            source: 'update_failure_graph_fallback'
+        }
+    });
 }
 
-async function ensureFailure(failure, failureMap) {
-    if (!failure || !failure.failure_code) return null;
-    const existing = failureMap.get(failure.failure_code);
-    if (existing) return existing;
+function applyPatch(artifact, patchPayload) {
+    const nodeMap = new Map((artifact.nodes || []).map((node) => [node.id, node]));
+    const edgeMap = new Map((artifact.edges || []).map((edge) => [edge.id, edge]));
 
-    const { data, error } = await supabase
-        .from('skylinetragedy_failures')
-        .upsert([failure], { onConflict: 'failure_code' })
-        .select()
-        .single();
-    if (error) throw error;
-    failureMap.set(data.failure_code, data);
-    return data;
+    (patchPayload.addNodes || []).forEach((node) => {
+        nodeMap.set(node.failure_code || node.id, {
+            id: node.failure_code || node.id,
+            runtimeId: node.runtime_id || node.failure_code || node.id,
+            aliases: [node.failure_code || node.id].filter(Boolean),
+            name: node.description || node.failure_code || node.id,
+            subsystem: node.system || 'systems',
+            category: node.system || 'systems',
+            applicability: node.applicability || ['*'],
+            observables: node.observables || [],
+            mitigationHooks: node.mitigation_hooks || [],
+            stages: node.stages || [{ id: 'active', next: null, duration: null, intensityTarget: null, intensityRate: null, transitionMetadata: null, hasDynamicDuration: false, hasEffect: false }],
+            narrativeHookIds: node.narrative_hook_ids || [],
+            evidenceRefs: node.evidence_refs || [],
+            symptomTemplates: node.symptom_templates || [],
+            metadata: {
+                severity: node.severity ?? null,
+                time_scale: node.time_scale || null,
+                source_confidence: node.source_confidence ?? null
+            },
+            source: node.source || 'proposal'
+        });
+    });
+
+    (patchPayload.addEdges || []).forEach((edge) => {
+        const sourceId = edge.cause_failure || edge.source_failure_code || edge.sourceId;
+        const targetId = edge.effect_failure || edge.target_failure_code || edge.targetId;
+        const edgeId = edge.id || `${sourceId}_TO_${targetId}_${edge.propagation_type || edge.propagationType || 'SYSTEM'}`;
+        edgeMap.set(edgeId, {
+            id: edgeId,
+            sourceId,
+            targetId,
+            probability: edge.probability ?? 1,
+            delaySeconds: edge.delay_seconds ?? edge.delaySeconds ?? 0,
+            propagationType: edge.propagation_type || edge.propagationType || 'SYSTEM',
+            sourceStage: edge.source_stage || null,
+            minSourceTimeInStage: edge.min_source_time_in_stage || 0,
+            requiredObservables: edge.required_observables || [],
+            inhibitedObservables: edge.inhibited_observables || [],
+            guards: edge.guards || [],
+            stageGate: edge.stage_gate || null,
+            targetContextTemplate: edge.target_context_template || {},
+            narrativeHookIds: edge.narrative_hook_ids || [],
+            evidenceRefs: edge.evidence_refs || [],
+            metadata: {
+                patch_source: 'approved_proposal'
+            }
+        });
+    });
+
+    return {
+        ...artifact,
+        nodes: Array.from(nodeMap.values()),
+        edges: Array.from(edgeMap.values())
+    };
 }
 
 async function applyApprovedProposals() {
     const { data: proposals, error } = await supabase
-        .from('skylinetragedy_revision_proposals')
+        .from('failure_graph_proposals')
         .select('*')
         .eq('status', 'approved');
     if (error) throw error;
@@ -293,44 +365,31 @@ async function applyApprovedProposals() {
         return;
     }
 
-    const failureMap = await loadFailureMap();
-
+    let artifact = await fetchCurrentDraftArtifact();
     for (const proposal of proposals) {
-        const node = proposal.proposed_node;
-        const edges = Array.isArray(proposal.proposed_edges) ? proposal.proposed_edges : [];
-        const nodeRecord = await ensureFailure(node, failureMap);
-        if (!nodeRecord) continue;
-
-        for (const edge of edges) {
-            const cause = failureMap.get(edge.cause_failure);
-            const effect = failureMap.get(edge.effect_failure) || nodeRecord;
-            if (!cause || !effect) continue;
-
-            const { data: existingEdges, error: edgeQueryError } = await supabase
-                .from('skylinetragedy_failure_edges')
-                .select('id')
-                .eq('cause_failure', cause.id)
-                .eq('effect_failure', effect.id)
-                .eq('propagation_type', edge.propagation_type);
-
-            if (edgeQueryError) throw edgeQueryError;
-
-            if (!existingEdges || existingEdges.length === 0) {
-                const { error: edgeInsertError } = await supabase
-                    .from('skylinetragedy_failure_edges')
-                    .insert({
-                        cause_failure: cause.id,
-                        effect_failure: effect.id,
-                        probability: edge.probability,
-                        delay_seconds: edge.delay_seconds,
-                        propagation_type: edge.propagation_type
-                    });
-                if (edgeInsertError) throw edgeInsertError;
-            }
-        }
+        artifact = applyPatch(artifact, proposal.patch_payload || {});
     }
 
-    console.log('Applied approved proposals.');
+    const version = `proposal-${new Date().toISOString()}`;
+    const result = await createArtifactVersion(supabase, artifact, {
+        version,
+        status: options.publishChannel ? 'published' : 'validated',
+        channel: options.publishChannel,
+        provenance: {
+            source: 'update_failure_graph',
+            applied_proposal_ids: proposals.map((proposal) => proposal.id)
+        }
+    });
+
+    await writeJson(FAILURE_GRAPH_ARTIFACT_FILE, result.artifact);
+
+    const { error: markAppliedError } = await supabase
+        .from('failure_graph_proposals')
+        .update({ status: 'applied' })
+        .in('id', proposals.map((proposal) => proposal.id));
+    if (markAppliedError) throw markAppliedError;
+
+    console.log(`Applied approved proposals into artifact version ${result.versionRow.version}.`);
 }
 
 if (options.applyApproved) {

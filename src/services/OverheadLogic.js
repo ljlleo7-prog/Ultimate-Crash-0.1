@@ -102,34 +102,26 @@ class OverheadLogic {
             };
         }
 
-        // 1. Electrical System (Power distribution foundation)
+        // Dependency-driven order:
+        // 1. electrical source state
         this.updateElectrical(systems, context, dt);
-
-        // 2. APU (Dependent on Battery)
+        // 2. apu runtime
         this.updateAPU(systems, context, dt);
-
-        // 3. Pneumatics (Dependent on Engines/APU)
+        // 3. electrical again so APU generator can power buses on the same tick
+        this.updateElectrical(systems, context, dt);
+        // 4. bleed / pneumatics
         this.updatePneumatics(systems, context, dt);
-
-        // 4. Hydraulics (Dependent on Elec/Engines)
-        this.updateHydraulics(systems, context, dt);
-
-        // 5. Fuel (Dependent on Elec)
+        // 5. fuel feed
         this.updateFuel(systems, context, dt);
-
-        // 6. Pressurization (Dependent on Pneumatics)
-        this.updatePressurization(systems, context, dt);
-
-        // 7. Lighting (Dependent on Elec)
-        this.updateLighting(systems, context, dt);
-
-        // 8. Engines (Start Sequence)
+        // 6. hydraulics from electric and engine supply
+        this.updateHydraulics(systems, context, dt);
+        // 7. engine start / switch-side logic using resolved bleed and fuel state
         this.updateEngines(systems, context, dt);
-
-        // 9. Fire Protection
+        // 8. cabin / packs
+        this.updatePressurization(systems, context, dt);
+        // 9. secondary systems
+        this.updateLighting(systems, context, dt);
         this.updateFireProtection(systems, context, dt);
-
-        // 10. ADIRS Logic
         this.updateADIRS(systems, context, dt);
     }
 
@@ -182,26 +174,22 @@ class OverheadLogic {
      */
     updateElectrical(systems, context, dt) {
         const elec = systems.electrical;
-        
-        // --- Sources ---
-        // Battery
+        const fuel = systems.fuel || {};
+        const hydraulics = systems.hydraulics || {};
+        const pressurization = systems.pressurization || {};
+        const lighting = systems.lighting || {};
+
         let generatorsOn = false;
-        
-        // Generators (Engine Driven)
-        // Check all potential generators (1-4)
         let genPowerAvailable = false;
         let activeGens = 0;
 
-        // Iterate through all keys in electrical that start with 'gen' and end with a number
         Object.keys(elec).forEach(key => {
             if (key.match(/^gen\d+$/)) {
-                const index = parseInt(key.replace('gen', '')) - 1; // 0-based index
+                const index = parseInt(key.replace('gen', '')) - 1;
                 const genOn = elec[key];
                 const n2 = context.engineN2[index] || 0;
-                // Generator comes online when engine is running stable (Idle is ~30% in physics, but ~20% is start cut-out)
-                // Lowering threshold to ensure power at idle.
                 const genReady = n2 > 25;
-                
+
                 if (genOn && genReady) {
                     genPowerAvailable = true;
                     activeGens++;
@@ -214,7 +202,8 @@ class OverheadLogic {
         });
 
         const apuGenReady = systems.apu.running && systems.apu.n2 > 95;
-        if (elec.apuGen && apuGenReady) {
+        elec.apuGenOn = !!(elec.apuGen && apuGenReady);
+        if (elec.apuGenOn) {
             genPowerAvailable = true;
             elec.apuGenOff = false;
             generatorsOn = true;
@@ -222,68 +211,52 @@ class OverheadLogic {
             elec.apuGenOff = true;
         }
 
-        // Battery Logic
         if (elec.battery) {
-            // Simple drain simulation
             if (!generatorsOn) {
                 elec.batteryCharge = Math.max(0, (elec.batteryCharge || 100) - (0.05 * dt));
             } else {
                 elec.batteryCharge = Math.min(100, (elec.batteryCharge || 100) + (0.1 * dt));
             }
-            elec.dcVolts = (elec.batteryCharge / 100) * 24 + (Math.random() * 0.5); // Fluctuation
+            elec.dcVolts = (elec.batteryCharge / 100) * 24 + (Math.random() * 0.5);
         } else {
             elec.dcVolts = 0;
         }
 
-        // --- Buses ---
-        // Simplified Bus Logic for Multi-Engine:
-        // If ANY generator is online, we assume buses are powered (with Bus Tie)
-        // In a deeper sim, we would model split/isolated buses.
         let mainBusPowered = false;
-
         if (genPowerAvailable && elec.busTie) {
             mainBusPowered = true;
-        } else if (activeGens > 0) {
-            // Even without bus tie, if we have gens, some bus is powered.
-            // For simplicity, we'll say yes.
+        } else if (activeGens > 0 || elec.apuGenOn) {
             mainBusPowered = true;
         }
 
-        // --- Outputs ---
-        // AC Volts / Freq
         if (mainBusPowered) {
             elec.acVolts = 115 + (Math.random() * 2 - 1);
             elec.acFreq = 400 + (Math.random() * 4 - 2);
-            
-            // TR Units (AC -> DC)
             elec.dcVolts = 28.0 + (Math.random() * 0.5);
             elec.standbyPower = true;
         } else if (elec.battery && elec.stbyPower) {
-            // Inverter logic
-            elec.acVolts = 0; // Main AC is dead
+            elec.acVolts = 0;
             elec.acFreq = 0;
-            elec.standbyPower = true; // Essential bus only
+            elec.standbyPower = true;
         } else {
             elec.acVolts = 0;
             elec.acFreq = 0;
             elec.standbyPower = false;
         }
 
-        // Update Amperage based on load (Approximate)
         let load = 0;
-        if (systems.fuel.leftPumps) load += 10;
-        if (systems.fuel.rightPumps) load += 10;
-        
-        // Dynamic hydraulic load
-        if (systems.hydraulics) {
-            Object.values(systems.hydraulics).forEach(sys => {
-                if (sys && sys.elecPump) load += 35;
-            });
-        }
+        if (fuel.leftPumps) load += 10;
+        if (fuel.rightPumps) load += 10;
+        if (fuel.centerPumps) load += 10;
 
-        if (systems.lighting.landing) load += 40;
-        if (systems.pressurization.packL) load += 20;
-        
+        Object.values(hydraulics).forEach(sys => {
+            if (sys && sys.elecPump) load += 35;
+        });
+
+        if (lighting.landing) load += 40;
+        if (pressurization.packL) load += 20;
+        if (pressurization.packR) load += 20;
+
         elec.acAmps = mainBusPowered ? load : 0;
     }
 
@@ -518,70 +491,46 @@ class OverheadLogic {
 
         hydKeys.forEach((sysName, sysIdx) => {
             const sys = systems.hydraulics[sysName];
-            let supply = false;
+            if (!sys.qty && sys.qty !== 0) sys.qty = 100;
 
-            // Engine Pumps Logic
-            // 1. Direct Engine Drive (EDP)
-            // Determine which engines drive this system
             let drivingEngineIndices = [];
-            
+
             if (sysIdx < engineCount) {
-                // Default 1:1 mapping (Sys A -> Eng 1, Sys B -> Eng 2...)
                 drivingEngineIndices.push(sysIdx);
             }
-            
-            // Special Logic for 4-Engine Aircraft with fewer Hydraulic Systems (e.g., A380 has 2 main systems + backups)
-            // If we have 4 engines but only 2 hydraulic systems (Sys A/B), map them:
-            // Sys A (Left) <- Eng 1 & 2
-            // Sys B (Right) <- Eng 3 & 4
+
             if (engineCount === 4 && hydKeys.length === 2) {
-                if (sysIdx === 0) drivingEngineIndices = [0, 1]; // Sys A driven by Eng 1 or 2
-                if (sysIdx === 1) drivingEngineIndices = [2, 3]; // Sys B driven by Eng 3 or 4
+                if (sysIdx === 0) drivingEngineIndices = [0, 1];
+                if (sysIdx === 1) drivingEngineIndices = [2, 3];
             }
-            
-            // Check if ANY driving engine is providing pressure
-            // Modified: Calculate pressure capability based on N2
+
             let maxEnginePressure = 0;
-            
             drivingEngineIndices.forEach(idx => {
                 const engN2 = context.engineN2[idx];
                 if (engN2 > 0) {
-                     // 3000 PSI at > 40% N2 (Idle is usually enough)
-                     // Linear drop below 40%
-                     const p = (engN2 >= 40) ? this.CONSTANTS.HYD_MAX_PRESSURE : (engN2 / 40) * this.CONSTANTS.HYD_MAX_PRESSURE;
-                     if (p > maxEnginePressure) maxEnginePressure = p;
+                    const p = (engN2 >= 40) ? this.CONSTANTS.HYD_MAX_PRESSURE : (engN2 / 40) * this.CONSTANTS.HYD_MAX_PRESSURE;
+                    if (p > maxEnginePressure) maxEnginePressure = p;
                 }
             });
 
-            if (sys.engPump && maxEnginePressure > 0) {
-                // Supply is available, but target is limited by N2
-            } 
-            // 2. Redundant/Auxiliary Systems (e.g., Center/Blue on 2-engine planes)
-            // Driven by Bleed Air or PTU (Power Transfer Unit) from other engines
-            else {
-                // If any engine is running, we assume bleed/PTU is available for this backup system
+            if (!(sys.engPump && maxEnginePressure > 0)) {
                 const anyEngineRunning = context.engineN2.some(n2 => n2 > 40);
                 if (sys.engPump && anyEngineRunning) {
-                     maxEnginePressure = this.CONSTANTS.HYD_MAX_PRESSURE;
+                    maxEnginePressure = this.CONSTANTS.HYD_MAX_PRESSURE;
                 }
             }
 
-            // Electric Pump (ACMP)
-            const elec = systems.electrical;
-            const acAvail = elec.acVolts > 100;
-            const elecPressure = (sys.elecPump && acAvail) ? this.CONSTANTS.HYD_MAX_PRESSURE : 0;
+            const acAvail = systems.electrical.acVolts > 100;
+            const hasFluid = sys.qty > 0;
+            const elecPressure = (sys.elecPump && acAvail && hasFluid) ? this.CONSTANTS.HYD_MAX_PRESSURE : 0;
+            const enginePressure = hasFluid ? maxEnginePressure : 0;
+            const target = Math.max(enginePressure, elecPressure);
 
-            // Pressure Logic
-            const target = Math.max(maxEnginePressure, elecPressure);
-            
             if (sys.pressure < target) {
-                sys.pressure += this.CONSTANTS.HYD_BUILD_RATE * dt;
+                sys.pressure = Math.min(target, sys.pressure + this.CONSTANTS.HYD_BUILD_RATE * dt);
             } else if (sys.pressure > target) {
-                sys.pressure -= this.CONSTANTS.HYD_DECAY_RATE * dt;
+                sys.pressure = Math.max(target, sys.pressure - this.CONSTANTS.HYD_DECAY_RATE * dt);
             }
-            
-            // Quantity (Leak simulation placeholder)
-            if (!sys.qty) sys.qty = 100;
         });
     }
 

@@ -8,12 +8,15 @@ class TerrainRadarService {
         this.isFetching = false;
         this.lastPlayerPos = { lat: 0, lon: 0 };
         this.maxCacheSize = 5000; // Limit cache size
-        
+        this.fetchTimer = null;
+
         // Open-Elevation API endpoint
         this.API_ENDPOINT = 'https://api.open-elevation.com/api/v1/lookup';
-        
-        // Start the fetch loop
-        this.startFetcher();
+
+        // Start the fetch loop only in browser/runtime usage
+        if (typeof window !== 'undefined') {
+            this.startFetcher();
+        }
     }
 
     // Convert lat/lon to grid indices
