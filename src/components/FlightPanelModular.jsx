@@ -16,7 +16,7 @@ import RudderPedal from './RudderPedal';
 import Sidebar from './Sidebar';
 import SaveLoadPanel from './SaveLoadPanel';
 import TimerPanel from './TimerPanel';
-import FlightComputerPanel from './FlightComputerPanel';
+import FMCPanel from './fmc/FMCPanel';
 import ChecklistPanel from './ChecklistPanel';
 import SystemStatusPanel from './SystemStatusPanel';
 import CircuitBreakerPanel from './CircuitBreakerPanel';
@@ -577,12 +577,12 @@ const FlightPanelModular = ({ flightData, physicsState, weatherData, onActionReq
     React.createElement(Sidebar, { activePanel: activeSidebarPanel, onTogglePanel: handleSidebarToggle }),
 
     // Flight Computer Panel Overlay
-    activeSidebarPanel === 'flight_computer' && React.createElement(FlightComputerPanel, {
+    activeSidebarPanel === 'flight_computer' && React.createElement(FMCPanel, {
       onClose: () => setActiveSidebarPanel(null),
       flightPlan: flightPlan,
       onUpdateFlightPlan: onUpdateFlightPlan,
       flightState: flightState,
-      onActionRequest: onActionRequest
+      aircraftData: aircraftModel
     }),
 
     // Timer Panel Overlay

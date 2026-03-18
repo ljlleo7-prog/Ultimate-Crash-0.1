@@ -1,0 +1,56 @@
+import { useRef, useCallback } from 'react';
+
+/**
+ * usePhysicsLoop - Manages the physics update loop independently
+ */
+export function usePhysicsLoop(physicsService, onUpdate) {
+  const animationFrameRef = useRef(null);
+  const lastUpdateTimeRef = useRef(Date.now());
+  const timeScaleRef = useRef(1);
+
+  const updatePhysics = useCallback((fixedDt = 1 / 60, controls = {}) => {
+    if (!physicsService) return null;
+
+    const iterations = timeScaleRef.current;
+    let newState;
+
+    for (let i = 0; i < iterations; i++) {
+      newState = physicsService.update(controls, fixedDt);
+      if (newState.hasCrashed) break;
+    }
+
+    if (onUpdate) onUpdate(newState);
+    return newState;
+  }, [physicsService, onUpdate]);
+
+  const startLoop = useCallback(() => {
+    const targetStep = 1 / 60;
+
+    const animate = () => {
+      const currentTime = Date.now();
+      const elapsed = (currentTime - lastUpdateTimeRef.current) / 1000;
+
+      if (elapsed >= targetStep) {
+        updatePhysics(targetStep);
+        lastUpdateTimeRef.current = currentTime;
+      }
+
+      animationFrameRef.current = requestAnimationFrame(animate);
+    };
+
+    animationFrameRef.current = requestAnimationFrame(animate);
+  }, [updatePhysics]);
+
+  const stopLoop = useCallback(() => {
+    if (animationFrameRef.current) {
+      cancelAnimationFrame(animationFrameRef.current);
+      animationFrameRef.current = null;
+    }
+  }, []);
+
+  const setTimeScale = useCallback((scale) => {
+    timeScaleRef.current = Math.max(1, Math.floor(scale));
+  }, []);
+
+  return { startLoop, stopLoop, updatePhysics, setTimeScale };
+}

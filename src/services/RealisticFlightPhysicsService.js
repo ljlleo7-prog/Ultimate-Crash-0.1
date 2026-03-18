@@ -18,6 +18,11 @@ import WarningSystem from './WarningSystem.js';
 import OverheadLogic from './OverheadLogic.js';
 import { airportService } from './airportService.js';
 import { Vector3, Quaternion, calculateDistanceMeters, calculateBearing } from '../utils/flightMath.js';
+import EnvironmentService from './physics/EnvironmentService.js';
+import GroundInteractionService from './physics/GroundInteractionService.js';
+import SystemsService from './physics/SystemsService.js';
+import AerodynamicsService from './physics/AerodynamicsService.js';
+import NavigationService from './physics/NavigationService.js';
 
 // ==========================================
 // Main Service
@@ -175,6 +180,13 @@ class RealisticFlightPhysicsService {
         // Motion control flag (allows disabling physics integration while keeping systems active)
         // Start DISABLED to prevent initial settling/sliding until scene is fully ready
         this.motionEnabled = false;
+
+        // Initialize extracted service modules
+        this.environmentService = new EnvironmentService(this.CONSTANTS, this.difficulty);
+        this.groundInteractionService = new GroundInteractionService();
+        this.systemsService = new SystemsService();
+        this.aerodynamicsService = new AerodynamicsService();
+        this.navigationService = new NavigationService();
 
         // Aircraft Systems State
         this.initializeSystems(this.difficulty);
@@ -1028,196 +1040,30 @@ class RealisticFlightPhysicsService {
     }
 
     calculateEnvironment(z_down) {
-        // Altitude = -z_down
-        const h = -z_down; 
-        
-        let temp = this.CONSTANTS.SEA_LEVEL_TEMP + (this.CONSTANTS.TEMP_LAPSE_RATE * h);
-        if (temp < 216.65) temp = 216.65;
-        const envTempC = this.environment && Number.isFinite(this.environment.temperature) ? this.environment.temperature : null;
-        if (envTempC !== null) {
-            temp = envTempC + 273.15;
-        }
-
-        const pressure = this.CONSTANTS.SEA_LEVEL_PRESSURE * Math.pow(temp / this.CONSTANTS.SEA_LEVEL_TEMP, -this.CONSTANTS.G / (this.CONSTANTS.TEMP_LAPSE_RATE * this.CONSTANTS.R_GAS));
-        const density = pressure / (this.CONSTANTS.R_GAS * temp);
-        const speedOfSound = Math.sqrt(this.CONSTANTS.GAMMA * this.CONSTANTS.R_GAS * temp);
-
-        // Wind & Turbulence (injected via update or stored state)
-        // Default to zero if not set
-        const wind = this.environment?.wind || new Vector3(0, 0, 0);
-        const turbulence = this.environment?.turbulence || 0;
-
-        return { density, pressure, temp, speedOfSound, wind, turbulence };
+        return this.environmentService.calculateEnvironment(z_down);
     }
 
-    /**
-     * Set environmental conditions (called from external service)
-     * @param {Object} envData { windSpeed, windDirection, turbulence, precipitation }
-     */
     setEnvironment(envData) {
-        if (!envData) return;
-        
-        // Convert Wind (Speed in Knots, Direction in Degrees From) to Earth Velocity Vector (m/s)
-        // Direction is "From", so vector is opposite.
-        // 0 deg = From North (Moving South). Vector X = -Speed.
-        // 90 deg = From East (Moving West). Vector Y = -Speed.
-        // Wind Vector (Earth NED):
-        // X (North) = -Speed * cos(dir)
-        // Y (East) = -Speed * sin(dir)
-        // Z (Down) = 0 (usually)
-        
-        const windSpeed = Number.isFinite(envData.windSpeed) ? envData.windSpeed : (this.environment?.windSpeed || 0);
-        const windDirection = Number.isFinite(envData.windDirection) ? envData.windDirection : (this.environment?.windDirection || 0);
-        const windGust = Number.isFinite(envData.windGust) ? envData.windGust : (this.environment?.windGust || windSpeed);
-        const windShear = Number.isFinite(envData.windShear) ? envData.windShear : (this.environment?.windShear || 0);
-        const speedMs = windSpeed * 0.514444;
-        const dirRad = windDirection * Math.PI / 180;
-        const gustSpeed = Math.max(0, windGust - windSpeed);
-        const gustStrengthMs = gustSpeed * 0.514444;
-        const shearInput = windShear;
-        const shearStrengthMs = (shearInput > 0 ? shearInput : gustSpeed * 0.6) * 0.514444;
-        const difficultyScale = this.getDifficultyScale();
-        
-        // North is X, East is Y.
-        // Wind 360 (From North) -> Flowing South -> -X
-        // Wind 090 (From East) -> Flowing West -> -Y
-        const windX = -speedMs * Math.cos(dirRad);
-        const windY = -speedMs * Math.sin(dirRad);
-        
-        const baseWind = new Vector3(windX, windY, 0);
-        this.environment = {
-            ...this.environment,
-            wind: baseWind,
-            baseWind,
-            gustStrength: gustStrengthMs * (1 + difficultyScale),
-            shearStrength: shearStrengthMs * (1 + difficultyScale),
-            gust: this.environment?.gust || 0,
-            gustTarget: this.environment?.gustTarget || 0,
-            gustTimer: this.environment?.gustTimer || 0,
-            shear: this.environment?.shear || new Vector3(0, 0, 0),
-            shearTarget: this.environment?.shearTarget || new Vector3(0, 0, 0),
-            shearTimer: this.environment?.shearTimer || 0,
-            turbulence: Number.isFinite(envData.turbulence) ? envData.turbulence : (this.environment?.turbulence || 0),
-            precipitation: Number.isFinite(envData.precipitation) ? envData.precipitation : (this.environment?.precipitation || 0),
-            cloudCover: Number.isFinite(envData.cloudCover) ? envData.cloudCover : (this.environment?.cloudCover || 0),
-            temperature: Number.isFinite(envData.temperature) ? envData.temperature : this.environment?.temperature ?? null,
-            windDirection,
-            windSpeed,
-            windGust,
-            windShear,
-            weatherCode: Number.isFinite(envData.weatherCode) ? envData.weatherCode : (this.environment?.weatherCode || 0)
-        };
+        this.environmentService.setEnvironment(envData);
+        this.environment = this.environmentService.environment;
     }
 
     getDifficultyScale() {
-        switch (this.difficulty) {
-            case 'rookie':
-                return 0;
-            case 'amateur':
-                return 0.1;
-            case 'intermediate':
-                return 0.2;
-            case 'advanced':
-                return 0.3;
-            case 'pro':
-                return 0.45;
-            case 'devil':
-                return 0.6;
-            default:
-                return 0.2;
-        }
+        return this.environmentService.getDifficultyScale();
     }
 
     updateDynamicWeather(dt) {
-        if (!this.environment) return;
-        const { gustStrength, shearStrength } = this.environment;
-        if (gustStrength > 0) {
-            this.environment.gustTimer -= dt;
-            if (this.environment.gustTimer <= 0) {
-                this.environment.gustTimer = 0.6 + Math.random() * 1.6;
-                this.environment.gustTarget = (Math.random() * 2 - 1) * gustStrength;
-            }
-            const gustBlend = 1 - Math.exp(-dt * 2.2);
-            this.environment.gust += (this.environment.gustTarget - this.environment.gust) * gustBlend;
-        } else {
-            this.environment.gust = 0;
-            this.environment.gustTarget = 0;
-        }
-
-        if (shearStrength > 0) {
-            this.environment.shearTimer -= dt;
-            if (this.environment.shearTimer <= 0) {
-                this.environment.shearTimer = 1.2 + Math.random() * 2.4;
-                const angle = Math.random() * Math.PI * 2;
-                const vertical = (Math.random() * 2 - 1) * 0.6;
-                const horizontal = Math.sqrt(Math.max(0, 1 - vertical * vertical));
-                this.environment.shearTarget = new Vector3(
-                    Math.cos(angle) * horizontal * shearStrength,
-                    Math.sin(angle) * horizontal * shearStrength,
-                    vertical * shearStrength
-                );
-            }
-            const shearBlend = 1 - Math.exp(-dt * 1.4);
-            this.environment.shear = this.environment.shear.add(
-                this.environment.shearTarget.sub(this.environment.shear).scale(shearBlend)
-            );
-        } else {
-            this.environment.shear = new Vector3(0, 0, 0);
-            this.environment.shearTarget = new Vector3(0, 0, 0);
-        }
-
-        const baseWind = this.environment.baseWind || new Vector3(0, 0, 0);
-        const baseMag = baseWind.magnitude();
-        let gustVector = new Vector3(0, 0, 0);
-        if (Math.abs(this.environment.gust) > 0.01) {
-            const dir = baseMag > 0.01
-                ? baseWind.normalize()
-                : new Vector3(-Math.cos(this.environment.windDirection * Math.PI / 180), -Math.sin(this.environment.windDirection * Math.PI / 180), 0);
-            gustVector = dir.scale(this.environment.gust);
-        }
-        this.environment.wind = baseWind.add(gustVector).add(this.environment.shear || new Vector3(0, 0, 0));
+        this.environmentService.updateDynamicWeather(dt);
+        this.environment = this.environmentService.environment;
     }
 
     updateIcing(dt) {
-        const env = this.environment || {};
-        const tempC = Number.isFinite(env.temperature) ? env.temperature : null;
-        const precip = env.precipitation || 0;
-        const cloud = env.cloudCover || 0;
-        const icingCondition = tempC !== null && tempC <= 0 && (precip > 0.2 || cloud > 70);
-        const antiIceOn = !!(this.systems?.ice?.wingAntiIce || this.systems?.ice?.eng1AntiIce || this.systems?.ice?.eng2AntiIce);
-
-        let rate = 0;
-        if (icingCondition && !antiIceOn) {
-            const precipFactor = Math.min(1, precip / 4);
-            const cloudFactor = cloud > 70 ? (cloud - 70) / 30 : 0;
-            rate = 0.002 + 0.01 * Math.max(precipFactor, cloudFactor);
-        } else if (antiIceOn) {
-            rate = -0.01;
-        } else {
-            rate = -0.002;
-        }
-
-        this.icingState.level = Math.max(0, Math.min(1, this.icingState.level + rate * dt));
-        this.icingState.rate = rate;
-
-        if (this.systems?.ice) {
-            this.systems.ice.icingLevel = this.icingState.level;
-            this.systems.ice.deicingRequired = !!(this.onGround && this.icingState.level > 0.2);
-        }
+        this.environmentService.updateIcing(dt, this.systems, this.onGround, this.icingState);
     }
 
     applyWindShear(intensity = 0.5) {
-        if (!this.environment) return;
-        const shearStrength = Math.max(this.environment.shearStrength || 0, 1) * (0.5 + intensity);
-        const angle = Math.random() * Math.PI * 2;
-        const vertical = (Math.random() * 2 - 1) * 0.7;
-        const horizontal = Math.sqrt(Math.max(0, 1 - vertical * vertical));
-        this.environment.shearTarget = new Vector3(
-            Math.cos(angle) * horizontal * shearStrength,
-            Math.sin(angle) * horizontal * shearStrength,
-            vertical * shearStrength
-        );
-        this.environment.shearTimer = 0.3;
+        this.environmentService.applyWindShear(intensity);
+        this.environment = this.environmentService.environment;
     }
 
     getRunwayBrakingData() {
@@ -2489,167 +2335,28 @@ class RealisticFlightPhysicsService {
     }
 
     updateGroundStatus() {
-        if (!this.runwayGeometry) {
-            this.groundStatus = { status: 'UNKNOWN', remainingLength: 0 };
-            const groundHeightAMSL = (this.terrainElevation !== null && this.terrainElevation !== undefined)
-                ? this.terrainElevation
-                : this.airportElevation;
-            this.currentGroundZ = -(groundHeightAMSL - this.airportElevation);
-            return;
-        }
-
-        const { thresholdStart, heading, length, width } = this.runwayGeometry;
-        const currentLat = this.state.geo.lat;
-        const currentLon = this.state.geo.lon;
-
-        // Convert Geo difference to Meters (NED approx)
-        const latRad = currentLat * Math.PI / 180;
-        const metersPerLat = 111132.92; // Approx
-        const metersPerLon = 111412.84 * Math.cos(latRad);
-
-        const dLat = currentLat - thresholdStart.latitude;
-        const dLon = currentLon - thresholdStart.longitude;
-
-        const x_north = dLat * metersPerLat;
-        const y_east = dLon * metersPerLon;
-
-        // Rotate into Runway Frame
-        // Heading is degrees CW from North
-        // We want X_runway along the runway heading
-        const hRad = heading * Math.PI / 180;
-        const cosH = Math.cos(hRad);
-        const sinH = Math.sin(hRad);
-
-        // Dot product with Runway Vector (cosH, sinH)
-        const distAlong = x_north * cosH + y_east * sinH;
-        
-        // Cross product (distance from centerline)
-        // Vector R = (cosH, sinH). Vector P = (x, y).
-        // Cross = x*sinH - y*cosH (This gives distance to the right? or left?)
-        // Let's take abs value for width check
-        const distCross = Math.abs(x_north * sinH - y_east * cosH);
-
-        // Check Zones
-        let status = 'OBJECTS';
-        
-        // Runway Zone
-        // Buffer of 0m? User said "0ft is safe for runway/grass".
-        if (distAlong >= 0 && distAlong <= length && distCross <= width / 2) {
-            status = 'RUNWAY';
-        }
-        // Grass Zone (Safe Area)
-        // Arbitrary: -500m to Length+500m, Width * 4
-        else if (distAlong >= -500 && distAlong <= length + 500 && distCross <= width * 2) {
-            status = 'GRASS';
-        }
-
-        // Remaining Length
-        // If before start, full length. If past end, 0.
-        let remaining = 0;
-        if (distAlong < 0) remaining = length;
-        else if (distAlong > length) remaining = 0;
-        else remaining = length - distAlong;
-
-        this.groundStatus = {
-            status: status,
-            remainingLength: remaining
-        };
-
-        // Update Ground Height (NED Z)
-        // If on Runway, assume Airport Level (0 relative Z)
-        // If Off Runway, use Terrain Elevation
-        let groundHeightAMSL = this.airportElevation;
-        // User request: "for runway and airport-grass, lets first use the same height with the airport."
-        if (status !== 'RUNWAY' && status !== 'GRASS') {
-             // Use terrain if available (non-null), otherwise stick to airport elevation (safety fallback)
-             if (this.terrainElevation !== null) {
-                 groundHeightAMSL = this.terrainElevation;
-             }
-        }
-        
-        // Calculate Relative Ground Z (NED)
-        // Z is Down. Positive Height = Negative Z.
-        // Origin is at Airport Elevation.
-        // Ground Z = -(GroundAMSL - AirportAMSL)
-        this.currentGroundZ = -(groundHeightAMSL - this.airportElevation);
+        const result = this.groundInteractionService.updateGroundStatus(
+            this.state,
+            this.runwayGeometry,
+            this.terrainElevation,
+            this.airportElevation
+        );
+        this.groundStatus = result.groundStatus;
+        this.currentGroundZ = result.currentGroundZ;
     }
 
     applyRunwayStabilizer() {
-        if (this.difficulty === 'devil') return null;
-        if (!this.onGround || this.groundStatus.status !== 'RUNWAY') return null;
-        if (!this.runwayGeometry || !this.runwayGeometry.thresholdStart) return null;
+        return this.groundInteractionService.applyRunwayStabilizer(
+            this.state,
+            this.runwayGeometry,
+            this.onGround,
+            this.groundStatus,
+            this.difficulty
+        );
+    }
 
-        const geom = this.runwayGeometry;
-        const lat = this.state.geo.lat;
-        const lon = this.state.geo.lon;
-        const lat0 = geom.thresholdStart.latitude;
-        const lon0 = geom.thresholdStart.longitude;
-        
-        const latRad = lat0 * Math.PI / 180;
-        const metersPerLat = 111132.92; 
-        const metersPerLon = 111412.84 * Math.cos(latRad);
-        
-        const dx = (lat - lat0) * metersPerLat; 
-        const dy = (lon - lon0) * metersPerLon; 
-        
-        const headingRad = geom.heading * Math.PI / 180;
-        const ux = Math.cos(headingRad);
-        const uy = Math.sin(headingRad);
-        
-        const distAlong = dx * ux + dy * uy;
-        
-        // XTE: Positive = Right of track
-        const XTE = dy * ux - dx * uy;
-
-        const euler = this.state.quat.toEuler();
-        const currentPsi = euler.psi; 
-        let headingDiff = currentPsi - headingRad;
-        while (headingDiff > Math.PI) headingDiff -= 2 * Math.PI;
-        while (headingDiff < -Math.PI) headingDiff += 2 * Math.PI;
-        
-        if (this.difficulty === 'rookie') {
-            // ROOKIE: Rail Mode - Force Centerline & Heading
-            const newDx = distAlong * ux;
-            const newDy = distAlong * uy;
-            
-            const newLat = lat0 + newDx / metersPerLat;
-            const newLon = lon0 + newDy / metersPerLon;
-            
-            this.state.geo.lat = newLat;
-            this.state.geo.lon = newLon;
-            
-            // Force Heading
-            this.state.quat = Quaternion.fromEuler(euler.phi, euler.theta, headingRad);
-            
-            // Kill lateral velocity & yaw rate
-            this.state.vel.y = 0; 
-            this.state.rates.z = 0;
-            
-            return null;
-        } else {
-            // OTHER: Gentle Pull
-            const sideVel = this.state.vel.y; 
-            const k_lat = 5000; 
-            const c_lat = 10000; 
-            
-            // Force in Body Y (Left if XTE > 0)
-            let F_y = -XTE * k_lat - sideVel * c_lat;
-            
-            const maxF = this.state.mass * 2.0; 
-            if (F_y > maxF) F_y = maxF;
-            if (F_y < -maxF) F_y = -maxF;
-            
-            const k_yaw = 500000; 
-            const c_yaw = 500000;
-            
-            let M_z = -headingDiff * k_yaw - this.state.rates.z * c_yaw;
-            
-            const maxM = 5000000;
-            if (M_z > maxM) M_z = maxM;
-            if (M_z < -maxM) M_z = -maxM;
-            
-            return { Fy: F_y, Mz: M_z };
-        }
+    getRunwayBrakingData() {
+        return this.groundInteractionService.getRunwayBrakingData();
     }
 
     /**
