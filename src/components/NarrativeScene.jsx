@@ -1,5 +1,5 @@
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import PropTypes from 'prop-types';
 import { useLanguage } from '../contexts/LanguageContext';
 import './NarrativeScene.css';
@@ -10,6 +10,7 @@ const NarrativeScene = ({ onComplete, context }) => {
   const [narrative, setNarrative] = useState(null);
   const [visibleLines, setVisibleLines] = useState(0);
   const [isReady, setIsReady] = useState(false);
+  const timeoutsRef = useRef([]);
 
   useEffect(() => {
     setNarrative(generateNarrative(context));
@@ -17,31 +18,17 @@ const NarrativeScene = ({ onComplete, context }) => {
 
   useEffect(() => {
     if (!narrative) return;
-    
-    // Sequence the text appearance
-    const sequence = async () => {
-      // Line 1: Role
-      await new Promise(r => setTimeout(r, 1000));
-      setVisibleLines(1);
-      
-      // Line 2: Experience
-      await new Promise(r => setTimeout(r, 2500));
-      setVisibleLines(2);
-      
-      // Line 3: Plan
-      await new Promise(r => setTimeout(r, 3000));
-      setVisibleLines(3);
-      
-      // Line 4: Difficulty
-      await new Promise(r => setTimeout(r, 3000));
-      setVisibleLines(4);
-      
-      // Ready button
-      await new Promise(r => setTimeout(r, 2000));
-      setIsReady(true);
+
+    timeoutsRef.current.push(setTimeout(() => setVisibleLines(1), 1000));
+    timeoutsRef.current.push(setTimeout(() => setVisibleLines(2), 3500));
+    timeoutsRef.current.push(setTimeout(() => setVisibleLines(3), 6500));
+    timeoutsRef.current.push(setTimeout(() => setVisibleLines(4), 9500));
+    timeoutsRef.current.push(setTimeout(() => setIsReady(true), 11500));
+
+    return () => {
+      timeoutsRef.current.forEach(clearTimeout);
+      timeoutsRef.current = [];
     };
-    
-    sequence();
   }, [narrative]);
 
   if (!narrative) return <div className="narrative-container" />;

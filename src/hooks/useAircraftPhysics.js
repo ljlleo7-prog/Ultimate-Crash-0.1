@@ -4,58 +4,35 @@ import { loadAircraftData } from '../services/aircraftService.js';
 import { airportService } from '../services/airportService.js';
 import { usePhysicsLoop } from './usePhysicsLoop.js';
 import { useFlightControls } from './useFlightControls.js';
+import { useFlightState } from './useFlightState.js';
 import { PhysicsCoordinator } from '../services/PhysicsCoordinator.js';
 
 export function useAircraftPhysics(config = {}, autoStart = true) {
-  const [flightData, setFlightData] = useState({
-    altitude: 0,
-    airspeed: 0,
-    verticalSpeed: 0,
-    pitch: 0,
-    roll: 0,
-    heading: 0,
-    systems: {}
-  });
-
   const [isInitialized, setIsInitialized] = useState(false);
   const [error, setError] = useState(null);
+  const [physicsState, setPhysicsState] = useState(null);
   const physicsServiceRef = useRef(null);
   const coordinatorRef = useRef(null);
 
-  const updateFlightData = useCallback((newState) => {
+  const { flightData, updateFromPhysics } = useFlightState();
+
+  const handlePhysicsUpdate = useCallback((newState) => {
     if (!newState || !physicsServiceRef.current) return;
+    setPhysicsState(newState);
+    updateFromPhysics(newState, physicsServiceRef.current);
+  }, [updateFromPhysics]);
 
-    const service = physicsServiceRef.current;
-    const airspeeds = service.calculateAirspeeds();
+  const controls = useFlightControls(physicsServiceRef);
 
-    setFlightData({
-      altitude: Math.max(0, newState.position.z) * 3.28084,
-      airspeed: airspeeds?.trueAirspeed || 0,
-      indicatedAirspeed: airspeeds?.indicatedAirspeed || 0,
-      verticalSpeed: newState.verticalSpeed || 0,
-      pitch: newState.orientation.theta * 180 / Math.PI,
-      roll: newState.orientation.phi * 180 / Math.PI,
-      heading: (newState.orientation.psi * 180 / Math.PI + 360) % 360,
-      throttle: newState.controls?.throttle * 100 || 0,
-      hasCrashed: newState.hasCrashed,
-      systems: newState.systems || {}
-    });
-  }, []);
-
-  const controls = useFlightControls(physicsServiceRef.current);
-
-  const updateWithControls = useCallback((newState) => {
-    if (physicsServiceRef.current && controls.getControls) {
-      const currentControls = controls.getControls();
-      physicsServiceRef.current.update(currentControls, 1/60);
-    }
-    updateFlightData(newState);
-  }, [controls, updateFlightData]);
-
-  const { startLoop, stopLoop, setTimeScale } = usePhysicsLoop(
-    physicsServiceRef.current,
-    updateWithControls
+  const { startLoop, stopLoop, updatePhysics: loopUpdatePhysics, setTimeScale, timeScale } = usePhysicsLoop(
+    physicsServiceRef,
+    handlePhysicsUpdate
   );
+
+  const updatePhysics = useCallback((dt = 1 / 60) => {
+    if (!physicsServiceRef.current) return null;
+    return loopUpdatePhysics(dt, controls.getControls ? controls.getControls() : {});
+  }, [loopUpdatePhysics, controls]);
 
   useEffect(() => {
     async function init() {
@@ -97,13 +74,29 @@ export function useAircraftPhysics(config = {}, autoStart = true) {
 
         physicsServiceRef.current = service;
         coordinatorRef.current = new PhysicsCoordinator(service);
+        handlePhysicsUpdate(service.getOutputState ? service.getOutputState() : null);
         setIsInitialized(true);
       } catch (err) {
         setError(err.message);
       }
     }
     init();
-  }, []);
+  }, [
+    handlePhysicsUpdate,
+    config.aircraftModel,
+    config.initialLatitude,
+    config.initialLongitude,
+    config.initialAltitude,
+    config.initialSpeed,
+    config.initialHeading,
+    config.flightPlan,
+    config.difficulty,
+    config.failureType,
+    config.departure,
+    config.arrival,
+    config.departureRunway,
+    config.arrivalRunway
+  ]);
 
   useEffect(() => {
     if (autoStart && isInitialized) startLoop();
@@ -112,22 +105,40 @@ export function useAircraftPhysics(config = {}, autoStart = true) {
 
   return {
     flightData,
+    physicsState,
     isInitialized,
     error,
+    getCurrentOutputState: useCallback(() => {
+      return physicsServiceRef.current?.getOutputState?.() ?? null;
+    }, []),
+    isCrashed: physicsState?.hasCrashed || physicsServiceRef.current?.crashed || false,
     physicsService: physicsServiceRef.current,
+    resetAircraft: useCallback(() => {
+      physicsServiceRef.current?.reset?.();
+      const state = physicsServiceRef.current?.getOutputState?.();
+      handlePhysicsUpdate(state);
+    }, [handlePhysicsUpdate]),
+    updatePhysics,
     ...controls,
     setMotionEnabled: useCallback((enabled) => {
       coordinatorRef.current?.setMotionEnabled(enabled);
     }, []),
     setEnvironment: useCallback((env) => {
       coordinatorRef.current?.updateEnvironment(env);
-    }, []),
+      const state = physicsServiceRef.current?.getOutputState?.();
+      handlePhysicsUpdate(state);
+    }, [handlePhysicsUpdate]),
     updateFlightPlan: useCallback((plan) => {
       physicsServiceRef.current?.updateFlightPlan(plan);
-    }, []),
+      const state = physicsServiceRef.current?.getOutputState?.();
+      handlePhysicsUpdate(state);
+    }, [handlePhysicsUpdate]),
     performSystemAction: useCallback((system, action, value) => {
       physicsServiceRef.current?.performSystemAction(system, action, value);
-    }, []),
-    setTimeScale
+      const state = physicsServiceRef.current?.getOutputState?.();
+      handlePhysicsUpdate(state);
+    }, [handlePhysicsUpdate]),
+    setTimeScale,
+    timeScale
   };
 }

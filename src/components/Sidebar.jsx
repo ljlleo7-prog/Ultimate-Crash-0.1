@@ -9,7 +9,7 @@ const Sidebar = ({ activePanel, onTogglePanel }) => {
     { id: 'timer', label: 'Timer', icon: '⏱️', disabled: false },
     { id: 'save_load', label: 'Save/Load', icon: '💾', disabled: false },
     { id: 'inspect', label: 'Inspect', icon: '🔍', disabled: false },
-    { id: 'settings', label: 'Settings', icon: '⚙️', disabled: true },
+    { id: 'settings', label: 'Settings', icon: '⚙️', disabled: false },
   ];
 
   return (

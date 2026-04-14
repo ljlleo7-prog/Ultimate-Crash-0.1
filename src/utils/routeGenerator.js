@@ -80,19 +80,25 @@ export const generateSmartRoute = async (startAirport, endAirport) => {
     return generateRouteWaypoints(startAirport, endAirport);
 };
 
+export const normalizeProcedurePrefix = (waypointName) => {
+  const cleaned = String(waypointName || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+  if (cleaned.length >= 3) return cleaned.slice(0, 3);
+  return 'DEF';
+};
+
+export const procedureMatchesWaypoint = (procedureName, waypointName) => {
+  if (!procedureName || !waypointName) return false;
+  return String(procedureName).toUpperCase().startsWith(normalizeProcedurePrefix(waypointName));
+};
+
 export const generateSID = (firstWaypoint) => {
-  if (!firstWaypoint || firstWaypoint.length < 3) return 'DEF01D';
-  const prefix = firstWaypoint.substring(0, 3);
-  const number = Math.floor(Math.random() * 10).toString(); // Single digit 0-9? User said 00, maybe 2 digits.
-  // User said "XXX00D format (X for alphabet and 0 for number)". 
-  // "XXX00D" usually means 3 letters, 2 numbers, 1 letter.
-  const numPart = Math.floor(Math.random() * 90 + 10).toString(); // 10-99
+  const prefix = normalizeProcedurePrefix(firstWaypoint);
+  const numPart = Math.floor(Math.random() * 90 + 10).toString();
   return `${prefix}${numPart}D`;
 };
 
 export const generateSTAR = (lastWaypoint) => {
-  if (!lastWaypoint || lastWaypoint.length < 3) return 'ARR01A';
-  const prefix = lastWaypoint.substring(0, 3);
+  const prefix = normalizeProcedurePrefix(lastWaypoint);
   const numPart = Math.floor(Math.random() * 90 + 10).toString();
   return `${prefix}${numPart}A`;
 };

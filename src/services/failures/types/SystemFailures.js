@@ -34,15 +34,68 @@ const SystemFailures = {
             inactive: { next: 'active' },
             active: {
                 description: (ctx) => ({
-                    text: "Hydraulic quantity decreasing rapidly.",
-                    system_alert: "HYD LOW QTY",
-                    visual: "shake_minor"
+                    text: 'Hydraulic quantity decreasing rapidly.',
+                    system_alert: 'HYD LOW QTY',
+                    visual: 'shake_minor'
                 }),
                 effect: (sys, intensity) => {
                     // Gradual pressure loss
                     sys.systems.hydraulics.sysA.qty -= 0.1 * intensity;
                     if (sys.systems.hydraulics.sysA.qty < 10) {
                          sys.systems.hydraulics.sysA.pressure *= 0.9;
+                    }
+                }
+            }
+        }
+    },
+
+    MAJOR_HYDRAULIC_FAILURE: {
+        id: 'major_hydraulic_failure',
+        name: 'Major Hydraulic Damage',
+        category: 'systems',
+        stages: {
+            inactive: { next: 'degraded' },
+            degraded: {
+                duration: 6.0,
+                next: 'active',
+                description: (ctx) => ({
+                    text: ctx.reason === 'debris_damage'
+                        ? 'Hydraulic pressure collapsing after debris severed a main line.'
+                        : 'Hydraulic pressure decaying. Primary flight controls becoming heavy.',
+                    system_alert: 'HYD SYS A+B',
+                    sound: 'master_caution',
+                    visual: 'buffet_minor'
+                }),
+                effect: (sys, intensity) => {
+                    const controlLimit = 0.75 - (intensity * 0.2);
+                    sys.controls.aileron *= Math.max(0.45, controlLimit);
+                    sys.controls.elevator *= Math.max(0.5, controlLimit);
+                    sys.controls.rudder *= Math.max(0.4, controlLimit);
+                    if (sys.systems.hydraulics?.sysA) {
+                        sys.systems.hydraulics.sysA.pressure = Math.max(0, sys.systems.hydraulics.sysA.pressure - 600);
+                    }
+                    if (sys.systems.hydraulics?.sysB) {
+                        sys.systems.hydraulics.sysB.pressure = Math.max(0, sys.systems.hydraulics.sysB.pressure - 450);
+                    }
+                }
+            },
+            active: {
+                description: (ctx) => ({
+                    text: 'Hydraulic power nearly exhausted. Flight control response severely degraded.',
+                    system_alert: 'HYD PRESS LOW',
+                    sound: 'hydraulic_whine',
+                    visual: 'controls_stiff'
+                }),
+                effect: (sys, intensity) => {
+                    const limit = Math.max(0.1, 0.3 - (intensity * 0.15));
+                    sys.controls.aileron *= limit;
+                    sys.controls.elevator *= limit;
+                    sys.controls.rudder *= limit;
+                    if (sys.systems.hydraulics?.sysA) {
+                        sys.systems.hydraulics.sysA.pressure = 0;
+                    }
+                    if (sys.systems.hydraulics?.sysB) {
+                        sys.systems.hydraulics.sysB.pressure = Math.min(sys.systems.hydraulics.sysB.pressure, 400);
                     }
                 }
             }
@@ -362,33 +415,6 @@ const SystemFailures = {
                 }),
                 effect: (sys) => {
                     // Screen failures eventually
-                }
-            }
-        }
-    },
-    
-    // Legacy mapping support
-    MAJOR_HYDRAULIC: {
-        id: 'major_hydraulic_failure',
-        name: 'Major Hydraulic Failure',
-        category: 'systems',
-        stages: {
-            inactive: { next: 'active' },
-            active: {
-                description: (ctx) => ({
-                    text: "TOTAL HYDRAULIC LOSS.",
-                    system_alert: "HYD ALL FAIL",
-                    visual: "controls_stiff"
-                }),
-                effect: (sys) => {
-                    if (sys.systems.hydraulics) {
-                        sys.systems.hydraulics.sysA.pressure = 0;
-                        sys.systems.hydraulics.sysB.pressure = 0;
-                        if (sys.systems.hydraulics.sysC) sys.systems.hydraulics.sysC.pressure = 0;
-                    }
-                    sys.controlEffectiveness.aileron = 0.0;
-                    sys.controlEffectiveness.elevator = 0.0;
-                    sys.controlEffectiveness.rudder = 0.0;
                 }
             }
         }

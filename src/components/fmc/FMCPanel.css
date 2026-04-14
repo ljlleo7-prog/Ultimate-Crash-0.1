@@ -15,6 +15,27 @@
   font-family: 'Courier New', monospace;
 }
 
+.fmc-panel.preflight-tablet {
+  position: relative;
+  top: auto;
+  left: auto;
+  transform: none;
+  width: 100%;
+  max-width: 100%;
+  height: min(80vh, 960px);
+  min-height: 780px;
+  border: 1px solid rgba(75, 85, 99, 0.9);
+  border-radius: 8px;
+  background: #000000;
+  box-shadow:
+    0 24px 64px rgba(0, 0, 0, 0.42),
+    0 10px 24px rgba(0, 0, 0, 0.28);
+  overflow: hidden;
+  color: #f9fafb;
+  font-family: 'Eurostile', 'Bank Gothic', 'Microgramma', 'DIN Condensed', 'Roboto Condensed', 'Arial Narrow', monospace;
+  box-sizing: border-box;
+}
+
 .fmc-header {
   display: flex;
   justify-content: space-between;
@@ -22,6 +43,19 @@
   padding: 15px 20px;
   background: #0f172a;
   border-bottom: 2px solid #334155;
+  margin-bottom: 6px;
+  color: #8ca0bb;
+  font-size: 11px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.fmc-panel.preflight-tablet .fmc-header {
+  position: relative;
+  padding: 22px 24px 14px;
+  background: #000000;
+  border-bottom: 1px solid #1f2937;
+  color: #9ca3af;
 }
 
 .fmc-header h3 {
@@ -29,6 +63,14 @@
   color: #4ade80;
   font-size: 18px;
   font-weight: bold;
+  text-transform: uppercase;
+}
+
+.fmc-panel.preflight-tablet .fmc-header h3 {
+  color: #f9fafb;
+  font-size: 30px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
 }
 
@@ -44,11 +86,34 @@
   line-height: 1;
 }
 
+.fmc-tablet-statusbar {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.fmc-panel.preflight-tablet .fmc-tablet-statusbar {
+  gap: 10px;
+}
+
 .fmc-nav {
   display: flex;
   background: #1e293b;
   border-bottom: 1px solid #334155;
   overflow-x: auto;
+}
+
+.fmc-panel.preflight-tablet .fmc-nav {
+  padding: 0 20px 16px;
+  border-bottom: none;
+  gap: 2px;
+  border-radius: 4px;
+  background: #161616;
+  margin: 0 20px;
+  overflow: hidden;
+  border: 1px solid #30363d;
 }
 
 .fmc-nav-btn {
@@ -66,9 +131,23 @@
   border-bottom: 3px solid transparent;
 }
 
+.fmc-panel.preflight-tablet .fmc-nav-btn {
+  min-height: 44px;
+  border-bottom-width: 0;
+  border-radius: 0;
+  padding: 8px 10px;
+  color: #9ca3af;
+  background: transparent;
+  justify-content: center;
+}
+
 .fmc-nav-btn:hover {
   background: #334155;
   color: #e2e8f0;
+}
+
+.fmc-panel.preflight-tablet .fmc-nav-btn:hover {
+  background: rgba(255, 255, 255, 0.04);
 }
 
 .fmc-nav-btn.active {
@@ -77,8 +156,14 @@
   background: rgba(74, 222, 128, 0.1);
 }
 
-.fmc-nav-icon {
-  font-size: 20px;
+.fmc-panel.preflight-tablet .fmc-nav-btn.active {
+  color: #f9fafb;
+  background: #2a2f36;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+}
+
+.fmc-panel.preflight-tablet .fmc-nav-icon {
+  font-size: 16px;
 }
 
 .fmc-nav-label {
@@ -86,10 +171,22 @@
   font-weight: bold;
 }
 
+.fmc-panel.preflight-tablet .fmc-nav-label {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
 .fmc-content {
   flex: 1;
   overflow-y: auto;
   padding: 20px;
+}
+
+.fmc-panel.preflight-tablet .fmc-content {
+  padding: 20px 20px 24px;
+  background: #000000;
 }
 
 .fmc-page {
@@ -104,6 +201,17 @@
   padding-bottom: 8px;
 }
 
+.fmc-panel.preflight-tablet .fmc-page-title {
+  color: #f3f4f6;
+  font-size: 16px;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  border-bottom: none;
+  padding-bottom: 0;
+  margin-bottom: 14px;
+}
+
 .fmc-section {
   margin-bottom: 20px;
   padding: 15px;
@@ -112,10 +220,41 @@
   border: 1px solid #334155;
 }
 
+.fmc-panel.preflight-tablet .fmc-section,
+.fmc-panel.preflight-tablet .fmc-airport-card,
+.fmc-panel.preflight-tablet .fmc-stat-card,
+.fmc-panel.preflight-tablet .fmc-leg-item {
+  border-radius: 4px;
+  border: 1px solid #374151;
+  background: #1c1c1e;
+  box-shadow: none;
+}
+
+.fmc-section-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.fmc-section-subtitle {
+  color: #8ca0bb;
+  font-size: 12px;
+  margin-top: 4px;
+}
+
 .fmc-label {
   font-size: 11px;
   color: #94a3b8;
   margin-bottom: 5px;
+  text-transform: uppercase;
+}
+
+.fmc-panel.preflight-tablet .fmc-label {
+  font-size: 13px;
+  color: #9ca3af;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
 }
 
@@ -130,10 +269,18 @@
   color: #4ade80;
 }
 
-.fmc-grid {
+.fmc-grid,
+.fmc-edit-grid,
+.fmc-route-summary-grid,
+.fmc-route-grid {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 15px;
+}
+
+.fmc-route-grid {
+  grid-template-columns: 1fr;
+  margin-bottom: 18px;
 }
 
 .fmc-field {
@@ -163,11 +310,34 @@
   font-family: 'Courier New', monospace;
 }
 
+.fmc-panel.preflight-tablet .fmc-input-group input,
+.fmc-panel.preflight-tablet .fmc-input-group select,
+.fmc-panel.preflight-tablet .fmc-airport-input {
+  min-height: 46px;
+  border-radius: 4px;
+  border: 1px solid #374151;
+  background: #111827;
+  color: #f9fafb;
+  font-family: 'Eurostile', 'Bank Gothic', 'Microgramma', 'DIN Condensed', 'Roboto Condensed', 'Arial Narrow', monospace;
+  font-size: 15px;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  padding: 10px 14px;
+  box-shadow: none;
+}
+
 .fmc-input-group small {
   display: block;
   font-size: 10px;
   color: #64748b;
   margin-top: 3px;
+}
+
+.fmc-panel.preflight-tablet .fmc-input-group small {
+  margin-top: 6px;
+  color: #9ca3af;
+  font-size: 11px;
+  line-height: 1.4;
 }
 
 .fmc-btn-primary,
@@ -200,6 +370,22 @@
   background: #475569;
 }
 
+.fmc-panel.preflight-tablet .fmc-btn-secondary {
+  width: auto;
+  min-width: 132px;
+  border-radius: 4px;
+  background: #d1d5db;
+  color: #0f172a;
+  border: 1px solid #9ca3af;
+  padding: 12px 16px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.fmc-inline-action {
+  width: auto;
+}
+
 .fmc-route-field {
   margin-bottom: 20px;
 }
@@ -226,6 +412,230 @@
   border-radius: 4px;
   cursor: pointer;
   font-weight: bold;
+}
+
+.fmc-airport-card {
+  padding: 18px;
+}
+
+.fmc-airport-card.warning {
+  border-color: rgba(245, 158, 11, 0.34);
+  background: #1f1a13;
+}
+
+.fmc-airport-card.error {
+  border-color: rgba(248, 113, 113, 0.34);
+  background: #221517;
+}
+
+.fmc-airport-card-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: flex-start;
+  margin-bottom: 12px;
+}
+
+.fmc-airport-code-summary {
+  color: #f9fafb;
+  font-size: 20px;
+  font-weight: 650;
+}
+
+.fmc-airport-helper {
+  max-width: 240px;
+  color: #9ca3af;
+  font-size: 12px;
+  text-align: right;
+  line-height: 1.4;
+}
+
+.fmc-airport-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 10px;
+  color: #9ca3af;
+  font-size: 12px;
+}
+
+.fmc-airport-search {
+  position: relative;
+}
+
+.selected-airport-badge {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  align-items: center;
+  margin-top: 12px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: #111827;
+  border: 1px solid #374151;
+}
+
+.selected-airport-copy {
+  min-width: 0;
+}
+
+.selected-airport-primary {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.selected-airport-secondary {
+  margin-top: 4px;
+  color: #9ca3af;
+  font-size: 12px;
+}
+
+.airport-code {
+  font-weight: 700;
+}
+
+.airport-subcode {
+  color: #9ca3af;
+  font-size: 12px;
+}
+
+.airport-name {
+  color: #f9fafb;
+}
+
+.clear-btn {
+  border: none;
+  background: rgba(55, 65, 81, 0.9);
+  color: #f9fafb;
+  width: 28px;
+  height: 28px;
+  border-radius: 999px;
+  cursor: pointer;
+}
+
+.search-results {
+  margin-top: 10px;
+  border-radius: 14px;
+  overflow: hidden;
+  border: 1px solid #374151;
+  background: #111827;
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.28);
+}
+
+.results-count {
+  padding: 10px 14px;
+  font-size: 11px;
+  color: #9ca3af;
+  border-bottom: 1px solid rgba(75, 85, 99, 0.5);
+}
+
+.result-item {
+  padding: 12px 14px;
+  cursor: pointer;
+  border-bottom: 1px solid rgba(75, 85, 99, 0.45);
+  color: #f9fafb;
+}
+
+.result-item:last-child {
+  border-bottom: none;
+}
+
+.result-item:hover {
+  background: rgba(10, 132, 255, 0.12);
+}
+
+.result-main,
+.result-secondary {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.result-secondary {
+  margin-top: 4px;
+  color: #9ca3af;
+  font-size: 12px;
+}
+
+.airport-search-status {
+  margin-top: 10px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.airport-search-status.loading,
+.airport-search-status.invalid {
+  background: rgba(31, 41, 55, 0.92);
+  color: #d1d5db;
+}
+
+.airport-search-status.no-results {
+  background: rgba(127, 29, 29, 0.35);
+  color: #fca5a5;
+}
+
+.fmc-banner {
+  margin-bottom: 18px;
+  padding: 12px 14px;
+  border-radius: 14px;
+  font-size: 13px;
+}
+
+.fmc-banner.error {
+  background: rgba(127, 29, 29, 0.3);
+  color: #fca5a5;
+  border: 1px solid rgba(248, 113, 113, 0.22);
+}
+
+.fmc-banner.success {
+  background: rgba(10, 132, 255, 0.16);
+  color: #60a5fa;
+  border: 1px solid rgba(10, 132, 255, 0.18);
+}
+
+.fmc-status-pill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 68px;
+  padding: 7px 11px;
+  border-radius: 999px;
+  background: #1f2937;
+  color: #9ca3af;
+  font-size: 11px;
+  letter-spacing: 0;
+  text-transform: none;
+  border: none;
+}
+
+.fmc-status-pill.ready {
+  background: rgba(10, 132, 255, 0.18);
+  color: #0a84ff;
+}
+
+.fmc-stat-card {
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.fmc-stat-label {
+  color: #9ca3af;
+  font-size: 12px;
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+.fmc-stat-value {
+  color: #f9fafb;
+  font-size: 18px;
+  font-weight: 600;
 }
 
 .fmc-legs-list {
@@ -369,4 +779,41 @@
   padding: 40px;
   color: #64748b;
   font-style: italic;
+}
+
+@media (max-width: 900px) {
+  .fmc-panel.preflight-tablet {
+    height: auto;
+    min-height: 620px;
+    border-radius: 24px;
+  }
+
+  .fmc-panel.preflight-tablet .fmc-header {
+    padding: 20px 18px 12px;
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .fmc-tablet-statusbar,
+  .fmc-airport-card-header,
+  .fmc-section-header {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .fmc-panel.preflight-tablet .fmc-content {
+    padding: 16px;
+  }
+
+  .fmc-panel.preflight-tablet .fmc-nav {
+    padding: 0;
+    margin: 0 16px 14px;
+  }
+
+  .fmc-grid,
+  .fmc-edit-grid,
+  .fmc-route-summary-grid,
+  .fmc-perf-grid {
+    grid-template-columns: 1fr;
+  }
 }

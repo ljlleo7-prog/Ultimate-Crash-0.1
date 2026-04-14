@@ -17,8 +17,13 @@ class FailureHandler {
         this.engineCount = config.engineCount || 2;
         this.activeFailures = new Map(); // id -> failureInstance
         this.registry = new Map();
+        this.incidentLog = [];
         this.graph = createCanonicalFailureGraph();
-        this.graphExecutor = new FailureGraphExecutor(this.graph);
+        this.settings = this.getDifficultySettings(this.difficulty);
+        this.graphExecutor = new FailureGraphExecutor(this.graph, {
+            onCascadeScheduled: (payload) => this.handleCascadeScheduled(payload),
+            onCascadeTriggered: (payload) => this.handleCascadeTriggered(payload)
+        });
 
         // Register definitions
         this.registerGroup(EngineFailures);
@@ -27,7 +32,6 @@ class FailureHandler {
         this.registerGroup(EnvironmentFailures);
         this.registerGroup(SensorFailures);
 
-        this.settings = this.getDifficultySettings(this.difficulty);
         this.time = 0;
         this.nextCheckTime = 10.0;
 
@@ -44,16 +48,62 @@ class FailureHandler {
     }
 
     getDifficultySettings(difficulty) {
-        // ... (Logic from old FailureSystem.js) ...
         const settings = {
-            rookie: { probMultiplier: 0.0, maxFailures: 0 },
-            amateur: { probMultiplier: 0.2, maxFailures: 1 },
-            intermediate: { probMultiplier: 0.5, maxFailures: 2 },
-            advanced: { probMultiplier: 1.0, maxFailures: 3 },
-            pro: { probMultiplier: 1.5, maxFailures: 4 },
-            devil: { probMultiplier: 2.5, maxFailures: 5 }
+            rookie: {
+                probMultiplier: 0.0,
+                maxFailures: 0,
+                cascadeProbabilityMultiplier: 0.35,
+                cascadeDelayMultiplier: 2.5,
+                blockedCascadeClasses: ['catastrophic']
+            },
+            amateur: {
+                probMultiplier: 0.2,
+                maxFailures: 1,
+                cascadeProbabilityMultiplier: 0.65,
+                cascadeDelayMultiplier: 1.5,
+                blockedCascadeClasses: []
+            },
+            intermediate: {
+                probMultiplier: 0.5,
+                maxFailures: 2,
+                cascadeProbabilityMultiplier: 1.0,
+                cascadeDelayMultiplier: 1.0,
+                blockedCascadeClasses: []
+            },
+            advanced: {
+                probMultiplier: 1.0,
+                maxFailures: 3,
+                cascadeProbabilityMultiplier: 1.1,
+                cascadeDelayMultiplier: 0.9,
+                blockedCascadeClasses: []
+            },
+            pro: {
+                probMultiplier: 1.5,
+                maxFailures: 4,
+                cascadeProbabilityMultiplier: 1.2,
+                cascadeDelayMultiplier: 0.8,
+                blockedCascadeClasses: []
+            },
+            devil: {
+                probMultiplier: 2.5,
+                maxFailures: 5,
+                cascadeProbabilityMultiplier: 1.35,
+                cascadeDelayMultiplier: 0.65,
+                blockedCascadeClasses: []
+            }
         };
         return settings[difficulty] || settings.intermediate;
+    }
+
+    getCascadePolicy(context = {}) {
+        const difficulty = context.difficulty || this.difficulty;
+        const settings = this.getDifficultySettings(difficulty);
+        return {
+            difficulty,
+            probabilityMultiplier: settings.cascadeProbabilityMultiplier ?? 1,
+            delayMultiplier: settings.cascadeDelayMultiplier ?? 1,
+            blockedCascadeClasses: Array.isArray(settings.blockedCascadeClasses) ? [...settings.blockedCascadeClasses] : []
+        };
     }
 
     update(dt, flightState) {
@@ -67,7 +117,8 @@ class FailureHandler {
         this.graphExecutor.update(dt, {
             activeFailures: this.activeFailures,
             flightState,
-            triggerFailure: (id, context) => this.triggerFailure(id, context)
+            triggerFailure: (id, context) => this.triggerFailure(id, context),
+            getCascadePolicy: (sourceFailure) => this.getCascadePolicy(sourceFailure?.variation?.context)
         });
 
         // Random triggering logic
@@ -85,9 +136,57 @@ class FailureHandler {
         });
     }
 
+    recordIncident(type, payload = {}) {
+        this.incidentLog.push({
+            time: this.time,
+            type,
+            ...payload
+        });
+    }
+
+    getIncidentLog() {
+        return this.incidentLog.map(entry => ({ ...entry }));
+    }
+
+    handleCascadeScheduled({ edge, sourceFailure, context, scheduledAt, triggerAt, time }) {
+        const payload = {
+            edgeId: edge.id,
+            source: edge.sourceRuntimeId,
+            target: edge.targetRuntimeId,
+            context,
+            scheduledAt,
+            triggerAt,
+            time,
+            sourceStage: sourceFailure?.currentStage || null,
+            effectiveProbability: context?.cascadePolicy?.effectiveProbability ?? edge.probability ?? 1,
+            effectiveDelay: context?.cascadePolicy?.effectiveDelay ?? edge.delaySeconds ?? 0,
+            cascadeBlocked: context?.cascadePolicy?.blocked === true
+        };
+        this.recordIncident('cascade_scheduled', payload);
+        eventBus.publish(eventBus.Types.FAILURE_CASCADE_SCHEDULED, payload);
+    }
+
+    handleCascadeTriggered({ edge, sourceFailure, context, scheduledAt, triggerAt, time }) {
+        const payload = {
+            edgeId: edge.id,
+            source: edge.sourceRuntimeId,
+            target: edge.targetRuntimeId,
+            context,
+            scheduledAt,
+            triggerAt,
+            time,
+            sourceStage: sourceFailure?.currentStage || null,
+            effectiveProbability: context?.cascadePolicy?.effectiveProbability ?? edge.probability ?? 1,
+            effectiveDelay: context?.cascadePolicy?.effectiveDelay ?? edge.delaySeconds ?? 0,
+            cascadeBlocked: context?.cascadePolicy?.blocked === true
+        };
+        this.recordIncident('cascade_triggered', payload);
+        eventBus.publish(eventBus.Types.FAILURE_CASCADE_TRIGGERED, payload);
+    }
+
     triggerFailure(id, context = {}) {
         if (this.activeFailures.has(id)) return;
-        
+
         const def = this.registry.get(id);
         if (!def) {
             console.warn(`Failure definition not found: ${id}`);
@@ -98,35 +197,51 @@ class FailureHandler {
         if (context.difficulty === undefined) {
             context.difficulty = this.difficulty;
         }
+        if (!context.cascadePolicy) {
+            context.cascadePolicy = this.getCascadePolicy(context);
+        }
 
         if (def.category === 'engine' && context.engineIndex === undefined) {
             context.engineIndex = Math.floor(Math.random() * this.engineCount);
         }
 
         const failure = new BaseFailure(def, context, this.handleTransition);
-        
-        // Initial transition will trigger the callback
-        // If it has stages, start at incipient or whatever the inactive next is
-        // Usually we manually call transitionTo('incipient') if it exists, or let it update from inactive
-        
-        // Check if 'incipient' exists, otherwise 'active'
-        const nextStage = def.stages.incipient ? 'incipient' : 'active';
-        failure.transitionTo(nextStage); 
-        
+        const initialStage = def.stages?.inactive?.next || (def.stages?.incipient ? 'incipient' : 'active');
+        failure.transitionTo(initialStage);
+
         this.activeFailures.set(id, failure);
-        
+        this.recordIncident('failure_triggered', {
+            failureId: id,
+            context: { ...context },
+            stage: failure.currentStage
+        });
+
         // Global Event
         eventBus.publish(eventBus.Types.FAILURE_OCCURRED, {
             type: id,
             severity: 'major', // Dynamic?
-            data: context
+            data: context,
+            time: this.time
         });
     }
     
     handleTransition(failure, desc) {
         // Handle sensory events
         let message = typeof desc === 'string' ? desc : desc.text;
-        
+        this.recordIncident('failure_progressed', {
+            failureId: failure.id,
+            stage: failure.currentStage,
+            message,
+            description: desc
+        });
+        eventBus.publish(eventBus.Types.FAILURE_PROGRESSED, {
+            type: failure.id,
+            stage: failure.currentStage,
+            message,
+            description: desc,
+            time: this.time
+        });
+
         if (typeof desc === 'object') {
             if (desc.sound) {
                 eventBus.publish('SENSORY_SOUND', { id: desc.sound });
@@ -155,7 +270,8 @@ class FailureHandler {
             eventBus.publish(eventBus.Types.CRITICAL_MESSAGE, {
                 title: 'SYSTEM ALERT',
                 content: message,
-                severity: 'warning'
+                severity: 'warning',
+                time: this.time
             });
         }
     }

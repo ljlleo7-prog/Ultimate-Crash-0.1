@@ -11,6 +11,7 @@ class FailureGraphManager {
         this.runtimeGraph = createCanonicalFailureGraph();
         this.graphArtifact = this.runtimeGraph;
         this.initialized = false;
+        this.remotePublicationsUnavailable = false;
     }
 
     async initialize() {
@@ -85,6 +86,10 @@ class FailureGraphManager {
     }
 
     async fetchPublishedArtifact(supabase) {
+        if (this.remotePublicationsUnavailable) {
+            return null;
+        }
+
         try {
             const { data: publication, error: publicationError } = await supabase
                 .from('failure_graph_publications')
@@ -110,6 +115,9 @@ class FailureGraphManager {
                 .single();
 
             if (publicationError) {
+                if (publicationError.code === 'PGRST205' || publicationError.code === '42P01' || publicationError.status === 404) {
+                    this.remotePublicationsUnavailable = true;
+                }
                 return null;
             }
 
@@ -191,6 +199,23 @@ class FailureGraphManager {
     loadRuntimeFallback() {
         this.resetState();
         this.loadArtifact(this.runtimeGraph);
+        this.initialized = true;
+    }
+
+    initializeRuntimeGraph() {
+        this.loadRuntimeFallback();
+        return this.getRuntimeGraphView();
+    }
+
+    getRuntimeGraphView() {
+        const artifact = this.getGraphArtifact();
+        return {
+            source: 'runtime',
+            artifact,
+            failures: this.getAllFailures(),
+            edges: this.getAllEdges(),
+            metadata: artifact?.metadata || {}
+        };
     }
 
     loadArtifact(artifact) {
@@ -232,6 +257,7 @@ class FailureGraphManager {
             probability: edge.probability,
             delay_seconds: edge.delaySeconds,
             propagation_type: edge.propagationType,
+            cascade_class: edge.cascadeClass,
             source_stage: edge.sourceStage,
             min_source_time_in_stage: edge.minSourceTimeInStage,
             required_observables: edge.requiredObservables,
@@ -248,6 +274,7 @@ class FailureGraphManager {
             targetId: edge.targetId,
             delaySeconds: edge.delaySeconds,
             propagationType: edge.propagationType,
+            cascadeClass: edge.cascadeClass,
             sourceStage: edge.sourceStage,
             minSourceTimeInStage: edge.minSourceTimeInStage,
             requiredObservables: edge.requiredObservables,

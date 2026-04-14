@@ -2,6 +2,7 @@ import airlinesData from '../data/airlinesDatabase.json';
 import { airportService } from './airportService.js';
 import aircraftService from './aircraftService.js';
 import { calculateDistance } from '../utils/distanceCalculator.js';
+import { generateGate, generateSID, generateSTAR, generateSmartRoute, generateTaxiway, getRunways } from '../utils/routeGenerator.js';
 
 class RandomFlightService {
   constructor() {
@@ -108,27 +109,45 @@ class RandomFlightService {
     const callsign = this.generateRandomCallsign(airline);
     const { departure, arrival, distance } = await this.getRandomAirports();
     const aircraft = await this.getRandomAircraftForDistance(distance.nauticalMiles);
-    
+    const waypoints = await generateSmartRoute(departure, arrival);
+    const depRunways = getRunways(departure);
+    const arrRunways = getRunways(arrival);
+    const isEastward = arrival.longitude > departure.longitude;
+    const departureRunway = depRunways.length > 0 ? [...depRunways].sort((a, b) => parseInt(a, 10) - parseInt(b, 10))[isEastward ? 0 : depRunways.length - 1] : '';
+    const landingRunway = arrRunways.length > 0 ? [...arrRunways].sort((a, b) => parseInt(a, 10) - parseInt(b, 10))[isEastward ? 0 : arrRunways.length - 1] : '';
+    const firstWaypointName = waypoints[0]?.name || 'DEF';
+    const lastWaypointName = waypoints[waypoints.length - 1]?.name || firstWaypointName;
+    const routeDetails = {
+      departureGate: generateGate(),
+      departureTaxiway: generateTaxiway(),
+      departureRunway,
+      sid: generateSID(firstWaypointName),
+      waypoints,
+      star: generateSTAR(lastWaypointName),
+      landingRunway,
+      landingTaxiway: generateTaxiway(),
+      arrivalGate: generateGate(),
+      alternate: null
+    };
+
     const maxPax = aircraft.passengers || 180;
     const rawPax = Math.floor(Math.random() * (maxPax * 0.8)) + Math.floor(maxPax * 0.2);
     const pax = Math.round(this.roundToSignificantDigits(rawPax, 3));
-    
+
     const rawPayload = Math.floor(pax * 100) + Math.floor(Math.random() * 5000);
     const payload = Math.round(this.roundToSignificantDigits(rawPayload, 3));
-    
+
     const rawFuelReserve = 0.1 + (Math.random() * 0.1);
     const fuelReserve = this.roundToSignificantDigits(rawFuelReserve, 3);
     const rawCruiseHeight = Math.floor(28000 + (Math.random() * 12000));
     const cruiseHeight = Math.round(this.roundToSignificantDigits(rawCruiseHeight, 3));
-    
-    // Random time and season
+
     const useRandomTime = true;
     const useRandomSeason = true;
-    
-    // Random difficulty
+
     const difficulties = ['rookie', 'amateur', 'intermediate', 'advanced', 'expert'];
     const difficulty = difficulties[Math.floor(Math.random() * difficulties.length)];
-    
+
     return {
       airline: airline.name,
       callsign,
@@ -142,6 +161,7 @@ class RandomFlightService {
       difficulty,
       selectedDeparture: departure,
       selectedArrival: arrival,
+      routeDetails,
       distance: distance.nauticalMiles
     };
   }

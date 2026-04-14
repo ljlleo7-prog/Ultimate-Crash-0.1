@@ -1,72 +1,108 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
+
+const REVERSE_IDLE_LEVER = 0.19;
+const FORWARD_IDLE_LEVER = 0.21;
+const REVERSE_DETENT = 0.2;
+const MODE_HYSTERESIS = 0.015;
+const REVERSE_SYNC_THRESHOLD = -0.05;
+const FORWARD_SYNC_THRESHOLD = 0.02;
+const MANUAL_SYNC_LOCK_MS = 1200;
 
 const ThrustManager = ({ controlThrust, flightState }) => {
   const engineCount =
     Array.isArray(flightState?.engineN1) ? flightState.engineN1.length :
     Array.isArray(flightState?.engineN2) ? flightState.engineN2.length : 2;
-  
-  const initial = Array(engineCount).fill(0.2);
+
+  const initial = Array(engineCount).fill(REVERSE_DETENT);
   const [throttles, setThrottles] = useState(initial);
   const [reverse, setReverse] = useState(Array(engineCount).fill(false));
   const [sync, setSync] = useState(true);
   const displayThrottles = throttles.map(t => t * 100);
-  
-  const isDraggingRef = React.useRef(Array(engineCount).fill(false));
+
+  const isDraggingRef = useRef(Array(engineCount).fill(false));
+  const lastManualThrottleChangeRef = useRef(0);
+  const reverseRef = useRef(reverse);
 
   useEffect(() => {
-    // Only update from props if not dragging
+    reverseRef.current = reverse;
+  }, [reverse]);
+
+  useEffect(() => {
+    isDraggingRef.current = Array(engineCount).fill(false);
+  }, [engineCount]);
+
+  const deriveReverseFromLever = useCallback((lever, previousMode = false) => {
+    if (lever < REVERSE_DETENT - MODE_HYSTERESIS) return true;
+    if (lever > REVERSE_DETENT + MODE_HYSTERESIS) return false;
+    return previousMode;
+  }, []);
+
+  const deriveReverseFromCommand = useCallback((command, previousMode = false) => {
+    if (command <= REVERSE_SYNC_THRESHOLD) return true;
+    if (command >= FORWARD_SYNC_THRESHOLD) return false;
+    return previousMode;
+  }, []);
+
+  const mapCommandToLever = useCallback((command) => {
+    const cmd = typeof command === 'number' ? command : 0;
+    if (cmd < 0) return (cmd + 1) * REVERSE_DETENT;
+    return (cmd * (1 - REVERSE_DETENT)) + REVERSE_DETENT;
+  }, []);
+
+  useEffect(() => {
     if (isDraggingRef.current.some(d => d)) return;
+    if (Date.now() - lastManualThrottleChangeRef.current < MANUAL_SYNC_LOCK_MS) return;
 
     if (Array.isArray(flightState?.engineThrottles)) {
-      // flightState.engineThrottles now contains commanded values (levers)
-      // We need to inverse map them to slider positions (0-1)
-      const values = flightState.engineThrottles.map(v => {
-        // v is in -1 to 1 range (approx)
-        const cmd = typeof v === 'number' ? v/100 : 0; // v is percent? 
-        // useAircraftPhysics returns values * 100. So v/100 gives -1..1.
-        
-        // Inverse Map:
-        // If cmd < 0: val = (cmd + 1) * 0.2
-        // If cmd >= 0: val = (cmd * 0.8) + 0.2
-        if (cmd < 0) return (cmd + 1) * 0.2;
-        return (cmd * 0.8) + 0.2;
-      });
+      const commands = flightState.engineThrottles.map(v => (typeof v === 'number' ? v : 0));
+      const values = commands.map(mapCommandToLever);
       if (values.length === engineCount) {
-        setThrottles(values);
-        setReverse(values.map(v => v <= 0.2));
+        const nextReverse = values.map((_, index) => deriveReverseFromCommand(commands[index], reverseRef.current[index] ?? false));
+        const throttlesChanged = values.some((value, index) => Math.abs((throttles[index] ?? 0) - value) > 0.0001);
+        const reverseChanged = nextReverse.some((value, index) => (reverseRef.current[index] ?? false) !== value);
+
+        if (throttlesChanged) {
+          setThrottles(values);
+        }
+        if (reverseChanged) {
+          reverseRef.current = nextReverse;
+          setReverse(nextReverse);
+        }
       }
     } else if (typeof flightState?.throttle === 'number') {
-      const cmd = flightState.throttle / 100;
-      let val;
-      if (cmd < 0) val = (cmd + 1) * 0.2;
-      else val = (cmd * 0.8) + 0.2;
-      setThrottles(Array(engineCount).fill(val));
-      setReverse(Array(engineCount).fill(val <= 0.2));
+      const command = flightState.throttle;
+      const val = mapCommandToLever(command);
+      const nextMode = deriveReverseFromCommand(command, reverseRef.current[0] ?? false);
+      const nextReverse = Array(engineCount).fill(nextMode);
+      const nextThrottles = Array(engineCount).fill(val);
+      const throttlesChanged = nextThrottles.some((value, index) => Math.abs((throttles[index] ?? 0) - value) > 0.0001);
+      const reverseChanged = nextReverse.some((value, index) => (reverseRef.current[index] ?? false) !== value);
+
+      if (throttlesChanged) {
+        setThrottles(nextThrottles);
+      }
+      if (reverseChanged) {
+        reverseRef.current = nextReverse;
+        setReverse(nextReverse);
+      }
     }
-  }, [flightState?.engineThrottles, flightState?.throttle, engineCount]);
-  
+  }, [flightState?.engineThrottles, flightState?.throttle, engineCount, deriveReverseFromCommand, mapCommandToLever, throttles]);
+
   const mapLeverToCommand = (lever) => {
     const v = Math.max(0, Math.min(1, lever));
-    const reverseSection = 0.2;
-    
-    if (v <= reverseSection) {
-      // 0.0 -> -1.0 (Max Rev)
-      // 0.2 -> 0.0 (Idle)
-      // Formula: -1.0 + (v / 0.2)
-      // v=0 -> -1.
-      // v=0.2 -> 0.
-      return -1.0 + (v / reverseSection);
-    } else {
-      // 0.2 -> 0.0 (Idle)
-      // 1.0 -> 1.0 (TOGA)
-      // Formula: (v - 0.2) / 0.8
-      return (v - reverseSection) / (1 - reverseSection);
+
+    if (v <= REVERSE_DETENT) {
+      return -1.0 + (v / REVERSE_DETENT);
     }
+
+    return (v - REVERSE_DETENT) / (1 - REVERSE_DETENT);
   };
 
-  const setLeverThrottle = useCallback((index, value) => {
+  const setLeverThrottle = useCallback((index, value, options = {}) => {
     const val = Math.max(0, Math.min(1, value));
-    
+    const { forcedReverse = null } = options;
+    lastManualThrottleChangeRef.current = Date.now();
+
     setThrottles(prev => {
       const next = [...prev];
       next[index] = val;
@@ -76,57 +112,52 @@ const ThrustManager = ({ controlThrust, flightState }) => {
       return next;
     });
 
-    // Update reverse state based on position
     setReverse(prev => {
       const next = [...prev];
-      const isRev = val <= 0.2;
-      next[index] = isRev;
+      const resolvedMode = typeof forcedReverse === 'boolean'
+        ? forcedReverse
+        : deriveReverseFromLever(val, prev[index] ?? false);
+      next[index] = resolvedMode;
       if (sync) {
-        for (let i = 0; i < engineCount; i++) next[i] = isRev;
+        for (let i = 0; i < engineCount; i++) next[i] = resolvedMode;
       }
+      reverseRef.current = next;
       return next;
     });
 
     const cmd = mapLeverToCommand(val);
     if (controlThrust) controlThrust(index, cmd);
-    
+
     if (sync) {
       for (let i = 0; i < engineCount; i++) {
-        // For sync, we use the SAME lever value 'val'
-        if (i !== index) {
-            const cmdSync = mapLeverToCommand(val);
-            if (controlThrust) controlThrust(i, cmdSync);
+        if (i !== index && controlThrust) {
+          controlThrust(i, cmd);
         }
       }
     }
-  }, [controlThrust, sync, engineCount]);
-  
+  }, [controlThrust, sync, engineCount, deriveReverseFromLever]);
+
   const onDrag = (index, e) => {
     isDraggingRef.current[index] = true;
     const target = e.currentTarget;
     const rect = target.getBoundingClientRect();
-    const startReverseState = reverse[index]; // Capture mode at start of drag
-    
+
     const move = (evt) => {
       const y = (evt.touches ? evt.touches[0].clientY : evt.clientY) - rect.top;
       const pct = Math.max(0, Math.min(100, (1 - y / rect.height) * 100));
       const raw = pct / 100;
-      
-      // Clamp based on mode to prevent accidental crossover
-      // Forward Mode: Cannot go below 0.2 (Idle)
-      // Reverse Mode: Cannot go above 0.2 (Idle)
+      const currentReverseState = reverseRef.current[index] ?? false;
+
       let clamped = raw;
-      if (!startReverseState) {
-        // In Forward Mode: Lock to [0.201, 1.0]
-        clamped = Math.max(0.201, raw);
+      if (!currentReverseState) {
+        clamped = Math.max(FORWARD_IDLE_LEVER, raw);
       } else {
-        // In Reverse Mode: Lock to [0.0, 0.2]
-        clamped = Math.min(0.2, raw);
+        clamped = Math.min(REVERSE_DETENT, raw);
       }
-      
-      setLeverThrottle(index, clamped);
+
+      setLeverThrottle(index, clamped, { forcedReverse: currentReverseState });
     };
-    
+
     const up = () => {
       isDraggingRef.current[index] = false;
       window.removeEventListener('mousemove', move);
@@ -134,34 +165,27 @@ const ThrustManager = ({ controlThrust, flightState }) => {
       window.removeEventListener('touchmove', move);
       window.removeEventListener('touchend', up);
     };
-    
+
     window.addEventListener('mousemove', move);
     window.addEventListener('mouseup', up);
     window.addEventListener('touchmove', move, { passive: true });
     window.addEventListener('touchend', up);
     move(e);
   };
-  
-  // Toggle acts as the "Gate" between Forward and Reverse
+
   const toggleReverse = (index) => {
-    const currentVal = throttles[index];
-    const isInRev = currentVal <= 0.2;
-    
-    // Toggle Mode:
-    // Rev -> Fwd: Go to Idle Forward (0.21)
-    // Fwd -> Rev: Go to Idle Reverse (0.19) - Safe start, user can then drag to Max Rev
-    const newVal = isInRev ? 0.21 : 0.19;
-    
-    setLeverThrottle(index, newVal);
+    const targetReverse = !(reverseRef.current[index] ?? false);
+    const newVal = targetReverse ? REVERSE_IDLE_LEVER : FORWARD_IDLE_LEVER;
+    setLeverThrottle(index, newVal, { forcedReverse: targetReverse });
   };
-  
+
   const lever = (index) => {
     const n1 = Array.isArray(flightState?.engineN1) ? flightState.engineN1[index] : flightState?.engineN1 || 22;
     const n2 = Array.isArray(flightState?.engineN2) ? flightState.engineN2[index] : flightState?.engineN2 || 45;
     const egt = Array.isArray(flightState?.engineEGT) ? flightState.engineEGT[index] : flightState?.engineEGT || 400;
     const pct = displayThrottles[index];
     const isRev = reverse[index];
-    
+
     return React.createElement('div', {
       key: index,
       style: {
@@ -206,7 +230,7 @@ const ThrustManager = ({ controlThrust, flightState }) => {
       )
     );
   };
-  
+
   return React.createElement('div', { style: { background: 'linear-gradient(135deg, #1e293b 0%, #334155 100%)', padding: '15px', borderRadius: '10px', border: '2px solid #475569', display: 'flex', gap: '10px', alignItems: 'flex-start', width: 'fit-content', boxShadow: '0 4px 20px rgba(0, 0, 0, 0.5)' } },
     React.createElement('div', { style: { display: 'flex', gap: '10px' } },
       Array.from({ length: engineCount }).map((_, i) => lever(i))
@@ -220,8 +244,10 @@ const ThrustManager = ({ controlThrust, flightState }) => {
               const checked = e.target.checked;
               setSync(checked);
               if (checked) {
-                const firstRev = reverse[0] || false;
-                setReverse(Array(engineCount).fill(firstRev));
+                const firstRev = reverseRef.current[0] || false;
+                const nextReverse = Array(engineCount).fill(firstRev);
+                reverseRef.current = nextReverse;
+                setReverse(nextReverse);
               }
             }
           }),

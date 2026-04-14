@@ -1,6 +1,6 @@
 
-import { airportService } from './airportService';
-import { regionControlService } from './RegionControlService';
+import { airportService } from './airportService.js';
+import { regionControlService } from './RegionControlService.js';
 
 // Flight Stages
 export const NPC_STAGE = {

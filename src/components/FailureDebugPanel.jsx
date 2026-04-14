@@ -5,11 +5,13 @@ const FailureDebugPanel = ({ physicsService, onClose }) => {
     const [activeFailures, setActiveFailures] = useState([]);
     const [graphFailures, setGraphFailures] = useState([]);
     const [graphEdges, setGraphEdges] = useState([]);
+    const [graphSource, setGraphSource] = useState('');
     const [nodePositions, setNodePositions] = useState({});
     const [isLoading, setIsLoading] = useState(true);
-    const [mapSize, setMapSize] = useState({ width: 1200, height: 680 });
+    const [pan, setPan] = useState({ x: 0, y: 0 });
+    const [canvasSize] = useState({ width: 2400, height: 1800 });
     const mapRef = useRef(null);
-    const draggingRef = useRef(null);
+    const dragStateRef = useRef(null);
 
     useEffect(() => {
         if (!physicsService || !physicsService.failureSystem) return;
@@ -22,47 +24,25 @@ const FailureDebugPanel = ({ physicsService, onClose }) => {
     }, [physicsService]);
 
     useEffect(() => {
-        let isMounted = true;
-        const loadGraph = async () => {
+        const loadGraph = () => {
             setIsLoading(true);
-            await failureGraphManager.initialize();
-            if (!isMounted) return;
-            setGraphFailures(failureGraphManager.getAllFailures());
-            setGraphEdges(failureGraphManager.getAllEdges());
+            const graphView = failureGraphManager.initializeRuntimeGraph();
+            setGraphFailures(graphView.failures);
+            setGraphEdges(graphView.edges);
+            setGraphSource(graphView.source);
             setIsLoading(false);
         };
         loadGraph();
-        return () => {
-            isMounted = false;
-        };
-    }, []);
-
-    useEffect(() => {
-        if (!mapRef.current) return;
-        const updateSize = () => {
-            if (!mapRef.current) return;
-            const nextWidth = mapRef.current.clientWidth;
-            const nextHeight = mapRef.current.clientHeight;
-            setMapSize(prev => {
-                if (prev.width === nextWidth && prev.height === nextHeight) {
-                    return prev;
-                }
-                return { width: nextWidth, height: nextHeight };
-            });
-        };
-        updateSize();
-        window.addEventListener('resize', updateSize);
-        return () => window.removeEventListener('resize', updateSize);
     }, []);
 
     const failureById = useMemo(() => new Map(graphFailures.map(f => [f.id, f])), [graphFailures]);
 
     const initialPositions = useMemo(() => {
-        const padding = 40;
-        const rowGap = 90;
+        const padding = 60;
+        const rowGap = 100;
         const systems = Array.from(new Set(graphFailures.map(f => f.system || 'OTHER'))).sort();
         const columnCount = Math.max(1, systems.length);
-        const columnWidth = Math.max(240, (mapSize.width - padding * 2) / columnCount);
+        const columnWidth = Math.max(280, (canvasSize.width - padding * 2) / columnCount);
         const grouped = systems.reduce((acc, system) => {
             acc[system] = [];
             return acc;
@@ -86,7 +66,7 @@ const FailureDebugPanel = ({ physicsService, onClose }) => {
             });
         });
         return positions;
-    }, [graphFailures, mapSize.width]);
+    }, [graphFailures, canvasSize.width]);
 
     useEffect(() => {
         if (graphFailures.length === 0) return;
@@ -100,31 +80,36 @@ const FailureDebugPanel = ({ physicsService, onClose }) => {
     }, [graphFailures, initialPositions]);
 
     useEffect(() => {
-        const handleMove = (event) => {
-            if (!draggingRef.current || !mapRef.current) return;
-            const dragData = draggingRef.current;
-            const rect = mapRef.current.getBoundingClientRect();
-            const nodeWidth = 190;
-            const nodeHeight = 64;
-            const x = event.clientX - rect.left - dragData.offsetX;
-            const y = event.clientY - rect.top - dragData.offsetY;
-            const clampedX = Math.max(10, Math.min(x, mapSize.width - nodeWidth - 10));
-            const clampedY = Math.max(10, Math.min(y, mapSize.height - nodeHeight - 10));
-            setNodePositions(prev => ({
-                ...prev,
-                [dragData.id]: { x: clampedX, y: clampedY }
-            }));
+        const handlePointerMove = (event) => {
+            if (!dragStateRef.current || !mapRef.current) return;
+            const dragData = dragStateRef.current;
+
+            if (dragData.type === 'pan') {
+                const dx = event.clientX - dragData.startX;
+                const dy = event.clientY - dragData.startY;
+                setPan({ x: dragData.panStartX + dx, y: dragData.panStartY + dy });
+            } else if (dragData.type === 'node') {
+                const rect = mapRef.current.getBoundingClientRect();
+                const x = event.clientX - rect.left - dragData.offsetX - pan.x;
+                const y = event.clientY - rect.top - dragData.offsetY - pan.y;
+                setNodePositions(prev => ({
+                    ...prev,
+                    [dragData.id]: { x, y }
+                }));
+            }
         };
-        const handleUp = () => {
-            draggingRef.current = null;
+
+        const handlePointerUp = () => {
+            dragStateRef.current = null;
         };
-        window.addEventListener('mousemove', handleMove);
-        window.addEventListener('mouseup', handleUp);
+
+        window.addEventListener('pointermove', handlePointerMove);
+        window.addEventListener('pointerup', handlePointerUp);
         return () => {
-            window.removeEventListener('mousemove', handleMove);
-            window.removeEventListener('mouseup', handleUp);
+            window.removeEventListener('pointermove', handlePointerMove);
+            window.removeEventListener('pointerup', handlePointerUp);
         };
-    }, [mapSize]);
+    }, [pan]);
 
     const getEdgeDelay = (edge) => {
         if (typeof edge.delay_seconds === 'number') return edge.delay_seconds;
@@ -168,12 +153,15 @@ const FailureDebugPanel = ({ physicsService, onClose }) => {
         }
     };
 
+    const activeFailureIds = useMemo(() => new Set(activeFailures.map((failure) => failure.id)), [activeFailures]);
+    const selectedFailure = graphFailures.find((failure) => activeFailureIds.has(failure.id)) || graphFailures[0] || null;
+
     if (!physicsService || !physicsService.failureSystem) {
         return null;
     }
 
-    const nodeWidth = 190;
-    const nodeHeight = 64;
+    const nodeWidth = 168;
+    const nodeHeight = 52;
 
     return (
         <div style={{
@@ -189,7 +177,7 @@ const FailureDebugPanel = ({ physicsService, onClose }) => {
             borderRadius: '12px',
             zIndex: 9999,
             border: '1px solid #334455',
-            width: '1300px',
+            width: '1360px',
             height: '860px',
             display: 'flex',
             flexDirection: 'column',
@@ -234,6 +222,9 @@ const FailureDebugPanel = ({ physicsService, onClose }) => {
                         </span>
                         <span style={{ color: '#667788' }}>THICK = HIGH PROB</span>
                     </div>
+                    <div style={{ fontSize: '10px', color: '#9fb2c5', padding: '4px 8px', border: '1px solid #324658', borderRadius: '999px' }}>
+                        SOURCE: {(graphSource || 'runtime').toUpperCase()}
+                    </div>
                     <div style={{ fontSize: '11px', color: '#8899aa', display: 'flex', alignItems: 'center' }}>
                         DIFFICULTY: <span style={{ color: '#fff', marginLeft: '6px' }}>{(physicsService.difficulty || 'ROOKIE').toUpperCase()}</span>
                     </div>
@@ -252,109 +243,181 @@ const FailureDebugPanel = ({ physicsService, onClose }) => {
                 </div>
             </div>
 
-            <div
-                ref={mapRef}
-                style={{
-                    position: 'relative',
-                    flex: 1,
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 280px', gap: '16px', flex: 1, minHeight: 0 }}>
+                <div
+                    ref={mapRef}
+                    onPointerDown={(event) => {
+                        if (event.target !== mapRef.current) return;
+                        dragStateRef.current = {
+                            type: 'pan',
+                            startX: event.clientX,
+                            startY: event.clientY,
+                            panStartX: pan.x,
+                            panStartY: pan.y
+                        };
+                    }}
+                    style={{
+                        position: 'relative',
+                        borderRadius: '10px',
+                        border: '1px solid #223344',
+                        overflow: 'hidden',
+                        background: 'radial-gradient(circle at 20% 20%, rgba(40, 60, 80, 0.25), transparent 45%), linear-gradient(0deg, rgba(20, 28, 36, 0.95), rgba(12, 18, 26, 0.95))',
+                        boxShadow: 'inset 0 0 40px rgba(0,0,0,0.5)',
+                        cursor: dragStateRef.current?.type === 'pan' ? 'grabbing' : 'grab'
+                    }}
+                >
+                    <div style={{ position: 'absolute', inset: 0, transform: `translate(${pan.x}px, ${pan.y}px)` }}>
+                        <svg
+                            width={canvasSize.width}
+                            height={canvasSize.height}
+                            style={{ position: 'absolute', top: 0, left: 0, pointerEvents: 'none' }}
+                        >
+                            <defs>
+                                <marker id="failure-cascade-arrow" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto" markerUnits="strokeWidth">
+                                    <path d="M 0 0 L 10 5 L 0 10 z" fill="#91a4b8" />
+                                </marker>
+                            </defs>
+                            {graphEdges.map(edge => {
+                                const fromPos = nodePositions[edge.cause_failure] || initialPositions[edge.cause_failure];
+                                const toPos = nodePositions[edge.effect_failure] || initialPositions[edge.effect_failure];
+                                if (!fromPos || !toPos) return null;
+                                const x1 = fromPos.x + nodeWidth / 2;
+                                const y1 = fromPos.y + nodeHeight / 2;
+                                const x2 = toPos.x + nodeWidth / 2;
+                                const y2 = toPos.y + nodeHeight / 2;
+                                const dx = Math.max(80, Math.abs(x2 - x1) / 2);
+                                const probability = typeof edge.probability === 'number' ? edge.probability : 0.5;
+                                const strokeWidth = 1.5 + probability * 4;
+                                const isActiveEdge = activeFailureIds.has(edge.cause_failure) || activeFailureIds.has(edge.effect_failure);
+                                const color = getSpeedColor(edge);
+                                return (
+                                    <path
+                                        key={edge.id}
+                                        d={`M ${x1} ${y1} C ${x1 + dx} ${y1}, ${x2 - dx} ${y2}, ${x2} ${y2}`}
+                                        stroke={color}
+                                        strokeWidth={strokeWidth}
+                                        strokeOpacity={isActiveEdge ? 0.95 : 0.45}
+                                        fill="none"
+                                        markerEnd="url(#failure-cascade-arrow)"
+                                    />
+                                );
+                            })}
+                        </svg>
+
+                        {graphFailures.map(failure => {
+                            const pos = nodePositions[failure.id] || initialPositions[failure.id] || { x: 0, y: 0 };
+                            const isActive = activeFailureIds.has(failure.id);
+                            const title = failure.failure_code || failure.id;
+                            return (
+                                <div
+                                    key={failure.id}
+                                    onPointerDown={(event) => {
+                                        event.stopPropagation();
+                                        if (!mapRef.current) return;
+                                        const rect = mapRef.current.getBoundingClientRect();
+                                        dragStateRef.current = {
+                                            type: 'node',
+                                            id: failure.id,
+                                            offsetX: event.clientX - rect.left - pan.x - pos.x,
+                                            offsetY: event.clientY - rect.top - pan.y - pos.y
+                                        };
+                                    }}
+                                    onDoubleClick={() => handleTrigger(failure.id)}
+                                    title={failure.description || title}
+                                    style={{
+                                        position: 'absolute',
+                                        left: `${pos.x}px`,
+                                        top: `${pos.y}px`,
+                                        width: `${nodeWidth}px`,
+                                        minHeight: `${nodeHeight}px`,
+                                        background: isActive ? 'linear-gradient(135deg, rgba(92, 28, 28, 0.82), rgba(26, 12, 12, 0.86))' : 'rgba(19, 27, 36, 0.72)',
+                                        border: isActive ? '1px solid #ff4d4d' : '1px solid rgba(90, 118, 145, 0.65)',
+                                        borderRadius: '10px',
+                                        padding: '9px 10px',
+                                        cursor: 'grab',
+                                        display: 'flex',
+                                        flexDirection: 'column',
+                                        gap: '6px',
+                                        boxShadow: isActive ? '0 0 18px rgba(255, 77, 77, 0.35)' : '0 0 10px rgba(0, 0, 0, 0.25)',
+                                        userSelect: 'none',
+                                        backdropFilter: 'blur(3px)'
+                                    }}
+                                >
+                                    <div style={{ fontSize: '10px', fontWeight: 'bold', color: '#eef4fb', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                        {title.toUpperCase()}
+                                    </div>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', gap: '8px', fontSize: '9px', color: '#9fb2c5' }}>
+                                        <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{(failure.system || 'OTHER').toUpperCase()}</span>
+                                        <span>{(failure.metadata?.time_scale || failure.time_scale || 'unknown').toUpperCase()}</span>
+                                    </div>
+                                </div>
+                            );
+                        })}
+                    </div>
+
+                    {isLoading && (
+                        <div style={{
+                            position: 'absolute',
+                            inset: 0,
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            background: 'rgba(8, 12, 16, 0.75)',
+                            color: '#cbd5e1',
+                            fontSize: '12px',
+                            letterSpacing: '1px'
+                        }}>
+                            LOADING FAILURE GRAPH...
+                        </div>
+                    )}
+                </div>
+
+                <div style={{
                     borderRadius: '10px',
                     border: '1px solid #223344',
-                    overflow: 'auto',
-                    background: 'radial-gradient(circle at 20% 20%, rgba(40, 60, 80, 0.25), transparent 45%), linear-gradient(0deg, rgba(20, 28, 36, 0.95), rgba(12, 18, 26, 0.95))',
-                    boxShadow: 'inset 0 0 40px rgba(0,0,0,0.5)'
-                }}
-            >
-                <svg
-                    width={mapSize.width}
-                    height={mapSize.height}
-                    style={{ position: 'absolute', top: 0, left: 0, pointerEvents: 'none' }}
-                >
-                    {graphEdges.map(edge => {
-                        const fromPos = nodePositions[edge.cause_failure] || initialPositions[edge.cause_failure];
-                        const toPos = nodePositions[edge.effect_failure] || initialPositions[edge.effect_failure];
-                        if (!fromPos || !toPos) return null;
-                        const x1 = fromPos.x + nodeWidth / 2;
-                        const y1 = fromPos.y + nodeHeight / 2;
-                        const x2 = toPos.x + nodeWidth / 2;
-                        const y2 = toPos.y + nodeHeight / 2;
-                        const dx = Math.max(60, Math.abs(x2 - x1) / 2);
-                        const probability = typeof edge.probability === 'number' ? edge.probability : 0.5;
-                        const strokeWidth = 1.5 + probability * 5;
-                        const strokeOpacity = 0.35 + probability * 0.65;
-                        const color = getSpeedColor(edge);
-                        return (
-                            <path
-                                key={edge.id}
-                                d={`M ${x1} ${y1} C ${x1 + dx} ${y1}, ${x2 - dx} ${y2}, ${x2} ${y2}`}
-                                stroke={color}
-                                strokeWidth={strokeWidth}
-                                strokeOpacity={strokeOpacity}
-                                fill="none"
-                            />
-                        );
-                    })}
-                </svg>
-
-                {graphFailures.map(failure => {
-                    const pos = nodePositions[failure.id] || initialPositions[failure.id] || { x: 0, y: 0 };
-                    const isActive = activeFailures.some(active => active.id === failure.id);
-                    return (
-                        <div
-                            key={failure.id}
-                            onMouseDown={(event) => {
-                                if (!mapRef.current) return;
-                                const rect = mapRef.current.getBoundingClientRect();
-                                draggingRef.current = {
-                                    id: failure.id,
-                                    offsetX: event.clientX - rect.left - pos.x,
-                                    offsetY: event.clientY - rect.top - pos.y
-                                };
-                            }}
-                            onDoubleClick={() => handleTrigger(failure.id)}
-                            style={{
-                                position: 'absolute',
-                                left: `${pos.x}px`,
-                                top: `${pos.y}px`,
-                                width: `${nodeWidth}px`,
-                                height: `${nodeHeight}px`,
-                                background: isActive ? 'linear-gradient(135deg, rgba(80, 30, 30, 0.9), rgba(30, 15, 15, 0.95))' : 'rgba(22, 30, 40, 0.92)',
-                                border: isActive ? '1px solid #ff4d4d' : '1px solid #2a3b4c',
-                                borderRadius: '8px',
-                                padding: '10px 12px',
-                                cursor: 'grab',
-                                display: 'flex',
-                                flexDirection: 'column',
-                                justifyContent: 'space-between',
-                                boxShadow: isActive ? '0 0 18px rgba(255, 77, 77, 0.4)' : '0 0 12px rgba(0, 0, 0, 0.4)',
-                                userSelect: 'none'
-                            }}
-                        >
-                            <div style={{ fontSize: '11px', fontWeight: 'bold', color: '#e8edf2' }}>
-                                {failure.description || failure.failure_code || failure.id}
+                    background: 'rgba(14, 20, 28, 0.94)',
+                    padding: '16px',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '12px',
+                    overflow: 'auto'
+                }}>
+                    <div style={{ fontSize: '11px', color: '#7f93a8' }}>SELECTED FAILURE</div>
+                    {selectedFailure ? (
+                        <>
+                            <div style={{ fontSize: '14px', fontWeight: 'bold', color: '#f8fbff' }}>
+                                {(selectedFailure.failure_code || selectedFailure.id).toUpperCase()}
                             </div>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '9px', color: '#8fa1b5' }}>
-                                <span>{(failure.system || 'OTHER').toUpperCase()}</span>
-                                <span>{(failure.time_scale || 'unknown').toUpperCase()}</span>
+                            <div style={{ fontSize: '11px', color: '#9fb2c5', lineHeight: 1.6 }}>
+                                {selectedFailure.description || selectedFailure.failure_code || selectedFailure.id}
                             </div>
-                        </div>
-                    );
-                })}
-
-                {isLoading && (
-                    <div style={{
-                        position: 'absolute',
-                        inset: 0,
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        background: 'rgba(8, 12, 16, 0.75)',
-                        color: '#cbd5e1',
-                        fontSize: '12px',
-                        letterSpacing: '1px'
-                    }}>
-                        LOADING FAILURE GRAPH...
-                    </div>
-                )}
+                            <div style={{ display: 'grid', gridTemplateColumns: 'auto 1fr', gap: '8px 10px', fontSize: '10px', color: '#91a4b8' }}>
+                                <span>SYSTEM</span><span>{(selectedFailure.system || 'OTHER').toUpperCase()}</span>
+                                <span>SOURCE</span><span>{(selectedFailure.source || 'runtime').toUpperCase()}</span>
+                                <span>TIME SCALE</span><span>{(selectedFailure.metadata?.time_scale || selectedFailure.time_scale || 'unknown').toUpperCase()}</span>
+                                <span>TRIGGER</span><span>DOUBLE-CLICK NODE</span>
+                            </div>
+                            <div style={{ marginTop: '8px' }}>
+                                <div style={{ fontSize: '11px', color: '#7f93a8', marginBottom: '8px' }}>OUTGOING CASCADES</div>
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                                    {graphEdges.filter(edge => edge.cause_failure === selectedFailure.id).slice(0, 8).map(edge => (
+                                        <div key={edge.id} style={{ border: '1px solid #233241', borderRadius: '8px', padding: '8px 10px', background: 'rgba(18, 25, 34, 0.8)' }}>
+                                            <div style={{ fontSize: '10px', color: '#dbe7f3' }}>{(edge.effect_failure || edge.target_failure_code || '').toUpperCase()}</div>
+                                            <div style={{ fontSize: '9px', color: '#89a0b7', marginTop: '4px' }}>
+                                                p={(typeof edge.probability === 'number' ? edge.probability : 0.5).toFixed(2)} · delay={getEdgeDelay(edge)}s{edge.cascadeClass ? ` · ${edge.cascadeClass}` : ''}
+                                            </div>
+                                        </div>
+                                    ))}
+                                    {graphEdges.filter(edge => edge.cause_failure === selectedFailure.id).length === 0 && (
+                                        <div style={{ fontSize: '10px', color: '#71859a' }}>No outgoing cascades.</div>
+                                    )}
+                                </div>
+                            </div>
+                        </>
+                    ) : (
+                        <div style={{ fontSize: '11px', color: '#7f93a8' }}>No failures loaded.</div>
+                    )}
+                </div>
             </div>
         </div>
     );

@@ -5,7 +5,7 @@ const HomePage = ({ onStartSinglePlayer, onStartTutorial, onOpenSettings }) => {
   return (
     <div className="homepage-container">
       <div className="homepage-content">
-        <h1 className="game-title">ULTIMATE CRASH</h1>
+        <h1 className="game-title">SKYLINE TRAGEDY</h1>
         <h2 className="game-subtitle">FLIGHT SIMULATOR</h2>
         
         <div className="menu-options">

@@ -1,9 +1,9 @@
 
-import americanAirports from '../data/americanAirports.json';
-import asianAirports from '../data/asianAirports.json';
-import europeanAirports from '../data/europeanAirports.json';
-import americanEmergency from '../data/americanEmergencyAirports.json';
-import otherEmergency from '../data/otherEmergencyAirports.json';
+import americanAirports from '../data/americanAirports.json' with { type: "json" };
+import asianAirports from '../data/asianAirports.json' with { type: "json" };
+import europeanAirports from '../data/europeanAirports.json' with { type: "json" };
+import americanEmergency from '../data/americanEmergencyAirports.json' with { type: "json" };
+import otherEmergency from '../data/otherEmergencyAirports.json' with { type: "json" };
 
 class RegionControlService {
     constructor() {

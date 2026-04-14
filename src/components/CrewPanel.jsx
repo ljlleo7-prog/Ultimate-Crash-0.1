@@ -1,23 +1,38 @@
 
-import React, { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import eventBus from '../services/eventBus';
 import { npcCrewService } from '../services/NPCCrewService';
+import './CrewPanel.css';
 
-const CrewPanel = ({ difficulty }) => {
+const CrewPanel = () => {
     const [messages, setMessages] = useState([]);
     const [foStress, setFoStress] = useState(0);
+    const [cabinStress, setCabinStress] = useState(0);
     const messagesEndRef = useRef(null);
 
     useEffect(() => {
         // Subscribe to crew messages
-        const unsubscribe = eventBus.subscribe('NPC_CREW_MESSAGE', (msg) => {
+        const unsubscribe = eventBus.subscribe(eventBus.Types.NPC_CREW_MESSAGE, (msg) => {
             setMessages(prev => [...prev, msg]);
-            if (msg.stress !== undefined && msg.role === 'FO') {
-                setFoStress(msg.stress);
+            if (msg.stress !== undefined) {
+                if (msg.role === 'FO') {
+                    setFoStress(msg.stress);
+                } else if (msg.role === 'CABIN_CREW') {
+                    setCabinStress(msg.stress);
+                }
             }
         });
 
-        return () => unsubscribe();
+        // Also we can poll npcCrewService for stress decay updates periodically
+        const interval = setInterval(() => {
+            setFoStress(npcCrewService.crewState.FO.stress);
+            setCabinStress(npcCrewService.crewState.CABIN_CREW.stress);
+        }, 5000);
+
+        return () => {
+            unsubscribe();
+            clearInterval(interval);
+        };
     }, []);
 
     useEffect(() => {
@@ -34,73 +49,40 @@ const CrewPanel = ({ difficulty }) => {
         npcCrewService.summon('CABIN_CREW');
     };
 
+    const getSenderClass = (sender) => {
+        if (sender === 'First Officer') return 'sender-fo';
+        if (sender === 'Cabin Crew') return 'sender-cabin';
+        return 'sender-system';
+    };
+
     return (
-        <div style={{
-            position: 'absolute',
-            bottom: '20px',
-            right: '350px', // Positioned to the left of other panels
-            width: '280px',
-            height: '200px',
-            background: 'rgba(15, 23, 42, 0.9)',
-            border: '1px solid #334155',
-            borderRadius: '8px',
-            display: 'flex',
-            flexDirection: 'column',
-            zIndex: 50,
-            overflow: 'hidden',
-            boxShadow: '0 4px 6px rgba(0,0,0,0.5)'
-        }}>
+        <div className="crew-panel">
             {/* Header */}
-            <div style={{
-                padding: '8px',
-                background: 'rgba(30, 41, 59, 0.8)',
-                borderBottom: '1px solid #334155',
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center'
-            }}>
-                <span style={{ fontSize: '12px', fontWeight: 'bold', color: '#94a3b8' }}>CREW INTERCOM</span>
-                <span style={{ fontSize: '10px', color: foStress > 50 ? '#ef4444' : '#4ade80' }}>
-                    FO STRESS: {foStress}%
-                </span>
+            <div className="crew-panel-header">
+                <span className="crew-panel-title">CREW INTERCOM</span>
+                <div className="crew-panel-stress-container">
+                    <span className={`crew-stress-indicator ${foStress > 50 ? 'stress-high' : 'stress-low'}`}>
+                        FO: {foStress}%
+                    </span>
+                    <span className={`crew-stress-indicator ${cabinStress > 50 ? 'stress-high' : 'stress-low'}`}>
+                        CABIN: {cabinStress}%
+                    </span>
+                </div>
             </div>
 
             {/* Message Log */}
-            <div style={{
-                flex: 1,
-                overflowY: 'auto',
-                padding: '8px',
-                display: 'flex',
-                flexDirection: 'column',
-                gap: '6px'
-            }}>
+            <div className="crew-panel-messages">
                 {messages.length === 0 && (
-                    <div style={{ fontSize: '11px', color: '#475569', fontStyle: 'italic', textAlign: 'center', marginTop: '20px' }}>
+                    <div className="crew-panel-empty">
                         No recent communications.
                     </div>
                 )}
                 {messages.map((msg, idx) => (
-                    <div key={idx} style={{
-                        display: 'flex',
-                        flexDirection: 'column',
-                        alignItems: msg.sender === 'System' ? 'center' : 'flex-start'
-                    }}>
-                        <span style={{ 
-                            fontSize: '10px', 
-                            color: msg.sender === 'First Officer' ? '#38bdf8' : (msg.sender === 'Cabin Crew' ? '#f472b6' : '#94a3b8'),
-                            fontWeight: 'bold',
-                            marginBottom: '1px'
-                        }}>
+                    <div key={idx} className="crew-message-item" style={{ alignItems: msg.sender === 'System' ? 'center' : 'flex-start' }}>
+                        <span className={`crew-message-sender ${getSenderClass(msg.sender)}`}>
                             {msg.sender}
                         </span>
-                        <div style={{
-                            fontSize: '11px',
-                            color: '#e2e8f0',
-                            background: 'rgba(255,255,255,0.05)',
-                            padding: '4px 8px',
-                            borderRadius: '4px',
-                            maxWidth: '100%'
-                        }}>
+                        <div className="crew-message-content">
                             {msg.content}
                         </div>
                     </div>
@@ -109,42 +91,11 @@ const CrewPanel = ({ difficulty }) => {
             </div>
 
             {/* Controls */}
-            <div style={{
-                padding: '8px',
-                borderTop: '1px solid #334155',
-                display: 'flex',
-                gap: '8px'
-            }}>
-                <button 
-                    onClick={handleSummonFO}
-                    style={{
-                        flex: 1,
-                        background: '#0f172a',
-                        border: '1px solid #38bdf8',
-                        color: '#38bdf8',
-                        borderRadius: '4px',
-                        padding: '4px',
-                        fontSize: '10px',
-                        cursor: 'pointer',
-                        fontWeight: 'bold'
-                    }}
-                >
+            <div className="crew-panel-controls">
+                <button className="crew-btn crew-btn-fo" onClick={handleSummonFO}>
                     CALL FO
                 </button>
-                <button 
-                    onClick={handleSummonCabin}
-                    style={{
-                        flex: 1,
-                        background: '#0f172a',
-                        border: '1px solid #f472b6',
-                        color: '#f472b6',
-                        borderRadius: '4px',
-                        padding: '4px',
-                        fontSize: '10px',
-                        cursor: 'pointer',
-                        fontWeight: 'bold'
-                    }}
-                >
+                <button className="crew-btn crew-btn-cabin" onClick={handleSummonCabin}>
                     CALL CABIN
                 </button>
             </div>

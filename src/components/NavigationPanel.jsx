@@ -1,4 +1,4 @@
-import React, { useRef, useEffect, useState } from 'react';
+import React, { useRef, useEffect, useState, useMemo } from 'react';
 import { calculateDistance } from '../utils/distanceCalculator';
 import { airportService } from '../services/airportService';
 import { terrainRadarService } from '../services/TerrainRadarService';
@@ -7,18 +7,16 @@ import { terrainRadarService } from '../services/TerrainRadarService';
 const NavigationPanel = ({ flightState, selectedArrival, flightPlan, npcs = [] }) => {
   const radarCanvasRef = useRef(null);
   const lastTerrainUpdateRef = useRef(0);
-  const [distanceToWaypoint, setDistanceToWaypoint] = useState(0);
   const [mapRange, setMapRange] = useState(40); // Default 40nm
-  const [nearbyRunways, setNearbyRunways] = useState([]);
 
   const groundSpeed = flightState?.groundSpeed || 0;
   const trueAirspeed = flightState?.trueAirspeed || 0;
   const heading = flightState?.heading || 0;
   const altitude = flightState?.altitude || 0;
 
-  const waypoints = flightPlan?.waypoints || [];
-  const [currentNextWaypointName, setCurrentNextWaypointName] = useState('N/A');
-  const [currentDistanceToNextWaypoint, setCurrentDistanceToNextWaypoint] = useState(0);
+  const waypoints = useMemo(() => (
+    Array.isArray(flightPlan?.waypoints) ? flightPlan.waypoints : []
+  ), [flightPlan?.waypoints]);
 
   // Range options (Exponential)
   const rangeOptions = [5, 10, 20, 40, 80, 160, 320, 640];
@@ -29,15 +27,17 @@ const NavigationPanel = ({ flightState, selectedArrival, flightPlan, npcs = [] }
     setMapRange(rangeOptions[nextIndex]);
   };
 
-  // Effect to find nearby runways and airports
-  useEffect(() => {
-    if (!flightState?.latitude || !flightState?.longitude) return;
+  const nearbyRunways = useMemo(() => {
+    if (!flightState?.latitude || !flightState?.longitude) {
+      return [];
+    }
 
-    // Get airports within range for display
-    const airports = airportService.getAirportsWithinRadius(flightState.latitude, flightState.longitude, Math.max(mapRange, 20)); 
-    setNearbyRunways(airports); // Using this state for airports too, we'll process runways inside loop
-
-  }, [flightState?.latitude, flightState?.longitude, mapRange]); // Depends on position and range
+    return airportService.getAirportsWithinRadius(
+      flightState.latitude,
+      flightState.longitude,
+      Math.max(mapRange, 20)
+    );
+  }, [flightState?.latitude, flightState?.longitude, mapRange]);
 
   // Effect to update Terrain Radar
   useEffect(() => {
@@ -55,56 +55,71 @@ const NavigationPanel = ({ flightState, selectedArrival, flightPlan, npcs = [] }
     }
     
   }, [flightState?.latitude, flightState?.longitude, mapRange]);
+  const distanceToWaypoint = useMemo(() => {
+    if (!flightState || !selectedArrival) {
+      return 0;
+    }
 
+    const currentLat = flightState.latitude;
+    const currentLon = flightState.longitude;
+    const arrivalLat = selectedArrival.latitude;
+    const arrivalLon = selectedArrival.longitude;
 
-  useEffect(() => {
-    if (flightState && selectedArrival) {
-      const currentLat = flightState.latitude;
-      const currentLon = flightState.longitude;
-      const arrivalLat = selectedArrival.latitude;
-      const arrivalLon = selectedArrival.longitude;
+    if (currentLat === undefined || currentLon === undefined || arrivalLat === undefined || arrivalLon === undefined) {
+      return 0;
+    }
 
-      if (currentLat !== undefined && currentLon !== undefined && arrivalLat !== undefined && arrivalLon !== undefined) {
-        const dist = calculateDistance(currentLat, currentLon, arrivalLat, arrivalLon);
-        setDistanceToWaypoint(dist);
+    return calculateDistance(currentLat, currentLon, arrivalLat, arrivalLon);
+  }, [flightState?.latitude, flightState?.longitude, selectedArrival?.latitude, selectedArrival?.longitude]);
+
+  const activeWaypointData = useMemo(() => {
+    if (!flightState || waypoints.length === 0) {
+      return { name: 'N/A', distance: 0 };
+    }
+
+    const currentLat = flightState.latitude;
+    const currentLon = flightState.longitude;
+
+    if (currentLat === undefined || currentLon === undefined) {
+      return { name: 'N/A', distance: 0 };
+    }
+
+    let activeWaypoint = null;
+    let distanceToActive = Infinity;
+
+    if (
+      typeof flightState.currentWaypointIndex === 'number' &&
+      flightState.currentWaypointIndex >= 0 &&
+      flightState.currentWaypointIndex < waypoints.length
+    ) {
+      activeWaypoint = waypoints[flightState.currentWaypointIndex];
+      distanceToActive = calculateDistance(currentLat, currentLon, activeWaypoint.latitude, activeWaypoint.longitude);
+    } else {
+      let minDistance = Infinity;
+      for (let i = 0; i < waypoints.length; i++) {
+        const wp = waypoints[i];
+        const dist = calculateDistance(currentLat, currentLon, wp.latitude, wp.longitude);
+        if (dist < minDistance) {
+          minDistance = dist;
+          activeWaypoint = wp;
+          distanceToActive = dist;
+        }
       }
     }
 
-    if (flightState && waypoints.length > 0) {
-      const currentLat = flightState.latitude;
-      const currentLon = flightState.longitude;
-
-      if (currentLat !== undefined && currentLon !== undefined) {
-        let activeWaypoint = null;
-        let distanceToActive = Infinity;
-
-        // Priority 1: Use the actual active waypoint index from flight physics
-        if (typeof flightState.currentWaypointIndex === 'number' && 
-            flightState.currentWaypointIndex >= 0 && 
-            flightState.currentWaypointIndex < waypoints.length) {
-          activeWaypoint = waypoints[flightState.currentWaypointIndex];
-          distanceToActive = calculateDistance(currentLat, currentLon, activeWaypoint.latitude, activeWaypoint.longitude);
-        } else {
-          // Priority 2: Fallback to closest waypoint (legacy behavior)
-          let minDistance = Infinity;
-          for (let i = 0; i < waypoints.length; i++) {
-            const wp = waypoints[i];
-            const dist = calculateDistance(currentLat, currentLon, wp.latitude, wp.longitude);
-            if (dist < minDistance) {
-              minDistance = dist;
-              activeWaypoint = wp;
-              distanceToActive = dist;
-            }
-          }
-        }
-
-        if (activeWaypoint) {
-          setCurrentNextWaypointName(activeWaypoint.label || activeWaypoint.name || 'WPT');
-          setCurrentDistanceToNextWaypoint(distanceToActive);
-        }
-      }
+    if (!activeWaypoint) {
+      return { name: 'N/A', distance: 0 };
     }
-  }, [flightState, selectedArrival, waypoints]);
+
+    return {
+      name: activeWaypoint.label || activeWaypoint.name || 'WPT',
+      distance: Number.isFinite(distanceToActive) ? distanceToActive : 0
+    };
+  }, [flightState?.latitude, flightState?.longitude, flightState?.currentWaypointIndex, waypoints]);
+
+  const currentNextWaypointName = activeWaypointData.name;
+  const currentDistanceToNextWaypoint = activeWaypointData.distance;
+
 
   useEffect(() => {
     const canvas = radarCanvasRef.current;

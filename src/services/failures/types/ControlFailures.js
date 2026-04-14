@@ -120,12 +120,27 @@ const ControlFailures = {
         name: 'Total Control Loss',
         category: 'controls',
         stages: {
-            inactive: { next: 'active' },
+            inactive: { next: 'degraded' },
+            degraded: {
+                duration: 5.0,
+                next: 'active',
+                description: (ctx) => ({
+                    text: 'Flight controls are responding sluggishly. Manual forces rising sharply.',
+                    system_alert: 'FLT CTL FEEL DIFF',
+                    sound: 'master_caution',
+                    visual: 'controls_stiff'
+                }),
+                effect: (sys) => {
+                    sys.controls.aileron *= 0.35;
+                    sys.controls.elevator *= 0.35;
+                    sys.controls.rudder *= 0.4;
+                }
+            },
             active: {
                 description: (ctx) => ({
-                    text: "FLIGHT CONTROLS UNRESPONSIVE.",
-                    system_alert: "FLT CTL ALL FAIL",
-                    sound: "cavalry_charge_warning"
+                    text: 'FLIGHT CONTROLS UNRESPONSIVE.',
+                    system_alert: 'FLT CTL ALL FAIL',
+                    sound: 'cavalry_charge_warning'
                 }),
                 effect: (sys) => {
                     sys.controls.aileron = 0;

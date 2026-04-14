@@ -19,6 +19,8 @@ const getByPath = (value, path) => {
     return path.split('.').reduce((current, key) => (current == null ? undefined : current[key]), value);
 };
 
+const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
+
 const compareObservable = (actual, operator, expected) => {
     switch (operator) {
         case '<': return actual < expected;
@@ -36,11 +38,30 @@ const compareObservable = (actual, operator, expected) => {
     }
 };
 
+const resolveEdgeDifficulty = (edge, cascadePolicy = {}) => {
+    const blockedCascadeClasses = Array.isArray(cascadePolicy.blockedCascadeClasses)
+        ? cascadePolicy.blockedCascadeClasses
+        : [];
+    const blocked = blockedCascadeClasses.includes(edge.cascadeClass);
+    const effectiveProbability = blocked
+        ? 0
+        : clamp((edge.probability ?? 1) * (cascadePolicy.probabilityMultiplier ?? 1), 0, 1);
+    const effectiveDelay = Math.max(0, (edge.delaySeconds || 0) * (cascadePolicy.delayMultiplier ?? 1));
+
+    return {
+        difficulty: cascadePolicy.difficulty,
+        blocked,
+        effectiveProbability,
+        effectiveDelay
+    };
+};
+
 class FailureGraphExecutor {
-    constructor(graph) {
+    constructor(graph, hooks = {}) {
         this.graph = graph;
         this.time = 0;
         this.pendingActivations = new Map();
+        this.hooks = hooks;
     }
 
     reset() {
@@ -49,10 +70,10 @@ class FailureGraphExecutor {
     }
 
     update(dt, payload) {
-        const { activeFailures, flightState, triggerFailure } = payload;
+        const { activeFailures, flightState, triggerFailure, getCascadePolicy } = payload;
         this.time += dt;
 
-        this.scheduleEligibleEdges(activeFailures, flightState);
+        this.scheduleEligibleEdges(activeFailures, flightState, getCascadePolicy);
 
         for (const [key, pending] of Array.from(this.pendingActivations.entries())) {
             if (activeFailures.has(pending.edge.targetRuntimeId)) {
@@ -70,12 +91,23 @@ class FailureGraphExecutor {
                 continue;
             }
 
+            if (typeof this.hooks.onCascadeTriggered === 'function') {
+                this.hooks.onCascadeTriggered({
+                    edge: pending.edge,
+                    sourceFailure,
+                    context: pending.context,
+                    scheduledAt: pending.scheduledAt,
+                    triggerAt: pending.triggerAt,
+                    time: this.time
+                });
+            }
+
             triggerFailure(pending.edge.targetRuntimeId, pending.context);
             this.pendingActivations.delete(key);
         }
     }
 
-    scheduleEligibleEdges(activeFailures, flightState) {
+    scheduleEligibleEdges(activeFailures, flightState, getCascadePolicy) {
         this.graph.edges.forEach((edge) => {
             const sourceFailure = activeFailures.get(edge.sourceRuntimeId);
             if (!sourceFailure) return;
@@ -84,13 +116,33 @@ class FailureGraphExecutor {
             const key = `${edge.id}:${sourceFailure.id}:${edge.targetRuntimeId}`;
             if (this.pendingActivations.has(key)) return;
             if (!this.isEdgeEligible(edge, sourceFailure, flightState)) return;
-            if (Math.random() > (edge.probability ?? 1)) return;
 
-            this.pendingActivations.set(key, {
+            const cascadePolicy = typeof getCascadePolicy === 'function'
+                ? getCascadePolicy(sourceFailure)
+                : {};
+            const edgeDifficulty = resolveEdgeDifficulty(edge, cascadePolicy);
+            if (edgeDifficulty.blocked) return;
+            if (Math.random() > edgeDifficulty.effectiveProbability) return;
+
+            const pending = {
                 edge,
-                triggerAt: this.time + (edge.delaySeconds || 0),
-                context: this.buildTargetContext(edge, sourceFailure)
-            });
+                scheduledAt: this.time,
+                triggerAt: this.time + edgeDifficulty.effectiveDelay,
+                context: this.buildTargetContext(edge, sourceFailure, edgeDifficulty)
+            };
+
+            this.pendingActivations.set(key, pending);
+
+            if (typeof this.hooks.onCascadeScheduled === 'function') {
+                this.hooks.onCascadeScheduled({
+                    edge,
+                    sourceFailure,
+                    context: pending.context,
+                    scheduledAt: pending.scheduledAt,
+                    triggerAt: pending.triggerAt,
+                    time: this.time
+                });
+            }
         });
     }
 
@@ -136,7 +188,7 @@ class FailureGraphExecutor {
         return getByPath(flightState, path);
     }
 
-    buildTargetContext(edge, sourceFailure) {
+    buildTargetContext(edge, sourceFailure, edgeDifficulty = {}) {
         const template = edge.targetContextTemplate || {};
         const context = {};
 
@@ -154,6 +206,13 @@ class FailureGraphExecutor {
 
         context.triggeredBy = edge.sourceRuntimeId;
         context.propagationType = edge.propagationType;
+        context.cascadeEdgeId = edge.id;
+        context.cascadePolicy = {
+            difficulty: edgeDifficulty.difficulty,
+            blocked: edgeDifficulty.blocked === true,
+            effectiveProbability: edgeDifficulty.effectiveProbability ?? edge.probability ?? 1,
+            effectiveDelay: edgeDifficulty.effectiveDelay ?? edge.delaySeconds ?? 0
+        };
         return context;
     }
 }

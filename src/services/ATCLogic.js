@@ -1,5 +1,5 @@
 
-import { getATCResponse } from '../data/atcResponseDatabase';
+import { getATCResponse } from '../data/atcResponseDatabase.js';
 
 export class ATCLogic {
   constructor() {

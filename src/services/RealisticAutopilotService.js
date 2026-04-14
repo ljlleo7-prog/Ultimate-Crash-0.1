@@ -287,6 +287,8 @@ class RealisticAutopilotService {
         if (!this.engaged) return null;
 
         const { airspeed, verticalSpeed, pitch, roll, heading, track, latitude, longitude, altitude } = state;
+        const altitudeAGL = state.altitudeAGL;
+        const onGround = state.onGround === true;
         const beta = state.beta || 0;
         const filtered = this.filterState({ airspeed, verticalSpeed, pitch, roll, heading, track, beta }, dt);
         const fAirspeed = filtered.airspeed;
@@ -483,17 +485,29 @@ class RealisticAutopilotService {
                  let targetAltitude = altitude; // Default to hold current
                  
                  const runwayElev = thresholdStart.elevation || 0;
+                const heightAglFt = Number.isFinite(altitudeAGL) ? altitudeAGL : Math.max(0, altitude - runwayElev);
+                const sinkRateFpm = Number.isFinite(verticalSpeed) ? verticalSpeed : 0;
+                const inFlareWindow = distToThresholdFt <= 1200 && distToThresholdFt > -1500;
+                const inRollout = onGround || (distToThresholdFt <= -150 && heightAglFt <= 5);
+                let ilsPhase = 'approach';
+                if (inRollout) ilsPhase = 'rollout';
+                else if (inFlareWindow || heightAglFt <= 80) ilsPhase = 'flare';
                  
                  // Active Zone: Approaching (dist > 0) and within reasonable range (< 50nm)
                  // and not "behind" the runway (distAlong < 0)
-                 if (distToThresholdFt > 0 && distToThresholdFt < 300000) {
+                 if (distToThresholdFt > 1200 && distToThresholdFt < 300000) {
                     targetAltitude = runwayElev + 50 + (distToThresholdFt * Math.tan(3 * Math.PI / 180));
-                 } else if (distToThresholdFt <= 0 && distToThresholdFt > -10000) {
-                     // Over runway: Flare / Hold 50ft
-                     targetAltitude = runwayElev + 50;
+                 } else if (distToThresholdFt > -1500) {
+                     const flareBlend = Math.min(1, Math.max(0, (1200 - distToThresholdFt) / 2700));
+                     const flareReferenceAltitude = runwayElev + Math.max(5, 50 * (1 - flareBlend));
+                    targetAltitude = flareReferenceAltitude;
                  }
                  
-                 const altError = targetAltitude - altitude;
+                 if (distToThresholdFt <= -1500) {
+                    targetAltitude = runwayElev;
+                }
+
+                const altError = targetAltitude - altitude;
                  
                  // Glideslope Capture Logic (Capture from Below)
                  // If we are significantly below the glidepath (altError > 50ft), 
@@ -520,13 +534,21 @@ class RealisticAutopilotService {
                      baseDescentRate = -groundSpeedKts * 5.2; 
                      
                      // If not in active approach zone, disable base descent
-                     if (distToThresholdFt <= 0 || distToThresholdFt > 120000) {
+                     if (distToThresholdFt <= -1500 || distToThresholdFt > 120000) {
                          baseDescentRate = 0;
                          vsCorrection = vsCorrection * 0.1;
                      }
                  }
                  
                  this.targets.vs = baseDescentRate + vsCorrection;
+
+                if (ilsPhase === 'flare') {
+                    this.targets.vs = Math.max(-900, Math.min(-150, this.targets.vs * 0.45));
+                }
+                if (ilsPhase === 'rollout') {
+                    this.targets.vs = 0;
+                    this.glideslopePID.reset();
+                }
                 
                 // Clamp VS for safety
                 // Increased max descent to 4500 fpm to allow capture from high altitude
@@ -625,7 +647,7 @@ class RealisticAutopilotService {
                  // Bank Limit Logic on Short Final
                  if (distNM < 1.0) {
                      isShortFinal = true;
-                     const limit = 5.0; // Stricter limit close in
+                     const limit = ilsPhase === 'flare' ? 3.0 : 5.0;
                      if (headingCorrection > limit) headingCorrection = limit;
                      if (headingCorrection < -limit) headingCorrection = -limit;
                  }
@@ -664,6 +686,10 @@ class RealisticAutopilotService {
                  } else {
                      ilsDebug.gsDeviationDeg = 0;
                  }
+
+                 ilsDebug.phase = ilsPhase;
+                 ilsDebug.runwayEntryHeightFt = Math.abs(distToThresholdFt) <= 600 ? heightAglFt : null;
+                 ilsDebug.sinkRateFpm = sinkRateFpm;
              }
         }
         

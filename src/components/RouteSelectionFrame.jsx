@@ -1,132 +1,113 @@
-
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import './RouteSelectionFrame.css';
-import { generateWaypoints, generateSID, generateSTAR, generateGate, generateTaxiway, getRunways, generateRouteWaypoints, generateSmartRoute } from '../utils/routeGenerator';
+import { generateSID, generateSTAR, generateGate, generateTaxiway, getRunways, generateSmartRoute, procedureMatchesWaypoint } from '../utils/routeGenerator';
 
-const RouteSelectionFrame = ({ 
-  isOpen, 
-  onConfirm, 
-  onSkip, 
-  difficulty, 
-  departure, 
-  arrival 
-}) => {
-  const [routeData, setRouteData] = useState({
-    departureGate: '',
-    departureTaxiway: '',
-    departureRunway: '',
-    sid: '',
-    waypoints: [],
-    star: '',
-    landingRunway: '',
-    landingTaxiway: '',
-    arrivalGate: ''
-  });
+const DEFAULT_ROUTE_DATA = {
+  departureGate: '',
+  departureTaxiway: '',
+  departureRunway: '',
+  sid: '',
+  waypoints: [],
+  star: '',
+  landingRunway: '',
+  landingTaxiway: '',
+  arrivalGate: ''
+};
 
+const RouteSelectionFrame = ({ isOpen, onConfirm, onSkip, onChange, difficulty, departure, arrival, routeData: externalRouteData }) => {
+  const [routeData, setRouteData] = useState(DEFAULT_ROUTE_DATA);
   const [availableRunwaysDep, setAvailableRunwaysDep] = useState([]);
   const [availableRunwaysArr, setAvailableRunwaysArr] = useState([]);
-  const [generatedWaypoints, setGeneratedWaypoints] = useState([]);
   const [isGeneratingRoute, setIsGeneratingRoute] = useState(false);
 
   useEffect(() => {
-    if (isOpen && departure && arrival) {
-      const depRunways = getRunways(departure);
-      const arrRunways = getRunways(arrival);
-      setAvailableRunwaysDep(depRunways);
-      setAvailableRunwaysArr(arrRunways);
+    if (externalRouteData) {
+      setRouteData({ ...DEFAULT_ROUTE_DATA, ...externalRouteData });
+    }
+  }, [externalRouteData]);
 
-      const fetchRoute = async () => {
-        setIsGeneratingRoute(true);
-        const waypoints = await generateSmartRoute(departure, arrival);
-        console.log('📍 Generated route waypoints:', waypoints);
-        setGeneratedWaypoints(waypoints);
+  useEffect(() => {
+    if (!isOpen || !departure || !arrival) return;
 
-        const sid = generateSID((waypoints[0] && waypoints[0].name) || 'ABC');
-        const star = generateSTAR((waypoints[waypoints.length - 1] && waypoints[waypoints.length - 1].name) || 'ABC');
-        const depGate = generateGate();
-        const arrGate = generateGate();
-        const depTaxi = generateTaxiway();
-        const arrTaxi = generateTaxiway();
+    const depRunways = getRunways(departure);
+    const arrRunways = getRunways(arrival);
+    setAvailableRunwaysDep(depRunways);
+    setAvailableRunwaysArr(arrRunways);
 
-        const isEastward = arrival.longitude > departure.longitude;
-        const bestDepRunway = depRunways.length > 0 ? [...depRunways].sort((a, b) => parseInt(a) - parseInt(b))[isEastward ? 0 : depRunways.length - 1] : '';
-        const bestArrRunway = arrRunways.length > 0 ? [...arrRunways].sort((a, b) => parseInt(a) - parseInt(b))[isEastward ? 0 : arrRunways.length - 1] : '';
+    const shouldHydrateDefaults = !externalRouteData || (!externalRouteData.waypoints?.length && !externalRouteData.departureRunway && !externalRouteData.landingRunway);
+    if (!shouldHydrateDefaults) return;
 
-        // Pre-fill based on difficulty to assist user
-        // Or leave empty if "must set".
-        // Let's pre-fill for everyone but require interaction for specific levels?
-        // Actually, standard UX is pre-fill with smart defaults.
-        
-        const isAmateurOrHigher = ['amateur', 'intermediate', 'advanced', 'pro', 'devil'].includes(difficulty);
-        const isIntermediateOrHigher = ['intermediate', 'advanced', 'pro', 'devil'].includes(difficulty);
-        const isAdvancedOrHigher = ['advanced', 'pro', 'devil'].includes(difficulty);
+    const fetchRoute = async () => {
+      setIsGeneratingRoute(true);
+      const waypoints = await generateSmartRoute(departure, arrival);
+      const sid = generateSID((waypoints[0] && waypoints[0].name) || 'ABC');
+      const star = generateSTAR((waypoints[waypoints.length - 1] && waypoints[waypoints.length - 1].name) || 'ABC');
+      const depGate = generateGate();
+      const arrGate = generateGate();
+      const depTaxi = generateTaxiway();
+      const arrTaxi = generateTaxiway();
+      const isEastward = arrival.longitude > departure.longitude;
+      const bestDepRunway = depRunways.length > 0 ? [...depRunways].sort((a, b) => parseInt(a) - parseInt(b))[isEastward ? 0 : depRunways.length - 1] : '';
+      const bestArrRunway = arrRunways.length > 0 ? [...arrRunways].sort((a, b) => parseInt(a) - parseInt(b))[isEastward ? 0 : arrRunways.length - 1] : '';
+      const isAmateurOrHigher = ['amateur', 'intermediate', 'advanced', 'pro', 'devil'].includes(difficulty);
+      const isIntermediateOrHigher = ['intermediate', 'advanced', 'pro', 'devil'].includes(difficulty);
+      const isAdvancedOrHigher = ['advanced', 'pro', 'devil'].includes(difficulty);
 
-        setRouteData({
-          departureGate: isAmateurOrHigher ? '' : depGate, // Amateur+ must set
-          departureTaxiway: depTaxi,
-          departureRunway: isAmateurOrHigher ? '' : bestDepRunway, // Amateur+ must set
-          sid: isAdvancedOrHigher ? '' : sid, // Advanced+ must set
-          waypoints: isIntermediateOrHigher ? [] : waypoints, // Intermediate+ must set
-          star: isAdvancedOrHigher ? '' : star, // Advanced+ must set
-          landingRunway: isAmateurOrHigher ? '' : bestArrRunway, // Amateur+ must set
-          landingTaxiway: arrTaxi,
-          arrivalGate: isAmateurOrHigher ? '' : arrGate // Amateur+ must set
-        });
-        setIsGeneratingRoute(false);
+      const nextRoute = {
+        departureGate: isAmateurOrHigher ? '' : depGate,
+        departureTaxiway: depTaxi,
+        departureRunway: isAmateurOrHigher ? '' : bestDepRunway,
+        sid: isAdvancedOrHigher ? '' : sid,
+        waypoints,
+        star: isAdvancedOrHigher ? '' : star,
+        landingRunway: isAmateurOrHigher ? '' : bestArrRunway,
+        landingTaxiway: arrTaxi,
+        arrivalGate: isAmateurOrHigher ? '' : arrGate
       };
 
-      fetchRoute();
-    }
-  }, [isOpen, departure, arrival, difficulty]);
+      setRouteData(nextRoute);
+      onChange?.(nextRoute);
+      setIsGeneratingRoute(false);
+    };
+
+    fetchRoute();
+  }, [isOpen, departure, arrival, difficulty, externalRouteData, onChange]);
 
   const handleChange = (field, value) => {
-    setRouteData(prev => ({ ...prev, [field]: value }));
+    const next = { ...routeData, [field]: value };
+    setRouteData(next);
+    onChange?.(next);
   };
 
   const handleGenerateWaypoints = async () => {
-     setIsGeneratingRoute(true);
-     const wps = await generateSmartRoute(departure, arrival);
-     setGeneratedWaypoints(wps);
-     handleChange('waypoints', wps);
-     
-     // Also update SID/STAR if they depend on waypoints
-     if (!routeData.sid) handleChange('sid', generateSID((wps[0] && wps[0].name) || 'ABC'));
-     if (!routeData.star) handleChange('star', generateSTAR((wps[wps.length - 1] && wps[wps.length - 1].name) || 'ABC'));
-     setIsGeneratingRoute(false);
+    setIsGeneratingRoute(true);
+    const wps = await generateSmartRoute(departure, arrival);
+    const next = {
+      ...routeData,
+      waypoints: wps,
+      sid: routeData.sid || generateSID((wps[0] && wps[0].name) || 'ABC'),
+      star: routeData.star || generateSTAR((wps[wps.length - 1] && wps[wps.length - 1].name) || 'ABC')
+    };
+    setRouteData(next);
+    onChange?.(next);
+    setIsGeneratingRoute(false);
   };
 
   const isFormValid = () => {
     if (difficulty === 'rookie') return true;
-
-    // Amateur: Gate, Runway
-    if (!routeData.departureGate || !routeData.departureRunway || 
-        !routeData.arrivalGate || !routeData.landingRunway) {
-        return false;
-    }
-
-    if (['intermediate', 'advanced', 'pro', 'devil'].includes(difficulty)) {
-        // Intermediate: + Waypoints
-        if (routeData.waypoints.length === 0) return false;
-    }
-
-    if (['advanced', 'pro', 'devil'].includes(difficulty)) {
-        // Advanced+: + SID/STAR
-        if (!routeData.sid || !routeData.star) return false;
-    }
-
+    if (!routeData.departureGate || !routeData.departureRunway || !routeData.arrivalGate || !routeData.landingRunway) return false;
+    if (['intermediate', 'advanced', 'pro', 'devil'].includes(difficulty) && routeData.waypoints.length === 0) return false;
+    if (['advanced', 'pro', 'devil'].includes(difficulty) && (!routeData.sid || !routeData.star)) return false;
+    const firstWaypoint = routeData.waypoints[0]?.name || routeData.waypoints[0] || '';
+    const lastWaypoint = routeData.waypoints[routeData.waypoints.length - 1]?.name || routeData.waypoints[routeData.waypoints.length - 1] || '';
+    if (routeData.sid && firstWaypoint && !procedureMatchesWaypoint(routeData.sid, firstWaypoint)) return false;
+    if (routeData.star && lastWaypoint && !procedureMatchesWaypoint(routeData.star, lastWaypoint)) return false;
     return true;
   };
 
   if (!isOpen) return null;
 
   const showSkip = difficulty === 'rookie';
-  const showSidStar = ['advanced', 'pro', 'devil'].includes(difficulty) || difficulty === 'rookie'; // Show for rookie (readonly/auto) or advanced (editable)
-  // Actually, user said "Intermediate need not SID/STAR". Implies they shouldn't bother with it.
-  // But for Rookie "skip this", it implies they see it but can skip.
-  
-  // Let's just show all fields but disable/hide based on difficulty?
-  // "Intermediate need not SID/STAR" -> Hide it?
-  
   const showWaypoints = ['intermediate', 'advanced', 'pro', 'devil', 'rookie'].includes(difficulty);
   const showSidStarFields = ['advanced', 'pro', 'devil', 'rookie'].includes(difficulty);
 
@@ -135,140 +116,81 @@ const RouteSelectionFrame = ({
       <div className="route-selection-frame">
         <h2>Detailed Route Selection</h2>
         <div className="route-difficulty-badge">{difficulty.toUpperCase()} MODE</div>
-        
+
         <div className="route-grid">
-          {/* Departure Section */}
           <div className="route-section">
             <h3>Departure ({departure?.iata})</h3>
-            
             <div className="form-group">
               <label>Gate/Ramp</label>
-              <input 
-                type="text" 
-                value={routeData.departureGate} 
-                onChange={(e) => handleChange('departureGate', e.target.value)}
-                placeholder="e.g. A12"
-              />
+              <input type="text" value={routeData.departureGate} onChange={(e) => handleChange('departureGate', e.target.value)} placeholder="e.g. A12" />
               <button className="generate-btn" onClick={() => handleChange('departureGate', generateGate())}>🎲</button>
             </div>
-
             <div className="form-group">
               <label>Taxiway</label>
-              <input 
-                type="text" 
-                value={routeData.departureTaxiway} 
-                onChange={(e) => handleChange('departureTaxiway', e.target.value)}
-                placeholder="e.g. A"
-              />
+              <input type="text" value={routeData.departureTaxiway} onChange={(e) => handleChange('departureTaxiway', e.target.value)} placeholder="e.g. A" />
             </div>
-
             <div className="form-group">
               <label>Runway</label>
-              <select 
-                value={routeData.departureRunway} 
-                onChange={(e) => handleChange('departureRunway', e.target.value)}
-              >
+              <select value={routeData.departureRunway} onChange={(e) => handleChange('departureRunway', e.target.value)}>
                 <option value="">Select Runway</option>
-                {availableRunwaysDep.map(r => <option key={r} value={r}>{r}</option>)}
+                {availableRunwaysDep.map((r) => <option key={r} value={r}>{r}</option>)}
               </select>
             </div>
-
             {showSidStarFields && (
               <div className="form-group">
                 <label>SID</label>
-                <input 
-                  type="text" 
-                  value={routeData.sid} 
-                  onChange={(e) => handleChange('sid', e.target.value)}
-                  placeholder="e.g. OMA12D"
-                />
+                <input type="text" value={routeData.sid} onChange={(e) => handleChange('sid', e.target.value)} placeholder="e.g. OMA12D" />
                 <button className="generate-btn" onClick={() => handleChange('sid', generateSID((routeData.waypoints[0] && routeData.waypoints[0].name) || 'ABC'))}>🎲</button>
               </div>
             )}
           </div>
 
-          {/* Enroute Section */}
           {showWaypoints && (
             <div className="route-section center-section">
               <h3>Enroute</h3>
               <div className="form-group full-width">
-                 <label>Waypoints</label>
-                 <div className="waypoints-display">
-                    {Array.isArray(routeData.waypoints) && routeData.waypoints.length > 0
-                      ? routeData.waypoints.map(wp => typeof wp === 'string' ? wp : (wp.name || 'WPT')).join(' ➝ ')
-                      : ''}
-                 </div>
-                 <button className="action-btn" onClick={handleGenerateWaypoints} disabled={isGeneratingRoute}>
-                   {isGeneratingRoute ? 'Generating...' : 'Generate New Route'}
-                 </button>
+                <label>Waypoints</label>
+                <div className="waypoints-display">
+                  {Array.isArray(routeData.waypoints) && routeData.waypoints.length > 0 ? routeData.waypoints.map((wp) => typeof wp === 'string' ? wp : (wp.name || 'WPT')).join(' ➝ ') : ''}
+                </div>
+                <button className="action-btn" onClick={handleGenerateWaypoints} disabled={isGeneratingRoute}>
+                  {isGeneratingRoute ? 'Generating...' : 'Generate New Route'}
+                </button>
               </div>
             </div>
           )}
 
-          {/* Arrival Section */}
           <div className="route-section">
             <h3>Arrival ({arrival?.iata})</h3>
-            
             {showSidStarFields && (
               <div className="form-group">
                 <label>STAR</label>
-                <input 
-                  type="text" 
-                  value={routeData.star} 
-                  onChange={(e) => handleChange('star', e.target.value)}
-                  placeholder="e.g. DXB45A"
-                />
-                <button className="generate-btn" onClick={() => handleChange('star', generateSTAR(((routeData.waypoints[routeData.waypoints.length-1] && routeData.waypoints[routeData.waypoints.length-1].name) || 'ABC')))}>🎲</button>
+                <input type="text" value={routeData.star} onChange={(e) => handleChange('star', e.target.value)} placeholder="e.g. DXB45A" />
+                <button className="generate-btn" onClick={() => handleChange('star', generateSTAR(((routeData.waypoints[routeData.waypoints.length - 1] && routeData.waypoints[routeData.waypoints.length - 1].name) || 'ABC')))}>🎲</button>
               </div>
             )}
-
-             <div className="form-group">
+            <div className="form-group">
               <label>Runway</label>
-              <select 
-                value={routeData.landingRunway} 
-                onChange={(e) => handleChange('landingRunway', e.target.value)}
-              >
+              <select value={routeData.landingRunway} onChange={(e) => handleChange('landingRunway', e.target.value)}>
                 <option value="">Select Runway</option>
-                {availableRunwaysArr.map(r => <option key={r} value={r}>{r}</option>)}
+                {availableRunwaysArr.map((r) => <option key={r} value={r}>{r}</option>)}
               </select>
             </div>
-
             <div className="form-group">
               <label>Taxiway</label>
-              <input 
-                type="text" 
-                value={routeData.landingTaxiway} 
-                onChange={(e) => handleChange('landingTaxiway', e.target.value)}
-                placeholder="e.g. B"
-              />
+              <input type="text" value={routeData.landingTaxiway} onChange={(e) => handleChange('landingTaxiway', e.target.value)} placeholder="e.g. B" />
             </div>
-
             <div className="form-group">
               <label>Gate/Ramp</label>
-              <input 
-                type="text" 
-                value={routeData.arrivalGate} 
-                onChange={(e) => handleChange('arrivalGate', e.target.value)}
-                placeholder="e.g. D05"
-              />
+              <input type="text" value={routeData.arrivalGate} onChange={(e) => handleChange('arrivalGate', e.target.value)} placeholder="e.g. D05" />
               <button className="generate-btn" onClick={() => handleChange('arrivalGate', generateGate())}>🎲</button>
             </div>
           </div>
         </div>
 
         <div className="route-actions">
-          {showSkip && (
-            <button className="skip-btn" onClick={onSkip}>
-              Skip (Use Defaults)
-            </button>
-          )}
-          <button 
-            className="confirm-btn" 
-            onClick={() => onConfirm(routeData)}
-            disabled={!isFormValid()}
-          >
-            Confirm Flight Plan
-          </button>
+          {showSkip && <button className="skip-btn" onClick={onSkip}>Skip (Use Defaults)</button>}
+          <button className="confirm-btn" onClick={() => onConfirm(routeData)} disabled={!isFormValid()}>Confirm Flight Plan</button>
         </div>
       </div>
     </div>

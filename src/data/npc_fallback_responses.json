@@ -1,0 +1,32 @@
+{
+    "FO": {
+        "taxi": ["Clear left and right.", "Taxiing, keeping eyes out.", "Runway is clear ahead."],
+        "takeoff_roll": ["Airspeed alive.", "V1.", "Rotate.", "V2."],
+        "climb": ["Positive rate, gear up.", "Passing [ALTITUDE].", "Climbing to target."],
+        "cruise": ["Systems normal.", "Cruising at [ALTITUDE].", "Autopilot engaged."],
+        "descent": ["Starting descent.", "Passing [ALTITUDE] on the way down.", "Descent checklist complete."],
+        "approach": ["Localizer captured.", "Glideslope alive.", "Gear down, three green.", "Flaps set for landing."],
+        "landing": ["Spoilers deployed.", "Reversers green.", "Manual braking."],
+        "summon": ["Yes, Captain?", "Go ahead.", "I'm listening.", "What do you need?"],
+        "status_check": ["Everything looks good here.", "No abnormal indications.", "All systems green."],
+        "engine_failure": ["We just lost an engine!", "Engine failure on [CB_PANEL] side!", "N1 dropping fast!"],
+        "engine_fire": ["Engine fire warning!", "Fire detected, [ALARM_NAME] is on!", "Pulling the fire handle!"],
+        "compressor_stall": ["Compressor stall! Watch the EGT.", "Loud bang from the engine!", "Engine is surging!"],
+        "dual_engine_failure": ["We've lost both engines!", "Dual engine failure, we are gliding!", "No thrust from either engine!"],
+        "hydraulic_failure": ["Hydraulic pressure dropping!", "We lost [PRESSURE] in the hydraulic system.", "Controls are getting heavy!"],
+        "electrical_failure": ["Main bus lost!", "Voltage is down to [VOLTAGE]!", "We lost the generators!"],
+        "cabin_pressure": ["Cabin altitude warning!", "We're losing pressure!", "Masks dropping!"],
+        "gear_failure": ["Gear is unsafe!", "No green lights on the gear.", "Landing gear won't extend!"],
+        "generic_failure": ["We have a warning light.", "Something's wrong with the system.", "Checking the abnormal checklist."]
+    },
+    "CABIN_CREW": {
+        "cruise": ["Everything is fine in the back.", "Passengers are settled.", "Serving drinks now."],
+        "descent": ["Cabin is secured for landing.", "Preparing for arrival.", "Passengers are buckled up."],
+        "summon": ["Yes, Captain?", "Cabin crew here.", "What's the situation?"],
+        "engine_fire": ["Captain, we see flames from the window!", "Passengers are panicking, there's fire!", "It looks bad out there!"],
+        "compressor_stall": ["Loud bangs heard in the cabin!", "Passengers are scared, what was that?", "The whole plane is shaking!"],
+        "dual_engine_failure": ["It's completely quiet back here.", "The lights flickered, are we okay?", "Captain, what's happening?"],
+        "cabin_pressure": ["Masks have deployed!", "Passengers are putting on masks!", "Cabin is securing!"],
+        "generic_failure": ["Captain, is everything okay?", "We felt a jolt back here.", "Please advise the cabin."]
+    }
+}

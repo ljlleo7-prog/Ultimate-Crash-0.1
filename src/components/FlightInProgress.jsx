@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useRef, useState, useEffect, useMemo } from 'react';
 import { useAircraftPhysics } from '../hooks/useAircraftPhysics';
 import { useLanguage } from '../contexts/LanguageContext';
 import { updateWeather } from '../services/weatherService';
@@ -10,7 +10,6 @@ import weatherConfig from '../config/weatherConfig.json';
 import FlightPanelModular from './FlightPanelModular';
 import DebugPhysicsPanel from './DebugPhysicsPanel';
 import FailureDebugPanel from './FailureDebugPanel';
-import commandDatabase from '../commandDatabase.json';
 import sceneManager from '../services/sceneManager.js';
 import eventBus from '../services/eventBus';
 import { getRunwayHeading } from '../utils/routeGenerator';
@@ -29,36 +28,45 @@ import { skylinetragedyService } from '../services/skylinetragedy/Skylinetragedy
 import { npcCrewService } from '../services/NPCCrewService';
 import CrewPanel from './CrewPanel';
 import TutorialOverlay from './TutorialOverlay';
+import MultiplayerTrafficPanel from './MultiplayerTrafficPanel.jsx';
+import usePhysicsMotionControl from '../hooks/flight/usePhysicsMotionControl.js';
+import useEventBusSubscriptions from '../hooks/flight/useEventBusSubscriptions.js';
+import useStartupChecklist from '../hooks/flight/useStartupChecklist.js';
+import { multiplayerSessionService } from '../services/multiplayer/MultiplayerSessionService.js';
+import { trafficSyncService } from '../services/multiplayer/TrafficSyncService.js';
+import { playerSettingsService } from '../services/playerSettingsService.js';
+import useAutoCloudSave from '../hooks/flight/useAutoCloudSave.js';
 
-const FlightInProgress = ({ 
-  callsign, 
-  aircraftModel, 
-  difficulty, 
-  selectedDeparture, 
-  selectedArrival, 
+const FlightInProgress = ({
+  callsign,
+  aircraftModel,
+  difficulty,
+  selectedDeparture,
+  selectedArrival,
   initialDeparture, // New prop
-  flightPlan, 
-  airline, 
-  pax, 
-  payload, 
-  fuelReserve, 
-  cruiseHeight, 
-  useRandomTime, 
-  timeZulu, 
-  useRandomSeason, 
-  season, 
-  handleResetFlight, 
-  formatDistance, 
-  formatFlightTime, 
-  formatFuel, 
-  weatherData, 
-  setWeatherData, 
-  failureType, 
-  crewCount, 
+  flightPlan,
+  airline,
+  pax,
+  payload,
+  fuelReserve,
+  cruiseHeight,
+  useRandomTime,
+  timeZulu,
+  useRandomSeason,
+  season,
+  handleResetFlight,
+  formatDistance,
+  formatFlightTime,
+  formatFuel,
+  weatherData,
+  setWeatherData,
+  failureType,
+  crewCount,
   physicsModel = 'realistic',
   routeDetails,
   isTutorial = false,
-  onTutorialClose
+  onTutorialClose,
+  offlineMode = false
 }) => {
 
 
@@ -88,7 +96,12 @@ const FlightInProgress = ({
   let initialLat = initialDeparture?.latitude || 37.6188;
   let initialLon = initialDeparture?.longitude || -122.3750;
 
-  if (initialDeparture && runwayName) {
+  if (isTutorial && selectedDeparture && selectedArrival) {
+      const tutorialLatBias = (selectedArrival.latitude - selectedDeparture.latitude) * 0.12;
+      const tutorialLonBias = (selectedArrival.longitude - selectedDeparture.longitude) * 0.12;
+      initialLat = selectedDeparture.latitude + tutorialLatBias;
+      initialLon = selectedDeparture.longitude + tutorialLonBias;
+  } else if (initialDeparture && runwayName) {
       // Try to get runway geometry to spawn at the threshold
       // Pass the airport code (IATA or ICAO)
       const airportCode = initialDeparture.iata || initialDeparture.icao;
@@ -105,17 +118,21 @@ const FlightInProgress = ({
               const offsetMeters = 100;
               const metersPerLat = 111111;
               const metersPerLon = 111111 * Math.cos(initialLat * Math.PI / 180);
-              
+
               const dLat = (offsetMeters * Math.cos(runwayHeadingRad)) / metersPerLat;
               const dLon = (offsetMeters * Math.sin(runwayHeadingRad)) / metersPerLon;
-              
+
               initialLat += dLat;
               initialLon += dLon;
           }
       }
   }
 
-  const aircraftConfig = {
+  const activeRouteWaypoints = (Array.isArray(routeDetails?.waypoints) && routeDetails.waypoints.length > 0)
+    ? routeDetails.waypoints
+    : (Array.isArray(flightPlan?.waypoints) ? flightPlan.waypoints : []);
+
+  const aircraftConfig = useMemo(() => ({
     aircraftModel,
     payloadWeight: totalPayloadWeight,
     fuelWeight: flightPlanFuelWeight,
@@ -129,22 +146,37 @@ const FlightInProgress = ({
     airportElevation: initialDeparture?.elevation || 0,
     initialAltitude: isTutorial ? 10000 : undefined,
     initialSpeed: isTutorial ? 250 : undefined,
-    flightPlan: (routeDetails?.waypoints || flightPlan?.waypoints || []),
+    flightPlan: activeRouteWaypoints,
     departure: selectedDeparture,
     arrival: selectedArrival,
     departureRunway: (routeDetails?.departureRunway) || (flightPlan?.departure?.runways?.[0]?.name),
     arrivalRunway: (routeDetails?.landingRunway) || (flightPlan?.arrival?.runways?.[0]?.name),
     difficulty: difficulty,
     failureType: failureType
-  };
-
+  }), [
+    aircraftModel,
+    totalPayloadWeight,
+    flightPlanFuelWeight,
+    cruiseHeight,
+    weatherData,
+    initialLat,
+    initialLon,
+    runwayHeadingDeg,
+    initialDeparture?.elevation,
+    isTutorial,
+    routeDetails,
+    flightPlan,
+    selectedDeparture,
+    selectedArrival,
+    difficulty,
+    failureType
+  ]);
   const {
     flightData,
     physicsState,
     isInitialized,
     error,
     isCrashed,
-    resetAircraft,
     updatePhysics,
     setThrottle,
     setPitch,
@@ -164,54 +196,266 @@ const FlightInProgress = ({
     setMotionEnabled
   } = useAircraftPhysics(aircraftConfig, false, physicsModel);
 
+  const formatNumber = (value, digits = 0, suffix = '') => (
+    Number.isFinite(value) ? `${value.toFixed(digits)}${suffix}` : '---'
+  );
+
   // Control state for UI components
   const { language } = useLanguage();
-  const [throttleControl, setThrottleControl] = useState(0); // Initialize at IDLE
+  const [, setThrottleControl] = useState(0); // Initialize at IDLE
   const [commandInput, setCommandInput] = useState('');
   const [radioMessages, setRadioMessages] = useState([]);
   const [currentFreq, setCurrentFreq] = useState(121.500);
-  const [useRealWeather, setUseRealWeather] = useState(true); // Enable Real Weather by default
-  const [sceneState, setSceneState] = useState(sceneManager.getState());
+  const [useRealWeather] = useState(!offlineMode);
+  const [sceneState, setSceneState] = useState(
+    isTutorial
+      ? {
+          scenarioId: null,
+          status: 'tutorial',
+          phaseId: null,
+          phaseName: 'Tutorial',
+          phaseType: null,
+          elapsedInPhase: 0,
+          totalElapsed: 0,
+          physicsActive: true,
+          activeFailures: [],
+          completedPhases: [],
+          lastCommand: null,
+          takeoffClearanceReceived: true,
+          narrativeHistory: []
+        }
+      : sceneManager.getState()
+  );
+  const lastSceneStateRef = useRef(sceneState);
+  const isInitializedRef = useRef(isInitialized);
+  const updatePhysicsRef = useRef(updatePhysics);
+  const physicsServiceRef = useRef(physicsService);
+  const physicsStateRef = useRef(physicsState);
   const [narrative, setNarrative] = useState(null);
+  const [activeFailures, setActiveFailures] = useState([]);
+  const [phaseName, setPhaseName] = useState('');
+  const [showDebugPhysics, setShowDebugPhysics] = useState(false);
+  const [showFailurePanel, setShowFailurePanel] = useState(false);
+  const [isChannelBusy, setIsChannelBusy] = useState(false);
+  const [npcs, setNpcs] = useState([]);
+  const [currentRegion, setCurrentRegion] = useState(null);
+  const [multiplayerStatus, setMultiplayerStatus] = useState({
+    label: 'Offline',
+    detail: 'Supabase auth and namespace session required.'
+  });
+  const [remoteTraffic, setRemoteTraffic] = useState([]);
+  const [playerSettings, setPlayerSettings] = useState(playerSettingsService.defaults);
+  const [playerSettingsError, setPlayerSettingsError] = useState(null);
+  const [playerSettingsLoaded, setPlayerSettingsLoaded] = useState(false);
+  const [activeFlightPlan, setActiveFlightPlan] = useState(flightPlan);
+  const [autoSaveStatus, setAutoSaveStatus] = useState({
+    isSaving: false,
+    lastSavedAt: null,
+    saveError: null
+  });
+  useEffect(() => {
+    if (offlineMode) {
+      setPlayerSettings(playerSettingsService.defaults);
+      setPlayerSettingsError(null);
+      setPlayerSettingsLoaded(true);
+      return;
+    }
+
+    let isMounted = true;
+
+    const loadPlayerSettings = async () => {
+      const { data, error } = await playerSettingsService.getPlayerSettings();
+      if (!isMounted) {
+        return;
+      }
+
+      if (data) {
+        setPlayerSettings(data);
+      }
+      setPlayerSettingsError(error?.message ?? null);
+      setPlayerSettingsLoaded(true);
+    };
+
+    loadPlayerSettings();
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  const handlePlayerSettingsChange = async (patch) => {
+    if (offlineMode) {
+      const nextSettings = {
+        ...playerSettings,
+        ...patch
+      };
+      setPlayerSettings(nextSettings);
+      setPlayerSettingsError(null);
+      return;
+    }
+
+    const nextSettings = {
+      ...playerSettings,
+      ...patch
+    };
+
+    setPlayerSettings(nextSettings);
+    const { data, error } = await playerSettingsService.updatePlayerSettings(nextSettings);
+
+    if (data) {
+      setPlayerSettings(data);
+    }
+    setPlayerSettingsError(error?.message ?? null);
+  };
+
+  const autoSaveMeta = useAutoCloudSave({
+    enabled: !offlineMode && playerSettings.autoSaveEnabled,
+    intervalMinutes: playerSettings.autoSaveIntervalMinutes,
+    isInitialized: !offlineMode && isInitialized && playerSettingsLoaded && !isTutorial,
+    flightData,
+    physicsState,
+    physicsService,
+    flightPlan: activeFlightPlan,
+    weatherData,
+    aircraftModel,
+    onSaveStateChange: setAutoSaveStatus
+  });
+
+  useEffect(() => {
+    setAutoSaveStatus(prev => ({
+      ...prev,
+      lastSavedAt: autoSaveMeta.lastSavedAt,
+      saveError: autoSaveMeta.saveError,
+      isSaving: autoSaveMeta.isSaving
+    }));
+  }, [autoSaveMeta.isSaving, autoSaveMeta.lastSavedAt, autoSaveMeta.saveError]);
+
+  useEffect(() => {
+    if (!isTutorial) {
+      return;
+    }
+
+    setNarrative(null);
+    setPhaseName('Tutorial');
+    setActiveFailures([]);
+    const tutorialSceneState = {
+      scenarioId: null,
+      status: 'tutorial',
+      phaseId: null,
+      phaseName: 'Tutorial',
+      phaseType: null,
+      elapsedInPhase: 0,
+      totalElapsed: 0,
+      physicsActive: true,
+      activeFailures: [],
+      completedPhases: [],
+      lastCommand: null,
+      takeoffClearanceReceived: true,
+      narrativeHistory: []
+    };
+    lastSceneStateRef.current = tutorialSceneState;
+    setSceneState(tutorialSceneState);
+  }, [isTutorial]);
+
   useEffect(() => {
     initializeATCPhraseologyTemplates();
   }, []);
 
-  // Control Physics Motion based on Phase (Narrative vs Active)
   useEffect(() => {
-    if (!setMotionEnabled || !isInitialized) return;
+    let mounted = true;
 
-    // Phases where the plane should be static (physics integration disabled, systems active)
-    // STRICT MODE: Ensure no movement until Takeoff Clearance is explicitly received
-    // This prevents "creep" during startup, pushback, and taxi if not fully simulated
-    const phaseType = sceneState.currentPhase?.type;
-    
-    // Check if we are in a pre-takeoff phase
-    const isGroundPhase = ['boarding', 'departure_clearance', 'pushback', 'taxiing', 'takeoff_prep'].includes(phaseType);
-    
-    // Logic: Freeze if we are on ground AND haven't received takeoff clearance
-    // Note: Once takeoff clearance is received, sceneManager usually transitions to 'takeoff' phase.
-    // But even if it stays in 'takeoff_prep' for a moment, this flag will unlock it.
-    // Conversely, if we force 'takeoff' phase but clearance logic hasn't fired, this might keep it frozen (safety).
-    // However, for non-ground phases (Cruise, etc), we always enable motion.
-    
-    const shouldFreeze = !isTutorial && isGroundPhase && !sceneState.takeoffClearanceReceived;
-    
-    if (shouldFreeze) {
-         // Force zero velocity and lock integration
-         setMotionEnabled(false);
-         // console.log('🔒 Physics Motion FROZEN (Waiting for Takeoff Clearance)');
-    } else {
-         // Enable integration (Systems run in both cases)
-         setMotionEnabled(true);
-         // console.log('🔓 Physics Motion ENABLED');
-    }
-  }, [sceneState.currentPhase, sceneState.takeoffClearanceReceived, setMotionEnabled, isInitialized]);
+    const setupMultiplayer = async () => {
+      if (isTutorial || offlineMode) {
+        setMultiplayerStatus({ label: 'Offline', detail: offlineMode ? 'Offline mode enabled.' : 'Tutorial mode active.' });
+        return;
+      }
+
+      const namespaceKey = import.meta.env.VITE_MULTIPLAYER_NAMESPACE || 'legacy';
+      const gate = await multiplayerSessionService.canUseMultiplayer();
+      if (!mounted) {
+        return;
+      }
+
+      if (!gate.ok) {
+        setMultiplayerStatus({ label: 'Offline', detail: gate.reason });
+        return;
+      }
+
+      const sessionCode = `${(selectedDeparture?.iata || selectedDeparture?.icao || 'DEP')}-${(selectedArrival?.iata || selectedArrival?.icao || 'ARR')}`;
+      const result = await multiplayerSessionService.createOrJoinSession({
+        namespaceKey,
+        sessionCode,
+        role: 'pilot',
+        callsign,
+        aircraftType: aircraftModel,
+        scenarioConfig: {
+          departure: selectedDeparture?.iata || selectedDeparture?.icao || null,
+          arrival: selectedArrival?.iata || selectedArrival?.icao || null,
+          difficulty,
+          failureType
+        }
+      });
+
+      if (!mounted) {
+        return;
+      }
+
+      if (result.error) {
+        setMultiplayerStatus({ label: 'Unavailable', detail: result.error.message || 'Failed to create multiplayer session.' });
+        return;
+      }
+
+      const session = result.data;
+      const connection = await trafficSyncService.connect({
+        namespaceKey: session.namespaceKey,
+        sessionId: session.sessionId,
+        userId: gate.user.id,
+        callsign,
+        aircraftType: aircraftModel,
+        role: session.role || 'pilot'
+      });
+
+      if (!mounted) {
+        return;
+      }
+
+      if (!connection.connected) {
+        setMultiplayerStatus({ label: 'Disconnected', detail: 'Realtime channel unavailable.' });
+        return;
+      }
+
+      setMultiplayerStatus({
+        label: 'Live traffic',
+        detail: `${session.namespaceKey} / ${session.sessionCode}`
+      });
+    };
+
+    setupMultiplayer();
+
+    const unsubscribeTraffic = eventBus.subscribe(eventBus.Types.MULTIPLAYER_TRAFFIC_UPDATED, (payload) => {
+      setRemoteTraffic(payload?.traffic || []);
+    });
+
+    const unsubscribeStatus = eventBus.subscribe(eventBus.Types.MULTIPLAYER_STATUS_CHANGED, (payload) => {
+      if (payload?.status === 'left') {
+        setRemoteTraffic([]);
+        setMultiplayerStatus({ label: 'Offline', detail: 'Multiplayer session closed.' });
+      }
+    });
+
+    return () => {
+      mounted = false;
+      unsubscribeTraffic?.();
+      unsubscribeStatus?.();
+      trafficSyncService.disconnect();
+      multiplayerSessionService.leaveCurrentSession().catch(() => {});
+    };
+  }, [isTutorial, offlineMode, callsign, aircraftModel, difficulty, failureType, selectedDeparture, selectedArrival]);
 
   // Radio Message Handler
   const handleRadioTransmit = (messageDataOrText, type, templateId, params) => {
     // Check if channel is busy
-    if (atcManager.isBusy()) {
+    if (atcManager.isBusy(currentFreq)) {
         setRadioMessages(prev => [...prev, {
             sender: 'System',
             text: '[FREQUENCY BUSY]',
@@ -251,12 +495,12 @@ const FlightInProgress = ({
     // Process with ATC Logic
     const context = {
         callsign: callsign,
-        altitude: Math.round(flightData.altitude),
-        heading: Math.round(flightData.heading),
+        altitude: Math.round(flightData?.altitude ?? 0),
+        heading: Math.round(flightData?.heading ?? 0),
         weather: weatherData, // Pass weather data to ATC context
         frequencyType: freqType,
         language,
-        phaseOfFlight: sceneState.currentPhase?.type
+        phaseOfFlight: sceneState.phaseType
     };
 
     atcManager.processMessage(
@@ -276,16 +520,6 @@ const FlightInProgress = ({
         }
     );
   };
-  const [activeFailures, setActiveFailures] = useState([]);
-  const [phaseName, setPhaseName] = useState('');
-  const [showDebugPhysics, setShowDebugPhysics] = useState(false);
-  const [showFailurePanel, setShowFailurePanel] = useState(false);
-  const [isChannelBusy, setIsChannelBusy] = useState(false);
-  const [npcs, setNpcs] = useState([]);
-  const [currentRegion, setCurrentRegion] = useState(null);
-  
-  // Dynamic Flight Plan State
-  const [activeFlightPlan, setActiveFlightPlan] = useState(flightPlan);
 
   // Startup Checklist Logic (Pro/Devil)
   const [startupStatus, setStartupStatus] = useState(() => {
@@ -297,6 +531,20 @@ const FlightInProgress = ({
   });
   const [approachTelemetrySamples, setApproachTelemetrySamples] = useState([]);
   const approachTelemetry = summarizeApproachTelemetry(approachTelemetrySamples);
+  const { startupStatus: quickStartupStatus } = useStartupChecklist(difficulty, physicsState?.systems);
+
+  usePhysicsMotionControl({
+    motionController: setMotionEnabled,
+    phaseType: sceneState.phaseType,
+    takeoffClearanceReceived: sceneState.takeoffClearanceReceived,
+    isInitialized,
+    isTutorial,
+    onParkedPhaseChange: (isParkedPhase) => {
+      if (physicsService?.setGroundMode) {
+        physicsService.setGroundMode(isParkedPhase);
+      }
+    }
+  });
 
   useEffect(() => {
     if (!physicsState || !physicsState.systems) return;
@@ -309,8 +557,19 @@ const FlightInProgress = ({
         return;
     }
 
+    if (quickStartupStatus && quickStartupStatus.items?.length > 0) {
+        const quickMissingItems = quickStartupStatus.items.filter(item => !item.complete).map(item => item.name);
+        if (!quickStartupStatus.complete && sceneState.phaseType === 'boarding') {
+            const nextQuickStatus = { canContinue: false, missingItems: quickMissingItems };
+            if (JSON.stringify(nextQuickStatus) !== JSON.stringify(startupStatus)) {
+                setStartupStatus(nextQuickStatus);
+            }
+            return;
+        }
+    }
+
     let phaseToCheck = null;
-    const currentPhaseType = sceneState.currentPhase?.type;
+    const currentPhaseType = sceneState.phaseType;
 
     // Map phases to checklist requirements
     // Scene 1: Boarding/Pre-flight -> Power Up
@@ -337,7 +596,7 @@ const FlightInProgress = ({
             setStartupStatus({ canContinue: true, missingItems: [] });
         }
     }
-  }, [physicsState, sceneState.currentPhase, difficulty]);
+  }, [physicsState, sceneState.phaseType, difficulty]);
 
   useEffect(() => {
     setApproachTelemetrySamples([]);
@@ -367,7 +626,7 @@ const FlightInProgress = ({
      if (Array.isArray(newPlan)) {
          // If we received just an array of waypoints, merge it into the existing plan object
          updatedPlanObject = {
-             ...activeFlightPlan,
+             ...(activeFlightPlan || {}),
              waypoints: newPlan
          };
      } else {
@@ -450,7 +709,7 @@ const FlightInProgress = ({
     if (dt > 1.0) dt = 0.016;
     
     // Sync busy state
-    const busy = atcManager.isBusy();
+    const busy = atcManager.isBusy(currentFreq);
     if (busy !== isChannelBusy) {
         setIsChannelBusy(busy);
     }
@@ -468,7 +727,7 @@ const FlightInProgress = ({
     // Update NPCs
     // Use timeScale for acceleration
     const effectiveDt = dt * (timeScale || 1);
-    const messages = npcService.update(effectiveDt, flightData.position, atcManager); // Pass atcManager for blocking checks
+    const messages = npcService.update(effectiveDt, flightData.position, { atcManager }); // Pass ATC context for channel blocking checks
     setNpcs([...npcService.npcs]); // Update state for radar
 
     // Update ATC Logic (Proactive & ATIS)
@@ -497,78 +756,53 @@ const FlightInProgress = ({
     }
   }, [flightData.frame, flightData.position]);
 
-  // Set up event listeners for narrative and failure updates
-  useEffect(() => {
-    // Subscribe to narrative updates
-    const unsubscribeNarrative = eventBus.subscribe(eventBus.Types.NARRATIVE_UPDATE, (payload) => {
+  useEventBusSubscriptions(eventBus, {
+    [eventBus.Types.NARRATIVE_UPDATE]: (payload) => {
       setNarrative(payload);
-    });
-    
-    // Subscribe to critical messages
-    const unsubscribeCritical = eventBus.subscribe(eventBus.Types.CRITICAL_MESSAGE, (payload) => {
-      // Flash effect or special handling for critical messages
+    },
+    [eventBus.Types.CRITICAL_MESSAGE]: (payload) => {
       setNarrative(payload);
-      // Could add audio alert here
-    });
-    
-    // Subscribe to phase changes
-    const unsubscribePhase = eventBus.subscribe(eventBus.Types.PHASE_CHANGED, (payload) => {
-      setPhaseName(payload.phase.name);
-      if (payload.phase.narrative) {
-        setNarrative(payload.phase.narrative);
+    },
+    [eventBus.Types.PHASE_CHANGED]: (payload) => {
+      const phase = payload?.phase;
+      setPhaseName(phase?.name || '');
+      if (phase?.narrative) {
+        setNarrative(phase.narrative);
       }
-    });
-    
-    // Subscribe to failure updates
-    const unsubscribeFailure = eventBus.subscribe(eventBus.Types.FAILURE_OCCURRED, (payload) => {
-      // Update active failures display
+    },
+    [eventBus.Types.FAILURE_OCCURRED]: () => {
       const state = sceneManager.getState();
       setActiveFailures(state.activeFailures);
-    });
-    
-    const unsubscribeFailureResolved = eventBus.subscribe(eventBus.Types.FAILURE_RESOLVED, (payload) => {
-      // Update active failures display
+    },
+    [eventBus.Types.FAILURE_RESOLVED]: () => {
       const state = sceneManager.getState();
       setActiveFailures(state.activeFailures);
-    });
-    
-    // Subscribe to physics initialization events
-    const unsubscribePhysicsInit = eventBus.subscribe(eventBus.Types.PHYSICS_INITIALIZE, (payload) => {
-      // Apply initial conditions to physics service only if provided
-      if (physicsService && typeof physicsService.setInitialConditions === 'function' && payload.initialConditions) {
+    },
+    [eventBus.Types.PHYSICS_INITIALIZE]: (payload) => {
+      if (physicsService && typeof physicsService.setInitialConditions === 'function' && payload?.initialConditions) {
         physicsService.setInitialConditions(payload.initialConditions);
       }
-      
-      // Update autopilot targets if provided
+
       if (physicsService && typeof physicsService.updateAutopilotTargets === 'function') {
         const targets = {};
-        if (payload.targetAltitude !== undefined) {
+        if (payload?.targetAltitude !== undefined) {
           targets.altitude = payload.targetAltitude;
         }
-        if (payload.targetSpeed !== undefined) {
+        if (payload?.targetSpeed !== undefined) {
           targets.speed = payload.targetSpeed;
         }
         if (Object.keys(targets).length > 0) {
           physicsService.updateAutopilotTargets(targets);
         }
       }
-    });
-    
-    return () => {
-      unsubscribeNarrative();
-      unsubscribeCritical();
-      unsubscribePhase();
-      unsubscribeFailure();
-      unsubscribeFailureResolved();
-      unsubscribePhysicsInit();
-    };
-  }, [physicsService]);
+    }
+  });
 
   // Weather update effect
   useEffect(() => {
     let interval;
-    
-    if (useRealWeather) {
+
+    if (useRealWeather && !offlineMode) {
        const fetchRealWeather = async () => {
          const lat = physicsService?.state?.geo?.lat || initialDeparture?.latitude || 37.6188;
          const lon = physicsService?.state?.geo?.lon || initialDeparture?.longitude || -122.3750;
@@ -602,26 +836,27 @@ const FlightInProgress = ({
     }
 
     return () => clearInterval(interval);
-  }, [useRealWeather, setEnvironment, physicsService]); // Removed weatherData and setWeatherData to prevent loops
+  }, [useRealWeather, offlineMode, setEnvironment, physicsService]); // Removed weatherData and setWeatherData to prevent loops
 
   // Terrain update effect
   useEffect(() => {
     const fetchTerrain = async () => {
        if (!physicsService || !physicsService.state || !physicsService.state.geo) return;
-       
+
        const { lat, lon } = physicsService.state.geo;
-       
+
        try {
-           // 1. Try Radar Service (Fastest, cached, consistent with visuals)
-           // Returns feet, convert to meters
            const radarEleFt = terrainRadarService.getTerrainHeight(lat, lon);
-           
+
            if (radarEleFt !== null) {
                physicsService.terrainElevation = radarEleFt * 0.3048;
                return;
            }
 
-           // 2. Fallback to direct Terrain Service fetch
+           if (offlineMode) {
+               return;
+           }
+
            const ele = await terrainService.getElevation(lat, lon);
            if (ele !== null && typeof ele === 'number') {
                physicsService.terrainElevation = ele;
@@ -634,10 +869,14 @@ const FlightInProgress = ({
     // Loop every 1 second
     const interval = setInterval(fetchTerrain, 1000);
     return () => clearInterval(interval);
-  }, [physicsService]);
+  }, [physicsService, offlineMode]);
 
   // Update scene manager with selected flight parameters
   useEffect(() => {
+    if (isTutorial) {
+      return;
+    }
+
     if (selectedDeparture && selectedArrival) {
       console.log('✈️  FlightInProgress: Updating scene manager with flight parameters:', {
         callsign: callsign,
@@ -648,7 +887,7 @@ const FlightInProgress = ({
         landingRunway: routeDetails?.landingRunway,
         initialHeading: runwayHeadingDeg
       });
-      
+
       sceneManager.updateScenario({
         callsign: callsign,
         departure: selectedDeparture.iata || selectedDeparture.icao,
@@ -658,16 +897,16 @@ const FlightInProgress = ({
         landingRunway: routeDetails?.landingRunway,
         initialHeading: runwayHeadingDeg
       });
-      
+
       console.log('✅ FlightInProgress: Scene manager updated successfully');
     }
-  }, [callsign, selectedDeparture, selectedArrival, aircraftModel, routeDetails, runwayHeadingDeg]);
+  }, [callsign, selectedDeparture, selectedArrival, aircraftModel, routeDetails, runwayHeadingDeg, isTutorial]);
 
   // Trigger Physics ILS update when radio frequency changes
   useEffect(() => {
     if (physicsService && isInitialized) {
         const currentFlightPlan = {
-            waypoints: routeDetails?.waypoints || flightPlan?.waypoints || [],
+            waypoints: activeRouteWaypoints,
             departure: selectedDeparture,
             arrival: selectedArrival
         };
@@ -677,40 +916,91 @@ const FlightInProgress = ({
 
   // Initialize SkylineTragedy Service
   useEffect(() => {
-    skylinetragedyService.initialize();
+    if (!offlineMode) {
+      skylinetragedyService.initialize();
+    }
     npcCrewService.initialize(difficulty);
-  }, [difficulty]);
+
+    return () => {
+      npcCrewService.destroy();
+    };
+  }, [difficulty, offlineMode]);
+
+  useEffect(() => {
+    npcCrewService.setAircraftStateProvider(() => {
+      if (!physicsService) return null;
+      return {
+        altitude: physicsService.altitude,
+        airspeed: physicsService.speed,
+        heading: physicsService.heading,
+        fuel: physicsService.systems?.fuel || 0
+      };
+    });
+  }, [physicsService]);
+
+  useEffect(() => {
+    isInitializedRef.current = isInitialized;
+    updatePhysicsRef.current = updatePhysics;
+    physicsServiceRef.current = physicsService;
+    physicsStateRef.current = physicsState;
+  }, [isInitialized, updatePhysics, physicsService, physicsState]);
 
   // Main update loop
   useEffect(() => {
-    sceneManager.start();
+    if (isTutorial) {
+      setMotionEnabled?.(true);
+    } else {
+      sceneManager.start();
+    }
+
+    const FIXED_STEP = 1 / 60;
+    const MAX_FRAME_DELTA = 0.1;
+    const MAX_ACCUMULATED_TIME = FIXED_STEP * 6;
     let animationId = null;
     let lastTime = performance.now();
-    const loop = now => {
-      const dt = (now - lastTime) / 1000;
-      lastTime = now;
-      
-      // Safety clamp to prevent physics explosion on lag spikes (max 0.1s)
-      const safeDt = Math.min(dt, 0.1);
+    let accumulator = 0;
 
-      const lastSceneState = sceneManager.getState();
-      let physicsState = null;
-      // Always update physics if initialized, even if scene says "physics inactive"
-      // This allows systems (engines, hydraulics) to update while motion is disabled.
-      // Motion is controlled via setMotionEnabled in the useEffect above.
-      if (isInitialized) {
-        // Use real elapsed time (safeDt) instead of hardcoded 1/60
-        // This fixes the "doubled update speed" on high refresh rate monitors (e.g. 120Hz)
-        physicsState = updatePhysics(safeDt, now);
-        
-        // Update SkylineTragedy Service
-        if (physicsService) {
-             skylinetragedyService.update(safeDt, physicsService);
+    const loop = now => {
+      const frameDt = Math.min((now - lastTime) / 1000, MAX_FRAME_DELTA);
+      lastTime = now;
+      accumulator = Math.min(accumulator + frameDt, MAX_ACCUMULATED_TIME);
+
+      let physicsSnapshot = physicsStateRef.current;
+      let steppedDt = 0;
+
+      while (isInitializedRef.current && accumulator >= FIXED_STEP) {
+        physicsSnapshot = updatePhysicsRef.current?.(FIXED_STEP) ?? physicsSnapshot;
+        accumulator -= FIXED_STEP;
+        steppedDt += FIXED_STEP;
+
+        if (physicsServiceRef.current) {
+          skylinetragedyService.update(FIXED_STEP, physicsServiceRef.current);
         }
       }
-      sceneManager.update(dt, physicsState);
-      const state = sceneManager.getState();
-      setSceneState(state);
+
+      if (!isTutorial) {
+        sceneManager.update(steppedDt || frameDt, physicsSnapshot);
+        const nextState = sceneManager.getState();
+        const previousState = lastSceneStateRef.current;
+        const shouldUpdateSceneState =
+          previousState.phaseId !== nextState.phaseId ||
+          previousState.phaseName !== nextState.phaseName ||
+          previousState.phaseType !== nextState.phaseType ||
+          previousState.status !== nextState.status ||
+          previousState.physicsActive !== nextState.physicsActive ||
+          previousState.takeoffClearanceReceived !== nextState.takeoffClearanceReceived ||
+          previousState.scenarioId !== nextState.scenarioId ||
+          previousState.activeFailures.length !== nextState.activeFailures.length ||
+          previousState.completedPhases.length !== nextState.completedPhases.length ||
+          previousState.narrativeHistory.length !== nextState.narrativeHistory.length ||
+          previousState.lastCommand !== nextState.lastCommand;
+
+        if (shouldUpdateSceneState) {
+          lastSceneStateRef.current = nextState;
+          setSceneState(nextState);
+        }
+      }
+
       animationId = requestAnimationFrame(loop);
     };
     animationId = requestAnimationFrame(loop);
@@ -719,14 +1009,36 @@ const FlightInProgress = ({
         cancelAnimationFrame(animationId);
       }
     };
-  }, [isInitialized, updatePhysics, physicsService]);
+  }, [isTutorial, setMotionEnabled]);
+
+  useEffect(() => {
+    if (offlineMode) {
+      return;
+    }
+
+    const session = multiplayerSessionService.getCurrentSession();
+    const userId = multiplayerSessionService.currentUser?.id;
+    if (!session || !userId || !flightData?.position) {
+      return;
+    }
+
+    trafficSyncService.broadcastTraffic({
+      sessionId: session.sessionId,
+      namespaceKey: session.namespaceKey,
+      userId,
+      callsign,
+      aircraftType: aircraftModel,
+      role: session.role || 'pilot',
+      flightData
+    });
+  }, [flightData, callsign, aircraftModel]);
 
   // ✅ CLEAN ARCHITECTURE: Throttle control handler
   const handleThrustControl = (engineIndex, throttleValue) => {
     console.log('🎯 FlightInProgress: Throttle control received:', {
       engineIndex,
       throttleValue,
-      percentage: (throttleValue * 100).toFixed(1) + '%'
+      percentage: `${((Number(throttleValue) || 0) * 100).toFixed(1)}%`
     });
     
     const validatedThrottle = Math.max(-0.7, Math.min(1, throttleValue));
@@ -956,7 +1268,7 @@ const FlightInProgress = ({
                     display: 'flex',
                     justifyContent: 'space-between'
                   }}>
-                    <span>{failure.type.toUpperCase()} {failure.data.engineIndex !== undefined ? `ENGINE ${failure.data.engineIndex + 1}` : ''}</span>
+                    <span>{failure.type.toUpperCase()} {failure?.data?.engineIndex !== undefined ? `ENGINE ${failure.data.engineIndex + 1}` : ''}</span>
                     <span>{failure.isCritical ? 'CRITICAL' : `${Math.round(failure.progress)}%`}</span>
                   </div>
                 ))}
@@ -964,15 +1276,16 @@ const FlightInProgress = ({
             </div>
           )}
         </div>
-        <div style={{ flex: 1.3, minWidth: '260px', height: '120px' }}>
-          <RadioActionPanel 
+        <div style={{ flex: 1.3, minWidth: '260px', height: '120px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+          <RadioActionPanel
             onTransmit={handleRadioTransmit}
-            currentStation={currentFreq.toFixed(3)}
+            currentStation={Number.isFinite(currentFreq) ? currentFreq.toFixed(3) : '---'}
             callsign={callsign || 'N12345'}
             flightPlan={activeFlightPlan}
             isChannelBusy={isChannelBusy}
             frequencyType={getFrequencyType(currentFreq)}
           />
+          <MultiplayerTrafficPanel status={multiplayerStatus} remoteTraffic={remoteTraffic} />
         </div>
       </div>
 
@@ -1005,12 +1318,14 @@ const FlightInProgress = ({
               ...flightData,
               physicsActive: sceneState.physicsActive,
               narrativeHistory: sceneState.narrativeHistory,
-              phaseName: sceneState.phase?.name,
+              phaseName: sceneState.phaseName,
               approachTelemetry
             }}
             physicsState={physicsState}
+            physicsService={physicsService}
             weatherData={weatherData}
             aircraftModel={aircraftModel}
+            aircraftData={physicsService?.aircraft}
             selectedArrival={selectedArrival}
             flightPlan={activeFlightPlan} // Pass active dynamic plan
             radioMessages={radioMessages}
@@ -1022,6 +1337,10 @@ const FlightInProgress = ({
             setTimeScale={setTimeScale}
             onUpdateFlightPlan={handleUpdateFlightPlan}
             startupStatus={startupStatus}
+            playerSettings={playerSettings}
+            playerSettingsError={offlineMode ? null : playerSettingsError}
+            autoSaveStatus={offlineMode ? { isSaving: false, lastSavedAt: null, saveError: null } : autoSaveStatus}
+            onUpdatePlayerSettings={handlePlayerSettingsChange}
             onActionRequest={(action, payload, extra) => {
               const payloadStr = typeof payload === 'number' ? payload.toFixed(5) : JSON.stringify(payload);
               console.log(`📡 UI Action: ${action} = ${payloadStr}, Extra: ${extra}`);
@@ -1178,24 +1497,24 @@ const FlightInProgress = ({
             justifyContent: 'space-between'
           }}>
             <span>FLIGHT DATA & LNAV</span>
-            <span>{flightData.derived?.heading.toFixed(0)}°</span>
+            <span>{formatNumber(flightData?.derived?.heading, 0, '°')}</span>
           </div>
 
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 8px' }}>
             <span style={{ color: '#9ca3af' }}>Lat:</span>
-            <span>{flightData.position?.latitude?.toFixed(5)}</span>
+            <span>{formatNumber(flightData?.position?.latitude, 5)}</span>
             
             <span style={{ color: '#9ca3af' }}>Lon:</span>
-            <span>{flightData.position?.longitude?.toFixed(5)}</span>
+            <span>{formatNumber(flightData?.position?.longitude, 5)}</span>
             
             <span style={{ color: '#9ca3af' }}>Alt:</span>
-            <span>{flightData.derived?.altitude_ft?.toFixed(0)} ft</span>
+            <span>{formatNumber(flightData?.derived?.altitude_ft, 0, ' ft')}</span>
             
             <span style={{ color: '#9ca3af' }}>IAS:</span>
-            <span>{flightData.indicatedAirspeed?.toFixed(0)} kts</span>
+            <span>{formatNumber(flightData?.indicatedAirspeed, 0, ' kts')}</span>
 
             <span style={{ color: '#9ca3af' }}>GS:</span>
-            <span>{flightData.derived?.airspeed?.toFixed(0)} kts</span>
+            <span>{formatNumber(flightData?.derived?.airspeed, 0, ' kts')}</span>
           </div>
 
           <div style={{ margin: '8px 0', borderTop: '1px solid rgba(74, 222, 128, 0.2)' }}></div>
@@ -1210,18 +1529,18 @@ const FlightInProgress = ({
             </span>
             
             <span style={{ color: '#9ca3af' }}>Target Hdg:</span>
-            <span>{flightData.autopilotTargets?.heading?.toFixed(1) || '---'}°</span>
+            <span>{Number.isFinite(flightData?.autopilotTargets?.heading) ? `${flightData.autopilotTargets.heading.toFixed(1)}°` : '---'}</span>
             
             <span style={{ color: '#9ca3af' }}>Hdg Error:</span>
             <span style={{ color: Math.abs(flightData.autopilotDebug?.headingError) > 5 ? '#f59e0b' : '#4ade80' }}>
-              {flightData.autopilotDebug?.headingError?.toFixed(2) || '0.00'}°
+              {Number.isFinite(flightData?.autopilotDebug?.headingError) ? `${flightData.autopilotDebug.headingError.toFixed(2)}°` : '0.00°'}
             </span>
             
             <span style={{ color: '#9ca3af' }}>Tgt Roll:</span>
-            <span>{flightData.autopilotDebug?.targetRoll?.toFixed(1) || '0.0'}°</span>
+            <span>{Number.isFinite(flightData?.autopilotDebug?.targetRoll) ? `${flightData.autopilotDebug.targetRoll.toFixed(1)}°` : '0.0°'}</span>
             
             <span style={{ color: '#9ca3af' }}>Act Roll:</span>
-            <span>{(flightData.orientation?.phi * 180 / Math.PI).toFixed(1)}°</span>
+            <span>{formatNumber((flightData?.orientation?.phi ?? 0) * 180 / Math.PI, 1, '°')}</span>
           </div>
 
           {flightData.autopilotDebug?.ils?.active && (
@@ -1229,29 +1548,29 @@ const FlightInProgress = ({
               <div style={{ margin: '8px 0', borderTop: '1px solid rgba(74, 222, 128, 0.2)' }}></div>
               <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: '4px 8px' }}>
                 <span style={{ color: '#f59e0b', fontWeight: 'bold' }}>ILS STATUS</span>
-                <span style={{ color: '#f59e0b', fontWeight: 'bold', textAlign: 'right' }}>{flightData.autopilotDebug.ils.runway}</span>
+                <span style={{ color: '#f59e0b', fontWeight: 'bold', textAlign: 'right' }}>{flightData?.autopilotDebug?.ils?.runway || '---'}</span>
 
                 <span style={{ color: '#9ca3af' }}>Dist:</span>
-                <span>{flightData.autopilotDebug.ils.distAlong !== null ? (flightData.autopilotDebug.ils.distAlong / 6076).toFixed(1) : '---'} nm</span>
+                <span>{Number.isFinite(flightData?.autopilotDebug?.ils?.distAlong) ? `${(flightData.autopilotDebug.ils.distAlong / 6076).toFixed(1)} nm` : '---'}</span>
 
                 <span style={{ color: '#9ca3af' }}>LOC Err:</span>
                 <span style={{ color: Math.abs(flightData.autopilotDebug.ils.distCross ?? 0) > 50 ? '#ef4444' : '#4ade80' }}>
-                  {flightData.autopilotDebug.ils.distCross !== null ? flightData.autopilotDebug.ils.distCross.toFixed(0) : '---'} ft
+                  {Number.isFinite(flightData?.autopilotDebug?.ils?.distCross) ? `${flightData.autopilotDebug.ils.distCross.toFixed(0)} ft` : '---'}
                 </span>
 
                 <span style={{ color: '#9ca3af' }}>LOC Dev:</span>
-                <span>{flightData.autopilotDebug.ils.locDeviationDeg !== null ? flightData.autopilotDebug.ils.locDeviationDeg.toFixed(2) : '---'}°</span>
+                <span>{Number.isFinite(flightData?.autopilotDebug?.ils?.locDeviationDeg) ? `${flightData.autopilotDebug.ils.locDeviationDeg.toFixed(2)}°` : '---'}</span>
 
                 <span style={{ color: '#9ca3af' }}>G/S Err:</span>
                 <span style={{ color: Math.abs(flightData.autopilotDebug.ils.altError ?? 0) > 50 ? '#ef4444' : '#4ade80' }}>
-                  {flightData.autopilotDebug.ils.altError !== null ? flightData.autopilotDebug.ils.altError.toFixed(0) : '---'} ft
+                  {Number.isFinite(flightData?.autopilotDebug?.ils?.altError) ? `${flightData.autopilotDebug.ils.altError.toFixed(0)} ft` : '---'}
                 </span>
 
                 <span style={{ color: '#9ca3af' }}>G/S Dev:</span>
-                <span>{flightData.autopilotDebug.ils.gsDeviationDeg !== null ? flightData.autopilotDebug.ils.gsDeviationDeg.toFixed(2) : '---'}°</span>
+                <span>{Number.isFinite(flightData?.autopilotDebug?.ils?.gsDeviationDeg) ? `${flightData.autopilotDebug.ils.gsDeviationDeg.toFixed(2)}°` : '---'}</span>
 
                 <span style={{ color: '#9ca3af' }}>Tgt Alt:</span>
-                <span>{flightData.autopilotDebug.ils.targetAltitude !== null ? flightData.autopilotDebug.ils.targetAltitude.toFixed(0) : '---'} ft</span>
+                <span>{Number.isFinite(flightData?.autopilotDebug?.ils?.targetAltitude) ? `${flightData.autopilotDebug.ils.targetAltitude.toFixed(0)} ft` : '---'}</span>
 
                 <span style={{ color: '#9ca3af' }}>Trend:</span>
                 <span style={{
@@ -1266,13 +1585,13 @@ const FlightInProgress = ({
 
                 <span style={{ color: '#9ca3af' }}>Capture:</span>
                 <span>
-                  LOC {approachTelemetry?.locCaptured ? `@ ${approachTelemetry.locCaptureTimeSec?.toFixed(1) ?? '0.0'}s` : 'ARM'} / GS {approachTelemetry?.gsCaptured ? `@ ${approachTelemetry.gsCaptureTimeSec?.toFixed(1) ?? '0.0'}s` : 'ARM'}
+                  LOC {approachTelemetry?.locCaptured ? `@ ${formatNumber(approachTelemetry?.locCaptureTimeSec, 1, 's')}` : 'ARM'} / GS {approachTelemetry?.gsCaptured ? `@ ${formatNumber(approachTelemetry?.gsCaptureTimeSec, 1, 's')}` : 'ARM'}
                 </span>
 
                 <span style={{ color: '#9ca3af' }}>Final:</span>
                 <span>
-                  {approachTelemetry?.final?.distCross !== null && approachTelemetry?.final?.distCross !== undefined
-                    ? `${Math.abs(approachTelemetry.final.distCross).toFixed(0)} ft / ${approachTelemetry?.final?.altError !== null && approachTelemetry?.final?.altError !== undefined ? `${Math.abs(approachTelemetry.final.altError).toFixed(0)} ft` : '---'}`
+                  {Number.isFinite(approachTelemetry?.final?.distCross)
+                    ? `${Math.abs(approachTelemetry.final.distCross).toFixed(0)} ft / ${Number.isFinite(approachTelemetry?.final?.altError) ? `${Math.abs(approachTelemetry.final.altError).toFixed(0)} ft` : '---'}`
                     : '---'}
                 </span>
               </div>
@@ -1285,14 +1604,14 @@ const FlightInProgress = ({
              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                <span style={{ color: '#9ca3af' }}>Next WP:</span>
                <span>
-                 {(routeDetails?.waypoints || flightPlan?.waypoints || [])[flightData.currentWaypointIndex]?.name || 
-                  (routeDetails?.waypoints || flightPlan?.waypoints || [])[flightData.currentWaypointIndex]?.id || 
+                 {activeRouteWaypoints[flightData.currentWaypointIndex]?.name ||
+                  activeRouteWaypoints[flightData.currentWaypointIndex]?.id ||
                   `IDX ${flightData.currentWaypointIndex}`}
                </span>
              </div>
              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                <span style={{ color: '#9ca3af' }}>WP Index:</span>
-               <span>{flightData.currentWaypointIndex} / {(routeDetails?.waypoints || flightPlan?.waypoints || []).length}</span>
+               <span>{flightData.currentWaypointIndex} / {activeRouteWaypoints.length}</span>
              </div>
           </div>
         </div>

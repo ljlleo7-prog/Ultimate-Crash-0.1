@@ -117,6 +117,7 @@ class RealisticFlightPhysicsService {
         this.runwayGeometry = null;
         this.groundStatus = { status: 'UNKNOWN', remainingLength: 0 };
         this.difficulty = difficulty; // Set from constructor
+        this.groundMode = false; // Ground operations mode (suppress flight warnings)
         // Initialize airport elevation from config (converted from feet to meters if provided)
         this.airportElevation = (aircraftData.airportElevation || 0) * 0.3048; 
         console.log("Physics Init: Elevation Data", {
@@ -209,212 +210,10 @@ class RealisticFlightPhysicsService {
     }
 
     initializeSystems(difficulty) {
-        // Cold & Dark for Pro/Devil/Survival
-        const isColdDark = difficulty === 'pro' || difficulty === 'devil' || difficulty === 'professional' || difficulty === 'survival';
-        
-        // For Rookie/Student (not cold & dark), ensure we are fully ready
-        // But if difficulty is 'advanced', user might want a warm start but not cold & dark. 
-        // Logic says: if !isColdDark, we are ready.
-        
-        const engineCount = this.aircraft.engineCount || 2;
-        
-        // Generate Engine States dynamically
-        const enginesState = {};
-        for (let i = 1; i <= engineCount; i++) {
-            enginesState[`eng${i}`] = { 
-                startSwitch: 'OFF', 
-                fuelControl: !isColdDark, 
-                n2: isColdDark ? 0 : 20, // Idle N2
-                egt: isColdDark ? 20 : 400 
-            };
+        this.systems = this.systemsService.initializeSystems(this.aircraft, difficulty, this.state.fuel, this.engines);
+        if (this.systems?.flightControls && this.systems.flightControls.yawDamper !== undefined) {
+            this.systems.flightControls.yawDamper = !['pro', 'devil', 'professional', 'survival'].includes(difficulty);
         }
-
-        // Sync physics engines with system state
-        if (this.engines) {
-            this.engines.forEach((eng, index) => {
-                if (isColdDark) {
-                    eng.state.running = false;
-                    eng.state.n1 = 0;
-                    eng.state.n2 = 0;
-                    eng.state.egt = 15; // Ambient
-                    eng.state.ff = 0;
-                } else {
-                    eng.state.running = true;
-                    eng.state.n1 = 5; // Idle N1 (derived from ~20% N2)
-                    eng.state.n2 = 20; // Idle N2
-                    eng.state.egt = 400;
-                    eng.state.ff = 0.3; // Idle fuel flow
-                }
-            });
-        }
-
-        // Generate Electrical Generator States
-        const elecState = {
-            battery: !isColdDark,
-            batteryCharge: 100, // %
-            stbyPower: !isColdDark,
-            apuGen: false,
-            busTie: true, // Auto
-            dcVolts: isColdDark ? 0 : 28.0,
-            acVolts: isColdDark ? 0 : 115,
-            acFreq: isColdDark ? 0 : 400,
-            acAmps: isColdDark ? 0 : 50,
-            apuGenOff: true
-        };
-        
-        // Add generators for each engine
-        for (let i = 1; i <= engineCount; i++) {
-            elecState[`gen${i}`] = !isColdDark;
-            elecState[`sourceOff${i}`] = isColdDark;
-        }
-
-        // Generate Pneumatic Bleed States
-        const pneuState = {
-            packL: !isColdDark,
-            packR: !isColdDark,
-            isolationValve: true, // Auto/Open
-            cabinAlt: 0,
-            diffPressure: 0,
-            targetAlt: 35000,
-            ductPressL: isColdDark ? 0 : 30,
-            ductPressR: isColdDark ? 0 : 30,
-            mode: 'AUTO'
-        };
-        
-        // Add bleeds for each engine
-        for (let i = 1; i <= engineCount; i++) {
-            pneuState[`bleed${i}`] = !isColdDark;
-        }
-
-        // Initialize Fuel System with correct quantities
-        // Distribute total fuel (this.state.fuel) into tanks
-        const totalFuel = this.state.fuel;
-        const fuelState = {
-            tanks: {
-                left: totalFuel * 0.3,
-                right: totalFuel * 0.3,
-                center: totalFuel * 0.4
-            },
-            leftPumps: !isColdDark,
-            rightPumps: !isColdDark,
-            centerPumps: !isColdDark,
-            crossfeed: false,
-            dump: false
-        };
-        
-        // Adjust distribution for 2-engine aircraft (less in center)
-        if (engineCount <= 2) {
-            fuelState.tanks.left = totalFuel * 0.45;
-            fuelState.tanks.right = totalFuel * 0.45;
-            fuelState.tanks.center = totalFuel * 0.10;
-        }
-
-        // Fire Detection/Protection
-        const fireState = {
-            apu: false,
-            cargo: false,
-            apuHandle: false,
-            bottle1: 100,
-            bottle2: 100
-        };
-        
-        for (let i = 1; i <= engineCount; i++) {
-            fireState[`eng${i}`] = false;       // Detection
-            fireState[`eng${i}Handle`] = false; // Handle
-        }
-
-        // Generate Hydraulic States dynamically
-        const hydraulicState = {};
-        const sysNames = ['A', 'B', 'C', 'D'];
-        // Default: 4 systems for 4-engine planes, 2 for others (unless specified)
-        const hydraulicCount = this.aircraft.hydraulicCount || (engineCount > 2 ? 4 : 2);
-        
-        for (let i = 0; i < hydraulicCount; i++) {
-            const name = i < sysNames.length ? `sys${sysNames[i]}` : `sys${i+1}`;
-            hydraulicState[name] = { 
-                pressure: isColdDark ? 0 : 3000, 
-                engPump: !isColdDark, 
-                elecPump: !isColdDark, 
-                qty: 100 
-            };
-        }
-
-        this.systems = {
-            electrical: elecState,
-            fuel: fuelState,
-            apu: { 
-                master: false,
-                start: false,
-                running: false,
-                starting: false,
-                bleed: false,
-                egt: 0,
-                n2: 0,
-                state: 'OFF'
-            },
-            hydraulics: hydraulicState,
-            transponder: {
-                code: 2000,
-                mode: 'STBY', // STBY, ALT, TA/RA
-                ident: false
-            },
-            pressurization: pneuState,
-            oxygen: {
-                masks: false,
-                crewPressure: 1800,
-                paxPressure: 1500
-            },
-            lighting: {
-                landing: false,
-                taxi: false,
-                nav: !isColdDark,
-                beacon: !isColdDark,
-                strobe: !isColdDark,
-                logo: false,
-                wing: false,
-                powered: !isColdDark
-            },
-            nav: {
-                irsL: !isColdDark,
-                irsR: !isColdDark
-            },
-            engines: enginesState,
-            fire: fireState,
-            // starters removed in favor of engines
-            signs: {
-                seatBelts: !isColdDark,
-                noSmoking: !isColdDark
-            },
-            wipers: {
-                left: false,
-                right: false
-            },
-            brakes: {
-                parkingBrake: true, // Always ON initially to prevent movement
-                autobrake: 'OFF', // RTO, OFF, 1, 2, 3, MAX
-                temp: [20, 20, 20, 20] // Brake temps
-            },
-            adirs: {
-                ir1: 'OFF',
-                ir2: 'OFF',
-                ir3: 'OFF',
-                alignState: 0,
-                aligned: false,
-                onBat: false
-            },
-            ice: {
-                windowHeat: !isColdDark,
-                probeHeat: !isColdDark,
-                wingAntiIce: false,
-                engAntiIce: false,
-                icingLevel: 0,
-                deicingRequired: false
-            },
-            flightControls: {
-                yawDamper: !isColdDark
-            }
-        };
-
     }
 
 
@@ -696,6 +495,7 @@ class RealisticFlightPhysicsService {
             // Override user inputs with AP outputs
             finalInput = {
                 ...input,
+                autopilotActive: true,
                 throttle: apOutputs.throttle,
                 pitch: apOutputs.elevator, // Map Elevator Command to Pitch Input
                 roll: apOutputs.aileron,   // Map Aileron Command to Roll Input
@@ -780,14 +580,18 @@ class RealisticFlightPhysicsService {
 
     processInputs(input, dt) {
         // Smooth inputs to simulate actuator dynamics
-        const rate = 5.0 * dt;
+        const responseRate = Math.min(1, 5.0 * dt);
+        const autopilotActive = input.autopilotActive === true;
         const throttleInput = Number.isFinite(input.throttle) ? input.throttle : this.controls.throttle;
         const pitchInput = Number.isFinite(input.pitch) ? input.pitch : this.controls.elevator;
         const rollInput = Number.isFinite(input.roll) ? input.roll : this.controls.aileron;
         const yawInput = Number.isFinite(input.yaw) ? input.yaw : this.controls.rudder;
+        const elevatorResponse = autopilotActive ? responseRate : Math.min(1, responseRate * 2);
+        const aileronResponse = autopilotActive ? Math.min(1, responseRate * 1.5) : Math.min(1, responseRate * 3);
+        const rudderResponse = autopilotActive ? responseRate : Math.min(1, responseRate * 2);
 
         // Throttle (Master)
-        this.controls.throttle += (throttleInput - this.controls.throttle) * rate;
+        this.controls.throttle += (throttleInput - this.controls.throttle) * responseRate;
 
         // Individual Throttles
         if (input.throttles && Array.isArray(input.throttles)) {
@@ -795,19 +599,19 @@ class RealisticFlightPhysicsService {
             for (let i = 0; i < this.controls.engineThrottles.length; i++) {
                 const rawTarget = input.throttles[i];
                 const target = Number.isFinite(rawTarget) ? rawTarget : throttleInput;
-                this.controls.engineThrottles[i] += (target - this.controls.engineThrottles[i]) * rate;
+                this.controls.engineThrottles[i] += (target - this.controls.engineThrottles[i]) * responseRate;
             }
         } else {
             // Sync to master if no individual inputs
             for (let i = 0; i < this.controls.engineThrottles.length; i++) {
-                this.controls.engineThrottles[i] += (throttleInput - this.controls.engineThrottles[i]) * rate;
+                this.controls.engineThrottles[i] += (throttleInput - this.controls.engineThrottles[i]) * responseRate;
             }
         }
 
         // Flight Controls (Pitch, Roll, Yaw)
-        this.controls.elevator += (pitchInput - this.controls.elevator) * rate * 2; // Faster response
-        this.controls.aileron += (rollInput - this.controls.aileron) * rate * 3;
-        this.controls.rudder += (yawInput - this.controls.rudder) * rate * 2;
+        this.controls.elevator += (pitchInput - this.controls.elevator) * elevatorResponse;
+        this.controls.aileron += (rollInput - this.controls.aileron) * aileronResponse;
+        this.controls.rudder += (yawInput - this.controls.rudder) * rudderResponse;
 
         // Systems
         if (input.flaps !== undefined) this.controls.flaps = input.flaps;
@@ -815,7 +619,7 @@ class RealisticFlightPhysicsService {
 
         // Trim smoothing
         const targetTrim = input.trim !== undefined ? input.trim : this.controls.trim;
-        this.controls.trim += (targetTrim - this.controls.trim) * rate;
+        this.controls.trim += (targetTrim - this.controls.trim) * responseRate;
 
         // Brakes (simple logic: low throttle + on ground)
         if (this.onGround && this.controls.throttle < 0.1) {
@@ -825,66 +629,19 @@ class RealisticFlightPhysicsService {
     }
 
     updateSystems(dt) {
-        // Construct context for OverheadLogic
-        const context = {
-            engineN2: this.engines.map(e => e.state.n2 || 0),
-            altitude: -this.state.pos.z * 3.28084, // ft
-            onGround: this.onGround,
-            airspeed: this.state.vel.magnitude() * 1.94384, // kts
-            difficulty: this.difficulty // Pass difficulty to logic
-        };
+        this.systemsService.updateSystems(
+            this.systems,
+            this.engines,
+            this.state,
+            this.onGround,
+            this.difficulty,
+            this.failureParams,
+            this.aircraft,
+            this.payloadMass,
+            dt
+        );
 
-        // Delegate logic to OverheadLogic service
-        OverheadLogic.update(this.systems, context, dt);
-
-        if (this.failureParams.quantity_rate) {
-            const rates = this.failureParams.quantity_rate;
-            
-            if (rates.fuel) {
-                const leak = rates.fuel * dt;
-                if (this.systems.fuel && this.systems.fuel.tanks) {
-                    const tanks = this.systems.fuel.tanks;
-                    const total = (tanks.left + tanks.right + tanks.center) || 1;
-                    if (tanks.left > 0) tanks.left = Math.max(0, tanks.left - leak * (tanks.left / total));
-                    if (tanks.right > 0) tanks.right = Math.max(0, tanks.right - leak * (tanks.right / total));
-                    if (tanks.center > 0) tanks.center = Math.max(0, tanks.center - leak * (tanks.center / total));
-                }
-            }
-            
-            if (this.systems.hydraulics) {
-                Object.keys(this.systems.hydraulics).forEach(sysName => {
-                    let rate = rates.hydraulics || 0;
-                    
-                    if (rates[sysName]) rate += rates[sysName];
-                    
-                    if (rate > 0) {
-                        const sys = this.systems.hydraulics[sysName];
-                        if (sys && sys.qty > 0) {
-                            sys.qty = Math.max(0, sys.qty - rate * dt);
-                            if (sys.qty <= 0) {
-                                sys.pressure = 0;
-                                sys.engPump = false;
-                                sys.elecPump = false;
-                            }
-                        }
-                    }
-                });
-            }
-        }
-        
-        // Update Control Effectiveness based on Hydraulics
         this.updateControlEffectiveness(dt);
-
-        // Sync Total Fuel and Mass
-        // Calculate total fuel from tanks
-        if (this.systems.fuel && this.systems.fuel.tanks) {
-            const totalFuel = Object.values(this.systems.fuel.tanks).reduce((a, b) => a + b, 0);
-            this.state.fuel = totalFuel;
-            
-            // Update Mass
-            // Mass = Empty Weight + Payload + Fuel
-            this.state.mass = (this.aircraft.emptyWeight || 40000) + this.payloadMass + this.state.fuel;
-        }
     }
 
     /**
@@ -892,90 +649,32 @@ class RealisticFlightPhysicsService {
      * Simulates redundancy and degradation.
      */
     updateControlEffectiveness(dt) {
-        if (!this.systems.hydraulics) return;
+        const effectiveness = this.systemsService.updateControlEffectiveness(this.systems);
+        this.controlEffectiveness.elevator = effectiveness.elevator ?? this.controlEffectiveness.elevator;
+        this.controlEffectiveness.aileron = effectiveness.aileron ?? this.controlEffectiveness.aileron;
+        this.controlEffectiveness.rudder = effectiveness.rudder ?? this.controlEffectiveness.rudder;
+        this.controlEffectiveness.gear = effectiveness.gear ?? this.controlEffectiveness.gear;
+        this.controlEffectiveness.spoilers = effectiveness.spoilers ?? this.controlEffectiveness.spoilers;
 
-        const hydSystems = Object.values(this.systems.hydraulics);
-        const totalSystems = hydSystems.length;
-        if (totalSystems === 0) return;
+        const hydraulicSystems = Object.values(this.systems?.hydraulics || {});
+        const totalSystems = hydraulicSystems.length;
+        const activeSystems = hydraulicSystems.filter(sys => sys.pressure > 1500).length;
+        const lagFactor = totalSystems === 0 || activeSystems === totalSystems
+            ? 1.0
+            : (1.0 + 2.0 * (1.0 - (activeSystems / totalSystems)));
 
-        // Count active systems (Pressure > 1500 PSI)
-        let activeSystems = 0;
-        let activeIndices = [];
-        
-        hydSystems.forEach((sys, idx) => {
-            if (sys.pressure > 1500) {
-                activeSystems++;
-                activeIndices.push(idx);
-            }
-        });
-
-        // Calculate generic hydraulic health factor (0.0 to 1.0)
-        // Redundancy Logic:
-        // 1 system is usually enough for control, but maybe slower (lag).
-        // 0 systems = manual reversion (very hard/ineffective) or complete loss.
-        
-        let healthFactor = 0.1; // Base manual reversion effectiveness
-        
-        if (activeSystems > 0) {
-             // If we have at least one system, we have decent control.
-             // But less systems might mean slower actuation (lag) or reduced force (effectiveness).
-             // User requested: "1/2 or 2/3 control strength" if failure.
-             
-             // Scale from 0.5 (1 system active out of many) to 1.0 (all active)
-             // Formula: 0.5 + 0.5 * (active / total)
-             // If 2/2 active: 0.5 + 0.5 = 1.0
-             // If 1/2 active: 0.5 + 0.25 = 0.75
-             // If 1/3 active: 0.5 + 0.16 = 0.66
-             // If 1/4 active: 0.5 + 0.125 = 0.625
-             healthFactor = 0.5 + 0.5 * (activeSystems / totalSystems);
-        }
-
-        // Apply to primary flight controls
-        this.controlEffectiveness.elevator = healthFactor;
-        this.controlEffectiveness.aileron = healthFactor;
-        this.controlEffectiveness.rudder = healthFactor;
-        this.controlEffectiveness.gear = healthFactor; // Gear extension might be slow/stuck
-
-        // Special handling for Split Surfaces (e.g. Speedbrakes/Spoilers)
-        // "A control outer speedbrake while B control inner"
-        // We simulate this by checking specific system indices.
-        // Assuming Sys A is index 0, Sys B is index 1.
-        
-        // If we have multiple systems, we split the spoiler effectiveness.
-        // If Sys A (0) is dead, we lose 50% (if 2 systems) or 33% (if 3).
-        // This is effectively covered by the generic ratio, BUT specific systems might map to specific surfaces.
-        // For simplified physics, the generic ratio active/total is actually a perfect representation 
-        // of "losing a subset of surfaces".
-        // e.g. 2 spoilers, 1 works -> 50% drag.
-        
-        // So for spoilers/speedbrakes, we use strictly linear ratio.
-        const spoilerHealth = activeSystems / totalSystems;
-        
-        // We don't have a separate controlEffectiveness.spoilers yet, let's add it or apply directly in getAirbrakeIncrements.
-        this.controlEffectiveness.spoilers = spoilerHealth;
-
-        // Update Control Lag (Response Time)
-        // Less hydraulics = slower response
-        // Normal lag = 1.0
-        // degraded = 3.0 (3x slower)
-        const lagFactor = activeSystems === totalSystems ? 1.0 : (1.0 + 2.0 * (1.0 - (activeSystems/totalSystems)));
-        
         this.controlLag.elevator = lagFactor;
         this.controlLag.aileron = lagFactor;
         this.controlLag.rudder = lagFactor;
         this.controlLag.gear = lagFactor;
 
-        // Apply specific failure parameter overrides
         ['aileron', 'elevator', 'rudder', 'gear', 'flaps'].forEach(axis => {
-            // Sensitivity
             if (this.failureParams.control_sensitivity[axis] !== undefined) {
-                 this.controlEffectiveness[axis] = (this.controlEffectiveness[axis] || 1.0) * this.failureParams.control_sensitivity[axis];
+                this.controlEffectiveness[axis] = (this.controlEffectiveness[axis] || 1.0) * this.failureParams.control_sensitivity[axis];
             }
-            
-            // Movement Restriction (Stuck/Jammed)
-            // If restricted, clamp effectiveness to near zero (or specific value if we had one)
+
             if (this.failureParams.movement_restricted[axis]) {
-                this.controlEffectiveness[axis] = Math.min(this.controlEffectiveness[axis] || 1.0, 0.05); // Almost stuck
+                this.controlEffectiveness[axis] = Math.min(this.controlEffectiveness[axis] || 1.0, 0.05);
             }
         });
     }
@@ -1925,6 +1624,59 @@ class RealisticFlightPhysicsService {
         }
     }
 
+    getSerializableState() {
+        const autopilotStatus = this.getAutopilotStatus ? this.getAutopilotStatus() : { engaged: false, mode: 'OFF', targets: {} };
+
+        return {
+            position: {
+                x: this.state.pos.x,
+                y: this.state.pos.y,
+                z: -this.state.pos.z,
+                latitude: this.state.geo.lat,
+                longitude: this.state.geo.lon
+            },
+            velocity: {
+                x: this.state.vel.x,
+                y: this.state.vel.y,
+                z: this.state.vel.z
+            },
+            orientation: {
+                w: this.state.quat.w,
+                x: this.state.quat.x,
+                y: this.state.quat.y,
+                z: this.state.quat.z
+            },
+            rates: {
+                x: this.state.rates.x,
+                y: this.state.rates.y,
+                z: this.state.rates.z
+            },
+            controls: {
+                ...this.controls,
+                throttles: Array.isArray(this.controls.engineThrottles) ? [...this.controls.engineThrottles] : []
+            },
+            engineParams: {
+                n1: this.engines.map((engine) => engine.state.n1),
+                n2: this.engines.map((engine) => engine.state.n2),
+                egt: this.engines.map((engine) => engine.state.egt),
+                fuelFlow: this.engines.map((engine) => engine.state.fuelFlow),
+                oilPressure: this.engines.map((engine) => engine.state.oilPressure),
+                vibration: this.engines.map((engine) => engine.state.vibration)
+            },
+            autopilot: {
+                engaged: autopilotStatus.engaged,
+                mode: autopilotStatus.mode,
+                targets: autopilotStatus.targets
+            },
+            autopilotTargets: autopilotStatus.targets,
+            systems: this.systems,
+            fuel: this.state.fuel,
+            runwayGeometry: this.runwayGeometry,
+            groundStatus: this.groundStatus,
+            currentWaypointIndex: this.currentWaypointIndex || 0
+        };
+    }
+
     getOutputState() {
         // Convert internal physics state to the App's expected format
         const euler = this.state.quat.toEuler(); // Rads
@@ -1973,11 +1725,13 @@ class RealisticFlightPhysicsService {
             },
             controls: {
                 throttle: this.controls.throttle,
+                throttles: Array.isArray(this.controls.engineThrottles) ? [...this.controls.engineThrottles] : [],
                 pitch: this.controls.elevator,
                 roll: this.controls.aileron,
                 yaw: this.controls.rudder,
                 trim: this.controls.trim
             },
+            engineThrottles: Array.isArray(this.controls.engineThrottles) ? [...this.controls.engineThrottles] : [],
             flaps: this.controls.flaps,
             gear: this.controls.gear > 0.5,
             airBrakes: this.controls.brakes, // Mapping brakes to airbrakes for now
@@ -2546,8 +2300,10 @@ class RealisticFlightPhysicsService {
             this.controls.gear = conditions.gear ? 1 : 0;
         }
 
+        const initialVelocity = this.state.vel.clone ? this.state.vel.clone() : new Vector3(this.state.vel.x, this.state.vel.y, this.state.vel.z);
+
         // Reset velocities and rates for initial state
-        this.state.vel = new Vector3(0, 0, 0);
+        this.state.vel = new Vector3(initialVelocity.x, initialVelocity.y, initialVelocity.z);
         this.state.rates = new Vector3(0, 0, 0);
         
         // Update autopilot targets if available
@@ -2931,6 +2687,10 @@ class RealisticFlightPhysicsService {
             this.failureSystem.difficulty = difficulty;
             this.failureSystem.settings = this.failureSystem.getDifficultySettings(difficulty);
         }
+    }
+
+    setGroundMode(enabled) {
+        this.groundMode = enabled;
     }
 
     setAutopilotMode(mode) {

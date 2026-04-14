@@ -170,18 +170,72 @@ const EnvironmentFailures = {
         name: 'Uncontained Engine Failure',
         category: 'environment',
         stages: {
-            inactive: { next: 'active' },
-            active: {
+            inactive: { next: 'impact' },
+            impact: {
+                duration: 1.5,
+                next: 'debris_field',
                 description: (ctx) => ({
-                    text: `EXPLOSION ENGINE ${ctx.engineIndex + 1}. STRUCTURAL DAMAGE.`,
-                    system_alert: "ENG FAIL",
-                    sound: "explosion_loud",
-                    visual: "shake_violent"
+                    text: `EXPLOSION ENGINE ${ctx.engineIndex + 1}. SHOCKWAVE AND DEBRIS IMPACT.`,
+                    system_alert: `ENG ${ctx.engineIndex + 1} FAIL`,
+                    sound: 'explosion_loud',
+                    visual: 'shake_violent'
                 }),
                 effect: (sys, intensity, ctx) => {
                     const idx = ctx.engineIndex !== undefined ? ctx.engineIndex : 0;
-                    if (sys.engines[idx]) sys.engines[idx].setFailed(true);
-                    sys.systems.hydraulics.sysA.pressure = 0; // Collateral damage
+                    if (sys.engines[idx]) {
+                        sys.engines[idx].setFailed(true);
+                        sys.engines[idx].state.vibration = 10;
+                        sys.engines[idx].state.n1 = Math.min(sys.engines[idx].state.n1, 55);
+                    }
+                    if (sys.systems?.fire) {
+                        sys.systems.fire[`eng${idx + 1}`] = true;
+                    }
+                    if (sys.systems?.hydraulics?.sysA) {
+                        sys.systems.hydraulics.sysA.pressure = Math.min(sys.systems.hydraulics.sysA.pressure, 1200);
+                    }
+                    if (sys.systems?.hydraulics?.sysB) {
+                        sys.systems.hydraulics.sysB.pressure = Math.min(sys.systems.hydraulics.sysB.pressure, 1800);
+                    }
+                    ctx.structuralDamage = true;
+                }
+            },
+            debris_field: {
+                duration: 4.0,
+                next: 'active',
+                description: (ctx) => ({
+                    text: `Engine ${ctx.engineIndex + 1} fragments strike nearby systems. Hydraulic lines compromised.`,
+                    system_alert: 'SECONDARY DAMAGE',
+                    sound: 'metal_impact',
+                    visual: 'buffet_minor'
+                }),
+                effect: (sys, intensity, ctx) => {
+                    if (sys.systems?.hydraulics?.sysA) {
+                        sys.systems.hydraulics.sysA.pressure = Math.max(0, sys.systems.hydraulics.sysA.pressure - 1200);
+                    }
+                    if (sys.systems?.hydraulics?.sysB) {
+                        sys.systems.hydraulics.sysB.pressure = Math.max(0, sys.systems.hydraulics.sysB.pressure - 800);
+                    }
+                    ctx.hydraulicDamage = true;
+                }
+            },
+            active: {
+                description: (ctx) => ({
+                    text: `Engine ${ctx.engineIndex + 1} destroyed. Debris damage spreading through adjacent systems.`,
+                    system_alert: 'STRUCTURAL DAMAGE',
+                    sound: 'master_caution',
+                    visual: 'shake_medium'
+                }),
+                effect: (sys, intensity, ctx) => {
+                    const idx = ctx.engineIndex !== undefined ? ctx.engineIndex : 0;
+                    if (sys.engines[idx]) {
+                        sys.engines[idx].setFailed(true);
+                    }
+                    if (sys.systems?.hydraulics?.sysA) {
+                        sys.systems.hydraulics.sysA.pressure = Math.min(sys.systems.hydraulics.sysA.pressure, 300);
+                    }
+                    if (sys.systems?.hydraulics?.sysB) {
+                        sys.systems.hydraulics.sysB.pressure = Math.min(sys.systems.hydraulics.sysB.pressure, 1200);
+                    }
                 }
             }
         }

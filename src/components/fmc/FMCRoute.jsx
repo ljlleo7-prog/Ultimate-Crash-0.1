@@ -1,98 +1,213 @@
-import { useState } from 'react';
+import { useCallback } from 'react';
 import PropTypes from 'prop-types';
+import AirportSearchInput from '../AirportSearchInput.jsx';
 import { airportService } from '../../services/airportService';
 
-const FMCRoute = ({ fmcService, flightState }) => {
-  const data = fmcService.getData();
-  const [searchOrigin, setSearchOrigin] = useState('');
-  const [searchDest, setSearchDest] = useState('');
-  const [searchAlt, setSearchAlt] = useState('');
+const MIN_SEARCH_LENGTH = 2;
 
-  const handleSetOrigin = () => {
-    const results = airportService.searchAirports(searchOrigin);
-    if (results.length > 0) {
-      fmcService.setRoute(results[0], data.destination, data.alternate);
-      setSearchOrigin('');
-    }
-  };
+const getAirportCodeLabel = (airport) => {
+  if (!airport) return '---';
+  const primary = airport.icao || airport.iata || '---';
+  const secondary = airport.iata && airport.iata !== primary ? ` / ${airport.iata}` : '';
+  return `${primary}${secondary}`;
+};
 
-  const handleSetDest = () => {
-    const results = airportService.searchAirports(searchDest);
-    if (results.length > 0) {
-      fmcService.setRoute(data.origin, results[0], data.alternate);
-      setSearchDest('');
-    }
-  };
+const getAirportSummary = (airport) => {
+  if (!airport) return null;
+  return [airport.city, airport.country].filter(Boolean).join(', ');
+};
 
-  const handleSetAlternate = () => {
-    const results = airportService.searchAirports(searchAlt);
-    if (results.length > 0) {
-      fmcService.setRoute(data.origin, data.destination, results[0]);
-      setSearchAlt('');
-    }
-  };
+const buildSearchStatus = (query, results, selectedAirport) => {
+  if (selectedAirport) {
+    return { status: 'selected', message: '' };
+  }
+
+  const trimmed = query.trim();
+  if (!trimmed) {
+    return { status: 'idle', message: 'Search by ICAO, IATA, city, or airport name.' };
+  }
+
+  if (trimmed.length < MIN_SEARCH_LENGTH) {
+    return { status: 'idle', message: 'Enter at least 2 characters.' };
+  }
+
+  if (results.length === 0) {
+    return { status: 'no-results', message: `No airport found for “${trimmed.toUpperCase()}”.` };
+  }
+
+  return { status: 'idle', message: '' };
+};
+
+const AirportSelectorCard = ({
+  label,
+  placeholder,
+  value,
+  selectedAirport,
+  onSearchChange,
+  searchResults,
+  onSelect,
+  helperText,
+  validationState = 'idle'
+}) => {
+  const searchStatus = buildSearchStatus(value, searchResults, selectedAirport);
+  const status = validationState !== 'idle' ? validationState : searchStatus.status;
 
   return (
-    <div className="fmc-page">
-      <h4 className="fmc-page-title">ROUTE</h4>
-
-      <div className="fmc-route-field">
-        <div className="fmc-label">ORIGIN</div>
-        {data.origin ? (
-          <div className="fmc-value">{data.origin.icao} - {data.origin.name}</div>
-        ) : (
-          <div className="fmc-input-inline">
-            <input
-              type="text"
-              value={searchOrigin}
-              onChange={(e) => setSearchOrigin(e.target.value)}
-              placeholder="Search ICAO/IATA"
-            />
-            <button onClick={handleSetOrigin}>Set</button>
-          </div>
-        )}
+    <div className={`fmc-airport-card ${validationState !== 'idle' ? validationState : ''}`.trim()}>
+      <div className="fmc-airport-card-header">
+        <div>
+          <div className="fmc-label">{label}</div>
+          <div className="fmc-airport-code-summary">{getAirportCodeLabel(selectedAirport)}</div>
+        </div>
+        {helperText && <div className="fmc-airport-helper">{helperText}</div>}
       </div>
 
-      <div className="fmc-route-field">
-        <div className="fmc-label">DESTINATION</div>
-        {data.destination ? (
-          <div className="fmc-value">{data.destination.icao} - {data.destination.name}</div>
-        ) : (
-          <div className="fmc-input-inline">
-            <input
-              type="text"
-              value={searchDest}
-              onChange={(e) => setSearchDest(e.target.value)}
-              placeholder="Search ICAO/IATA"
-            />
-            <button onClick={handleSetDest}>Set</button>
-          </div>
-        )}
+      <AirportSearchInput
+        placeholder={placeholder}
+        onSelect={onSelect}
+        selectedAirport={selectedAirport}
+        searchResults={searchResults}
+        handleSearch={onSearchChange}
+        status={status}
+        statusMessage={validationState !== 'idle' ? helperText : searchStatus.message}
+        className="fmc-airport-search"
+        badgeClassName="fmc-airport-badge"
+        inputClassName="fmc-airport-input"
+      />
+
+      {selectedAirport && (
+        <div className="fmc-airport-meta">
+          <span>{selectedAirport.name}</span>
+          {getAirportSummary(selectedAirport) && <span>{getAirportSummary(selectedAirport)}</span>}
+        </div>
+      )}
+    </div>
+  );
+};
+
+AirportSelectorCard.propTypes = {
+  label: PropTypes.string.isRequired,
+  placeholder: PropTypes.string.isRequired,
+  value: PropTypes.string.isRequired,
+  selectedAirport: PropTypes.object,
+  onSearchChange: PropTypes.func.isRequired,
+  searchResults: PropTypes.array.isRequired,
+  onSelect: PropTypes.func.isRequired,
+  helperText: PropTypes.string,
+  validationState: PropTypes.oneOf(['idle', 'warning', 'error'])
+};
+
+const FMCRoute = ({
+  routeDetails,
+  selectedDeparture,
+  selectedArrival,
+  onSelectDeparture,
+  onSelectArrival,
+  onUpdateRouteDetails,
+  flightState,
+  routeSearchState,
+  routeValidation
+}) => {
+  const handleAlternateSelect = useCallback((airport) => {
+    onUpdateRouteDetails?.({ alternate: airport || null });
+  }, [onUpdateRouteDetails]);
+
+  const handleDepartureSearch = useCallback((value) => {
+    routeSearchState?.setDepartureQuery?.(value);
+  }, [routeSearchState]);
+
+  const handleArrivalSearch = useCallback((value) => {
+    routeSearchState?.setArrivalQuery?.(value);
+  }, [routeSearchState]);
+
+  const handleAlternateSearch = useCallback((value) => {
+    routeSearchState?.setAlternateQuery?.(value);
+  }, [routeSearchState]);
+
+  const selectedAlternate = routeDetails?.alternate || null;
+
+  return (
+    <div className="fmc-page fmc-route-page">
+      <h4 className="fmc-page-title">Route Setup</h4>
+
+      <div className="fmc-route-grid">
+        <AirportSelectorCard
+          label="Departure"
+          placeholder="Search departure airport"
+          value={routeSearchState?.departureQuery || ''}
+          selectedAirport={selectedDeparture}
+          onSearchChange={handleDepartureSearch}
+          searchResults={routeSearchState?.departureResults || []}
+          onSelect={onSelectDeparture}
+          helperText={routeValidation?.departureMessage}
+          validationState={routeValidation?.departureState || 'idle'}
+        />
+
+        <AirportSelectorCard
+          label="Arrival"
+          placeholder="Search arrival airport"
+          value={routeSearchState?.arrivalQuery || ''}
+          selectedAirport={selectedArrival}
+          onSearchChange={handleArrivalSearch}
+          searchResults={routeSearchState?.arrivalResults || []}
+          onSelect={onSelectArrival}
+          helperText={routeValidation?.arrivalMessage}
+          validationState={routeValidation?.arrivalState || 'idle'}
+        />
+
+        <AirportSelectorCard
+          label="Alternate"
+          placeholder="Optional alternate airport"
+          value={routeSearchState?.alternateQuery || ''}
+          selectedAirport={selectedAlternate}
+          onSearchChange={handleAlternateSearch}
+          searchResults={routeSearchState?.alternateResults || []}
+          onSelect={handleAlternateSelect}
+          helperText={routeValidation?.alternateMessage}
+          validationState={routeValidation?.alternateState || 'idle'}
+        />
       </div>
 
-      <div className="fmc-route-field">
-        <div className="fmc-label">ALTERNATE</div>
-        {data.alternate ? (
-          <div className="fmc-value">{data.alternate.icao} - {data.alternate.name}</div>
-        ) : (
-          <div className="fmc-input-inline">
-            <input
-              type="text"
-              value={searchAlt}
-              onChange={(e) => setSearchAlt(e.target.value)}
-              placeholder="Optional"
-            />
-            <button onClick={handleSetAlternate}>Set</button>
+      {routeValidation?.routeState === 'error' && routeValidation?.routeMessage && (
+        <div className="fmc-banner error">{routeValidation.routeMessage}</div>
+      )}
+      {routeValidation?.routeState === 'success' && routeValidation?.routeMessage && (
+        <div className="fmc-banner success">{routeValidation.routeMessage}</div>
+      )}
+
+      <div className="fmc-section">
+        <div className="fmc-section-header">
+          <div className="fmc-label">Route Summary</div>
+          <div className={`fmc-status-pill ${routeValidation?.isRouteReady ? 'ready' : ''}`}>{routeValidation?.isRouteReady ? 'Ready' : 'Incomplete'}</div>
+        </div>
+        <div className="fmc-route-summary-grid">
+          <div className="fmc-stat-card">
+            <span className="fmc-stat-label">Departure runway</span>
+            <span className="fmc-stat-value">{routeDetails?.departureRunway || 'Not set'}</span>
           </div>
-        )}
+          <div className="fmc-stat-card">
+            <span className="fmc-stat-label">Arrival runway</span>
+            <span className="fmc-stat-value">{routeDetails?.landingRunway || 'Not set'}</span>
+          </div>
+          <div className="fmc-stat-card">
+            <span className="fmc-stat-label">Waypoints</span>
+            <span className="fmc-stat-value">{routeDetails?.waypoints?.length || 0}</span>
+          </div>
+          <div className="fmc-stat-card">
+            <span className="fmc-stat-label">Distance</span>
+            <span className="fmc-stat-value">
+              {selectedDeparture && selectedArrival
+                ? `${airportService.calculateDistance(selectedDeparture, selectedArrival).toLocaleString()} NM`
+                : '—'}
+            </span>
+          </div>
+        </div>
       </div>
 
       {flightState && (
         <div className="fmc-section">
-          <div className="fmc-label">CURRENT POSITION</div>
-          <div className="fmc-value">
-            {flightState.latitude?.toFixed(4)}, {flightState.longitude?.toFixed(4)}
-          </div>
+          <div className="fmc-label">Current position</div>
+          <div className="fmc-value">{flightState.latitude?.toFixed(4)}, {flightState.longitude?.toFixed(4)}</div>
         </div>
       )}
     </div>
@@ -100,8 +215,35 @@ const FMCRoute = ({ fmcService, flightState }) => {
 };
 
 FMCRoute.propTypes = {
-  fmcService: PropTypes.object.isRequired,
-  flightState: PropTypes.object
+  routeDetails: PropTypes.object,
+  selectedDeparture: PropTypes.object,
+  selectedArrival: PropTypes.object,
+  onSelectDeparture: PropTypes.func,
+  onSelectArrival: PropTypes.func,
+  onUpdateRouteDetails: PropTypes.func,
+  flightState: PropTypes.object,
+  routeSearchState: PropTypes.shape({
+    departureQuery: PropTypes.string,
+    arrivalQuery: PropTypes.string,
+    alternateQuery: PropTypes.string,
+    departureResults: PropTypes.array,
+    arrivalResults: PropTypes.array,
+    alternateResults: PropTypes.array,
+    setDepartureQuery: PropTypes.func,
+    setArrivalQuery: PropTypes.func,
+    setAlternateQuery: PropTypes.func
+  }),
+  routeValidation: PropTypes.shape({
+    departureState: PropTypes.string,
+    departureMessage: PropTypes.string,
+    arrivalState: PropTypes.string,
+    arrivalMessage: PropTypes.string,
+    alternateState: PropTypes.string,
+    alternateMessage: PropTypes.string,
+    routeState: PropTypes.string,
+    routeMessage: PropTypes.string,
+    isRouteReady: PropTypes.bool
+  })
 };
 
 export default FMCRoute;

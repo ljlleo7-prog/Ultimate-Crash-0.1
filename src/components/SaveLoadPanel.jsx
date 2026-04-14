@@ -1,22 +1,21 @@
 import React, { useState } from 'react';
 import { encryptFlightData, decryptFlightData } from '../utils/flightDataCrypto';
+import { buildFlightSavePayload } from '../services/buildFlightSavePayload.js';
 import './SaveLoadPanel.css';
 
-const SaveLoadPanel = ({ flightData, physicsState, flightPlan, weatherData, aircraftModel, onClose, onLoadFlight }) => {
+const SaveLoadPanel = ({ flightData, physicsState, physicsService, flightPlan, weatherData, aircraftModel, onClose, onLoadFlight }) => {
   const [error, setError] = useState(null);
   const [successMsg, setSuccessMsg] = useState(null);
 
   const generateSaveData = () => {
-    return {
-      version: '1.0',
-      timestamp: Date.now(),
-      flightData: flightData,
-      physicsState: physicsState,
-      runwayGeometry: flightData?.runwayGeometry,
-      flightPlan: flightPlan,
-      weatherData: weatherData,
-      aircraftModel: aircraftModel,
-    };
+    return buildFlightSavePayload({
+      flightData,
+      physicsState,
+      physicsService,
+      flightPlan,
+      weatherData,
+      aircraftModel
+    });
   };
 
   const handleSave = () => {

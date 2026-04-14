@@ -1,11 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import './TutorialOverlay.css'; // We'll create this CSS file
 
 const TUTORIAL_STEPS = [
   {
     id: 'welcome',
     title: 'Welcome Pilot',
-    instruction: 'Welcome to the flight deck. This tutorial will guide you through basic flight operations.',
+    instruction: 'Welcome to the flight deck. This tutorial will guide you through the on-screen controls you can click and drag.',
     action: 'Press "Next" to continue.',
     condition: () => true,
     highlight: null
@@ -13,7 +13,7 @@ const TUTORIAL_STEPS = [
   {
     id: 'controls_pitch',
     title: 'Flight School: Pitch Control',
-    instruction: 'Use the joystick (mouse drag) or W/S keys to control aircraft pitch (nose up/down).',
+    instruction: 'Use the flight controls in the main panel and drag the aircraft nose up until the pitch ladder shows a climb attitude.',
     action: 'Goal: Pitch up to 10 degrees.',
     condition: (state) => state.pitch > 10,
     highlight: '.attitude-indicator'
@@ -21,7 +21,7 @@ const TUTORIAL_STEPS = [
   {
     id: 'controls_roll',
     title: 'Flight School: Roll Control',
-    instruction: 'Use the joystick (mouse drag) or A/D keys to control aircraft roll (bank left/right).',
+    instruction: 'Use the same flight controls panel to bank the aircraft right until the attitude display shows a noticeable right roll.',
     action: 'Goal: Bank right to 10 degrees.',
     condition: (state) => state.roll > 10,
     highlight: '.attitude-indicator'
@@ -29,7 +29,7 @@ const TUTORIAL_STEPS = [
   {
     id: 'throttle',
     title: 'Flight School: Throttle Control',
-    instruction: 'Use "R" to increase throttle and "F" to decrease throttle.',
+    instruction: 'Use the throttle levers in the engine control area and drag them upward to add thrust.',
     action: 'Goal: Increase throttle to at least 50%.',
     condition: (state) => state.throttle > 50,
     highlight: '.throttle-lever'
@@ -37,8 +37,8 @@ const TUTORIAL_STEPS = [
   {
     id: 'autopilot',
     title: 'Flight School: Autopilot',
-    instruction: 'Engage autopilot to maintain current heading and altitude.',
-    action: 'Goal: Press "Z" to toggle Autopilot Master.',
+    instruction: 'Open the autopilot controls on the panel and click the autopilot master control to engage it.',
+    action: 'Goal: Engage autopilot from the on-screen panel.',
     condition: (state) => state.autopilotEngaged === true,
     highlight: '.autopilot-panel'
   },
@@ -55,38 +55,67 @@ const TUTORIAL_STEPS = [
 const TutorialOverlay = ({ physicsState, onClose }) => {
   const [currentStepIndex, setCurrentStepIndex] = useState(0);
   const [isMinimized, setIsMinimized] = useState(false);
+  const pendingAdvanceTimeoutRef = useRef(null);
 
   const currentStep = TUTORIAL_STEPS[currentStepIndex];
+  const isAutoAdvanceStep = currentStep && currentStep.id !== 'welcome' && currentStep.id !== 'complete';
+
+  const tutorialState = useMemo(() => ({
+    pitch: physicsState?.pitch ?? 0,
+    roll: physicsState?.roll ?? 0,
+    throttle: physicsState?.throttle ?? 0,
+    autopilotEngaged: physicsState?.autopilotEngaged === true
+  }), [
+    physicsState?.pitch,
+    physicsState?.roll,
+    physicsState?.throttle,
+    physicsState?.autopilotEngaged
+  ]);
+
+  const isConditionMet = useMemo(() => {
+    if (!currentStep?.condition) return false;
+    return currentStep.condition(tutorialState);
+  }, [currentStep, tutorialState]);
+
+  const clearPendingAdvance = useCallback(() => {
+    if (pendingAdvanceTimeoutRef.current) {
+      clearTimeout(pendingAdvanceTimeoutRef.current);
+      pendingAdvanceTimeoutRef.current = null;
+    }
+  }, []);
+
+  const handleNext = useCallback(() => {
+    clearPendingAdvance();
+    setCurrentStepIndex(prev => {
+      if (prev < TUTORIAL_STEPS.length - 1) {
+        return prev + 1;
+      }
+
+      onClose();
+      return prev;
+    });
+  }, [clearPendingAdvance, onClose]);
 
   useEffect(() => {
-    // Check condition periodically
-    if (!physicsState) return;
-
-    const checkCondition = () => {
-      if (currentStep.condition && currentStep.condition(physicsState)) {
-        // Automatically advance if condition is met? 
-        // Or maybe just show a "Next" button enabled?
-        // Let's auto-advance for dynamic steps, manual for static ones.
-        if (currentStep.id !== 'welcome' && currentStep.id !== 'complete') {
-             // Add a small delay so user sees success
-             setTimeout(() => {
-                 handleNext();
-             }, 1000);
-        }
-      }
-    };
-
-    const interval = setInterval(checkCondition, 500);
-    return () => clearInterval(interval);
-  }, [physicsState, currentStepIndex]);
-
-  const handleNext = () => {
-    if (currentStepIndex < TUTORIAL_STEPS.length - 1) {
-      setCurrentStepIndex(prev => prev + 1);
-    } else {
-      onClose();
+    if (!isAutoAdvanceStep || !isConditionMet || pendingAdvanceTimeoutRef.current) {
+      return undefined;
     }
-  };
+
+    pendingAdvanceTimeoutRef.current = setTimeout(() => {
+      pendingAdvanceTimeoutRef.current = null;
+      handleNext();
+    }, 1000);
+
+    return () => {
+      clearPendingAdvance();
+    };
+  }, [clearPendingAdvance, handleNext, isAutoAdvanceStep, isConditionMet, currentStepIndex]);
+
+  useEffect(() => {
+    return () => {
+      clearPendingAdvance();
+    };
+  }, [clearPendingAdvance]);
 
   const handleSkip = () => {
     handleNext();

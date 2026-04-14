@@ -2,14 +2,29 @@
 /* FlightInitialization.css */
 
 .flight-initialization {
+  --preflight-shell-width: 1200px;
   background: #0d1117;
   color: #c9d1d9;
   font-family: 'Roboto Mono', monospace;
-  max-width: 1200px;
+  width: 100%;
+  max-width: var(--preflight-shell-width);
   margin: 0 auto;
   padding: 2rem;
   border: 1px solid #30363d;
   box-shadow: 0 0 40px rgba(0, 0, 0, 0.8);
+  box-sizing: border-box;
+}
+
+.preflight-init-layout {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.preflight-tablet-shell {
+  width: 100%;
+  max-width: var(--preflight-shell-width);
+  margin: 0 auto 2rem;
 }
 
 .section-header {
@@ -23,10 +38,9 @@
 }
 
 .dispatch-section {
-  margin-bottom: 3rem;
+  margin-bottom: 0;
 }
 
-/* 01. DIFFICULTY GRID */
 .difficulty-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -63,7 +77,6 @@
   box-shadow: 0 0 15px rgba(88, 166, 255, 0.2);
 }
 
-/* Difficulty specific active states */
 .difficulty-btn.rookie.active { border-color: #3fb950; color: #3fb950; background: rgba(63, 185, 80, 0.1); }
 .difficulty-btn.amateur.active { border-color: #d29922; color: #d29922; background: rgba(210, 153, 34, 0.1); }
 .difficulty-btn.intermediate.active { border-color: #58a6ff; color: #58a6ff; background: rgba(88, 166, 255, 0.1); }
@@ -99,11 +112,14 @@
   font-style: italic;
 }
 
-/* FORM ELEMENTS */
 .dispatch-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
   gap: 1.5rem;
+}
+
+.compact-grid {
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
 }
 
 .parameter-group {
@@ -134,40 +150,16 @@
   background: #161b22;
 }
 
-.selected-airport-badge {
-  background: rgba(88, 166, 255, 0.15);
-  border: 1px solid #58a6ff;
-  padding: 0.5rem 1rem;
-  margin-top: 0.5rem;
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  font-size: 0.85rem;
-}
-
-.selected-airport-badge .airport-code {
-  color: #58a6ff;
-  font-weight: bold;
-}
-
-.selected-airport-badge .clear-btn {
-  background: none;
-  border: none;
-  color: #8b949e;
-  cursor: pointer;
-  font-size: 1.2rem;
-  margin-left: auto;
-  padding: 0 0.5rem;
-}
-
-.selected-airport-badge .clear-btn:hover {
-  color: #f85149;
-}
-
 .checkbox-input-group {
   display: flex;
   align-items: center;
   gap: 1rem;
+}
+
+.checkbox-input-group.stacked {
+  align-items: flex-start;
+  flex-direction: column;
+  gap: 0.6rem;
 }
 
 .checkbox-label {
@@ -179,21 +171,14 @@
   white-space: nowrap;
 }
 
-/* ROUTE SELECTION */
-.airport-selection-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 2rem;
-}
-
-/* SUMMARY PANEL */
 .dispatch-summary {
   background: #161b22;
   border: 2px solid #30363d;
   padding: 1.5rem;
   display: flex;
   justify-content: space-around;
-  margin-bottom: 2rem;
+  margin: 0 auto 2rem;
+  max-width: 1200px;
 }
 
 .summary-item {
@@ -214,7 +199,6 @@
   font-weight: bold;
 }
 
-/* ACTIONS */
 .dispatch-actions {
   display: flex;
   justify-content: space-between;
@@ -264,10 +248,58 @@
   background: #161b22;
 }
 
+.tablet-handoff-note {
+  margin-top: 1.5rem;
+  padding: 1rem 1.2rem;
+  border: 1px solid #30363d;
+  border-radius: 14px;
+  background: linear-gradient(180deg, rgba(17, 24, 39, 0.92) 0%, rgba(13, 17, 23, 0.96) 100%);
+}
+
+.tablet-handoff-title {
+  color: #58a6ff;
+  font-size: 0.9rem;
+  font-weight: bold;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  margin-bottom: 0.35rem;
+}
+
+.tablet-handoff-text {
+  color: #c9d1d9;
+  font-size: 0.88rem;
+  line-height: 1.5;
+}
+
+.tablet-handoff-status {
+  display: flex;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+  margin-top: 0.9rem;
+}
+
+.tablet-status-chip {
+  border: 1px solid #30363d;
+  color: #8b949e;
+  background: #111827;
+  border-radius: 999px;
+  padding: 0.35rem 0.75rem;
+  font-size: 0.72rem;
+  font-weight: bold;
+  letter-spacing: 0.06em;
+}
+
+.tablet-status-chip.ready {
+  color: #4ade80;
+  border-color: rgba(74, 222, 128, 0.5);
+  background: rgba(74, 222, 128, 0.08);
+}
+
 @media (max-width: 900px) {
-  .difficulty-grid, .airport-selection-grid {
+  .difficulty-grid {
     grid-template-columns: 1fr;
   }
+
   .dispatch-summary {
     flex-direction: column;
     gap: 1rem;

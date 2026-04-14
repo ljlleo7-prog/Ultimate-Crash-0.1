@@ -1,7 +1,7 @@
 
-import { NPCFlightModel, NPC_STAGE } from './NPCFlightModel';
-import airlineData from '../data/airlinesDatabase.json';
-import { airportService } from './airportService';
+import { NPCFlightModel, NPC_STAGE } from './NPCFlightModel.js';
+import airlineData from '../data/airlinesDatabase.json' with { type: "json" };
+import { airportService } from './airportService.js';
 
 class NPCManagerService {
   constructor() {
@@ -20,9 +20,9 @@ class NPCManagerService {
     const R = 3440.065; // Earth radius in NM
     const dLat = (pos2.latitude - pos1.latitude) * Math.PI / 180;
     const dLon = (pos2.longitude - pos1.longitude) * Math.PI / 180;
-    const a = 
+    const a =
       Math.sin(dLat/2) * Math.sin(dLat/2) +
-      Math.cos(pos1.latitude * Math.PI / 180) * Math.cos(pos2.latitude * Math.PI / 180) * 
+      Math.cos(pos1.latitude * Math.PI / 180) * Math.cos(pos2.latitude * Math.PI / 180) *
       Math.sin(dLon/2) * Math.sin(dLon/2);
     const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
     return R * c;
@@ -32,11 +32,11 @@ class NPCManagerService {
     // Random bearing and distance
     const dist = Math.random() * radiusNm;
     const bearing = Math.random() * 2 * Math.PI;
-    
+
     // Simple flat earth approx for short distances (valid enough for 80nm)
     // 1 nm = 1/60 degree roughly
     const dDeg = dist / 60;
-    
+
     return {
       latitude: centerPos.latitude + dDeg * Math.cos(bearing),
       longitude: centerPos.longitude + dDeg * Math.sin(bearing),
@@ -48,21 +48,22 @@ class NPCManagerService {
 
   generateCallsign() {
     if (this.airlines.length === 0) return `N${Math.floor(Math.random()*900)+100}GA`;
-    
+
     const airline = this.airlines[Math.floor(Math.random() * this.airlines.length)];
     const number = Math.floor(Math.random() * 9000) + 100;
     return `${airline.callsign} ${number}`;
   }
 
-  update(dt, playerPos) {
+  update(dt, playerPos, context = {}) {
     if (!playerPos || !playerPos.latitude) return [];
 
+    const { atcManager = null } = context || {};
     const messages = [];
 
     // 1. Update existing NPCs
     this.npcs.forEach(npc => {
-      npc.update(dt);
-      
+      npc.update(dt, atcManager);
+
       // Check for messages
       const msg = npc.popMessage();
       if (msg) messages.push(msg);
@@ -89,7 +90,7 @@ class NPCManagerService {
     // Must have at least minNPCs
     if (nearbyCount < this.minNPCs) {
       this.spawnNPC(playerPos);
-    } 
+    }
     // Chance to spawn more up to max
     else if (nearbyCount < this.maxNPCs && Math.random() < 0.01) { // Low probability per frame/update
       this.spawnNPC(playerPos);
@@ -113,7 +114,7 @@ class NPCManagerService {
       // Try to find airport for Takeoff/Landing
       // Search slightly larger radius to find suitable airports
       const airports = airportService.getAirportsWithinRadius(centerPos.latitude, centerPos.longitude, this.spawnRadius);
-      
+
       // Filter out airports too close to player (likely user's current airport)
       // Assume user is on runway if < 3nm
       const validAirports = airports.filter(ap => {
@@ -135,7 +136,7 @@ class NPCManagerService {
           // Spawn just after takeoff, climbing out
           const heading = Math.random() * 360; // Random heading (simulating random runway)
           // 1-2nm out
-          const distOut = 1 + Math.random(); 
+          const distOut = 1 + Math.random();
           const dDeg = distOut / 60;
 
           pos = {
@@ -153,17 +154,17 @@ class NPCManagerService {
           const distOut = 10 + Math.random() * 10; // 10-20nm out
           const approachAngle = Math.random() * 2 * Math.PI;
           const dDeg = distOut / 60;
-          
+
           // Position relative to airport
           const lat = airport.latitude + dDeg * Math.cos(approachAngle);
           const lon = airport.longitude + dDeg * Math.sin(approachAngle);
-          
+
           // Heading pointing towards airport
           // atan2(dy, dx) gives angle from pos to airport
           const dy = airport.latitude - lat;
           const dx = (airport.longitude - lon) * Math.cos(lat * Math.PI / 180); // Adjust for longitude
           const bearing = Math.atan2(dx, dy) * 180 / Math.PI; // Simple bearing calculation
-          
+
           pos = {
             latitude: lat,
             longitude: lon,

@@ -7,7 +7,8 @@ export const EventCategories = {
   PHYSICS_EVENT: 'physics.event',
   CONTROL_INPUT: 'control.input',
   NARRATIVE: 'narrative',
-  USER_ACTION: 'user.action'
+  USER_ACTION: 'user.action',
+  MULTIPLAYER: 'multiplayer'
 };
 
 // Event types with structured payloads
@@ -15,12 +16,14 @@ export const EventTypes = {
   // Flight phase events
   PHASE_CHANGED: 'flight.phase.changed',
   PHASE_COMPLETE: 'flight.phase.complete',
-  
+
   // System failure events
   FAILURE_OCCURRED: 'system.failure.occurred',
   FAILURE_PROGRESSED: 'system.failure.progressed',
   FAILURE_RESOLVED: 'system.failure.resolved',
-  
+  FAILURE_CASCADE_SCHEDULED: 'system.failure.cascade_scheduled',
+  FAILURE_CASCADE_TRIGGERED: 'system.failure.cascade_triggered',
+
   // Physics events
   STALL_WARNING: 'physics.stall.warning',
   STALL_OCCURRED: 'physics.stall.occurred',
@@ -29,20 +32,26 @@ export const EventTypes = {
   ALTITUDE_WARNING: 'physics.altitude.warning',
   G_FORCE_WARNING: 'physics.gforce.warning',
   PHYSICS_INITIALIZE: 'physics.initialize',
-  
+
   // Control events
   THROTTLE_CHANGED: 'control.throttle.changed',
   SURFACE_CHANGED: 'control.surface.changed',
   AUTOPILOT_CHANGED: 'control.autopilot.changed',
-  
+
   // Narrative events
   NARRATIVE_UPDATE: 'narrative.update',
   CRITICAL_MESSAGE: 'narrative.critical',
   STATUS_UPDATE: 'narrative.status',
-  
+  NPC_CREW_MESSAGE: 'narrative.npc_crew_message',
+
   // User action events
   COMMAND_EXECUTED: 'user.command.executed',
-  EMERGENCY_PROCEDURE: 'user.emergency.procedure'
+  EMERGENCY_PROCEDURE: 'user.emergency.procedure',
+
+  // Multiplayer events
+  MULTIPLAYER_STATUS_CHANGED: 'multiplayer.status.changed',
+  MULTIPLAYER_TRAFFIC_UPDATED: 'multiplayer.traffic.updated',
+  MULTIPLAYER_EVENT_RECEIVED: 'multiplayer.event.received'
 };
 
 function subscribe(type, handler) {

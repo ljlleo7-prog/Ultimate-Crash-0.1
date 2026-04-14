@@ -21,10 +21,11 @@ import ChecklistPanel from './ChecklistPanel';
 import SystemStatusPanel from './SystemStatusPanel';
 import CircuitBreakerPanel from './CircuitBreakerPanel';
 import SensoryFeedback from './SensoryFeedback';
+import SettingsPanel from './SettingsPanel';
 import { useLanguage } from '../contexts/LanguageContext';
 import './FlightPanel.css';
 
-const FlightPanelModular = ({ flightData, physicsState, weatherData, onActionRequest, aircraftModel, selectedArrival, flightPlan, radioMessages, onRadioFreqChange, npcs, frequencyContext, currentRegion, timeScale, setTimeScale, onUpdateFlightPlan, availableRunways, startupStatus }) => {
+const FlightPanelModular = ({ flightData, physicsState, physicsService, weatherData, onActionRequest, aircraftModel, aircraftData, selectedArrival, flightPlan, radioMessages, onRadioFreqChange, npcs, frequencyContext, currentRegion, timeScale, setTimeScale, onUpdateFlightPlan, availableRunways, startupStatus, playerSettings, playerSettingsError, autoSaveStatus, onUpdatePlayerSettings }) => {
   const { t } = useLanguage();
   // Use flightData from parent component instead of creating own physics service
   const [showOverhead, setShowOverhead] = useState(false);
@@ -103,73 +104,88 @@ const FlightPanelModular = ({ flightData, physicsState, weatherData, onActionReq
   // Update flightState when flightData changes
   useEffect(() => {
     if (flightData) {
-      setFlightState(prevState => ({
-        ...prevState,
-        // Navigation
-        heading: flightData.heading,
-        trueAirspeed: flightData.airspeed,
-        groundSpeed: flightData.groundSpeed !== undefined ? flightData.groundSpeed : flightData.airspeed,
-        indicatedAirspeed: flightData.indicatedAirspeed || 0, // FIXED: Ensure IAS is always a number
-        radioFreq: prevState.radioFreq,
-        latitude: (flightData && flightData.position && typeof flightData.position.latitude === 'number') ? flightData.position.latitude : prevState.latitude,
-        longitude: (flightData && flightData.position && typeof flightData.position.longitude === 'number') ? flightData.position.longitude : prevState.longitude,
-        
-        // Flight Pose
-        pitch: flightData.pitch || 0, // FIXED: Ensure pitch is always a number
-        roll: flightData.roll || 0, // FIXED: Ensure roll is always a number
-        verticalSpeed: flightData.verticalSpeed || 0, // FIXED: Ensure vertical speed is always a number
-        altitude: flightData.altitude || 0, // FIXED: Ensure altitude is always a number
-        altimeter: prevState.altimeter,
-        localQNH: (weatherData && typeof weatherData.pressureInHg === 'number') ? weatherData.pressureInHg : (prevState.localQNH || 29.92),
-        terrainElevation: (flightData.derived && typeof flightData.derived.terrain_elevation_ft === 'number') ? flightData.derived.terrain_elevation_ft : (prevState.terrainElevation || 0),
-        visibility: weatherData?.visibility, // Update visibility
-        
-        // Engine
-        engineN1: (flightData.engineParams && flightData.engineParams.n1) || flightData.engineN1 || prevState.engineN1,
-        engineN2: (flightData.engineParams && flightData.engineParams.n2) || flightData.engineN2 || prevState.engineN2,
-        engineEGT: (flightData.engineParams && flightData.engineParams.egt) || flightData.engineEGT || prevState.engineEGT,
-        engineFuelFlow: (flightData.engineParams && flightData.engineParams.fuelFlow) || flightData.engineFuelFlow || prevState.engineFuelFlow || [0, 0],
-        fuel: flightData.fuel || prevState.fuel,
-        engineThrottles: flightData.engineThrottles || prevState.engineThrottles,
-        
-        // Systems
-        hydraulicPressure: flightData.hydraulicPressure || prevState.hydraulicPressure,
-        oilPressure: (flightData.engineParams && flightData.engineParams.oilPressure && flightData.engineParams.oilPressure.length > 0) 
-            ? Math.min(...flightData.engineParams.oilPressure) 
-            : (flightData.systems?.engines?.left?.oilPressure || 45),
-        electricalVoltage: (flightData.systems?.electrical?.acVolts) || 115,
-        circuitBreakers: prevState.circuitBreakers,
-        alarms: flightData.alarms || prevState.alarms,
-        activeWarnings: flightData.activeWarnings || [],
-        
-        // Scene State
-        physicsActive: flightData.physicsActive,
-        currentNarrative: flightData.narrativeHistory && flightData.narrativeHistory.length > 0 
-          ? flightData.narrativeHistory[flightData.narrativeHistory.length - 1] 
-          : prevState.currentNarrative,
-        flightPhase: flightData.phaseName || prevState.flightPhase,
+      setFlightState(prevState => {
+        const nextState = {
+          ...prevState,
+          // Navigation
+          heading: flightData.heading,
+          trueAirspeed: flightData.airspeed,
+          groundSpeed: flightData.groundSpeed !== undefined ? flightData.groundSpeed : flightData.airspeed,
+          indicatedAirspeed: flightData.indicatedAirspeed ?? 0,
+          radioFreq: prevState.radioFreq,
+          latitude: (flightData && flightData.position && typeof flightData.position.latitude === 'number') ? flightData.position.latitude : prevState.latitude,
+          longitude: (flightData && flightData.position && typeof flightData.position.longitude === 'number') ? flightData.position.longitude : prevState.longitude,
 
-        // Surface controls
-        flapsValue: flightData.flapsValue,
-        gearValue: flightData.gearValue,
-        flaps: (typeof flightData.flaps === 'number') ? flightData.flaps : (flightData.flapsValue || 0),
-        gearDown: (typeof flightData.gear === 'boolean') ? flightData.gear : (flightData.gearValue > 0.5),
-        airBrakesValue: flightData.airBrakesValue,
-        trimValue: typeof flightData.trimValue === 'number' ? flightData.trimValue : prevState.trimValue,
-        
-        // Autopilot - Update from physics service status
-        autopilot: flightData.autopilotEngaged || false, // ✅ Use physics service status
-        autopilotMode: flightData.autopilotMode || prevState.autopilotMode || 'LNAV',
-        autopilotDebug: flightData.autopilotDebug || {}, // Pass debug state
-        approachTelemetry: flightData.approachTelemetry || null,
-        flightDirector: prevState.flightDirector,
-        altitudeHold: prevState.altitudeHold,
-        headingHold: prevState.headingHold,
-        autopilotTargets: flightData.autopilotTargets || prevState.autopilotTargets,
-        frame: typeof flightData.frame === 'number' ? flightData.frame : prevState.frame,
-        systems: flightData.systems || prevState.systems || {},
-        currentWaypointIndex: flightData.currentWaypointIndex !== undefined ? flightData.currentWaypointIndex : (prevState.currentWaypointIndex || 0)
-      }));
+          // Flight Pose
+          pitch: flightData.pitch ?? 0,
+          roll: flightData.roll ?? 0,
+          verticalSpeed: flightData.verticalSpeed ?? 0,
+          altitude: flightData.altitude ?? 0,
+          altimeter: prevState.altimeter,
+          localQNH: (weatherData && typeof weatherData.pressureInHg === 'number') ? weatherData.pressureInHg : (prevState.localQNH || 29.92),
+          terrainElevation: (flightData.derived && typeof flightData.derived.terrain_elevation_ft === 'number') ? flightData.derived.terrain_elevation_ft : (prevState.terrainElevation || 0),
+          visibility: weatherData?.visibility,
+
+          // Engine
+          engineN1: Array.isArray(flightData.engineN1)
+            ? flightData.engineN1
+            : (Array.isArray(flightData.engineParams?.n1) ? flightData.engineParams.n1 : prevState.engineN1),
+          engineN2: Array.isArray(flightData.engineN2)
+            ? flightData.engineN2
+            : (Array.isArray(flightData.engineParams?.n2) ? flightData.engineParams.n2 : prevState.engineN2),
+          engineEGT: Array.isArray(flightData.engineEGT)
+            ? flightData.engineEGT
+            : (Array.isArray(flightData.engineParams?.egt) ? flightData.engineParams.egt : prevState.engineEGT),
+          engineFuelFlow: Array.isArray(flightData.engineFuelFlow)
+            ? flightData.engineFuelFlow
+            : (Array.isArray(flightData.engineParams?.fuelFlow) ? flightData.engineParams.fuelFlow : (prevState.engineFuelFlow || [0, 0])),
+          fuel: flightData.fuel ?? prevState.fuel,
+          throttle: typeof flightData.controls?.throttle === 'number' ? flightData.controls.throttle : prevState.throttle,
+          engineThrottles: Array.isArray(flightData.engineThrottles)
+            ? flightData.engineThrottles
+            : (Array.isArray(flightData.controls?.throttles) ? flightData.controls.throttles : prevState.engineThrottles),
+
+          // Systems
+          hydraulicPressure: flightData.hydraulicPressure ?? prevState.hydraulicPressure,
+          oilPressure: (Array.isArray(flightData.engineParams?.oilPressure) && flightData.engineParams.oilPressure.length > 0)
+              ? Math.min(...flightData.engineParams.oilPressure)
+              : (flightData.systems?.engines?.left?.oilPressure ?? 45),
+          electricalVoltage: flightData.systems?.electrical?.acVolts ?? 115,
+          circuitBreakers: prevState.circuitBreakers,
+          alarms: flightData.alarms ?? prevState.alarms,
+          activeWarnings: flightData.activeWarnings ?? [],
+
+          // Scene State
+          physicsActive: flightData.physicsActive,
+          currentNarrative: flightData.narrativeHistory && flightData.narrativeHistory.length > 0
+            ? flightData.narrativeHistory[flightData.narrativeHistory.length - 1]
+            : prevState.currentNarrative,
+          flightPhase: flightData.phaseName || prevState.flightPhase,
+
+          // Surface controls
+          flapsValue: flightData.flapsValue,
+          gearValue: flightData.gearValue,
+          flaps: (typeof flightData.flaps === 'number') ? flightData.flaps : (flightData.flapsValue || 0),
+          gearDown: (typeof flightData.gear === 'boolean') ? flightData.gear : (flightData.gearValue > 0.5),
+          airBrakesValue: flightData.airBrakesValue,
+          trimValue: typeof flightData.trimValue === 'number' ? flightData.trimValue : prevState.trimValue,
+
+          // Autopilot - Update from physics service status
+          autopilot: flightData.autopilotEngaged === true,
+          autopilotMode: flightData.autopilotMode ?? prevState.autopilotMode ?? 'LNAV',
+          autopilotDebug: flightData.autopilotDebug ?? {},
+          approachTelemetry: flightData.approachTelemetry ?? null,
+          flightDirector: prevState.flightDirector,
+          altitudeHold: prevState.altitudeHold,
+          headingHold: prevState.headingHold,
+          autopilotTargets: flightData.autopilotTargets ?? prevState.autopilotTargets,
+          frame: typeof flightData.frame === 'number' ? flightData.frame : prevState.frame,
+          systems: flightData.systems ?? prevState.systems ?? {},
+          currentWaypointIndex: flightData.currentWaypointIndex !== undefined ? flightData.currentWaypointIndex : (prevState.currentWaypointIndex || 0)
+        };
+
+        return nextState;
+      });
     }
   }, [flightData, weatherData]);
   
@@ -582,7 +598,8 @@ const FlightPanelModular = ({ flightData, physicsState, weatherData, onActionReq
       flightPlan: flightPlan,
       onUpdateFlightPlan: onUpdateFlightPlan,
       flightState: flightState,
-      aircraftData: aircraftModel
+      aircraftData: aircraftData || { name: aircraftModel, mass: 70000 },
+      weatherData: weatherData
     }),
 
     // Timer Panel Overlay
@@ -605,11 +622,20 @@ const FlightPanelModular = ({ flightData, physicsState, weatherData, onActionReq
     activeSidebarPanel === 'save_load' && React.createElement(SaveLoadPanel, {
         flightData,
         physicsState,
+        physicsService,
         flightPlan,
         weatherData,
         aircraftModel,
         onClose: () => setActiveSidebarPanel(null),
         onLoadFlight: handleLoadFlight
+    }),
+
+    activeSidebarPanel === 'settings' && React.createElement(SettingsPanel, {
+        settings: playerSettings,
+        settingsError: playerSettingsError,
+        autoSaveStatus,
+        onUpdateSettings: onUpdatePlayerSettings,
+        onClose: () => setActiveSidebarPanel(null)
     }),
 
     // System Status Panel Overlay

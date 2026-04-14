@@ -1,6 +1,7 @@
 
-import { supabase } from './skylinetragedy/SupabaseClient';
-import eventBus from './eventBus';
+import { supabase } from './skylinetragedy/SupabaseClient.js';
+import eventBus from './eventBus.js';
+import fallbackResponses from '../data/npc_fallback_responses.json' with { type: "json" };
 
 class NPCCrewService {
     constructor() {
@@ -13,10 +14,24 @@ class NPCCrewService {
         this.responseCache = new Map(); // key: scenario_id + role + difficulty -> [responses]
         this.initialized = false;
         
+        // Data Provider
+        this.aircraftStateProvider = null;
+
+        // Pending timeouts mapping
+        this.pendingTimeouts = new Map();
+        
+        // Decay interval ID
+        this.decayInterval = null;
+
         // Bind methods
         this.handleFailure = this.handleFailure.bind(this);
         this.handlePhaseChange = this.handlePhaseChange.bind(this);
         this.summon = this.summon.bind(this);
+        this.decayStress = this.decayStress.bind(this);
+    }
+
+    setAircraftStateProvider(providerFn) {
+        this.aircraftStateProvider = providerFn;
     }
 
     initialize(difficulty = 'intermediate') {
@@ -28,8 +43,34 @@ class NPCCrewService {
         
         // Preload common scenarios
         this.preloadResponses();
+
+        // Start stress decay loop
+        this.decayInterval = setInterval(this.decayStress, 5000);
         
         console.log(`NPCCrewService initialized with difficulty: ${this.difficulty}`);
+    }
+
+    destroy() {
+        if (this.decayInterval) {
+            clearInterval(this.decayInterval);
+            this.decayInterval = null;
+        }
+        this.pendingTimeouts.forEach(id => clearTimeout(id));
+        this.pendingTimeouts.clear();
+        this.initialized = false;
+    }
+
+    decayStress() {
+        // Decay stress gradually if no active failures
+        // FO decays slightly slower than CABIN_CREW
+        if (this.crewState.FO.stress > 0) {
+            this.crewState.FO.stress = Math.max(0, this.crewState.FO.stress - 2);
+        }
+        if (this.crewState.CABIN_CREW.stress > 0) {
+            this.crewState.CABIN_CREW.stress = Math.max(0, this.crewState.CABIN_CREW.stress - 3);
+        }
+        
+        // Occasionally notify UI of stress change even without a message, but we'll do it silently or just let the next message carry it.
     }
 
     setupListeners() {
@@ -73,7 +114,7 @@ class NPCCrewService {
 
             if (error) {
                 console.warn(`Supabase error fetching NPC responses: ${error.message}`);
-                return this.getFallbackResponses(role);
+                return this.getFallbackResponses(role, scenarioId);
             }
             
             if (data && data.length > 0) {
@@ -81,19 +122,81 @@ class NPCCrewService {
                 this.responseCache.set(key, responses);
                 return responses;
             } else {
-                return this.getFallbackResponses(role);
+                return this.getFallbackResponses(role, scenarioId);
             }
         } catch (err) {
             console.warn(`Failed to fetch NPC responses for ${key}:`, err);
-            return this.getFallbackResponses(role);
+            return this.getFallbackResponses(role, scenarioId);
         }
     }
 
-    getFallbackResponses(role) {
+    getFallbackResponses(role, scenarioId = null) {
+        if (role && fallbackResponses[role]) {
+            if (scenarioId && fallbackResponses[role][scenarioId]) {
+                return fallbackResponses[role][scenarioId];
+            }
+            if (fallbackResponses[role]['generic_failure']) {
+                return fallbackResponses[role]['generic_failure'];
+            }
+        }
+
         if (role === 'FO') {
             return ["(Silence)", "Copy that.", "I'm checking.", "Standby."];
         }
         return ["(Cabin Noise)", "Captain?", "Everything okay back here?"];
+    }
+
+    hydrateMessage(content) {
+        if (!this.aircraftStateProvider) return content;
+        
+        const state = this.aircraftStateProvider();
+        if (!state) return content;
+
+        let output = content;
+
+        // Altitude (round to nearest 100)
+        if (state.altitude !== undefined) {
+            const alt = Math.round(state.altitude / 100) * 100;
+            output = output.replace(/\[ALTITUDE\]/g, `${alt}`);
+        } else {
+            output = output.replace(/\[ALTITUDE\]/g, `current altitude`);
+        }
+
+        // Airspeed (round to nearest 10)
+        if (state.airspeed !== undefined) {
+            const spd = Math.round(state.airspeed / 10) * 10;
+            output = output.replace(/\[AIRSPEED\]/g, `${spd}`);
+        } else {
+            output = output.replace(/\[AIRSPEED\]/g, `current speed`);
+        }
+
+        // Heading (round to nearest 5)
+        if (state.heading !== undefined) {
+            const hdg = Math.round(state.heading / 5) * 5;
+            output = output.replace(/\[HEADING\]/g, `${hdg.toString().padStart(3, '0')}`);
+        } else {
+            output = output.replace(/\[HEADING\]/g, `current heading`);
+        }
+
+        // Fuel (round to nearest 100)
+        if (state.fuel !== undefined) {
+            const fuel = Math.round(state.fuel / 100) * 100;
+            output = output.replace(/\[FUEL\]/g, `${fuel} kg`);
+        } else {
+            output = output.replace(/\[FUEL\]/g, `fuel quantity`);
+        }
+
+        // Runways, Temps, Alarms etc (Fallbacks if not specific)
+        output = output.replace(/\[RUNWAY\]/g, `the runway`);
+        output = output.replace(/\[TEMP\]/g, `temperature`);
+        output = output.replace(/\[PRESSURE\]/g, `pressure`);
+        output = output.replace(/\[VOLTAGE\]/g, `voltage`);
+        output = output.replace(/\[AMP\]/g, `amps`);
+        output = output.replace(/\[CB_PANEL\]/g, `the panel`);
+        output = output.replace(/\[CB_LABEL\]/g, `the breaker`);
+        output = output.replace(/\[ALARM_NAME\]/g, `master warning`);
+
+        return output;
     }
 
     async triggerResponse(scenarioId, role, force = false) {
@@ -106,29 +209,43 @@ class NPCCrewService {
             return;
         }
 
+        // Clear any pending timeout for this role to prevent overlapping messages
+        if (this.pendingTimeouts.has(role)) {
+            clearTimeout(this.pendingTimeouts.get(role));
+            this.pendingTimeouts.delete(role);
+        }
+
         // Latency simulation
         const baseLatency = isHard ? 2000 : 500;
         const randomLatency = Math.random() * (isHard ? 3000 : 1000);
         const delay = baseLatency + randomLatency;
         
-        setTimeout(async () => {
+        const timeoutId = setTimeout(async () => {
+            this.pendingTimeouts.delete(role);
+
             const responses = await this.fetchResponses(scenarioId, role);
             
             // Pick random response
-            const content = responses[Math.floor(Math.random() * responses.length)];
+            let content = responses[Math.floor(Math.random() * responses.length)];
             
-            // Publish to EventBus so UI can display it
-            eventBus.publish('NPC_CREW_MESSAGE', {
+            // Hydrate specific data
+            content = this.hydrateMessage(content);
+            
+            const payload = {
                 sender: role === 'FO' ? 'First Officer' : 'Cabin Crew',
                 content: content,
                 timestamp: Date.now(),
                 stress: this.crewState[role].stress,
                 role: role
-            });
+            };
+            eventBus.publish(eventBus.Types.NPC_CREW_MESSAGE, payload);
+            eventBus.publish('NPC_CREW_MESSAGE', payload);
             
             console.log(`[NPC ${role}] Says: "${content}"`);
             
         }, delay);
+        
+        this.pendingTimeouts.set(role, timeoutId);
     }
 
     handleFailure(data) {
@@ -178,12 +295,14 @@ class NPCCrewService {
             // Ignored completely
             console.log(`${role} ignored summon!`);
             // Maybe show a "No Response" hint in UI?
-            eventBus.publish('NPC_CREW_MESSAGE', {
+            const payload = {
                 sender: 'System',
                 content: `${role === 'FO' ? 'First Officer' : 'Cabin Crew'} is not responding.`,
                 timestamp: Date.now(),
                 type: 'system'
-            });
+            };
+            eventBus.publish(eventBus.Types.NPC_CREW_MESSAGE, payload);
+            eventBus.publish('NPC_CREW_MESSAGE', payload);
             return;
         }
 

@@ -1,4 +1,4 @@
-import { test } from 'node:test';
+import { after, test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
 import RealisticFlightPhysicsService from '../src/services/RealisticFlightPhysicsService.js';
@@ -25,6 +25,15 @@ const runFailureTicks = (service, seconds, step = 1) => {
     service.failureSystem.applyImpact(service);
   }
 };
+
+const createServiceForDifficulty = (difficulty) => {
+  const service = new RealisticFlightPhysicsService(aircraft, 0, 0, difficulty);
+  service.setAutopilot(false);
+  return service;
+};
+
+const getCascadeEvent = (service, edgeId) => service.failureSystem.getIncidentLog()
+  .find((entry) => entry.type === 'cascade_scheduled' && entry.edgeId === edgeId);
 
 test('engine failure progresses to active and fails engine', () => {
   withFixedRandom(0.5, () => {
@@ -100,12 +109,65 @@ test('engine fire cascade reaches hydraulic failure after stage/time guard', () 
   });
 });
 
-test('electrical bus failure cascade requires low bus power before avionics overheat', () => {
+test('rookie mode blocks catastrophic uncontained engine cascades', () => {
   withFixedRandom(0.0, () => {
-    const service = new RealisticFlightPhysicsService(aircraft);
-    service.failureSystem.triggerFailure('electrical_bus_failure');
-    runFailureTicks(service, 30);
-    assert.equal(service.failureSystem.activeFailures.has('avionics_overheat'), true);
+    const rookieService = createServiceForDifficulty('rookie');
+    rookieService.failureSystem.triggerFailure('uncontained_engine_failure', { engineIndex: 0 });
+    runFailureTicks(rookieService, 20);
+
+    assert.equal(rookieService.failureSystem.activeFailures.has('major_hydraulic_failure'), false);
+    assert.equal(rookieService.failureSystem.activeFailures.has('total_flight_control_failure'), false);
   });
 });
 
+test('intermediate mode allows uncontained engine catastrophic cascades', () => {
+  withFixedRandom(0.0, () => {
+    const service = createServiceForDifficulty('intermediate');
+    service.failureSystem.triggerFailure('uncontained_engine_failure', { engineIndex: 0 });
+    runFailureTicks(service, 20);
+
+    assert.equal(service.failureSystem.activeFailures.has('major_hydraulic_failure'), true);
+    assert.equal(service.failureSystem.activeFailures.has('total_flight_control_failure'), true);
+  });
+});
+
+after(() => {
+  setTimeout(() => process.exit(0), 0);
+});
+test('rookie mode blocks catastrophic uncontained engine cascades', () => {
+  withFixedRandom(0.0, () => {
+    const rookieService = createServiceForDifficulty('rookie');
+    rookieService.failureSystem.triggerFailure('uncontained_engine_failure', { engineIndex: 0 });
+    runFailureTicks(rookieService, 20);
+
+    const hydraulicCascade = getCascadeEvent(rookieService, 'UNCONTAINED_ENGINE_TO_MAJOR_HYDRAULIC');
+    const controlCascade = getCascadeEvent(rookieService, 'HYDRAULIC_TO_FLIGHT_CONTROL');
+
+    assert.equal(hydraulicCascade, undefined);
+    assert.equal(controlCascade, undefined);
+    assert.equal(rookieService.failureSystem.activeFailures.has('major_hydraulic_failure'), false);
+    assert.equal(rookieService.failureSystem.activeFailures.has('total_flight_control_failure'), false);
+  });
+});
+
+test('intermediate mode still allows uncontained engine catastrophic cascades', () => {
+  withFixedRandom(0.0, () => {
+    const service = createServiceForDifficulty('intermediate');
+    service.failureSystem.triggerFailure('uncontained_engine_failure', { engineIndex: 0 });
+    runFailureTicks(service, 20);
+
+    const hydraulicCascade = getCascadeEvent(service, 'UNCONTAINED_ENGINE_TO_MAJOR_HYDRAULIC');
+    const controlCascade = getCascadeEvent(service, 'HYDRAULIC_TO_FLIGHT_CONTROL');
+
+    assert.ok(hydraulicCascade);
+    assert.ok(controlCascade);
+    assert.equal(hydraulicCascade.effectiveProbability, 1);
+    assert.equal(hydraulicCascade.effectiveDelay, 2);
+    assert.equal(service.failureSystem.activeFailures.has('major_hydraulic_failure'), true);
+    assert.equal(service.failureSystem.activeFailures.has('total_flight_control_failure'), true);
+  });
+});
+
+after(() => {
+  setTimeout(() => process.exit(0), 0);
+});

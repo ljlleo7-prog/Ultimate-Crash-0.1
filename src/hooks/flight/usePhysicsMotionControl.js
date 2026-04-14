@@ -1,12 +1,26 @@
 import { useEffect } from 'react';
 
-export default function usePhysicsMotionControl(physicsService, scenePhase, atcClearance) {
+export default function usePhysicsMotionControl({
+    motionController,
+    phaseType,
+    takeoffClearanceReceived,
+    isInitialized = true,
+    isTutorial = false,
+    onParkedPhaseChange
+}) {
     useEffect(() => {
-        if (!physicsService) return;
+        if (!motionController || !isInitialized) return;
 
-        const shouldFreeze = ['PRE_FLIGHT', 'GROUND_HOLD', 'AWAITING_CLEARANCE'].includes(scenePhase) ||
-                           (scenePhase === 'TAXI' && !atcClearance?.taxiApproved);
+        const isParkedPhase = ['boarding', 'departure_clearance', 'pushback'].includes(phaseType);
+        onParkedPhaseChange?.(isParkedPhase);
 
-        physicsService.setMotionEnabled(!shouldFreeze);
-    }, [physicsService, scenePhase, atcClearance]);
+        const shouldFreeze = !isTutorial && isParkedPhase;
+
+        if (typeof motionController === 'function') {
+            motionController(!shouldFreeze);
+            return;
+        }
+
+        motionController.setMotionEnabled?.(!shouldFreeze);
+    }, [motionController, phaseType, takeoffClearanceReceived, isInitialized, isTutorial, onParkedPhaseChange]);
 }

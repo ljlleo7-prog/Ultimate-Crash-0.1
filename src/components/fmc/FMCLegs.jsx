@@ -1,6 +1,5 @@
 import { useState } from 'react';
 import PropTypes from 'prop-types';
-import { airportService } from '../../services/airportService';
 
 const FMCLegs = ({ flightPlan, onUpdateFlightPlan, flightState }) => {
   const waypoints = Array.isArray(flightPlan) ? flightPlan : (flightPlan?.waypoints || []);
@@ -39,29 +38,20 @@ const FMCLegs = ({ flightPlan, onUpdateFlightPlan, flightState }) => {
           {waypoints.map((wp, idx) => {
             const isActive = idx === currentIdx;
             const isPassed = idx < currentIdx;
+            const waypointLabel = wp.label || wp.name || wp.id || `WPT${idx + 1}`;
 
             return (
               <div key={idx} className={`fmc-leg-item ${isActive ? 'active' : ''} ${isPassed ? 'passed' : ''}`}>
                 <div className="fmc-leg-header">
                   <span className="fmc-leg-num">{idx + 1}</span>
-                  <span className="fmc-leg-label">{wp.label}</span>
+                  <span className="fmc-leg-label">{waypointLabel}</span>
                   {isActive && <span className="fmc-leg-badge">ACTIVE</span>}
                 </div>
 
                 {editIdx === idx ? (
                   <div className="fmc-leg-edit">
-                    <input
-                      type="number"
-                      placeholder="Alt (ft)"
-                      value={altConstraint}
-                      onChange={(e) => setAltConstraint(e.target.value)}
-                    />
-                    <input
-                      type="number"
-                      placeholder="Speed (kt)"
-                      value={spdConstraint}
-                      onChange={(e) => setSpdConstraint(e.target.value)}
-                    />
+                    <input type="number" placeholder="Alt (ft)" value={altConstraint} onChange={(e) => setAltConstraint(e.target.value)} />
+                    <input type="number" placeholder="Speed (kt)" value={spdConstraint} onChange={(e) => setSpdConstraint(e.target.value)} />
                     <button onClick={() => handleSaveConstraint(idx)}>Save</button>
                     <button onClick={() => setEditIdx(null)}>Cancel</button>
                   </div>

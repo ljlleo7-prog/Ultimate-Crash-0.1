@@ -13,6 +13,12 @@ export function useFlightControls(physicsService) {
     trim: 0
   });
 
+  const resolvePhysicsService = useCallback(() => (
+    physicsService && typeof physicsService === 'object' && 'current' in physicsService
+      ? physicsService.current
+      : physicsService
+  ), [physicsService]);
+
   const setThrottle = useCallback((value) => {
     const normalized = Math.max(-0.7, Math.min(1, value));
     controlsRef.current.throttle = normalized;
@@ -20,12 +26,13 @@ export function useFlightControls(physicsService) {
   }, []);
 
   const setEngineThrottle = useCallback((engineIndex, value) => {
+    const service = resolvePhysicsService();
     const normalized = Math.max(-0.7, Math.min(1, value));
-    if (physicsService?.setEngineThrottle) {
-      physicsService.setEngineThrottle(engineIndex, normalized);
+    if (service?.setEngineThrottle) {
+      service.setEngineThrottle(engineIndex, normalized);
     }
 
-    const engineCount = physicsService?.engines?.length || 2;
+    const engineCount = service?.engines?.length || 2;
     const throttles = Array.isArray(controlsRef.current.engineThrottles)
       ? [...controlsRef.current.engineThrottles]
       : Array(engineCount).fill(controlsRef.current.throttle);
@@ -33,7 +40,7 @@ export function useFlightControls(physicsService) {
     throttles[engineIndex] = normalized;
     controlsRef.current.engineThrottles = throttles;
     controlsRef.current.throttle = normalized;
-  }, [physicsService]);
+  }, [resolvePhysicsService]);
 
   const setPitch = useCallback((value) => {
     const normalized = Math.abs(value) <= 1 ? value : value / 100;
@@ -50,25 +57,26 @@ export function useFlightControls(physicsService) {
   }, []);
 
   const setTrim = useCallback((value) => {
+    const service = resolvePhysicsService();
     const normalized = Math.abs(value) <= 1 ? value : value / 100;
     const trimValue = normalized * 0.2;
     controlsRef.current.trim = trimValue;
-    if (physicsService?.setTrim) {
-      physicsService.setTrim(trimValue);
+    if (service?.setTrim) {
+      service.setTrim(trimValue);
     }
-  }, [physicsService]);
+  }, [resolvePhysicsService]);
 
   const setFlaps = useCallback((value) => {
-    if (physicsService?.setFlaps) {
-      physicsService.setFlaps(value);
-    }
-  }, [physicsService]);
+    resolvePhysicsService()?.setFlaps?.(value);
+  }, [resolvePhysicsService]);
+
+  const setAirBrakes = useCallback((value) => {
+    resolvePhysicsService()?.setAirBrakes?.(value);
+  }, [resolvePhysicsService]);
 
   const setGear = useCallback((value) => {
-    if (physicsService?.setGear) {
-      physicsService.setGear(value);
-    }
-  }, [physicsService]);
+    resolvePhysicsService()?.setGear?.(value);
+  }, [resolvePhysicsService]);
 
   const getControls = useCallback(() => controlsRef.current, []);
 
@@ -80,6 +88,7 @@ export function useFlightControls(physicsService) {
     setYaw,
     setTrim,
     setFlaps,
+    setAirBrakes,
     setGear,
     getControls
   };

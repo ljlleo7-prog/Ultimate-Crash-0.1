@@ -56,6 +56,16 @@ class WarningSystem {
 
         if (!physicsState) return this.activeWarnings;
 
+        // Skip flight warnings in ground mode (boarding, clearance, pushback)
+        const groundMode = physicsState.groundMode || false;
+        const groundSpeed = Math.sqrt((physicsState.vel?.x || 0)**2 + (physicsState.vel?.y || 0)**2) * 1.94384; // m/s to knots
+
+        if (groundMode && groundSpeed < 10) {
+            // Only check critical system warnings, skip flight warnings
+            this.checkSystemWarnings(physicsState);
+            return this.activeWarnings;
+        }
+
         // Extract necessary data
         const {
             derived,
@@ -299,14 +309,34 @@ class WarningSystem {
         // Altitude Alert
         if (autopilotTargets && typeof autopilotTargets.altitude === 'number') {
             const diff = Math.abs(altitudeMSL - autopilotTargets.altitude);
-            
+
             // Approaching target? (Not implemented statefully yet)
-            
+
             // Deviation alert (if we were supposed to be there)
-            // For now, just a simple check if we are significantly off while in ALT HOLD mode? 
+            // For now, just a simple check if we are significantly off while in ALT HOLD mode?
             // Simplified: If diff > 300ft and AP is engaged, maybe just advisory if it persists?
             // Leaving out for now to avoid nuisance warnings during climb/descent
         }
+    }
+
+    checkSystemWarnings(physicsState) {
+        const { systems, fuel, engineParams } = physicsState;
+
+        if (!systems) return;
+
+        // Engine Fire
+        if (engineParams) {
+            engineParams.forEach((eng, i) => {
+                if (eng.fire) this.addWarning(`ENG${i+1}_FIRE`, `ENGINE ${i+1} FIRE`, 'CRITICAL', true);
+            });
+        }
+
+        // Fuel
+        if (fuel < 1000) this.addWarning('FUEL_LOW', 'FUEL LOW', 'WARNING');
+
+        // Hydraulics
+        if (systems.hydraulics?.sysA?.pressure < 1000) this.addWarning('HYD_A_LOW', 'HYD A PRESS LOW', 'ADVISORY');
+        if (systems.hydraulics?.sysB?.pressure < 1000) this.addWarning('HYD_B_LOW', 'HYD B PRESS LOW', 'ADVISORY');
     }
 }
 

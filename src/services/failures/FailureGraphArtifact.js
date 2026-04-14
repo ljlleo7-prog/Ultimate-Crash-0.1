@@ -69,6 +69,7 @@ const normalizeEdge = (edge = {}) => ({
     probability: typeof edge.probability === 'number' ? edge.probability : 1,
     delaySeconds: typeof edge.delaySeconds === 'number' ? edge.delaySeconds : (typeof edge.delay_seconds === 'number' ? edge.delay_seconds : (typeof edge.time_delay_seconds === 'number' ? edge.time_delay_seconds : 0)),
     propagationType: edge.propagationType || edge.propagation_type || 'SYSTEM',
+    cascadeClass: edge.cascadeClass || edge.cascade_class || null,
     sourceStage: edge.sourceStage || edge.source_stage || null,
     minSourceTimeInStage: typeof edge.minSourceTimeInStage === 'number' ? edge.minSourceTimeInStage : 0,
     requiredObservables: sortArray((edge.requiredObservables || edge.required_observables || []).map(normalizeObservable)),

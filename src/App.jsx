@@ -1,15 +1,13 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import './App.css';
 import useAirportSearch from './hooks/useAirportSearch';
 import aircraftService from './services/aircraftService';
-import { airportService } from './services/airportService';
-import { calculateDistance, calculateFlightPlan, formatDistance, formatFlightTime, formatFuel } from './utils/distanceCalculator';
-import AirportSearchInput from './components/AirportSearchInput.jsx';
+import { calculateFlightPlan, formatDistance, formatFlightTime, formatFuel } from './utils/distanceCalculator';
 import FlightInitialization from './components/FlightInitialization.jsx';
 import FlightInProgress from './components/FlightInProgress.jsx';
 import RouteSelectionFrame from './components/RouteSelectionFrame.jsx';
 import NarrativeScene from './components/NarrativeScene.jsx';
-import { generateInitialWeather, updateWeather } from './services/weatherService';
+import { generateInitialWeather } from './services/weatherService';
 import { getRunwayHeading } from './utils/routeGenerator';
 
 import { FadeOverlay, CinematicReview } from './components/CinematicComponents.jsx';
@@ -17,71 +15,342 @@ import { LanguageProvider } from './contexts/LanguageContext';
 import LanguageSwitcher from './components/LanguageSwitcher';
 import Header from './components/Header';
 import HomePage from './components/HomePage';
+import FMCPanel from './components/fmc/FMCPanel';
+import { airportService } from './services/airportService';
+import { cloudSaveService } from './services/cloudSaveService.js';
+import { getSupabaseUser, supabase } from './services/skylinetragedy/SupabaseClient.js';
+
+const APP_SETTINGS_STORAGE_KEY = 'app_settings';
+const DEFAULT_APP_SETTINGS = {
+  offlineMode: true
+};
+
+const DEFAULT_WEATHER = {
+  type: 'clear',
+  windSpeed: 0,
+  visibility: 10,
+  ceiling: 5000,
+  precipitation: 0,
+  turbulence: 0
+};
+
+const DEFAULT_ROUTE_DETAILS = {
+  departureGate: '',
+  departureTaxiway: '',
+  departureRunway: '',
+  sid: '',
+  waypoints: [],
+  star: '',
+  landingRunway: '',
+  landingTaxiway: '',
+  arrivalGate: '',
+  alternate: null
+};
+
+const normalizeWaypoint = (waypoint, index = 0) => {
+  if (!waypoint) return null;
+  if (typeof waypoint === 'string') {
+    return {
+      name: waypoint,
+      label: waypoint,
+      latitude: 0,
+      longitude: 0
+    };
+  }
+
+  const name = waypoint.name || waypoint.label || waypoint.id || `WPT${index + 1}`;
+
+  return {
+    ...waypoint,
+    name,
+    label: waypoint.label || name,
+    latitude: typeof waypoint.latitude === 'number' ? waypoint.latitude : Number(waypoint.latitude) || 0,
+    longitude: typeof waypoint.longitude === 'number' ? waypoint.longitude : Number(waypoint.longitude) || 0
+  };
+};
+
+const buildApproachWaypoints = (arrivalAirport, departureAirport, landingRunway) => {
+  if (!arrivalAirport || !departureAirport || !landingRunway) return [];
+
+  const isEastward = arrivalAirport.longitude > departureAirport.longitude;
+  const runwayHdg = getRunwayHeading(landingRunway, isEastward);
+  const approachHdg = (runwayHdg + 180) % 360;
+  const distance = 10;
+  const lat1 = arrivalAirport.latitude * Math.PI / 180;
+  const lon1 = arrivalAirport.longitude * Math.PI / 180;
+  const brng = approachHdg * Math.PI / 180;
+  const R = 3440.065;
+
+  const lat2 = Math.asin(Math.sin(lat1) * Math.cos(distance / R) + Math.cos(lat1) * Math.sin(distance / R) * Math.cos(brng));
+  const lon2 = lon1 + Math.atan2(Math.sin(brng) * Math.sin(distance / R) * Math.cos(lat1), Math.cos(distance / R) - Math.sin(lat1) * Math.sin(lat2));
+
+  return [
+    normalizeWaypoint({
+      name: 'FINAL',
+      latitude: lat2 * 180 / Math.PI,
+      longitude: lon2 * 180 / Math.PI,
+      type: 'APPROACH_FIX'
+    }),
+    normalizeWaypoint({
+      name: landingRunway,
+      label: landingRunway,
+      latitude: arrivalAirport.latitude,
+      longitude: arrivalAirport.longitude,
+      type: 'RUNWAY_FIX'
+    })
+  ];
+};
+
+const normalizeRouteDetails = (routeDetails, selectedDeparture, selectedArrival) => {
+  const normalized = {
+    ...DEFAULT_ROUTE_DETAILS,
+    ...(routeDetails || {})
+  };
+
+  const baseWaypoints = (normalized.waypoints || []).map(normalizeWaypoint).filter(Boolean);
+  const hasRunwayFix = baseWaypoints.some((waypoint) => waypoint.type === 'RUNWAY_FIX' || waypoint.name === normalized.landingRunway);
+  const finalWaypoints = normalized.landingRunway && !hasRunwayFix
+    ? [...baseWaypoints, ...buildApproachWaypoints(selectedArrival, selectedDeparture, normalized.landingRunway)]
+    : baseWaypoints;
+
+  return {
+    ...normalized,
+    waypoints: finalWaypoints
+  };
+};
+
+const mergeFlightPlanWithRoute = (flightPlan, routeDetails) => {
+  if (!flightPlan) return null;
+
+  const normalizedRoute = routeDetails ? {
+    ...routeDetails,
+    waypoints: (routeDetails.waypoints || []).map(normalizeWaypoint).filter(Boolean)
+  } : null;
+
+  return {
+    ...flightPlan,
+    waypoints: normalizedRoute?.waypoints?.length ? normalizedRoute.waypoints : (flightPlan.waypoints || []).map(normalizeWaypoint).filter(Boolean),
+    departure: {
+      ...flightPlan.departure,
+      runways: normalizedRoute?.departureRunway ? [{ name: normalizedRoute.departureRunway }] : flightPlan.departure?.runways
+    },
+    arrival: {
+      ...flightPlan.arrival,
+      runways: normalizedRoute?.landingRunway ? [{ name: normalizedRoute.landingRunway }] : flightPlan.arrival?.runways
+    }
+  };
+};
+
+const isPositiveNumber = (value) => Number.isFinite(Number(value)) && Number(value) > 0;
 
 function App() {
-  // Add development mode flag
   const [devMode, setDevMode] = useState(false);
-  
-  // App Mode State
-  const [appMode, setAppMode] = useState('home'); // 'home', 'init', 'simulation'
+  const [appMode, setAppMode] = useState('home');
   const [isTutorial, setIsTutorial] = useState(false);
-
-  // Flight initialization state
   const [difficulty, setDifficulty] = useState('rookie');
-  const [airline, setAirline] = useState('Test Airline');
-  const [callsign, setCallsign] = useState('TEST001');
-  const [aircraftModel, setAircraftModel] = useState('B737-800');
-  const [pax, setPax] = useState(150);
-  const [payload, setPayload] = useState(20000);
-  const [fuelReserve, setFuelReserve] = useState(0.1);
-  const [cruiseHeight, setCruiseHeight] = useState(35000);
-  const [timeZulu, setTimeZulu] = useState('');
-  const [useRandomTime, setUseRandomTime] = useState(true);
-  const [season, setSeason] = useState('');
-  const [useRandomSeason, setUseRandomSeason] = useState(true);
-  const [apiKey, setApiKey] = useState('');
-  
-  // Flight simulation state
-  const [flightInitialized, setFlightInitialized] = useState(false);
-  const [flightPlan, setFlightPlan] = useState(null);
-  
-  // Airport search state
-  const { searchResults, selectedDeparture, selectedArrival, searchAirports, selectDeparture, selectArrival, clearSelection, getAirportByCode } = useAirportSearch();
-  
-  // Aircraft suggestions
-  const [aircraftSuggestions, setAircraftSuggestions] = useState([]);
-  
-  // New simulation state variables
-  const [failureType, setFailureType] = useState('random');
-  const [weatherData, setWeatherData] = useState({
-    type: 'clear',
-    windSpeed: 0,
-    visibility: 10,
-    ceiling: 5000,
-    precipitation: 0,
-    turbulence: 0
+  const [preflightConfig, setPreflightConfig] = useState({
+    airline: 'Test Airline',
+    callsign: 'TEST001',
+    aircraftModel: 'B737-800',
+    pax: 150,
+    payload: 20000,
+    fuelReserve: 0.1,
+    cruiseHeight: 35000,
+    crewCount: 2,
+    timeZulu: '',
+    useRandomTime: true,
+    season: '',
+    useRandomSeason: true,
+    weatherData: DEFAULT_WEATHER,
+    selectedDeparture: null,
+    selectedArrival: null,
+    routeDetails: DEFAULT_ROUTE_DETAILS,
+    flightPlan: null
   });
-  const [crewCount, setCrewCount] = useState(2);
-  const [simulationStarted, setSimulationStarted] = useState(false);
-  const [cinematicPhase, setCinematicPhase] = useState('none');
-  
-  // Route Selection State
-  const [showRouteSelection, setShowRouteSelection] = useState(false);
-  const [detailedRoute, setDetailedRoute] = useState(null);
 
-  // Development mode bypass - directly initialize flight
+  const [flightInitialized, setFlightInitialized] = useState(false);
+  const [resumeSave, setResumeSave] = useState(null);
+  const [resumeCheckLoading, setResumeCheckLoading] = useState(false);
+  const [resumeCheckError, setResumeCheckError] = useState(null);
+  const [activeUser, setActiveUser] = useState(null);
+  const { selectedDeparture, selectedArrival, selectDeparture, selectArrival, getAirportByCode } = useAirportSearch();
+  const [aircraftSuggestions, setAircraftSuggestions] = useState([]);
+  const [failureType, setFailureType] = useState('random');
+  const [weatherData, setWeatherData] = useState(DEFAULT_WEATHER);
+  const [cinematicPhase, setCinematicPhase] = useState('none');
+  const [showSettings, setShowSettings] = useState(false);
+  const [showRouteSelection, setShowRouteSelection] = useState(false);
+  const [appSettings, setAppSettings] = useState(() => {
+    if (typeof window === 'undefined') {
+      return DEFAULT_APP_SETTINGS;
+    }
+
+    try {
+      const raw = window.localStorage.getItem(APP_SETTINGS_STORAGE_KEY);
+      if (!raw) {
+        return DEFAULT_APP_SETTINGS;
+      }
+      const parsed = JSON.parse(raw);
+      return {
+        ...DEFAULT_APP_SETTINGS,
+        ...parsed
+      };
+    } catch {
+      return DEFAULT_APP_SETTINGS;
+    }
+  });
+  const [departureQuery, setDepartureQuery] = useState('');
+  const [arrivalQuery, setArrivalQuery] = useState('');
+  const [alternateQuery, setAlternateQuery] = useState('');
+
+  const offlineMode = appSettings.offlineMode;
+
+  useEffect(() => {
+    if (typeof window === 'undefined') {
+      return;
+    }
+
+    window.localStorage.setItem(APP_SETTINGS_STORAGE_KEY, JSON.stringify(appSettings));
+  }, [appSettings]);
+  const departureResults = useMemo(() => airportService.searchAirports(departureQuery).slice(0, 10), [departureQuery]);
+  const arrivalResults = useMemo(() => airportService.searchAirports(arrivalQuery).slice(0, 10), [arrivalQuery]);
+  const alternateResults = useMemo(() => airportService.searchAirports(alternateQuery).slice(0, 10), [alternateQuery]);
+
+  const updatePreflightConfig = (patch) => {
+    setPreflightConfig((prev) => ({ ...prev, ...patch }));
+  };
+
+  const updateRouteDetails = (patch) => {
+    setPreflightConfig((prev) => ({
+      ...prev,
+      routeDetails: normalizeRouteDetails(
+        typeof patch === 'function' ? patch(prev.routeDetails) : { ...prev.routeDetails, ...patch },
+        prev.selectedDeparture,
+        prev.selectedArrival
+      )
+    }));
+  };
+
+  const setPreflightDeparture = (airport) => {
+    selectDeparture(airport);
+    setDepartureQuery('');
+    setPreflightConfig((prev) => ({
+      ...prev,
+      selectedDeparture: airport,
+      routeDetails: normalizeRouteDetails(prev.routeDetails, airport, prev.selectedArrival)
+    }));
+  };
+
+  const setPreflightArrival = (airport) => {
+    selectArrival(airport);
+    setArrivalQuery('');
+    setPreflightConfig((prev) => ({
+      ...prev,
+      selectedArrival: airport,
+      routeDetails: normalizeRouteDetails(prev.routeDetails, prev.selectedDeparture, airport)
+    }));
+  };
+
+  const setPreflightAlternate = (airport) => {
+    setAlternateQuery('');
+    updateRouteDetails({ alternate: airport || null });
+  };
+
+  const mergedFlightPlan = useMemo(
+    () => mergeFlightPlanWithRoute(preflightConfig.flightPlan, preflightConfig.routeDetails),
+    [preflightConfig.flightPlan, preflightConfig.routeDetails]
+  );
+
+  const runtimeRouteDetails = useMemo(
+    () => normalizeRouteDetails(preflightConfig.routeDetails, preflightConfig.selectedDeparture, preflightConfig.selectedArrival),
+    [preflightConfig.routeDetails, preflightConfig.selectedDeparture, preflightConfig.selectedArrival]
+  );
+
+  const routeValidation = useMemo(() => {
+    const departure = preflightConfig.selectedDeparture;
+    const arrival = preflightConfig.selectedArrival;
+    const alternate = runtimeRouteDetails.alternate;
+    const hasDeparture = Boolean(departure);
+    const hasArrival = Boolean(arrival);
+    const sameAirport = hasDeparture && hasArrival && (departure.icao || departure.iata) === (arrival.icao || arrival.iata);
+    const isRouteReady = hasDeparture && hasArrival && !sameAirport;
+
+    return {
+      departureState: hasDeparture ? 'idle' : 'warning',
+      departureMessage: hasDeparture ? 'Departure selected.' : 'Select a valid departure airport.',
+      arrivalState: hasArrival ? 'idle' : 'warning',
+      arrivalMessage: hasArrival ? 'Arrival selected.' : 'Select a valid arrival airport.',
+      alternateState: alternate ? 'idle' : 'idle',
+      alternateMessage: alternate ? 'Alternate selected.' : 'Optional but recommended for dispatch planning.',
+      routeState: sameAirport ? 'error' : isRouteReady ? 'success' : 'idle',
+      routeMessage: sameAirport
+        ? 'Departure and arrival must be different airports.'
+        : isRouteReady
+          ? 'Valid route selected. You can continue to route review.'
+          : 'Set both departure and arrival to complete the route.',
+      isRouteReady
+    };
+  }, [preflightConfig.selectedDeparture, preflightConfig.selectedArrival, runtimeRouteDetails.alternate]);
+
+  const tabletReadiness = useMemo(() => {
+    const hasPax = isPositiveNumber(preflightConfig.pax);
+    const hasPayload = isPositiveNumber(preflightConfig.payload);
+    const hasReserve = Number.isFinite(Number(preflightConfig.fuelReserve)) && Number(preflightConfig.fuelReserve) >= 0;
+    const hasCruise = isPositiveNumber(preflightConfig.cruiseHeight);
+    const hasFlightPlanFuel = Boolean(preflightConfig.flightPlan?.fuel?.totalFuel);
+    const isLoadoutReady = hasPax && hasPayload && hasReserve && hasCruise;
+    const isPerformanceReady = hasFlightPlanFuel && isLoadoutReady;
+
+    return {
+      isRouteReady: routeValidation.isRouteReady,
+      isLoadoutReady,
+      isPerformanceReady,
+      isFinalizeReady: routeValidation.isRouteReady && isLoadoutReady,
+      hasPax,
+      hasPayload,
+      hasReserve,
+      hasCruise
+    };
+  }, [preflightConfig.pax, preflightConfig.payload, preflightConfig.fuelReserve, preflightConfig.cruiseHeight, preflightConfig.flightPlan, routeValidation.isRouteReady]);
+
+  const routeSearchState = useMemo(() => ({
+    departureQuery,
+    arrivalQuery,
+    alternateQuery,
+    departureResults,
+    arrivalResults,
+    alternateResults,
+    setDepartureQuery,
+    setArrivalQuery,
+    setAlternateQuery
+  }), [departureQuery, arrivalQuery, alternateQuery, departureResults, arrivalResults, alternateResults]);
+
+  const {
+    airline,
+    callsign,
+    aircraftModel,
+    pax,
+    payload,
+    fuelReserve,
+    cruiseHeight,
+    crewCount,
+    timeZulu,
+    useRandomTime,
+    season,
+    useRandomSeason
+  } = preflightConfig;
+
   const handleDevStart = () => {
     console.log('🚀 Development Mode: Starting flight simulation directly');
-    
-    // Set default airports for dev mode (KSFO -> KLAX)
+
     const devDeparture = getAirportByCode('KSFO') || getAirportByCode('KATL');
     const devArrival = getAirportByCode('KLAX') || getAirportByCode('KJFK');
-    
+
     if (devDeparture && devArrival) {
       console.log('📍 Dev Mode: Using default airports', devDeparture.iata, '->', devArrival.iata);
-      selectDeparture(devDeparture);
-      selectArrival(devArrival);
-      
+      setPreflightDeparture(devDeparture);
+      setPreflightArrival(devArrival);
+
       setTimeout(() => {
         setFlightInitialized(true);
         setAppMode('simulation');
@@ -95,7 +364,6 @@ function App() {
     }
   };
 
-  // Load popular aircraft models
   useEffect(() => {
     const loadAircraft = async () => {
       try {
@@ -109,125 +377,193 @@ function App() {
     loadAircraft();
   }, []);
 
-  // Calculate flight plan when airports, aircraft, payload, and fuel reserve are selected
+  useEffect(() => {
+    if (offlineMode) {
+      setActiveUser(null);
+      return;
+    }
+
+    let isMounted = true;
+
+    const syncUser = async () => {
+      const user = await getSupabaseUser();
+      if (isMounted) {
+        setActiveUser(user);
+      }
+    };
+
+    syncUser();
+
+    if (!supabase?.auth?.onAuthStateChange) {
+      return () => {
+        isMounted = false;
+      };
+    }
+
+    const { data } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (!isMounted) return;
+      setActiveUser(session?.user ?? null);
+    });
+
+    return () => {
+      isMounted = false;
+      data?.subscription?.unsubscribe?.();
+    };
+  }, []);
+
+  useEffect(() => {
+    if (offlineMode) {
+      setResumeSave(null);
+      setResumeCheckError(null);
+      setResumeCheckLoading(false);
+      return;
+    }
+
+    let isMounted = true;
+
+    const loadResumeSave = async () => {
+      if (!activeUser || appMode !== 'init') {
+        if (isMounted) {
+          setResumeSave(null);
+          setResumeCheckError(null);
+          setResumeCheckLoading(false);
+        }
+        return;
+      }
+
+      setResumeCheckLoading(true);
+      const { data, error } = await cloudSaveService.getCurrentUserSave();
+
+      if (!isMounted) {
+        return;
+      }
+
+      setResumeSave(data ?? null);
+      setResumeCheckError(error?.message ?? null);
+      setResumeCheckLoading(false);
+    };
+
+    loadResumeSave();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [activeUser, appMode]);
+
   useEffect(() => {
     const calculateFlightPlanAsync = async () => {
-      if (selectedDeparture && selectedArrival && aircraftModel) {
+      if (preflightConfig.selectedDeparture && preflightConfig.selectedArrival && preflightConfig.aircraftModel) {
         try {
-          const plan = await calculateFlightPlan(selectedDeparture, selectedArrival, aircraftModel, payload, fuelReserve);
-          setFlightPlan(plan);
+          const plan = await calculateFlightPlan(
+            preflightConfig.selectedDeparture,
+            preflightConfig.selectedArrival,
+            preflightConfig.aircraftModel,
+            preflightConfig.payload,
+            preflightConfig.fuelReserve
+          );
+          setPreflightConfig((prev) => ({ ...prev, flightPlan: plan }));
         } catch (error) {
           console.error('Error calculating flight plan:', error);
-          setFlightPlan(null);
+          setPreflightConfig((prev) => ({ ...prev, flightPlan: null }));
         }
       } else {
-        setFlightPlan(null);
+        setPreflightConfig((prev) => ({ ...prev, flightPlan: null }));
       }
     };
     calculateFlightPlanAsync();
-  }, [selectedDeparture, selectedArrival, aircraftModel, payload, fuelReserve]);
-
-  const handleSearch = (query) => {
-    searchAirports(query);
-  };
+  }, [preflightConfig.selectedDeparture, preflightConfig.selectedArrival, preflightConfig.aircraftModel, preflightConfig.payload, preflightConfig.fuelReserve]);
 
   const handleInitializeFlight = () => {
-    if (!selectedDeparture || !selectedArrival) {
-      alert('Please select both departure and arrival airports');
+    if (!tabletReadiness.isFinalizeReady) {
+      alert('Complete the tablet route and loadout setup before continuing.');
       return;
     }
     setShowRouteSelection(true);
   };
 
   const handleRouteConfirm = (routeData) => {
-    // Insert 10nm approach fix logic
-    if (routeData.landingRunway && selectedArrival && selectedDeparture) {
-       const isEastward = selectedArrival.longitude > selectedDeparture.longitude;
-       const runwayHdg = getRunwayHeading(routeData.landingRunway, isEastward);
-       const approachHdg = (runwayHdg + 180) % 360; 
-       const distance = 10; 
-       
-       const lat1 = selectedArrival.latitude * Math.PI / 180;
-       const lon1 = selectedArrival.longitude * Math.PI / 180;
-       const brng = approachHdg * Math.PI / 180;
-       const d = distance;
-       const R = 3440.065; 
-       
-       const lat2 = Math.asin(Math.sin(lat1)*Math.cos(d/R) + Math.cos(lat1)*Math.sin(d/R)*Math.cos(brng));
-       const lon2 = lon1 + Math.atan2(Math.sin(brng)*Math.sin(d/R)*Math.cos(lat1), Math.cos(d/R)-Math.sin(lat1)*Math.sin(lat2));
-       
-       const approachFix = {
-         name: `FINAL`,
-         latitude: lat2 * 180 / Math.PI,
-         longitude: lon2 * 180 / Math.PI
-       };
-       
-       const runwayFix = {
-          name: routeData.landingRunway || 'RWY',
-          latitude: selectedArrival.latitude,
-          longitude: selectedArrival.longitude
-       };
-       
-       if (!routeData.waypoints) routeData.waypoints = [];
-       routeData.waypoints.push(approachFix);
-       routeData.waypoints.push(runwayFix);
-    }
-
-    setDetailedRoute(routeData);
+    updateRouteDetails(routeData);
     setShowRouteSelection(false);
-    setFlightPlan(prev => {
-      if (!prev) return prev;
-      const merged = { ...prev };
-      if (Array.isArray(routeData.waypoints) && routeData.waypoints.length > 0) {
-        merged.waypoints = routeData.waypoints;
-      }
-      if (routeData?.departureRunway) {
-        merged.departure = {
-          ...merged.departure,
-          runways: [{ name: routeData.departureRunway }]
-        };
-      }
-      if (routeData?.landingRunway) {
-        merged.arrival = {
-          ...merged.arrival,
-          runways: [{ name: routeData.landingRunway }]
-        };
-      }
-      return merged;
-    });
     startSimulation(routeData);
   };
 
   const handleRouteSkip = () => {
     setShowRouteSelection(false);
-    setDetailedRoute(null);
-    startSimulation(null);
+    updateRouteDetails(DEFAULT_ROUTE_DETAILS);
+    startSimulation(DEFAULT_ROUTE_DETAILS);
   };
 
-  const startSimulation = (routeData) => {
+  const handleResumeFlight = (saveRecord) => {
+    const payload = saveRecord?.data;
+    if (!payload) {
+      alert('Saved flight data is unavailable.');
+      return;
+    }
+
+    const restoredFlightData = payload.flightData || {};
+    const restoredFlightPlan = payload.flightPlan || null;
+    const restoredWeather = payload.weatherData || weatherData;
+
+    setPreflightConfig((prev) => ({
+      ...prev,
+      flightPlan: restoredFlightPlan,
+      weatherData: restoredWeather,
+      aircraftModel: payload.aircraftModel || prev.aircraftModel
+    }));
+    setWeatherData(restoredWeather);
+    setResumeSave(saveRecord);
+    setFlightInitialized(true);
+    setAppMode('simulation');
+  };
+
+  const handleDiscardResumeSave = async () => {
+    if (offlineMode) {
+      setResumeSave(null);
+      return;
+    }
+
+    if (!resumeSave?.id) {
+      setResumeSave(null);
+      return;
+    }
+
+    const { error } = await cloudSaveService.discardFlight(resumeSave.id);
+    if (error) {
+      alert(`Failed to discard saved flight: ${error.message || 'Unknown error'}`);
+      return;
+    }
+
+    setResumeSave(null);
+    setResumeCheckError(null);
+  };
+
+  const startSimulation = () => {
     const fadeDuration = 2500;
-    
+
     let currentSeason = season;
     if (useRandomSeason) {
       const seasons = ['spring', 'summer', 'autumn', 'winter'];
       currentSeason = seasons[Math.floor(Math.random() * seasons.length)];
-      setSeason(currentSeason);
+      updatePreflightConfig({ season: currentSeason });
     }
 
     let currentTimeZulu = timeZulu;
     if (useRandomTime) {
-      const now = new Date();
-      currentTimeZulu = now.toISOString();
-      setTimeZulu(currentTimeZulu);
+      currentTimeZulu = new Date().toISOString();
+      updatePreflightConfig({ timeZulu: currentTimeZulu });
     }
 
-    const initialWeather = generateInitialWeather(
-      selectedDeparture.latitude,
-      selectedDeparture.longitude,
-      currentSeason,
-      currentTimeZulu
-    );
-    setWeatherData(initialWeather);
+    const departureAirport = preflightConfig.selectedDeparture;
+    if (departureAirport) {
+      const initialWeather = generateInitialWeather(
+        departureAirport.latitude,
+        departureAirport.longitude,
+        currentSeason,
+        currentTimeZulu
+      );
+      setWeatherData(initialWeather);
+      updatePreflightConfig({ weatherData: initialWeather });
+    }
 
     setCinematicPhase('fade_out');
 
@@ -244,18 +580,17 @@ function App() {
     setCinematicPhase('fade_in');
     setTimeout(() => {
       setFlightInitialized(true);
-      setAppMode('simulation'); // Ensure appMode syncs
+      setAppMode('simulation');
       setCinematicPhase('none');
     }, 2500);
   };
 
   const handleResetFlight = () => {
     setFlightInitialized(false);
-    setAppMode('init'); // Go back to init
-    setFlightPlan(null);
+    setAppMode('init');
+    updatePreflightConfig({ flightPlan: null, routeDetails: DEFAULT_ROUTE_DETAILS });
   };
-  
-  // HomePage Handlers
+
   const handleStartSinglePlayer = () => {
     setAppMode('init');
     setIsTutorial(false);
@@ -263,47 +598,53 @@ function App() {
 
   const handleStartTutorial = () => {
     setIsTutorial(true);
-    
-    // Setup Tutorial Flight (KSFO -> KLAX)
+
     const dep = getAirportByCode('KSFO');
     const arr = getAirportByCode('KLAX');
-    
+
     if (dep && arr) {
-        selectDeparture(dep);
-        selectArrival(arr);
-        setCinematicPhase('none');
-        
-        // Slight delay to ensure state updates
-        setTimeout(() => {
-            setFlightInitialized(true);
-            setAppMode('simulation');
-        }, 100);
+      setPreflightDeparture(dep);
+      setPreflightArrival(arr);
+      setCinematicPhase('none');
+
+      setTimeout(() => {
+        setFlightInitialized(true);
+        setAppMode('simulation');
+      }, 100);
     } else {
-        alert("Could not load tutorial airports. Please try again.");
+      alert('Could not load tutorial airports. Please try again.');
     }
   };
 
   const handleOpenSettings = () => {
-      // Placeholder
-      alert("Settings menu is under construction.");
+    setShowSettings(true);
+  };
+
+  const handleCloseSettings = () => {
+    setShowSettings(false);
+  };
+
+  const handleOfflineModeChange = (event) => {
+    const checked = event.target.checked;
+    setAppSettings(prev => ({
+      ...prev,
+      offlineMode: checked
+    }));
   };
 
   const handleTutorialClose = () => {
-      setIsTutorial(false);
-      setFlightInitialized(false);
-      setAppMode('home');
-      setFlightPlan(null);
+    setIsTutorial(false);
+    setFlightInitialized(false);
+    setAppMode('home');
+    updatePreflightConfig({ flightPlan: null, routeDetails: DEFAULT_ROUTE_DETAILS });
   };
 
-  // Render Logic
-  
-  // 1. Cinematic Phase (Overrides everything if active)
   if (cinematicPhase !== 'none') {
     return (
       <LanguageProvider>
         <div className={`cinematic-container ${cinematicPhase}`}>
           <LanguageSwitcher style={{ position: 'absolute', top: '20px', right: '20px', zIndex: 2000 }} />
-          
+
           {cinematicPhase === 'fade_out' && (
             <FadeOverlay phase="fade-out">
               <div className="fade-content">
@@ -312,12 +653,12 @@ function App() {
               </div>
             </FadeOverlay>
           )}
-          
+
           {cinematicPhase === 'cinematic_review' && (
             <CinematicReview
               callsign={callsign}
-              selectedDeparture={selectedDeparture}
-              selectedArrival={selectedArrival}
+              selectedDeparture={preflightConfig.selectedDeparture}
+              selectedArrival={preflightConfig.selectedArrival}
               aircraftModel={aircraftModel}
               weatherData={weatherData}
               setWeatherData={setWeatherData}
@@ -326,7 +667,7 @@ function App() {
               difficulty={difficulty}
               pax={pax}
               payload={payload}
-              routeDetails={detailedRoute}
+              routeDetails={runtimeRouteDetails}
               onComplete={handleCinematicReviewComplete}
             />
           )}
@@ -336,14 +677,14 @@ function App() {
               onComplete={handleNarrativeComplete}
               context={{
                 difficulty,
-                departure: selectedDeparture,
-                arrival: selectedArrival,
+                departure: preflightConfig.selectedDeparture,
+                arrival: preflightConfig.selectedArrival,
                 pax,
                 callsign
               }}
             />
           )}
-          
+
           {cinematicPhase === 'fade_in' && (
             <FadeOverlay phase="fade-in">
               <div className="fade-content">
@@ -357,7 +698,6 @@ function App() {
     );
   }
 
-  // 2. Simulation Mode (Tutorial or Regular)
   if (appMode === 'simulation' && flightInitialized) {
     return (
       <LanguageProvider>
@@ -366,10 +706,10 @@ function App() {
           callsign={callsign}
           aircraftModel={aircraftModel}
           difficulty={difficulty}
-          selectedDeparture={selectedDeparture}
-          selectedArrival={selectedArrival}
-          initialDeparture={selectedDeparture}
-          flightPlan={flightPlan}
+          selectedDeparture={preflightConfig.selectedDeparture}
+          selectedArrival={preflightConfig.selectedArrival}
+          initialDeparture={preflightConfig.selectedDeparture}
+          flightPlan={mergedFlightPlan}
           airline={airline}
           pax={pax}
           payload={payload}
@@ -387,15 +727,15 @@ function App() {
           setWeatherData={setWeatherData}
           failureType={failureType}
           crewCount={crewCount}
-          routeDetails={detailedRoute}
+          routeDetails={runtimeRouteDetails}
           isTutorial={isTutorial}
           onTutorialClose={handleTutorialClose}
+          offlineMode={offlineMode}
         />
       </LanguageProvider>
     );
   }
 
-  // 3. Initialization Mode
   if (appMode === 'init') {
     return (
       <LanguageProvider>
@@ -409,61 +749,61 @@ function App() {
                 isOpen={showRouteSelection}
                 onConfirm={handleRouteConfirm}
                 onSkip={handleRouteSkip}
+                onChange={updateRouteDetails}
                 difficulty={difficulty}
-                departure={selectedDeparture}
-                arrival={selectedArrival}
+                departure={preflightConfig.selectedDeparture}
+                arrival={preflightConfig.selectedArrival}
+                routeData={runtimeRouteDetails}
               />
             ) : (
-              <FlightInitialization
-                difficulty={difficulty}
-                setDifficulty={setDifficulty}
-                airline={airline}
-                setAirline={setAirline}
-                callsign={callsign}
-                setCallsign={setCallsign}
-                aircraftModel={aircraftModel}
-                setAircraftModel={setAircraftModel}
-                pax={pax}
-                setPax={setPax}
-                payload={payload}
-                setPayload={setPayload}
-                fuelReserve={fuelReserve}
-                setFuelReserve={setFuelReserve}
-                cruiseHeight={cruiseHeight}
-                setCruiseHeight={setCruiseHeight}
-                timeZulu={timeZulu}
-                setTimeZulu={setTimeZulu}
-                useRandomTime={useRandomTime}
-                setUseRandomTime={setUseRandomTime}
-                season={season}
-                setSeason={setSeason}
-                useRandomSeason={useRandomSeason}
-                setUseRandomSeason={setUseRandomSeason}
-                selectedDeparture={selectedDeparture}
-                selectedArrival={selectedArrival}
-                searchResults={searchResults}
-                searchAirports={searchAirports}
-                selectDeparture={selectDeparture}
-                selectArrival={selectArrival}
-                flightPlan={flightPlan}
-                formatDistance={formatDistance}
-                formatFlightTime={formatFlightTime}
-                formatFuel={formatFuel}
-                failureType={failureType}
-                setFailureType={setFailureType}
-                weatherData={weatherData}
-                setWeatherData={setWeatherData}
-                crewCount={crewCount}
-                setCrewCount={setCrewCount}
-                aircraftSuggestions={aircraftSuggestions}
-                handleInitializeFlight={handleInitializeFlight}
-                handleSearch={handleSearch}
-                apiKey={apiKey}
-                setApiKey={setApiKey}
-              />
+              <>
+                <div className="preflight-init-layout">
+                  <FlightInitialization
+                    difficulty={difficulty}
+                    setDifficulty={setDifficulty}
+                    preflightConfig={preflightConfig}
+                    updatePreflightConfig={updatePreflightConfig}
+                    selectedDeparture={preflightConfig.selectedDeparture}
+                    selectedArrival={preflightConfig.selectedArrival}
+                    aircraftSuggestions={aircraftSuggestions}
+                    handleInitializeFlight={handleInitializeFlight}
+                    tabletReadiness={tabletReadiness}
+                    resumeSave={resumeSave}
+                    resumeCheckLoading={resumeCheckLoading}
+                    resumeCheckError={resumeCheckError}
+                    onResumeFlight={handleResumeFlight}
+                    onDiscardResumeSave={handleDiscardResumeSave}
+                    isLoggedIn={Boolean(activeUser)}
+                    offlineMode={offlineMode}
+                  />
+                  <div className="preflight-tablet-shell">
+                    <FMCPanel
+                      preflightMode
+                      flightPlan={mergedFlightPlan}
+                      preflightConfig={preflightConfig}
+                      routeDetails={runtimeRouteDetails}
+                      onUpdatePreflight={updatePreflightConfig}
+                      onUpdateRouteDetails={(patch) => {
+                        if (patch && Object.prototype.hasOwnProperty.call(patch, 'alternate')) {
+                          setPreflightAlternate(patch.alternate);
+                        }
+                        updateRouteDetails(patch);
+                      }}
+                      onSelectDeparture={setPreflightDeparture}
+                      onSelectArrival={setPreflightArrival}
+                      aircraftData={{ name: aircraftModel, mass: 70000 }}
+                      aircraftSuggestions={aircraftSuggestions}
+                      weatherData={weatherData}
+                      routeSearchState={routeSearchState}
+                      tabletReadiness={tabletReadiness}
+                      routeValidation={routeValidation}
+                    />
+                  </div>
+                </div>
+              </>
             )}
           </main>
-          
+
           <footer className="app-footer">
             <p>©2026, GeeksProductionStudio. All Rights Reserved.</p>
           </footer>
@@ -472,16 +812,51 @@ function App() {
     );
   }
 
-  // 4. Default: Home Page
   return (
     <LanguageProvider>
-        <HomePage 
-            onStartSinglePlayer={handleStartSinglePlayer}
-            onStartTutorial={handleStartTutorial}
-            onOpenSettings={handleOpenSettings}
-        />
+      <HomePage
+        onStartSinglePlayer={handleStartSinglePlayer}
+        onStartTutorial={handleStartTutorial}
+        onOpenSettings={handleOpenSettings}
+      />
+      {showSettings && (
+        <div style={{
+          position: 'fixed',
+          inset: 0,
+          background: 'rgba(0, 0, 0, 0.65)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 3000
+        }}>
+          <div style={{
+            width: 'min(420px, calc(100vw - 32px))',
+            background: '#111827',
+            border: '1px solid #374151',
+            borderRadius: '12px',
+            padding: '20px',
+            color: '#f9fafb',
+            boxShadow: '0 20px 50px rgba(0,0,0,0.4)'
+          }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+              <h2 style={{ margin: 0, fontSize: '20px' }}>Settings</h2>
+              <button onClick={handleCloseSettings} style={{ background: 'transparent', color: '#f9fafb', border: 'none', fontSize: '18px', cursor: 'pointer' }}>✕</button>
+            </div>
+            <label style={{ display: 'flex', justifyContent: 'space-between', gap: '16px', alignItems: 'center' }}>
+              <div>
+                <div style={{ fontWeight: 600 }}>Offline mode</div>
+                <div style={{ color: '#9ca3af', fontSize: '14px', marginTop: '4px' }}>
+                  Disable multiplayer, cloud save, live weather, and network terrain fetches.
+                </div>
+              </div>
+              <input type="checkbox" checked={offlineMode} onChange={handleOfflineModeChange} />
+            </label>
+          </div>
+        </div>
+      )}
     </LanguageProvider>
   );
 }
 
 export default App;
+export { normalizeWaypoint, normalizeRouteDetails, mergeFlightPlanWithRoute };
