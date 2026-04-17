@@ -1,13 +1,15 @@
 import React, { useState, useEffect } from 'react';
 import aircraftService from '../services/aircraftService';
 
-const ControlSurfacePanel = ({ controlFlaps, controlGear, controlAirBrakes, controlTrim, flightState, aircraftModel }) => {
+const ControlSurfacePanel = ({ controlFlaps, controlGear, controlAirBrakes, controlWheelBrakes, controlTrim, flightState, aircraftModel }) => {
   const [flapProfile, setFlapProfile] = useState(null);
   const [airbrakeProfile, setAirbrakeProfile] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  // Trim state
-  const trimValue = flightState?.trimValue || 0;
+  const trimValue = typeof flightState?.trimValue === 'number' ? flightState.trimValue : 0;
+  const wheelBrakesValue = typeof flightState?.wheelBrakesValue === 'number'
+    ? flightState.wheelBrakesValue
+    : (flightState?.systems?.brakes?.parkingBrake ? 1 : 0);
 
   useEffect(() => {
     const fetchProfiles = async () => {
@@ -269,7 +271,7 @@ const ControlSurfacePanel = ({ controlFlaps, controlGear, controlAirBrakes, cont
                     minWidth: '40px',
                     textAlign: 'center'
                 } 
-            }, (value * 100).toFixed(1)) // Show "Units" (1 unit = 0.01 rad)
+            }, (value * 100).toFixed(1)) // Show trim percentage within live authority range
         ),
         
         // Wheel Container
@@ -401,12 +403,21 @@ const ControlSurfacePanel = ({ controlFlaps, controlGear, controlAirBrakes, cont
       
       // Airbrakes
       React.createElement(LeverControl, {
-        label: 'BRAKES',
+        label: 'AIRBRK',
         position: flightState.airBrakesValue || 0,
         maxPosition: airbrakeMax,
         onToggle: controlAirBrakes,
         positionLabels: airbrakeLabels,
         colorMap: { 0: '#10b981', [airbrakeMax]: '#ef4444' }
+      }),
+
+      React.createElement(LeverControl, {
+        label: 'W-BRK',
+        position: wheelBrakesValue,
+        maxPosition: 1,
+        onToggle: controlWheelBrakes,
+        positionLabels: { 0: 'REL', 1: 'SET' },
+        colorMap: { 0: '#10b981', 1: '#ef4444' }
       }),
 
       // Trim Wheel (Custom UI)

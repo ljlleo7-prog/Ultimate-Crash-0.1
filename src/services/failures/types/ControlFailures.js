@@ -190,4 +190,38 @@ const ControlFailures = {
     }
 };
 
-export default ControlFailures;
+const createSupplementalControlFailure = (id, name, systemAlert) => ({
+    id,
+    name,
+    category: 'controls',
+    stages: {
+        inactive: { next: 'active' },
+        active: {
+            description: () => ({
+                text: name,
+                system_alert: systemAlert
+            }),
+            effect: () => {}
+        }
+    }
+});
+
+const SupplementalControlFailures = {
+    AUTOPILOT_DISCONNECT: createSupplementalControlFailure('autopilot_disconnect', 'Autopilot Disconnect', 'A/P DISC'),
+    SPOILER_ASYMMETRY: createSupplementalControlFailure('spoiler_asymmetry', 'Spoiler Asymmetry', 'SPOILER ASYM'),
+    AILERON_LOCKOUT: createSupplementalControlFailure('aileron_lockout', 'Aileron Lockout', 'AIL LOCKOUT'),
+    ELEVATOR_REVERSION: createSupplementalControlFailure('elevator_reversion', 'Elevator Feel Reversion', 'ELEV FEEL'),
+    RUDDER_TRIM_RUNAWAY: createSupplementalControlFailure('rudder_trim_runaway', 'Rudder Trim Runaway', 'RUD TRIM'),
+    FLAP_DRIVE_OVERHEAT: createSupplementalControlFailure('flap_drive_overheat', 'Flap Drive Overheat', 'FLAP DRIVE'),
+    SPEEDBRAKE_UNCOMMANDED: createSupplementalControlFailure('speedbrake_uncommanded', 'Uncommanded Speedbrake Deployment', 'SPD BRK'),
+    BRAKE_FAILURE: createSupplementalControlFailure('brake_failure', 'Brake System Failure', 'BRAKES'),
+    NOSEWHEEL_STEERING_FAIL: createSupplementalControlFailure('nosewheel_steering_fail', 'Nosewheel Steering Failure', 'NWS FAIL'),
+    SLAT_DISAGREE: createSupplementalControlFailure('slat_disagree', 'Slat Disagree', 'SLAT DISAGREE'),
+    ELEVATOR_SPLIT: createSupplementalControlFailure('elevator_split', 'Elevator Split Condition', 'ELEV SPLIT'),
+    YAW_DAMPER_FAIL: createSupplementalControlFailure('yaw_damper_fail', 'Yaw Damper Failure', 'YAW DAMPER')
+};
+
+export default {
+    ...ControlFailures,
+    ...SupplementalControlFailures
+};

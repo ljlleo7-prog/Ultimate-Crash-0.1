@@ -97,6 +97,20 @@ export const generateSID = (firstWaypoint) => {
   return `${prefix}${numPart}D`;
 };
 
+export const getLastProcedureWaypoint = (waypoints = []) => {
+  const normalized = Array.isArray(waypoints) ? waypoints : [];
+  for (let index = normalized.length - 1; index >= 0; index -= 1) {
+    const waypoint = normalized[index];
+    const name = typeof waypoint === 'string' ? waypoint : waypoint?.name || waypoint?.label || '';
+    const type = typeof waypoint === 'string' ? 'WAYPOINT' : waypoint?.type || 'WAYPOINT';
+    if (!name) continue;
+    if (type === 'APPROACH_FIX' || type === 'RUNWAY_FIX') continue;
+    if (String(name).toUpperCase() === 'FINAL') continue;
+    return name;
+  }
+  return '';
+};
+
 export const generateSTAR = (lastWaypoint) => {
   const prefix = normalizeProcedurePrefix(lastWaypoint);
   const numPart = Math.floor(Math.random() * 90 + 10).toString();

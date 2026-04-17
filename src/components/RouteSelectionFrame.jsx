@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import './RouteSelectionFrame.css';
-import { generateSID, generateSTAR, generateGate, generateTaxiway, getRunways, generateSmartRoute, procedureMatchesWaypoint } from '../utils/routeGenerator';
+import { generateSID, generateSTAR, generateGate, generateTaxiway, getLastProcedureWaypoint, getRunways, generateSmartRoute, procedureMatchesWaypoint } from '../utils/routeGenerator';
 
 const DEFAULT_ROUTE_DATA = {
   departureGate: '',
@@ -41,7 +41,7 @@ const RouteSelectionFrame = ({ isOpen, onConfirm, onSkip, onChange, difficulty, 
       setIsGeneratingRoute(true);
       const waypoints = await generateSmartRoute(departure, arrival);
       const sid = generateSID((waypoints[0] && waypoints[0].name) || 'ABC');
-      const star = generateSTAR((waypoints[waypoints.length - 1] && waypoints[waypoints.length - 1].name) || 'ABC');
+      const star = generateSTAR(getLastProcedureWaypoint(waypoints) || (waypoints[waypoints.length - 1] && waypoints[waypoints.length - 1].name) || 'ABC');
       const depGate = generateGate();
       const arrGate = generateGate();
       const depTaxi = generateTaxiway();
@@ -86,7 +86,7 @@ const RouteSelectionFrame = ({ isOpen, onConfirm, onSkip, onChange, difficulty, 
       ...routeData,
       waypoints: wps,
       sid: routeData.sid || generateSID((wps[0] && wps[0].name) || 'ABC'),
-      star: routeData.star || generateSTAR((wps[wps.length - 1] && wps[wps.length - 1].name) || 'ABC')
+      star: routeData.star || generateSTAR(getLastProcedureWaypoint(wps) || ((wps[wps.length - 1] && wps[wps.length - 1].name) || 'ABC'))
     };
     setRouteData(next);
     onChange?.(next);
@@ -99,7 +99,7 @@ const RouteSelectionFrame = ({ isOpen, onConfirm, onSkip, onChange, difficulty, 
     if (['intermediate', 'advanced', 'pro', 'devil'].includes(difficulty) && routeData.waypoints.length === 0) return false;
     if (['advanced', 'pro', 'devil'].includes(difficulty) && (!routeData.sid || !routeData.star)) return false;
     const firstWaypoint = routeData.waypoints[0]?.name || routeData.waypoints[0] || '';
-    const lastWaypoint = routeData.waypoints[routeData.waypoints.length - 1]?.name || routeData.waypoints[routeData.waypoints.length - 1] || '';
+    const lastWaypoint = getLastProcedureWaypoint(routeData.waypoints) || '';
     if (routeData.sid && firstWaypoint && !procedureMatchesWaypoint(routeData.sid, firstWaypoint)) return false;
     if (routeData.star && lastWaypoint && !procedureMatchesWaypoint(routeData.star, lastWaypoint)) return false;
     return true;
@@ -166,7 +166,7 @@ const RouteSelectionFrame = ({ isOpen, onConfirm, onSkip, onChange, difficulty, 
               <div className="form-group">
                 <label>STAR</label>
                 <input type="text" value={routeData.star} onChange={(e) => handleChange('star', e.target.value)} placeholder="e.g. DXB45A" />
-                <button className="generate-btn" onClick={() => handleChange('star', generateSTAR(((routeData.waypoints[routeData.waypoints.length - 1] && routeData.waypoints[routeData.waypoints.length - 1].name) || 'ABC')))}>🎲</button>
+                <button className="generate-btn" onClick={() => handleChange('star', generateSTAR((getLastProcedureWaypoint(routeData.waypoints) || ((routeData.waypoints[routeData.waypoints.length - 1] && routeData.waypoints[routeData.waypoints.length - 1].name) || 'ABC'))))}>🎲</button>
               </div>
             )}
             <div className="form-group">

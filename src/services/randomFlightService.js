@@ -2,7 +2,7 @@ import airlinesData from '../data/airlinesDatabase.json';
 import { airportService } from './airportService.js';
 import aircraftService from './aircraftService.js';
 import { calculateDistance } from '../utils/distanceCalculator.js';
-import { generateGate, generateSID, generateSTAR, generateSmartRoute, generateTaxiway, getRunways } from '../utils/routeGenerator.js';
+import { generateGate, generateSID, generateSTAR, generateSmartRoute, generateTaxiway, getLastProcedureWaypoint, getRunways } from '../utils/routeGenerator.js';
 
 class RandomFlightService {
   constructor() {
@@ -116,7 +116,7 @@ class RandomFlightService {
     const departureRunway = depRunways.length > 0 ? [...depRunways].sort((a, b) => parseInt(a, 10) - parseInt(b, 10))[isEastward ? 0 : depRunways.length - 1] : '';
     const landingRunway = arrRunways.length > 0 ? [...arrRunways].sort((a, b) => parseInt(a, 10) - parseInt(b, 10))[isEastward ? 0 : arrRunways.length - 1] : '';
     const firstWaypointName = waypoints[0]?.name || 'DEF';
-    const lastWaypointName = waypoints[waypoints.length - 1]?.name || firstWaypointName;
+    const lastWaypointName = getLastProcedureWaypoint(waypoints) || firstWaypointName;
     const routeDetails = {
       departureGate: generateGate(),
       departureTaxiway: generateTaxiway(),

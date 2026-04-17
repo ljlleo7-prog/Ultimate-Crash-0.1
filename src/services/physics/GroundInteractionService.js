@@ -25,11 +25,17 @@ export default class GroundInteractionService {
         const sinH = Math.sin(hRad);
         const distAlong = x_north * cosH + y_east * sinH;
         const distCross = Math.abs(x_north * sinH - y_east * cosH);
+        const speed = typeof state.vel?.magnitude === 'function' ? state.vel.magnitude() : 0;
+        const nearGround = Math.abs(state.pos?.z ?? 0) <= 6;
+        const lowSpeed = speed <= 35;
+        const runwayWidthTolerance = nearGround && lowSpeed ? width : width / 2;
+        const grassWidthTolerance = nearGround && lowSpeed ? width * 3 : width * 2;
+        const alongBuffer = nearGround && lowSpeed ? 800 : 500;
 
         let status = 'OBJECTS';
-        if (distAlong >= 0 && distAlong <= length && distCross <= width / 2) {
+        if (distAlong >= -50 && distAlong <= length + 50 && distCross <= runwayWidthTolerance) {
             status = 'RUNWAY';
-        } else if (distAlong >= -500 && distAlong <= length + 500 && distCross <= width * 2) {
+        } else if (distAlong >= -alongBuffer && distAlong <= length + alongBuffer && distCross <= grassWidthTolerance) {
             status = 'GRASS';
         }
 
@@ -102,8 +108,8 @@ export default class GroundInteractionService {
         }
     }
 
-    getRunwayBrakingData() {
-        return [
+    getRunwayBrakingData(runwayGeometry = {}, environment = {}) {
+        const stages = [
             { index: 1, label: 'NIL', brakeScale: 0.2, gripScale: 0.2 },
             { index: 2, label: 'POOR', brakeScale: 0.35, gripScale: 0.35 },
             { index: 3, label: 'MEDIUM/POOR', brakeScale: 0.5, gripScale: 0.5 },
@@ -111,5 +117,44 @@ export default class GroundInteractionService {
             { index: 5, label: 'GOOD/MEDIUM', brakeScale: 0.85, gripScale: 0.8 },
             { index: 6, label: 'GOOD', brakeScale: 1.0, gripScale: 1.0 }
         ];
+
+        let stageIndex = 6;
+        const runway = runwayGeometry || {};
+        const env = environment || {};
+        const tempC = Number.isFinite(env.temperature) ? env.temperature : null;
+        const precip = env.precipitation || 0;
+        const code = env.weatherCode || 0;
+        const isSnow = (code >= 71 && code <= 77) || (code >= 85 && code <= 86);
+        const isFreezing = (code >= 56 && code <= 57) || (code >= 66 && code <= 67);
+
+        if (typeof runway.brakingAction === 'string') {
+            const value = runway.brakingAction.toLowerCase();
+            if (value.includes('nil')) stageIndex = 1;
+            else if (value.includes('poor')) stageIndex = value.includes('medium') ? 3 : 2;
+            else if (value.includes('medium')) stageIndex = value.includes('good') ? 5 : 4;
+            else if (value.includes('good')) stageIndex = 6;
+        } else if (typeof runway.frictionCoefficient === 'number') {
+            const mu = runway.frictionCoefficient;
+            if (mu < 0.15) stageIndex = 1;
+            else if (mu < 0.25) stageIndex = 2;
+            else if (mu < 0.35) stageIndex = 3;
+            else if (mu < 0.45) stageIndex = 4;
+            else if (mu < 0.55) stageIndex = 5;
+            else stageIndex = 6;
+        } else {
+            if (tempC !== null && tempC <= 0) {
+                if (precip > 4 || isFreezing) stageIndex = 1;
+                else if (precip > 1 || isSnow) stageIndex = 2;
+                else if (precip > 0.2) stageIndex = 3;
+                else stageIndex = 4;
+            } else {
+                if (precip > 6) stageIndex = 3;
+                else if (precip > 2) stageIndex = 4;
+                else if (precip > 0.2) stageIndex = 5;
+                else stageIndex = 6;
+            }
+        }
+
+        return stages[Math.max(0, Math.min(stages.length - 1, stageIndex - 1))];
     }
 }

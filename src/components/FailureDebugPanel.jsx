@@ -166,22 +166,23 @@ const FailureDebugPanel = ({ physicsService, onClose }) => {
     return (
         <div style={{
             position: 'absolute',
-            top: '50%',
-            left: '50%',
-            transform: 'translate(-50%, -50%)',
+            top: '84px',
+            left: '108px',
+            right: '20px',
+            bottom: '20px',
             background: 'rgba(10, 15, 20, 0.95)',
             color: '#e0e0e0',
             fontFamily: '"JetBrains Mono", monospace',
             fontSize: '12px',
             padding: '22px',
             borderRadius: '12px',
-            zIndex: 9999,
+            zIndex: 9998,
             border: '1px solid #334455',
-            width: '1360px',
-            height: '860px',
             display: 'flex',
             flexDirection: 'column',
-            boxShadow: '0 0 80px rgba(0, 0, 0, 0.8)'
+            boxShadow: '0 0 80px rgba(0, 0, 0, 0.8)',
+            overflow: 'hidden',
+            boxSizing: 'border-box'
         }}>
             <div style={{
                 display: 'flex',

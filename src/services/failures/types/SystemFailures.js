@@ -421,4 +421,40 @@ const SystemFailures = {
     }
 };
 
-export default SystemFailures;
+const createSupplementalSystemFailure = (id, name, systemAlert) => ({
+    id,
+    name,
+    category: 'systems',
+    stages: {
+        inactive: { next: 'active' },
+        active: {
+            description: () => ({
+                text: name,
+                system_alert: systemAlert
+            }),
+            effect: () => {}
+        }
+    }
+});
+
+const SupplementalSystemFailures = {
+    BUS_TIE_STUCK: createSupplementalSystemFailure('bus_tie_stuck', 'Bus Tie Stuck', 'BUS TIE'),
+    TRANSFORMER_RECTIFIER_FAIL: createSupplementalSystemFailure('transformer_rectifier_fail', 'Transformer Rectifier Failure', 'TR UNIT'),
+    STANDBY_POWER_FAIL: createSupplementalSystemFailure('standby_power_fail', 'Standby Power Failure', 'STBY PWR'),
+    CABIN_FAN_FAIL: createSupplementalSystemFailure('cabin_fan_fail', 'Cabin Ventilation Fan Failure', 'CAB FAN'),
+    BLEED_LEAK: createSupplementalSystemFailure('bleed_leak', 'Bleed Duct Leak', 'BLEED DUCT'),
+    ISOLATION_VALVE_FAIL: createSupplementalSystemFailure('isolation_valve_fail', 'Isolation Valve Failure', 'ISOL VALVE'),
+    PACK_OVERHEAT: createSupplementalSystemFailure('pack_overheat', 'Air Conditioning Pack Overheat', 'PACK OVHT'),
+    FUEL_CROSSFEED_STUCK: createSupplementalSystemFailure('fuel_crossfeed_stuck', 'Crossfeed Valve Stuck', 'X FEED'),
+    CENTER_TANK_PUMP_FAIL: createSupplementalSystemFailure('center_tank_pump_fail', 'Center Tank Pump Failure', 'CTR TK PUMP'),
+    BRAKE_ACCUMULATOR_LOW: createSupplementalSystemFailure('brake_accumulator_low', 'Brake Accumulator Low', 'BRAKE ACCUM'),
+    ANTI_SKID_FAIL: createSupplementalSystemFailure('anti_skid_fail', 'Anti-Skid Failure', 'ANTI SKID'),
+    CARGO_SMOKE_LOOP_FAIL: createSupplementalSystemFailure('cargo_smoke_loop_fail', 'Cargo Smoke Loop Failure', 'CARGO SMOKE'),
+    LAVATORY_SMOKE: createSupplementalSystemFailure('lavatory_smoke', 'Lavatory Smoke Detection', 'LAV SMOKE'),
+    EMERGENCY_LIGHTS_FAIL: createSupplementalSystemFailure('emergency_lights_fail', 'Emergency Lights Failure', 'EMER LIGHTS')
+};
+
+export default {
+    ...SystemFailures,
+    ...SupplementalSystemFailures
+};

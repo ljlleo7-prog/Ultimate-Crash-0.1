@@ -2,19 +2,18 @@ import React from 'react';
 
 // Flight Pose Panel Component - Vertically compressed 3-column layout
 const FlightPosePanel = ({ flightState }) => {
-  // FIXED: Add safety checks for all properties
-  const indicatedAirspeed = flightState.indicatedAirspeed || 0;
+  const indicatedAirspeed = Number.isFinite(flightState?.indicatedAirspeed) ? flightState.indicatedAirspeed : 0;
   // Use derived AMSL altitude if available (from physics engine), otherwise fallback
-  const trueAltitude = (flightState.derived && flightState.derived.altitude_ft) 
-    ? flightState.derived.altitude_ft 
-    : (flightState.altitude || 0);
-    
-  const verticalSpeed = flightState.verticalSpeed || 0;
-  const heading = flightState.heading || 0;
-  const groundSpeed = flightState.groundSpeed || 0;
-  const trueAirspeed = flightState.trueAirspeed || 0;
-  const pitch = flightState.pitch || 0;
-  const roll = flightState.roll || 0;
+  const trueAltitude = Number.isFinite(flightState?.derived?.altitude_ft)
+    ? flightState.derived.altitude_ft
+    : (Number.isFinite(flightState?.altitude) ? flightState.altitude : 0);
+
+  const verticalSpeed = Number.isFinite(flightState?.verticalSpeed) ? flightState.verticalSpeed : 0;
+  const heading = Number.isFinite(flightState?.heading) ? flightState.heading : 0;
+  const groundSpeed = Number.isFinite(flightState?.groundSpeed) ? flightState.groundSpeed : 0;
+  const trueAirspeed = Number.isFinite(flightState?.trueAirspeed) ? flightState.trueAirspeed : 0;
+  const pitch = Number.isFinite(flightState?.pitch) ? flightState.pitch : 0;
+  const roll = Number.isFinite(flightState?.roll) ? flightState.roll : 0;
   
   // Altimeter Logic
   const altimeterSetting = flightState.altimeter || 29.92;

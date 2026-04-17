@@ -67,7 +67,11 @@ const defaultScenario = {
       name: 'Pushback & Start',
       type: FlightPhases.PUSHBACK,
       durationSeconds: 3600,
-      physics: { mode: 'off' },
+      physics: {
+        mode: 'continuous',
+        initialAltitude: 0,
+        initialSpeed: 0
+      },
       narrative: {
         title: 'Pushback Approved',
         content: 'A gentle jolt as the tug connects. "Ground to Cockpit, brakes released." The terminal building slowly drifts away as you start the engines. The hum of the APU is replaced by the roar of the main turbines.'
@@ -78,7 +82,11 @@ const defaultScenario = {
       name: 'Taxi',
       type: FlightPhases.TAXIING,
       durationSeconds: 3600,
-      physics: { mode: 'off' },
+      physics: {
+        mode: 'continuous',
+        initialAltitude: 0,
+        initialSpeed: 0
+      },
       narrative: {
         title: 'Taxi to Runway ${departureRunway}',
         content: '"${callsign}, taxi to runway ${departureRunway} via Alpha, Bravo." You release the parking brake. The tires thump rhythmically over the concrete joints as you weave through the maze of taxiways. Sunlight glints off the tarmac.'
@@ -633,7 +641,7 @@ class SceneManager {
              }
         } else {
             // Wait for taxi (speed > 5 kts) and duration
-            const groundSpeed = payload?.airspeed || 0; // Approx
+            const groundSpeed = payload?.derived?.groundSpeed ?? payload?.groundSpeed ?? payload?.airspeed ?? 0;
             // Fix: Allow manual continue for Rookies too
             if (this.userSkipped) {
                 isPhaseComplete = true;
@@ -962,12 +970,13 @@ class SceneManager {
     // This allows smooth transitions between Climb, Cruise, Descent, etc.
     const isPreviousContinuous = previousPhase && previousPhase.physics && previousPhase.physics.mode === 'continuous';
     const isNextContinuous = physics.mode === 'continuous';
-    const shouldSkipReset = isPreviousContinuous && isNextContinuous && !physics.forceReset;
+    const isLiveTakeoffHandoff = previousPhase?.type === FlightPhases.TAKEOFF_PREP && phase.type === FlightPhases.TAKEOFF;
+    const shouldSkipReset = (isPreviousContinuous && isNextContinuous && !physics.forceReset) || isLiveTakeoffHandoff;
 
     if (shouldSkipReset) {
       // Just update targets without resetting position/velocity
       const minimalConditions = {};
-      
+
       // Special case: Release brakes when transitioning to Takeoff from Prep
       if (phase.type === FlightPhases.TAKEOFF) {
         minimalConditions.brakes = 0;
@@ -1033,7 +1042,7 @@ class SceneManager {
       // Apply takeoff configuration
       if (phase.type === FlightPhases.TAKEOFF_PREP) {
         initialConditions.throttle = 0.0; // Idle
-        initialConditions.brakes = 1.0; // Hold brakes
+        initialConditions.brakes = 0; // Keep rollout/taxi under user control in live ground phases
       } else {
         initialConditions.throttle = 0.4; // Initial power for takeoff (if starting directly)
         initialConditions.brakes = 0; // Release brakes

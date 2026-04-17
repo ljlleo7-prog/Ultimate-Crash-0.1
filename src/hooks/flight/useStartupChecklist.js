@@ -11,8 +11,7 @@ export default function useStartupChecklist(difficulty, systems) {
 
         const checks = [
             { name: 'Battery', complete: systems.electrical?.battery },
-            { name: 'APU', complete: systems.apu?.running },
-            { name: 'Engines', complete: systems.engines?.eng1?.n2 > 50 }
+            { name: 'APU', complete: systems.apu?.running }
         ];
 
         const allComplete = checks.every(c => c.complete);

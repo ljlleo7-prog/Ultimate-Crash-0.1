@@ -89,8 +89,8 @@ const FlightInProgress = ({
   // Calculate initial heading from runway
   const runwayName = (routeDetails?.departureRunway) || (flightPlan?.departure?.runways?.[0]?.name) || '36L';
   const isEastward = selectedArrival && selectedDeparture ? selectedArrival.longitude > selectedDeparture.longitude : null;
-  const runwayHeadingDeg = getRunwayHeading(runwayName, isEastward);
-  const runwayHeadingRad = runwayHeadingDeg * Math.PI / 180;
+  let runwayHeadingDeg = getRunwayHeading(runwayName, isEastward);
+  let runwayHeadingRad = runwayHeadingDeg * Math.PI / 180;
 
   // Calculate Spawn Position (Runway Threshold)
   let initialLat = initialDeparture?.latitude || 37.6188;
@@ -111,8 +111,10 @@ const FlightInProgress = ({
               console.log(`Spawn Point Adjusted to Runway ${runwayName} Threshold:`, geom.thresholdStart);
               initialLat = geom.thresholdStart.latitude;
               initialLon = geom.thresholdStart.longitude;
+              runwayHeadingDeg = Number.isFinite(geom.heading) ? geom.heading : runwayHeadingDeg;
+              runwayHeadingRad = runwayHeadingDeg * Math.PI / 180;
 
-              // Apply 100m offset along runway heading to prevent "sliding off the back" or grass glitches
+              // Apply 100m offset along runway geometry heading to prevent spawn jitter at the exact threshold
               // 1 deg Lat ~= 111,111m
               // 1 deg Lon ~= 111,111m * cos(lat)
               const offsetMeters = 100;
@@ -184,6 +186,7 @@ const FlightInProgress = ({
     setYaw,
     setFlaps,
     setAirBrakes,
+    setWheelBrakes,
     setGear,
     setTrim,
     performSystemAction,
@@ -199,6 +202,28 @@ const FlightInProgress = ({
   const formatNumber = (value, digits = 0, suffix = '') => (
     Number.isFinite(value) ? `${value.toFixed(digits)}${suffix}` : '---'
   );
+
+  const overlayTelemetryRef = useRef({
+    heading: 0,
+    latitude: initialLat,
+    longitude: initialLon,
+    altitude_ft: 0,
+    indicatedAirspeed: 0,
+    groundSpeed: 0
+  });
+
+  useEffect(() => {
+    const next = overlayTelemetryRef.current;
+
+    if (Number.isFinite(flightData?.derived?.heading)) next.heading = flightData.derived.heading;
+    if (Number.isFinite(flightData?.position?.latitude)) next.latitude = flightData.position.latitude;
+    if (Number.isFinite(flightData?.position?.longitude)) next.longitude = flightData.position.longitude;
+    if (Number.isFinite(flightData?.derived?.altitude_ft)) next.altitude_ft = flightData.derived.altitude_ft;
+    else if (Number.isFinite(flightData?.altitude)) next.altitude_ft = flightData.altitude;
+    if (Number.isFinite(flightData?.indicatedAirspeed)) next.indicatedAirspeed = flightData.indicatedAirspeed;
+    if (Number.isFinite(flightData?.derived?.groundSpeed)) next.groundSpeed = flightData.derived.groundSpeed;
+    else if (Number.isFinite(flightData?.groundSpeed)) next.groundSpeed = flightData.groundSpeed;
+  }, [flightData, initialLat, initialLon]);
 
   // Control state for UI components
   const { language } = useLanguage();
@@ -521,13 +546,10 @@ const FlightInProgress = ({
     );
   };
 
-  // Startup Checklist Logic (Pro/Devil)
-  const [startupStatus, setStartupStatus] = useState(() => {
-    const isHardcore = difficulty === 'pro' || difficulty === 'devil';
-    return {
-      canContinue: !isHardcore,
-      missingItems: isHardcore ? ['System Initialization...'] : []
-    };
+  // Startup Checklist Logic (advisory-only)
+  const [startupStatus, setStartupStatus] = useState({
+    canContinue: true,
+    missingItems: []
   });
   const [approachTelemetrySamples, setApproachTelemetrySamples] = useState([]);
   const approachTelemetry = summarizeApproachTelemetry(approachTelemetrySamples);
@@ -551,7 +573,7 @@ const FlightInProgress = ({
 
     // Only enforce for Pro/Devil modes
     if (difficulty !== 'pro' && difficulty !== 'devil') {
-        if (!startupStatus.canContinue) {
+        if (startupStatus.missingItems.length > 0) {
             setStartupStatus({ canContinue: true, missingItems: [] });
         }
         return;
@@ -560,7 +582,7 @@ const FlightInProgress = ({
     if (quickStartupStatus && quickStartupStatus.items?.length > 0) {
         const quickMissingItems = quickStartupStatus.items.filter(item => !item.complete).map(item => item.name);
         if (!quickStartupStatus.complete && sceneState.phaseType === 'boarding') {
-            const nextQuickStatus = { canContinue: false, missingItems: quickMissingItems };
+            const nextQuickStatus = { canContinue: true, missingItems: quickMissingItems };
             if (JSON.stringify(nextQuickStatus) !== JSON.stringify(startupStatus)) {
                 setStartupStatus(nextQuickStatus);
             }
@@ -584,15 +606,19 @@ const FlightInProgress = ({
     }
 
     if (phaseToCheck) {
-        const result = checkStartupRequirements(phaseToCheck, physicsState.systems, physicsState.engines);
-        
+        const result = checkStartupRequirements(
+          phaseToCheck,
+          physicsState.systems,
+          physicsState.systems?.engines || physicsState.engines
+        );
+        const advisoryStatus = { canContinue: true, missingItems: result.missingItems };
+
         // Only update state if changed to avoid render loops
-        if (result.canContinue !== startupStatus.canContinue || 
-            JSON.stringify(result.missingItems) !== JSON.stringify(startupStatus.missingItems)) {
-            setStartupStatus(result);
+        if (JSON.stringify(advisoryStatus) !== JSON.stringify(startupStatus)) {
+            setStartupStatus(advisoryStatus);
         }
     } else {
-        if (!startupStatus.canContinue) {
+        if (startupStatus.missingItems.length > 0) {
             setStartupStatus({ canContinue: true, missingItems: [] });
         }
     }
@@ -743,6 +769,7 @@ const FlightInProgress = ({
         verticalSpeed: flightData.verticalSpeed,
         callsign: callsign,
         weather: weatherData,
+        weatherData,
         language
     }, freqInfo, (msg) => {
         setRadioMessages(prev => [...prev, { ...msg, frequency: freqType }]);
@@ -779,8 +806,45 @@ const FlightInProgress = ({
       setActiveFailures(state.activeFailures);
     },
     [eventBus.Types.PHYSICS_INITIALIZE]: (payload) => {
-      if (physicsService && typeof physicsService.setInitialConditions === 'function' && payload?.initialConditions) {
-        physicsService.setInitialConditions(payload.initialConditions);
+      const initialConditions = payload?.initialConditions;
+      const hasDestructiveInitFields = Boolean(
+        initialConditions && (
+          initialConditions.position !== undefined ||
+          initialConditions.velocity !== undefined ||
+          initialConditions.orientation !== undefined ||
+          initialConditions.latitude !== undefined ||
+          initialConditions.longitude !== undefined ||
+          initialConditions.altitude !== undefined ||
+          initialConditions.speed !== undefined ||
+          initialConditions.flightPlan !== undefined ||
+          initialConditions.difficulty !== undefined ||
+          initialConditions.coldStart !== undefined
+        )
+      );
+
+      if (physicsService && typeof physicsService.setInitialConditions === 'function' && hasDestructiveInitFields) {
+        physicsService.setInitialConditions(initialConditions);
+      } else if (physicsService && initialConditions) {
+        if (initialConditions.throttle !== undefined) {
+          physicsService.controls.throttle = initialConditions.throttle;
+          if (Array.isArray(physicsService.controls.engineThrottles)) {
+            physicsService.controls.engineThrottles.fill(initialConditions.throttle);
+          }
+          physicsService.engines?.forEach(engine => engine.setThrottle(initialConditions.throttle));
+        }
+        if (initialConditions.brakes !== undefined) {
+          const brakeValue = Math.max(0, Math.min(1, initialConditions.brakes));
+          physicsService.controls.wheelBrakes = brakeValue;
+          if (physicsService.systems?.brakes) {
+            physicsService.systems.brakes.parkingBrake = brakeValue > 0.1;
+          }
+        }
+        if (initialConditions.airBrakes !== undefined) {
+          physicsService.controls.airBrakes = initialConditions.airBrakes;
+        }
+        if (initialConditions.gear !== undefined) {
+          physicsService.controls.gear = initialConditions.gear ? 1 : 0;
+        }
       }
 
       if (physicsService && typeof physicsService.updateAutopilotTargets === 'function') {
@@ -1072,6 +1136,14 @@ const FlightInProgress = ({
     setAirBrakes(position);
   };
 
+  const handleWheelBrakesControl = (position) => {
+    console.log(`🛞 Wheel brakes control: ${position}`);
+    setWheelBrakes(position);
+    if (performSystemAction) {
+      performSystemAction('brakes', 'parkingBrake', position >= 0.5);
+    }
+  };
+
   const handleCommandSubmit = (event) => {
     event.preventDefault();
     const trimmed = commandInput.trim();
@@ -1145,9 +1217,10 @@ const FlightInProgress = ({
     <div style={{
       position: 'relative',
       width: '100vw',
-      height: '100vh',
+      minHeight: '100vh',
       background: '#0a0a0a',
-      overflow: 'hidden',
+      overflowX: 'hidden',
+      overflowY: 'auto',
       display: 'flex',
       flexDirection: 'column'
     }}>
@@ -1290,27 +1363,44 @@ const FlightInProgress = ({
       </div>
 
       <div style={{ flex: 1, display: 'flex', position: 'relative' }}>
-        {/* Debug Panel - Toggled via Sidebar or Button */}
-        {showDebugPhysics && (
-          <DebugPhysicsPanel 
-            debugPhysicsData={flightData?.debugPhysics}
-            thrust={flightData?.thrust}
-            drag={flightData?.drag}
-            waypoints={aircraftConfig.flightPlan}
-            flightData={flightData}
-            groundStatus={physicsService?.groundStatus?.status}
-            remainingRunwayLength={physicsService?.groundStatus?.remainingLength ?? 0}
-          />
-        )}
-
         {showFailurePanel && (
-          <FailureDebugPanel 
-            physicsService={physicsService} 
+          <FailureDebugPanel
+            physicsService={physicsService}
             onClose={() => setShowFailurePanel(false)}
           />
         )}
 
-        <CrewPanel difficulty={difficulty} />
+        <div
+          style={{
+            position: 'absolute',
+            right: '350px',
+            bottom: '20px',
+            display: 'flex',
+            alignItems: 'flex-end',
+            gap: '12px',
+            zIndex: 50,
+            pointerEvents: 'none'
+          }}
+        >
+          {showDebugPhysics && (
+            <div style={{ pointerEvents: 'auto' }}>
+              <DebugPhysicsPanel
+                debugPhysicsData={flightData?.debugPhysics}
+                thrust={flightData?.thrust}
+                drag={flightData?.drag}
+                waypoints={aircraftConfig.flightPlan}
+                flightData={flightData}
+                groundStatus={physicsService?.groundStatus?.status}
+                remainingRunwayLength={physicsService?.groundStatus?.remainingLength ?? 0}
+                embedded
+              />
+            </div>
+          )}
+
+          <div style={{ pointerEvents: 'auto' }}>
+            <CrewPanel difficulty={difficulty} />
+          </div>
+        </div>
 
         <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', zIndex: 10 }}>
           <FlightPanelModular
@@ -1356,6 +1446,10 @@ const FlightInProgress = ({
                   break;
                 case 'airBrakes':
                   handleAirBrakesControl(payload);
+                  console.log(`📡 FlightPanel Action: ${action} = ${payload}`);
+                  break;
+                case 'wheelBrakes':
+                  handleWheelBrakesControl(payload);
                   console.log(`📡 FlightPanel Action: ${action} = ${payload}`);
                   break;
                 case 'gear':
@@ -1433,9 +1527,16 @@ const FlightInProgress = ({
                   break;
                 }
                 case 'toggle-debug': {
+                  if (payload?.target === 'physics') {
+                    setShowDebugPhysics(prev => !prev);
+                    setShowFailurePanel(prev => !prev);
+                    console.log(`📡 FlightPanel Action: ${action} -> Toggling Physics Debug Panel & Failure Graph`);
+                    break;
+                  }
+
                   setShowDebugPhysics(prev => !prev);
                   setShowFailurePanel(prev => !prev);
-                  console.log(`📡 FlightPanel Action: ${action} -> Toggling Debug & Failure Panels`);
+                  console.log(`📡 FlightPanel Action: ${action} -> Toggling Physics Debug Panel & Failure Graph`);
                   break;
                 }
                 case 'skip-phase': {
@@ -1469,154 +1570,6 @@ const FlightInProgress = ({
         </div>
       </div>
       
-      {/* Debug Panel for LNAV/PID */}
-      {showDebugPhysics && flightData && (
-        <div style={{
-          position: 'absolute',
-          top: '90px',
-          right: '20px',
-          background: 'rgba(10, 15, 30, 0.85)',
-          color: '#4ade80',
-          padding: '12px',
-          fontFamily: 'monospace',
-          fontSize: '11px',
-          borderRadius: '6px',
-          border: '1px solid rgba(74, 222, 128, 0.3)',
-          zIndex: 100,
-          pointerEvents: 'none',
-          width: '220px',
-          boxShadow: '0 4px 6px rgba(0,0,0,0.3)'
-        }}>
-          <div style={{ 
-            fontSize: '12px', 
-            fontWeight: 'bold', 
-            borderBottom: '1px solid rgba(74, 222, 128, 0.3)',
-            paddingBottom: '4px',
-            marginBottom: '8px',
-            display: 'flex',
-            justifyContent: 'space-between'
-          }}>
-            <span>FLIGHT DATA & LNAV</span>
-            <span>{formatNumber(flightData?.derived?.heading, 0, '°')}</span>
-          </div>
-
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 8px' }}>
-            <span style={{ color: '#9ca3af' }}>Lat:</span>
-            <span>{formatNumber(flightData?.position?.latitude, 5)}</span>
-            
-            <span style={{ color: '#9ca3af' }}>Lon:</span>
-            <span>{formatNumber(flightData?.position?.longitude, 5)}</span>
-            
-            <span style={{ color: '#9ca3af' }}>Alt:</span>
-            <span>{formatNumber(flightData?.derived?.altitude_ft, 0, ' ft')}</span>
-            
-            <span style={{ color: '#9ca3af' }}>IAS:</span>
-            <span>{formatNumber(flightData?.indicatedAirspeed, 0, ' kts')}</span>
-
-            <span style={{ color: '#9ca3af' }}>GS:</span>
-            <span>{formatNumber(flightData?.derived?.airspeed, 0, ' kts')}</span>
-          </div>
-
-          <div style={{ margin: '8px 0', borderTop: '1px solid rgba(74, 222, 128, 0.2)' }}></div>
-
-          <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: '4px 8px' }}>
-            <span style={{ color: '#9ca3af' }}>Mode:</span>
-            <span style={{ fontWeight: 'bold' }}>{flightData.autopilotDebug?.mode || 'OFF'}</span>
-            
-            <span style={{ color: '#9ca3af' }}>Engaged:</span>
-            <span style={{ color: flightData.autopilotDebug?.engaged ? '#4ade80' : '#ef4444' }}>
-              {flightData.autopilotDebug?.engaged ? 'ACTIVE' : 'OFF'}
-            </span>
-            
-            <span style={{ color: '#9ca3af' }}>Target Hdg:</span>
-            <span>{Number.isFinite(flightData?.autopilotTargets?.heading) ? `${flightData.autopilotTargets.heading.toFixed(1)}°` : '---'}</span>
-            
-            <span style={{ color: '#9ca3af' }}>Hdg Error:</span>
-            <span style={{ color: Math.abs(flightData.autopilotDebug?.headingError) > 5 ? '#f59e0b' : '#4ade80' }}>
-              {Number.isFinite(flightData?.autopilotDebug?.headingError) ? `${flightData.autopilotDebug.headingError.toFixed(2)}°` : '0.00°'}
-            </span>
-            
-            <span style={{ color: '#9ca3af' }}>Tgt Roll:</span>
-            <span>{Number.isFinite(flightData?.autopilotDebug?.targetRoll) ? `${flightData.autopilotDebug.targetRoll.toFixed(1)}°` : '0.0°'}</span>
-            
-            <span style={{ color: '#9ca3af' }}>Act Roll:</span>
-            <span>{formatNumber((flightData?.orientation?.phi ?? 0) * 180 / Math.PI, 1, '°')}</span>
-          </div>
-
-          {flightData.autopilotDebug?.ils?.active && (
-            <>
-              <div style={{ margin: '8px 0', borderTop: '1px solid rgba(74, 222, 128, 0.2)' }}></div>
-              <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: '4px 8px' }}>
-                <span style={{ color: '#f59e0b', fontWeight: 'bold' }}>ILS STATUS</span>
-                <span style={{ color: '#f59e0b', fontWeight: 'bold', textAlign: 'right' }}>{flightData?.autopilotDebug?.ils?.runway || '---'}</span>
-
-                <span style={{ color: '#9ca3af' }}>Dist:</span>
-                <span>{Number.isFinite(flightData?.autopilotDebug?.ils?.distAlong) ? `${(flightData.autopilotDebug.ils.distAlong / 6076).toFixed(1)} nm` : '---'}</span>
-
-                <span style={{ color: '#9ca3af' }}>LOC Err:</span>
-                <span style={{ color: Math.abs(flightData.autopilotDebug.ils.distCross ?? 0) > 50 ? '#ef4444' : '#4ade80' }}>
-                  {Number.isFinite(flightData?.autopilotDebug?.ils?.distCross) ? `${flightData.autopilotDebug.ils.distCross.toFixed(0)} ft` : '---'}
-                </span>
-
-                <span style={{ color: '#9ca3af' }}>LOC Dev:</span>
-                <span>{Number.isFinite(flightData?.autopilotDebug?.ils?.locDeviationDeg) ? `${flightData.autopilotDebug.ils.locDeviationDeg.toFixed(2)}°` : '---'}</span>
-
-                <span style={{ color: '#9ca3af' }}>G/S Err:</span>
-                <span style={{ color: Math.abs(flightData.autopilotDebug.ils.altError ?? 0) > 50 ? '#ef4444' : '#4ade80' }}>
-                  {Number.isFinite(flightData?.autopilotDebug?.ils?.altError) ? `${flightData.autopilotDebug.ils.altError.toFixed(0)} ft` : '---'}
-                </span>
-
-                <span style={{ color: '#9ca3af' }}>G/S Dev:</span>
-                <span>{Number.isFinite(flightData?.autopilotDebug?.ils?.gsDeviationDeg) ? `${flightData.autopilotDebug.ils.gsDeviationDeg.toFixed(2)}°` : '---'}</span>
-
-                <span style={{ color: '#9ca3af' }}>Tgt Alt:</span>
-                <span>{Number.isFinite(flightData?.autopilotDebug?.ils?.targetAltitude) ? `${flightData.autopilotDebug.ils.targetAltitude.toFixed(0)} ft` : '---'}</span>
-
-                <span style={{ color: '#9ca3af' }}>Trend:</span>
-                <span style={{
-                  color: approachTelemetry?.trend === 'improving'
-                    ? '#4ade80'
-                    : approachTelemetry?.trend === 'worsening'
-                      ? '#ef4444'
-                      : '#f59e0b'
-                }}>
-                  {(approachTelemetry?.trend || 'stable').toUpperCase()}
-                </span>
-
-                <span style={{ color: '#9ca3af' }}>Capture:</span>
-                <span>
-                  LOC {approachTelemetry?.locCaptured ? `@ ${formatNumber(approachTelemetry?.locCaptureTimeSec, 1, 's')}` : 'ARM'} / GS {approachTelemetry?.gsCaptured ? `@ ${formatNumber(approachTelemetry?.gsCaptureTimeSec, 1, 's')}` : 'ARM'}
-                </span>
-
-                <span style={{ color: '#9ca3af' }}>Final:</span>
-                <span>
-                  {Number.isFinite(approachTelemetry?.final?.distCross)
-                    ? `${Math.abs(approachTelemetry.final.distCross).toFixed(0)} ft / ${Number.isFinite(approachTelemetry?.final?.altError) ? `${Math.abs(approachTelemetry.final.altError).toFixed(0)} ft` : '---'}`
-                    : '---'}
-                </span>
-              </div>
-            </>
-          )}
-          
-          <div style={{ margin: '8px 0', borderTop: '1px solid rgba(74, 222, 128, 0.2)' }}></div>
-          
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-             <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-               <span style={{ color: '#9ca3af' }}>Next WP:</span>
-               <span>
-                 {activeRouteWaypoints[flightData.currentWaypointIndex]?.name ||
-                  activeRouteWaypoints[flightData.currentWaypointIndex]?.id ||
-                  `IDX ${flightData.currentWaypointIndex}`}
-               </span>
-             </div>
-             <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-               <span style={{ color: '#9ca3af' }}>WP Index:</span>
-               <span>{flightData.currentWaypointIndex} / {activeRouteWaypoints.length}</span>
-             </div>
-          </div>
-        </div>
-      )}
-
       {isCrashed && (
         <div className="end-scene-overlay">
           <div className="end-scene-content">

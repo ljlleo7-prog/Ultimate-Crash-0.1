@@ -244,4 +244,39 @@ const EngineFailures = {
     }
 };
 
-export default EngineFailures;
+const createSupplementalEngineFailure = (id, name, systemAlert) => ({
+    id,
+    name,
+    category: 'engine',
+    stages: {
+        inactive: { next: 'active' },
+        active: {
+            description: (ctx = {}) => ({
+                text: ctx.engineIndex !== undefined ? `Engine ${ctx.engineIndex + 1} ${name.toLowerCase()}.` : name,
+                system_alert: systemAlert
+            }),
+            effect: () => {}
+        }
+    }
+});
+
+const SupplementalEngineFailures = {
+    ENGINE_OIL_FILTER_BYPASS: createSupplementalEngineFailure('engine_oil_filter_bypass', 'Oil Filter Bypass', 'ENG OIL FILTER'),
+    ENGINE_FUEL_NOZZLE_CLOG: createSupplementalEngineFailure('engine_fuel_nozzle_clog', 'Fuel Nozzle Clog', 'ENG FUEL NOZZLE'),
+    ENGINE_STARTER_FAILURE: createSupplementalEngineFailure('engine_starter_failure', 'Starter Failure', 'ENG STARTER'),
+    ENGINE_BLEED_LEAK: createSupplementalEngineFailure('engine_bleed_leak', 'Bleed Air Leak', 'ENG BLEED'),
+    ENGINE_OVERSPEED: createSupplementalEngineFailure('engine_overspeed', 'Core Overspeed', 'ENG OVERSPEED'),
+    ENGINE_FADEC_FAIL: createSupplementalEngineFailure('engine_fadec_fail', 'FADEC Failure', 'ENG FADEC'),
+    ENGINE_IGNITION_FAULT: createSupplementalEngineFailure('engine_ignition_fault', 'Ignition Fault', 'ENG IGN'),
+    ENGINE_FAN_BLADE_DAMAGE: createSupplementalEngineFailure('engine_fan_blade_damage', 'Fan Blade Damage', 'ENG FAN DAMAGE'),
+    ENGINE_CORE_OVERHEAT: createSupplementalEngineFailure('engine_core_overheat', 'Core Overheat', 'ENG CORE HOT'),
+    ENGINE_TURBINE_DAMAGE: createSupplementalEngineFailure('engine_turbine_damage', 'Turbine Damage', 'ENG TURBINE'),
+    ENGINE_THRUST_IMBALANCE: createSupplementalEngineFailure('engine_thrust_imbalance', 'Thrust Imbalance', 'THRUST ASYM'),
+    ENGINE_VIBRATION_SENSOR_FAIL: createSupplementalEngineFailure('engine_vibration_sensor_fail', 'Vibration Sensor Failure', 'ENG VIB MON'),
+    ENGINE_FUEL_METER_FAIL: createSupplementalEngineFailure('engine_fuel_meter_fail', 'Fuel Metering Failure', 'ENG FUEL METER')
+};
+
+export default {
+    ...EngineFailures,
+    ...SupplementalEngineFailures
+};

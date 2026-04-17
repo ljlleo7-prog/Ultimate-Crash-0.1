@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import PropTypes from 'prop-types';
 import { randomFlightService } from '../../services/randomFlightService';
-import { procedureMatchesWaypoint } from '../../utils/routeGenerator';
+import { procedureMatchesWaypoint, getLastProcedureWaypoint } from '../../utils/routeGenerator';
 
 const DEFAULT_RANDOM_ROUTE_DETAILS = {
   departureGate: '',
@@ -27,7 +27,7 @@ const FMCInit = ({ aircraftData, preflightConfig, onUpdatePreflight, aircraftSug
   const routeProcedureSummary = useMemo(() => {
     const waypoints = preflightConfig?.routeDetails?.waypoints || [];
     const firstWaypoint = waypoints[0]?.name || '';
-    const lastWaypoint = waypoints[waypoints.length - 1]?.name || '';
+    const lastWaypoint = getLastProcedureWaypoint(waypoints) || '';
     const sid = preflightConfig?.routeDetails?.sid || '';
     const star = preflightConfig?.routeDetails?.star || '';
 

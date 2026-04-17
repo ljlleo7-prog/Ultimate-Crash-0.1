@@ -75,7 +75,8 @@ class RealisticFlightPhysicsService {
             rudder: 0,   // -1 to 1 (Yaw)
             flaps: 0,    // 0 to 1
             gear: 1,     // 0 (up) to 1 (down)
-            brakes: 1.0, // Start with parking brake set
+            airBrakes: 0,
+            wheelBrakes: 0,   // Start released so pushback/taxi can move once motion is enabled
             trim: 0      // Pitch trim
         };
 
@@ -116,6 +117,7 @@ class RealisticFlightPhysicsService {
         this.time = 0;
         this.runwayGeometry = null;
         this.groundStatus = { status: 'UNKNOWN', remainingLength: 0 };
+        this.objectCollisionTimer = 0;
         this.difficulty = difficulty; // Set from constructor
         this.groundMode = false; // Ground operations mode (suppress flight warnings)
         // Initialize airport elevation from config (converted from feet to meters if provided)
@@ -471,7 +473,8 @@ class RealisticFlightPhysicsService {
                 }
 
                 // Update Runway Geometry if target is an airport with a selected runway
-                if (this.currentWaypointIndex < this.flightPlan.length) {
+                // Do not auto-switch away from the departure runway while still on the ground.
+                if (!this.onGround && this.currentWaypointIndex < this.flightPlan.length) {
                     const targetWP = this.flightPlan[this.currentWaypointIndex];
                     if ((targetWP.type === 'airport' || targetWP.type === 'runway') && targetWP.selectedRunway && targetWP.details) {
                         const airportCode = targetWP.details.iata || targetWP.details.icao || targetWP.label;
@@ -496,6 +499,7 @@ class RealisticFlightPhysicsService {
             finalInput = {
                 ...input,
                 autopilotActive: true,
+                throttles: null,
                 throttle: apOutputs.throttle,
                 pitch: apOutputs.elevator, // Map Elevator Command to Pitch Input
                 roll: apOutputs.aileron,   // Map Aileron Command to Roll Input
@@ -569,6 +573,9 @@ class RealisticFlightPhysicsService {
                 this.state.vel.set(0, 0, 0);
                 this.state.rates.set(0, 0, 0);
             }
+
+            // Keep runway/ground classification in sync with live substep motion.
+            this.updateGroundStatus();
 
             // 6. Constraints
             this.checkConstraints();
@@ -766,53 +773,7 @@ class RealisticFlightPhysicsService {
     }
 
     getRunwayBrakingData() {
-        const stages = [
-            { index: 1, label: 'NIL', brakeScale: 0.2, gripScale: 0.2 },
-            { index: 2, label: 'POOR', brakeScale: 0.35, gripScale: 0.35 },
-            { index: 3, label: 'MEDIUM/POOR', brakeScale: 0.5, gripScale: 0.5 },
-            { index: 4, label: 'MEDIUM', brakeScale: 0.65, gripScale: 0.65 },
-            { index: 5, label: 'GOOD/MEDIUM', brakeScale: 0.85, gripScale: 0.8 },
-            { index: 6, label: 'GOOD', brakeScale: 1, gripScale: 1 }
-        ];
-
-        let stageIndex = 6;
-        const runway = this.runwayGeometry || {};
-        const env = this.environment || {};
-        const tempC = Number.isFinite(env.temperature) ? env.temperature : null;
-        const precip = env.precipitation || 0;
-        const code = env.weatherCode || 0;
-        const isSnow = (code >= 71 && code <= 77) || (code >= 85 && code <= 86);
-        const isFreezing = (code >= 56 && code <= 57) || (code >= 66 && code <= 67);
-
-        if (typeof runway.brakingAction === 'string') {
-            const value = runway.brakingAction.toLowerCase();
-            if (value.includes('nil')) stageIndex = 1;
-            else if (value.includes('poor')) stageIndex = value.includes('medium') ? 3 : 2;
-            else if (value.includes('medium')) stageIndex = value.includes('good') ? 5 : 4;
-            else if (value.includes('good')) stageIndex = 6;
-        } else if (typeof runway.frictionCoefficient === 'number') {
-            const mu = runway.frictionCoefficient;
-            if (mu < 0.15) stageIndex = 1;
-            else if (mu < 0.25) stageIndex = 2;
-            else if (mu < 0.35) stageIndex = 3;
-            else if (mu < 0.45) stageIndex = 4;
-            else if (mu < 0.55) stageIndex = 5;
-            else stageIndex = 6;
-        } else {
-            if (tempC !== null && tempC <= 0) {
-                if (precip > 4 || isFreezing) stageIndex = 1;
-                else if (precip > 1 || isSnow) stageIndex = 2;
-                else if (precip > 0.2) stageIndex = 3;
-                else stageIndex = 4;
-            } else {
-                if (precip > 6) stageIndex = 3;
-                else if (precip > 2) stageIndex = 4;
-                else if (precip > 0.2) stageIndex = 5;
-                else stageIndex = 6;
-            }
-        }
-
-        const stage = stages[Math.max(0, Math.min(stages.length - 1, stageIndex - 1))];
+        const stage = this.groundInteractionService.getRunwayBrakingData(this.runwayGeometry, this.environment);
         this.runwayBraking = stage;
         return stage;
     }
@@ -923,6 +884,11 @@ class RealisticFlightPhysicsService {
                  sysEng.n2 = engine.state.n2;
                  sysEng.egt = engine.state.egt;
                  sysEng.ff = engine.state.fuelFlow;
+
+                 const engineSelfSustaining = engine.state.running || engine.state.n2 >= 55;
+                 if (sysEng.startSwitch === 'GRD' && engineSelfSustaining) {
+                     sysEng.startSwitch = 'CONT';
+                 }
              }
              
              // 5. Detect Engine Stall/Failure conditions?
@@ -1252,7 +1218,8 @@ class RealisticFlightPhysicsService {
             const P_world_z = this.state.pos.z + P_offset_earth.z;
             
             // Check against current ground height (NED Z)
-            if (P_world_z > this.currentGroundZ) {
+            // Treat exact contact as on-ground so the first substep doesn't free-fall through the support model.
+            if (P_world_z >= this.currentGroundZ) {
                 onGroundAny = true;
                 const depth = P_world_z - this.currentGroundZ;
                 
@@ -1295,7 +1262,7 @@ class RealisticFlightPhysicsService {
                 const vy_wheel = -V_point_body.x * sinS + V_point_body.y * cosS;
                 
                 // Friction Coefficients
-                const isBraking = this.controls.brakes > 0.1 && gear.name.includes('main');
+                const isBraking = this.controls.wheelBrakes > 0.1 && gear.name.includes('main');
                 let mu_roll = isBraking ? this.aircraft.brakingFriction : this.aircraft.frictionCoeff; // 0.8 or 0.02
                 let mu_slide = 0.9; // High lateral friction (0.9 for dry tarmac)
                 const brakingData = this.groundStatus && this.groundStatus.status === 'RUNWAY'
@@ -1538,9 +1505,9 @@ class RealisticFlightPhysicsService {
         // M = I * dw/dt + w x (I * w)
         // dw/dt = I_inv * (M - w x (I * w))
         // Assuming diagonal Inertia Tensor for simplicity
-        const Ix = this.aircraft.Ix;
-        const Iy = this.aircraft.Iy;
-        const Iz = this.aircraft.Iz;
+        const Ix = this.aircraft.Ix || 1000000;
+        const Iy = this.aircraft.Iy || 2000000;
+        const Iz = this.aircraft.Iz || 3000000;
         
         const p = this.state.rates.x;
         const q = this.state.rates.y;
@@ -1575,7 +1542,8 @@ class RealisticFlightPhysicsService {
         this.state.quat.normalize();
 
         // Hard Stop for Low Speed Ground Stability
-        if (this.onGround && this.state.vel.magnitude() < 0.5 && this.controls.throttle < 0.1) {
+        const brakingToHold = this.controls.wheelBrakes > 0.1 || this.systems?.brakes?.parkingBrake === true;
+        if (this.onGround && brakingToHold && this.state.vel.magnitude() < 0.5 && this.controls.throttle < 0.1) {
             this.state.vel = new Vector3(0, 0, 0);
             this.state.rates = new Vector3(0, 0, 0);
         }
@@ -1616,11 +1584,22 @@ class RealisticFlightPhysicsService {
         // 2. Obstacle Collision Check (New Safety Rules)
         // Rule: Safe at 0ft only on RUNWAY or GRASS. Unsafe (< 10ft) elsewhere.
         if (!this.crashed && altitude < 3.05) { // < 10 ft
-            if (this.groundStatus.status === 'OBJECTS') {
-                this.crashed = true;
-                this.crashReason = "Collision with Ground Objects";
-                console.log("CRASH: Collision with objects at altitude " + altitude.toFixed(2) + "m");
+            const groundStatus = this.groundStatus?.status;
+            const speed = typeof this.state.vel?.magnitude === 'function' ? this.state.vel.magnitude() : 0;
+            const groundedTaxiLike = this.onGround && speed < 80;
+
+            if (groundStatus === 'OBJECTS' && !groundedTaxiLike) {
+                this.objectCollisionTimer += 0.016;
+                if (this.objectCollisionTimer >= 0.5) {
+                    this.crashed = true;
+                    this.crashReason = "Collision with Ground Objects";
+                    console.log("CRASH: Collision with objects at altitude " + altitude.toFixed(2) + "m");
+                }
+            } else {
+                this.objectCollisionTimer = 0;
             }
+        } else {
+            this.objectCollisionTimer = 0;
         }
     }
 
@@ -1734,7 +1713,8 @@ class RealisticFlightPhysicsService {
             engineThrottles: Array.isArray(this.controls.engineThrottles) ? [...this.controls.engineThrottles] : [],
             flaps: this.controls.flaps,
             gear: this.controls.gear > 0.5,
-            airBrakes: this.controls.brakes, // Mapping brakes to airbrakes for now
+            airBrakes: this.controls.airBrakes,
+            wheelBrakes: this.controls.wheelBrakes,
             verticalSpeed: applyNoise(vs * 196.85), // m/s -> ft/min
             hasCrashed: this.crashed,
             crashWarning: this.crashReason,
@@ -1764,9 +1744,8 @@ class RealisticFlightPhysicsService {
                 cloudCover: this.environment?.cloudCover || 0,
                 temperature: this.environment?.temperature ?? null
             },
-            runwayBraking: this.onGround && this.groundStatus?.status === 'RUNWAY' ? this.getRunwayBrakingData() : null,
-            
-            // Debug / Derived
+            thrust: Number.isFinite(this.thrustForces?.x) ? this.thrustForces.x : 0,
+            drag: Number.isFinite(this.aeroForces?.x) ? Math.abs(this.aeroForces.x) : 0,
             derived: {
                 altitude_ft: altitudeAMSL * 3.28084, // Display AMSL
                 altitude_agl_ft: altitudeAGL * 3.28084,
@@ -1815,8 +1794,14 @@ class RealisticFlightPhysicsService {
     
     // Interface methods required by the hook
     setFlaps(val) { this.controls.flaps = val; }
-    setGear(val) { this.controls.gear = val ? 1 : 0; }
-    setAirBrakes(val) { this.controls.brakes = val; }
+    setGear(val) {
+        if (this.onGround && !val) {
+            return;
+        }
+        this.controls.gear = val ? 1 : 0;
+    }
+    setAirBrakes(val) { this.controls.airBrakes = val; }
+    setWheelBrakes(val) { this.controls.wheelBrakes = Math.max(0, Math.min(1, Number.isFinite(val) ? val : 0)); }
     setTrim(val) { this.controls.trim = val; }
     setAutopilot(engaged, targets) {
         // If targets provided, set them
@@ -1903,15 +1888,35 @@ class RealisticFlightPhysicsService {
              else if (action === 'eng4_fuel' && this.systems.engines.eng4) this.systems.engines.eng4.fuelControl = toggle(this.systems.engines.eng4.fuelControl);
         }
         else if (system === 'fire') {
+            const normalizedAction = String(action)
+                .replace(/Handle$/, '_handle')
+                .replace(/^eng(\d+)Handle$/, 'eng$1_handle')
+                .replace(/^apuHandle$/, 'apu_handle')
+                .replace(/^bottle(\d+)_discharge$/, 'eng1_bottle$1');
+
             // Fire Handles
-            if (action === 'eng1_handle') this.systems.fire.eng1Handle = toggle(this.systems.fire.eng1Handle);
-            else if (action === 'eng2_handle') this.systems.fire.eng2Handle = toggle(this.systems.fire.eng2Handle);
-            else if (action === 'apu_handle') this.systems.fire.apuHandle = toggle(this.systems.fire.apuHandle);
-            
+            if (normalizedAction === 'eng1_handle') this.systems.fire.eng1Handle = toggle(this.systems.fire.eng1Handle);
+            else if (normalizedAction === 'eng2_handle') this.systems.fire.eng2Handle = toggle(this.systems.fire.eng2Handle);
+            else if (normalizedAction === 'apu_handle') this.systems.fire.apuHandle = toggle(this.systems.fire.apuHandle);
+
             // Bottle Discharge (Requires handle pulled usually, but we check in logic)
-            else if (action === 'eng1_bottle1') this.systems.fire.bottle1_discharge = true; // Momentary
-            else if (action === 'eng1_bottle2') this.systems.fire.bottle2_discharge = true;
-            // ... add more if needed
+            else if (normalizedAction === 'eng1_bottle1') this.systems.fire.bottle1_discharge = true; // Momentary
+            else if (normalizedAction === 'eng1_bottle2') this.systems.fire.bottle2_discharge = true;
+            else if (normalizedAction === 'eng2_bottle1') this.systems.fire.bottle1_discharge = true;
+            else if (normalizedAction === 'eng2_bottle2') this.systems.fire.bottle2_discharge = true;
+            else if (normalizedAction === 'apu_bottle1') this.systems.fire.bottle1_discharge = true;
+            else if (normalizedAction === 'apu_bottle2') this.systems.fire.bottle2_discharge = true;
+        }
+        else if (system === 'brakes') {
+            if (action === 'parkingBrake') {
+                const nextValue = value !== undefined ? !!value : !this.systems.brakes.parkingBrake;
+                this.systems.brakes.parkingBrake = nextValue;
+                this.controls.wheelBrakes = nextValue ? 1 : 0;
+            } else if (action === 'autobrake') {
+                this.systems.brakes.autobrake = value ?? this.systems.brakes.autobrake;
+            } else {
+                console.warn(`Brakes action ${action} not found`);
+            }
         }
         else if (system === 'transponder') {
             // Transponder has specific fields
@@ -2110,7 +2115,9 @@ class RealisticFlightPhysicsService {
     }
 
     getRunwayBrakingData() {
-        return this.groundInteractionService.getRunwayBrakingData();
+        const stage = this.groundInteractionService.getRunwayBrakingData(this.runwayGeometry, this.environment);
+        this.runwayBraking = stage;
+        return stage;
     }
 
     /**
@@ -2221,6 +2228,16 @@ class RealisticFlightPhysicsService {
     setInitialConditions(conditions) {
         if (!conditions) return;
 
+        const hasKinematicResetFields = Boolean(
+            conditions.position !== undefined ||
+            conditions.velocity !== undefined ||
+            conditions.orientation !== undefined ||
+            conditions.latitude !== undefined ||
+            conditions.longitude !== undefined ||
+            conditions.altitude !== undefined ||
+            conditions.speed !== undefined
+        );
+
         // Position
         if (conditions.latitude !== undefined) this.state.geo.lat = conditions.latitude;
         if (conditions.longitude !== undefined) this.state.geo.lon = conditions.longitude;
@@ -2270,7 +2287,11 @@ class RealisticFlightPhysicsService {
             this.controls.engineThrottles.fill(0.65);
             this.controls.gear = 0;
             this.controls.flaps = 0;
-            this.controls.brakes = 0;
+            this.controls.airBrakes = 0;
+            this.controls.wheelBrakes = 0;
+            if (this.systems?.brakes) {
+                this.systems.brakes.parkingBrake = false;
+            }
         }
 
         // Flight Plan
@@ -2294,7 +2315,13 @@ class RealisticFlightPhysicsService {
             this.engines.forEach(e => e.setThrottle(conditions.throttle));
         }
         if (conditions.brakes !== undefined) {
-            this.controls.brakes = conditions.brakes;
+            this.controls.wheelBrakes = Math.max(0, Math.min(1, conditions.brakes));
+            if (this.systems?.brakes) {
+                this.systems.brakes.parkingBrake = conditions.brakes > 0.1;
+            }
+        }
+        if (conditions.airBrakes !== undefined) {
+            this.controls.airBrakes = conditions.airBrakes;
         }
         if (conditions.gear !== undefined) {
             this.controls.gear = conditions.gear ? 1 : 0;
@@ -2302,9 +2329,11 @@ class RealisticFlightPhysicsService {
 
         const initialVelocity = this.state.vel.clone ? this.state.vel.clone() : new Vector3(this.state.vel.x, this.state.vel.y, this.state.vel.z);
 
-        // Reset velocities and rates for initial state
+        // Reset velocities and rates only for true kinematic reinitialization
         this.state.vel = new Vector3(initialVelocity.x, initialVelocity.y, initialVelocity.z);
-        this.state.rates = new Vector3(0, 0, 0);
+        if (hasKinematicResetFields) {
+            this.state.rates = new Vector3(0, 0, 0);
+        }
         
         // Update autopilot targets if available
         if (conditions.orientation && conditions.orientation.psi !== undefined) {
@@ -2525,6 +2554,7 @@ class RealisticFlightPhysicsService {
         // 3. Reset Crash State & Re-validate Ground Status
         this.crashed = false;
         this.crashReason = "";
+        this.objectCollisionTimer = 0;
         this.time = data.flightData?.frame ? (data.flightData.frame * 0.016) : 0; // Approximate time
         
         // Ensure altitude is safe if we just loaded
@@ -2614,7 +2644,7 @@ class RealisticFlightPhysicsService {
         
         // Handle legacy profile structure (fallback)
         if (profile && profile.airPosition && !profile.positions) {
-            const brakeInput = this.controls.brakes;
+            const brakeInput = this.controls.airBrakes;
             
             if (profile.hasTwoTier) {
                 // Map indices to legacy behavior roughly
@@ -2653,7 +2683,7 @@ class RealisticFlightPhysicsService {
             return { cl: 0, cd: 0 };
         }
 
-        let brakeInput = this.controls.brakes; // Interpreted as Index (0 to MaxIndex)
+        let brakeInput = this.controls.airBrakes;
         const positions = profile.positions;
         const numPositions = positions.length;
         const maxIndex = numPositions - 1;
@@ -2725,6 +2755,7 @@ class RealisticFlightPhysicsService {
         this.state.rates = new Vector3(0, 0, 0);
         this.state.quat = new Quaternion();
         this.crashed = false;
+        this.objectCollisionTimer = 0;
         this.currentWaypointIndex = 0;
         
         // Reset Controls
@@ -2733,7 +2764,8 @@ class RealisticFlightPhysicsService {
         this.controls.aileron = 0;
         this.controls.elevator = 0;
         this.controls.rudder = 0;
-        this.controls.brakes = 0;
+        this.controls.airBrakes = 0;
+        this.controls.wheelBrakes = 0;
 
         // Reset Engines
         this.engines.forEach(e => { 

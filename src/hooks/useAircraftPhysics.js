@@ -17,9 +17,13 @@ export function useAircraftPhysics(config = {}, autoStart = true) {
   const { flightData, updateFromPhysics } = useFlightState();
 
   const handlePhysicsUpdate = useCallback((newState) => {
-    if (!newState || !physicsServiceRef.current) return;
-    setPhysicsState(newState);
-    updateFromPhysics(newState, physicsServiceRef.current);
+    if (!physicsServiceRef.current) return;
+
+    const resolvedState = physicsServiceRef.current.getOutputState?.() ?? newState;
+    if (!resolvedState) return;
+
+    setPhysicsState(resolvedState);
+    updateFromPhysics(resolvedState, physicsServiceRef.current);
   }, [updateFromPhysics]);
 
   const controls = useFlightControls(physicsServiceRef);
@@ -35,9 +39,17 @@ export function useAircraftPhysics(config = {}, autoStart = true) {
   }, [loopUpdatePhysics, controls]);
 
   useEffect(() => {
+    if (physicsServiceRef.current) {
+      return;
+    }
+
+    let cancelled = false;
+
     async function init() {
       try {
         const db = await loadAircraftData().catch(() => null);
+        if (cancelled || physicsServiceRef.current) return;
+
         const aircraft = db?.find(a => a.model === config.aircraftModel) || db?.[0] || {
           name: 'Boeing 737-800',
           mass: 41410,
@@ -64,7 +76,7 @@ export function useAircraftPhysics(config = {}, autoStart = true) {
             failureType: config.failureType
           });
 
-          const airport = config.departure?.iata || config.arrival?.iata;
+          const airport = config.departure?.iata || config.departure?.icao || config.arrival?.iata || config.arrival?.icao;
           const runway = config.departureRunway || config.arrivalRunway;
           if (airport) {
             const geometry = airportService.getRunwayGeometry(airport, runway);
@@ -72,15 +84,23 @@ export function useAircraftPhysics(config = {}, autoStart = true) {
           }
         }
 
+        if (cancelled || physicsServiceRef.current) return;
+
         physicsServiceRef.current = service;
         coordinatorRef.current = new PhysicsCoordinator(service);
         handlePhysicsUpdate(service.getOutputState ? service.getOutputState() : null);
         setIsInitialized(true);
       } catch (err) {
-        setError(err.message);
+        if (!cancelled) {
+          setError(err.message);
+        }
       }
     }
     init();
+
+    return () => {
+      cancelled = true;
+    };
   }, [
     handlePhysicsUpdate,
     config.aircraftModel,

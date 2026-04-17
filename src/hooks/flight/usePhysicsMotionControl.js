@@ -11,10 +11,10 @@ export default function usePhysicsMotionControl({
     useEffect(() => {
         if (!motionController || !isInitialized) return;
 
-        const isParkedPhase = ['boarding', 'departure_clearance', 'pushback'].includes(phaseType);
+        const isParkedPhase = phaseType === 'boarding' || phaseType === 'departure_clearance';
         onParkedPhaseChange?.(isParkedPhase);
 
-        const shouldFreeze = !isTutorial && isParkedPhase;
+        const shouldFreeze = false;
 
         if (typeof motionController === 'function') {
             motionController(!shouldFreeze);

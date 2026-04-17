@@ -311,6 +311,16 @@ export const ATC_RESPONSES = {
 };
 
 export const getATCResponse = (templateId, params, context) => {
+  const generator = ATC_RESPONSES[templateId];
+  if (templateId === 'req_atis' && generator) {
+    let response = generator(params, context);
+    if (!response) return null;
+    if (context?.callsign) {
+      response = response.replace('{callsign}', context.callsign);
+    }
+    return response;
+  }
+
   const intent = resolveIntent(templateId, params, context);
   const phaseOfFlight = resolvePhaseOfFlight(context);
   const speakerRole = resolveSpeakerRole(context);
@@ -321,11 +331,10 @@ export const getATCResponse = (templateId, params, context) => {
     if (rendered) return rendered;
   }
 
-  const generator = ATC_RESPONSES[templateId];
   if (generator) {
     let response = generator(params, context);
     if (!response) return null; // No response needed
-    
+
     // Replace context placeholders
     if (context.callsign) {
       response = response.replace('{callsign}', context.callsign);

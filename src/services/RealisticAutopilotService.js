@@ -60,54 +60,37 @@ class RealisticAutopilotService {
         // --- PID Configurations ---
         
         // Auto-Throttle
-        this.speedPID = new PIDController(0.08, 0.02, 0.05, 0.0, 1.0, 0.8); // More assertive speed hold
+        this.speedPID = new PIDController(0.06, 0.012, 0.025, 0.0, 1.0, 0.45); // Smooth but authoritative speed hold
 
         // Vertical Speed (VS -> Pitch)
-        // CRITICAL: No smoothing to prevent overspeed crashes
-        // Increased Max Pitch Down to -15 deg to allow steeper descents if needed
-        // Reduced Kp (0.00015 -> 0.00010) to improve stability and prevent diverging oscillations
-        this.vsPID = new PIDController(0.00010, 0.00005, 0.00005, -15 * Math.PI/180, 20 * Math.PI/180, 1.0);
+        // Softer outer-loop pitch target prevents step changes from becoming elevator snaps.
+        this.vsPID = new PIDController(0.000075, 0.000025, 0.000025, -12 * Math.PI/180, 15 * Math.PI/180, 0.45);
 
         // Altitude Hold (Altitude -> Target VS)
         // Used when not in ILS GS mode but Altitude Target is set.
-        // Kp = 1.5 (1000ft error -> 1500fpm).
-        this.altitudePID = new PIDController(1.5, 0.01, 0.0, -3000, 3000, 1.0);
+        this.altitudePID = new PIDController(1.0, 0.004, 0.0, -2200, 2200, 0.5);
 
         // Pitch Attitude (Target Pitch -> Elevator)
-        // Inner Loop: MUST be fast. No smoothing (1.0).
-        // Reduced Kp (-4.0 -> -2.5) to prevent over-reaction
-        // Increased Kd (-0.2 -> -0.8) for better damping
-        this.pitchPID = new PIDController(-2.5, -1.0, -0.8, -1.0, 1.0, 1.0);
+        // Inner loop remains responsive, but derivative smoothing and lower gains avoid jerky reversals.
+        this.pitchPID = new PIDController(-1.55, -0.35, -0.45, -0.85, 0.85, 0.35);
 
         // Roll Hold (Roll -> Aileron)
-        // Inner Loop: MUST be fast. No smoothing (1.0).
-        // Reduced Kp (3.0 -> 2.0) to prevent physics instability
-        this.rollPID = new PIDController(1.8, 0.3, 0.25, -1.0, 1.0, 0.9);
+        this.rollPID = new PIDController(1.15, 0.12, 0.16, -0.85, 0.85, 0.35);
 
         // Heading Hold (Heading -> Roll)
         // Outer Loop: Smooths the roll commands.
-        this.headingPID = new PIDController(1.0, 0.02, 0.3, -30 * Math.PI / 180, 30 * Math.PI / 180, 0.8);
+        this.headingPID = new PIDController(0.75, 0.008, 0.16, -25 * Math.PI / 180, 25 * Math.PI / 180, 0.35);
 
         // Turn Coordination
-        // Inner Loop: Fast.
-        // Reduced Kp (2.0 -> 0.5) to prevent fighting the turn
-        this.rudderPID = new PIDController(0.5, 0.1, 0.5, -1.0, 1.0, 1.0);
+        this.rudderPID = new PIDController(0.28, 0.035, 0.16, -0.65, 0.65, 0.3);
 
         // --- ILS PID Configurations ---
-        
+
         // Glideslope (Altitude Error -> Target VS)
-        // CRITICAL: No smoothing to ensure fast descent arrest
-        // Reduced Kp to 6.0 and Max Descent to -2000 for stability
-        this.glideslopePID = new PIDController(6.0, 0.1, 2.0, -2000, 1500, 1.0); 
+        this.glideslopePID = new PIDController(4.0, 0.04, 0.9, -1500, 1100, 0.35);
 
         // Localizer (Angular Deviation -> Target Heading Adjustment)
-        // Increased Kp to 12.0 for better capture at distance.
-        // Angular deviation is small far out, so we need high gain.
-        // Close in, deviation grows, so high gain might oscillate.
-        // But max output is limited to 45 deg.
-        // Increased Kd to 15.0 to dampen oscillations
-        // Ki 0.5 for stronger steady-state correction (Target < 20ft error)
-        this.localizerPID = new PIDController(12.0, 0.5, 15.0, -60, 60, 1.0); // Output limited to +/- 60 deg correction
+        this.localizerPID = new PIDController(8.0, 0.18, 6.0, -35, 35, 0.3); // Output limited to +/- 35 deg correction
 
         this.engaged = false;
         this.mode = 'HDG'; // Default mode
@@ -138,12 +121,12 @@ class RealisticAutopilotService {
         this.navState = { preTurnEngaged: false };
         this.filteredState = null;
         this.outputState = null;
-        this.inputFilterTau = 0.4;
+        this.inputFilterTau = 0.8;
         this.outputRateLimits = {
-            throttle: 0.6,
-            elevator: 1.2,
-            aileron: 1.5,
-            rudder: 1.5
+            throttle: 0.35,
+            elevator: 0.55,
+            aileron: 0.75,
+            rudder: 0.55
         };
     }
 

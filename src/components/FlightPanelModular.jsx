@@ -34,19 +34,19 @@ const FlightPanelModular = ({ flightData, physicsState, physicsService, weatherD
 
   const [flightState, setFlightState] = useState({
     // Navigation
-    heading: flightData?.heading || 270,
-    trueAirspeed: flightData?.airspeed || 450,
-    groundSpeed: flightData?.airspeed || 430,
-    indicatedAirspeed: flightData?.indicatedAirspeed || 280,
+    heading: flightData?.heading ?? 270,
+    trueAirspeed: flightData?.airspeed ?? 450,
+    groundSpeed: flightData?.groundSpeed ?? flightData?.airspeed ?? 430,
+    indicatedAirspeed: flightData?.indicatedAirspeed ?? 280,
     latitude: (flightData && flightData.position && typeof flightData.position.latitude === 'number') ? flightData.position.latitude : 0,
     longitude: (flightData && flightData.position && typeof flightData.position.longitude === 'number') ? flightData.position.longitude : 0,
     radioFreq: 121.5,
     
     // Flight Pose
-    pitch: flightData?.pitch || 2.5,
-    roll: flightData?.roll || 0.5,
-    verticalSpeed: flightData?.verticalSpeed || 1200,
-    altitude: flightData?.altitude || 35000,
+    pitch: flightData?.pitch ?? 2.5,
+    roll: flightData?.roll ?? 0.5,
+    verticalSpeed: flightData?.verticalSpeed ?? 1200,
+    altitude: flightData?.altitude ?? 35000,
     altimeter: 29.92,
     localQNH: weatherData?.pressureInHg || 29.92,
     
@@ -98,7 +98,7 @@ const FlightPanelModular = ({ flightData, physicsState, physicsService, weatherD
     crashWarning: null,
     timeToCrash: null,
     hasCrashed: false,
-    frame: flightData?.frame || 0
+    frame: flightData?.frame ?? 0
   });
   
   // Update flightState when flightData changes
@@ -108,10 +108,10 @@ const FlightPanelModular = ({ flightData, physicsState, physicsService, weatherD
         const nextState = {
           ...prevState,
           // Navigation
-          heading: flightData.heading,
-          trueAirspeed: flightData.airspeed,
-          groundSpeed: flightData.groundSpeed !== undefined ? flightData.groundSpeed : flightData.airspeed,
-          indicatedAirspeed: flightData.indicatedAirspeed ?? 0,
+          heading: flightData.heading ?? prevState.heading,
+          trueAirspeed: flightData.airspeed ?? prevState.trueAirspeed,
+          groundSpeed: flightData.groundSpeed ?? prevState.groundSpeed,
+          indicatedAirspeed: flightData.indicatedAirspeed ?? prevState.indicatedAirspeed,
           radioFreq: prevState.radioFreq,
           latitude: (flightData && flightData.position && typeof flightData.position.latitude === 'number') ? flightData.position.latitude : prevState.latitude,
           longitude: (flightData && flightData.position && typeof flightData.position.longitude === 'number') ? flightData.position.longitude : prevState.longitude,
@@ -168,6 +168,7 @@ const FlightPanelModular = ({ flightData, physicsState, physicsService, weatherD
           flaps: (typeof flightData.flaps === 'number') ? flightData.flaps : (flightData.flapsValue || 0),
           gearDown: (typeof flightData.gear === 'boolean') ? flightData.gear : (flightData.gearValue > 0.5),
           airBrakesValue: flightData.airBrakesValue,
+          wheelBrakesValue: typeof flightData.wheelBrakesValue === 'number' ? flightData.wheelBrakesValue : prevState.wheelBrakesValue,
           trimValue: typeof flightData.trimValue === 'number' ? flightData.trimValue : prevState.trimValue,
 
           // Autopilot - Update from physics service status
@@ -301,6 +302,12 @@ const FlightPanelModular = ({ flightData, physicsState, physicsService, weatherD
     }
   };
 
+  const controlWheelBrakes = (position) => {
+    if (onActionRequest) {
+      onActionRequest('wheelBrakes', position);
+    }
+  };
+
   const controlGear = (position) => {
     if (onActionRequest) {
       onActionRequest('gear', position);
@@ -326,8 +333,9 @@ const FlightPanelModular = ({ flightData, physicsState, physicsService, weatherD
   const handleSidebarToggle = (panelId) => {
     if (panelId === 'inspect') {
       if (onActionRequest) {
-        onActionRequest('toggle-debug');
+        onActionRequest('toggle-debug', { target: 'physics' });
       }
+      setActiveSidebarPanel(prev => prev === panelId ? null : panelId);
     } else {
       setActiveSidebarPanel(prev => prev === panelId ? null : panelId);
     }
@@ -344,7 +352,7 @@ const FlightPanelModular = ({ flightData, physicsState, physicsService, weatherD
   const renderContent = () => {
     // PHY-OFF INTERFACE (Immersive Narrative Mode)
     // Show this mode if physics is off OR if we are in a narrative-heavy phase (like Boarding)
-    const isNarrativePhase = ['BOARDING', 'DEPARTURE_CLEARANCE', 'PUSHBACK'].includes(flightState.flightPhase);
+    const isNarrativePhase = ['BOARDING', 'DEPARTURE_CLEARANCE'].includes(flightState.flightPhase);
     
     if (!flightState.physicsActive || isNarrativePhase) {
       return React.createElement('div', { 
@@ -448,39 +456,35 @@ const FlightPanelModular = ({ flightData, physicsState, physicsService, weatherD
         React.createElement('div', { style: { position: 'relative' } },
           React.createElement('button', {
             onClick: () => {
-              const canContinue = startupStatus ? startupStatus.canContinue : true;
-              if (canContinue && onActionRequest) onActionRequest('skip-phase');
+              if (onActionRequest) onActionRequest('skip-phase');
             },
-            disabled: startupStatus && !startupStatus.canContinue,
             style: {
               padding: '12px 30px',
               background: 'transparent',
-              border: `1px solid ${(startupStatus && !startupStatus.canContinue) ? '#6b7280' : '#4ade80'}`,
-              color: (startupStatus && !startupStatus.canContinue) ? '#6b7280' : '#4ade80',
+              border: '1px solid #4ade80',
+              color: '#4ade80',
               borderRadius: '4px',
-              cursor: (startupStatus && !startupStatus.canContinue) ? 'not-allowed' : 'pointer',
+              cursor: 'pointer',
               fontSize: '1rem',
               letterSpacing: '2px',
               transition: 'all 0.3s ease',
-              opacity: (startupStatus && !startupStatus.canContinue) ? 0.5 : 0.8,
+              opacity: 0.8,
               textTransform: 'uppercase'
             },
             onMouseEnter: (e) => {
-              if (startupStatus && !startupStatus.canContinue) return;
               e.target.style.background = 'rgba(74, 222, 128, 0.1)';
               e.target.style.opacity = 1;
               e.target.style.boxShadow = '0 0 15px rgba(74, 222, 128, 0.2)';
             },
             onMouseLeave: (e) => {
-              if (startupStatus && !startupStatus.canContinue) return;
               e.target.style.background = 'transparent';
               e.target.style.opacity = 0.8;
               e.target.style.boxShadow = 'none';
             }
           }, `${t('ui.startup.continue') || 'CONTINUE'} ►`),
-          
+
           // Startup Requirements Tooltip
-          startupStatus && !startupStatus.canContinue && startupStatus.missingItems && startupStatus.missingItems.length > 0 &&
+          startupStatus && startupStatus.missingItems && startupStatus.missingItems.length > 0 &&
           React.createElement('div', {
             style: {
               position: 'absolute',
@@ -579,6 +583,7 @@ const FlightPanelModular = ({ flightData, physicsState, physicsService, weatherD
           controlFlaps,
           controlGear,
           controlAirBrakes,
+          controlWheelBrakes,
           controlTrim: (payload) => onActionRequest('trim', payload),
           flightState,
           aircraftModel
@@ -597,9 +602,9 @@ const FlightPanelModular = ({ flightData, physicsState, physicsService, weatherD
       onClose: () => setActiveSidebarPanel(null),
       flightPlan: flightPlan,
       onUpdateFlightPlan: onUpdateFlightPlan,
-      flightState: flightState,
-      aircraftData: aircraftData || { name: aircraftModel, mass: 70000 },
-      weatherData: weatherData
+      weatherData: weatherData,
+      aircraftModel: aircraftModel,
+      aircraftData: aircraftData
     }),
 
     // Timer Panel Overlay
@@ -690,7 +695,8 @@ const FlightPanelModular = ({ flightData, physicsState, physicsService, weatherD
         onClose: () => setShowOverhead(false),
         flightState,
         onSystemAction: handleSystemAction,
-        aircraftModel: aircraftModel // Pass model for styling
+        aircraftModel: aircraftModel,
+        aircraftData: aircraftData
       }),
 
       // Circuit Breaker Panel Overlay

@@ -4,7 +4,7 @@ import { airportService } from '../services/airportService';
 import { useLanguage } from '../contexts/LanguageContext';
 import './FlightComputerPanel.css';
 
-const FlightComputerPanel = ({ onClose, flightPlan, onUpdateFlightPlan, flightState, onActionRequest }) => {
+const FlightComputerPanel = ({ onClose, flightPlan, onUpdateFlightPlan, flightState, onActionRequest, aircraftModel, aircraftData }) => {
   const { t } = useLanguage();
   const [activeTab, setActiveTab] = useState('waypoints'); // 'waypoints', 'add', 'nearest'
   const [waypoints, setWaypoints] = useState([]);
@@ -366,7 +366,10 @@ const FlightComputerPanel = ({ onClose, flightPlan, onUpdateFlightPlan, flightSt
   return (
     <div className="flight-computer-panel">
       <div className="fc-header">
-        <h3>{t('ui.flight_computer.title')}</h3>
+        <div>
+          <h3>{t('ui.flight_computer.title')}</h3>
+          <div className="fc-aircraft-label">{aircraftData?.name || aircraftModel || 'Unknown aircraft'}</div>
+        </div>
         <button className="close-btn" onClick={onClose}>×</button>
       </div>
       
@@ -765,7 +768,14 @@ FlightComputerPanel.propTypes = {
       nav1Frequency: PropTypes.number
     })
   }),
-  onActionRequest: PropTypes.func
+  onActionRequest: PropTypes.func,
+  aircraftModel: PropTypes.string,
+  aircraftData: PropTypes.shape({
+    name: PropTypes.string,
+    model: PropTypes.string,
+    emptyWeight: PropTypes.number,
+    mass: PropTypes.number
+  })
 };
 
 export default FlightComputerPanel;

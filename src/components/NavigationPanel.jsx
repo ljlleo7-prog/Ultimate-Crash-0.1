@@ -9,10 +9,10 @@ const NavigationPanel = ({ flightState, selectedArrival, flightPlan, npcs = [] }
   const lastTerrainUpdateRef = useRef(0);
   const [mapRange, setMapRange] = useState(40); // Default 40nm
 
-  const groundSpeed = flightState?.groundSpeed || 0;
-  const trueAirspeed = flightState?.trueAirspeed || 0;
-  const heading = flightState?.heading || 0;
-  const altitude = flightState?.altitude || 0;
+  const groundSpeed = Number.isFinite(flightState?.groundSpeed) ? flightState.groundSpeed : 0;
+  const trueAirspeed = Number.isFinite(flightState?.trueAirspeed) ? flightState.trueAirspeed : 0;
+  const heading = Number.isFinite(flightState?.heading) ? flightState.heading : 0;
+  const altitude = Number.isFinite(flightState?.altitude) ? flightState.altitude : 0;
 
   const waypoints = useMemo(() => (
     Array.isArray(flightPlan?.waypoints) ? flightPlan.waypoints : []

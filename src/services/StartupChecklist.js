@@ -91,15 +91,14 @@ export const checkStartupRequirements = (phase, systems, engines = []) => {
         }
 
         const engineCount = engineEntries.length || 2;
-        // Check ALL engines, not just the first 2 (supports 4-engine aircraft)
-        const requiredEngines = engineCount; 
+        const requiredEngines = engineCount;
 
         for (let i = 0; i < requiredEngines; i++) {
             const eng = engineEntries[i];
             const n2 = eng ? (typeof eng.n2 === 'number' ? eng.n2 : eng.state && eng.state.n2) : null;
-            const engRunning = typeof n2 === 'number' && n2 > 50;
+            const engRunning = typeof n2 === 'number' && n2 >= 44;
             if (!engRunning) {
-                missingItems.push(`Engine ${i + 1} Running (N2 > 50%)`);
+                missingItems.push(`Engine ${i + 1} Running (N2 ≥ 45%)`);
             }
         }
 
@@ -108,14 +107,6 @@ export const checkStartupRequirements = (phase, systems, engines = []) => {
             if (!systems.electrical?.[genKey]) {
                 missingItems.push(`Generator ${i + 1} ON`);
             }
-        }
-
-        if (systems.apu?.running || systems.electrical?.apuGen) {
-            missingItems.push('APU Shutdown & APU Gen OFF');
-        }
-
-        if (systems.adirs && !systems.adirs.aligned) {
-            missingItems.push('ADIRS Alignment Complete');
         }
     }
 

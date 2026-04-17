@@ -126,4 +126,37 @@ const SensorFailures = {
     }
 };
 
-export default SensorFailures;
+const createSupplementalSensorFailure = (id, name, systemAlert) => ({
+    id,
+    name,
+    category: 'sensors',
+    stages: {
+        inactive: { next: 'active' },
+        active: {
+            description: () => ({
+                text: name,
+                system_alert: systemAlert
+            }),
+            effect: () => {}
+        }
+    }
+});
+
+const SupplementalSensorFailures = {
+    IRS_ALIGNMENT_FAIL: createSupplementalSensorFailure('irs_alignment_fail', 'IRS Alignment Failure', 'IRS ALIGN'),
+    ADIRU_FAIL: createSupplementalSensorFailure('adiru_fail', 'ADIRU Failure', 'ADIRU'),
+    RADIO_ALTIMETER_BIAS: createSupplementalSensorFailure('radio_altimeter_bias', 'Radio Altimeter Bias', 'RAD ALT'),
+    MARKER_BEACON_FAIL: createSupplementalSensorFailure('marker_beacon_fail', 'Marker Beacon Failure', 'MKR BCN'),
+    GLIDESLOPE_FLAG: createSupplementalSensorFailure('glideslope_flag', 'Glideslope Flag', 'GS FLAG'),
+    LOCALIZER_FLAG: createSupplementalSensorFailure('localizer_flag', 'Localizer Flag', 'LOC FLAG'),
+    WEATHER_RADAR_FAIL: createSupplementalSensorFailure('weather_radar_fail', 'Weather Radar Failure', 'WXR FAIL'),
+    TCAS_FAIL: createSupplementalSensorFailure('tcas_fail', 'TCAS Failure', 'TCAS FAIL'),
+    TRANSPONDER_FAIL: createSupplementalSensorFailure('transponder_fail', 'Transponder Failure', 'XPDR FAIL'),
+    STANDBY_AIRSPEED_FAIL: createSupplementalSensorFailure('standby_airspeed_fail', 'Standby Airspeed Failure', 'STBY IAS'),
+    ATTITUDE_INDICATOR_FAIL: createSupplementalSensorFailure('attitude_indicator_fail', 'Attitude Indicator Failure', 'ATT FAIL')
+};
+
+export default {
+    ...SensorFailures,
+    ...SupplementalSensorFailures
+};

@@ -264,4 +264,36 @@ const EnvironmentFailures = {
     }
 };
 
-export default EnvironmentFailures;
+const createSupplementalEnvironmentFailure = (id, name, systemAlert) => ({
+    id,
+    name,
+    category: 'environment',
+    stages: {
+        inactive: { next: 'active' },
+        active: {
+            description: () => ({
+                text: name,
+                system_alert: systemAlert
+            }),
+            effect: () => {}
+        }
+    }
+});
+
+const SupplementalEnvironmentFailures = {
+    MICROBURST: createSupplementalEnvironmentFailure('microburst', 'Microburst Encounter', 'WINDSHEAR'),
+    VOLCANIC_ASH: createSupplementalEnvironmentFailure('volcanic_ash', 'Volcanic Ash Ingestion', 'ASH CLOUD'),
+    HAIL_DAMAGE: createSupplementalEnvironmentFailure('hail_damage', 'Hail Damage', 'HAIL DAMAGE'),
+    LIGHTNING_STRIKE: createSupplementalEnvironmentFailure('lightning_strike', 'Lightning Strike', 'LIGHTNING'),
+    WAKE_TURBULENCE: createSupplementalEnvironmentFailure('wake_turbulence', 'Wake Turbulence Encounter', 'WAKE TURB'),
+    RUNWAY_CONTAMINATION: createSupplementalEnvironmentFailure('runway_contamination', 'Runway Contamination', 'RWY CONTAM'),
+    HEAVY_PRECIPITATION: createSupplementalEnvironmentFailure('heavy_precipitation', 'Heavy Precipitation', 'HEAVY RAIN'),
+    MOUNTAIN_WAVE: createSupplementalEnvironmentFailure('mountain_wave', 'Mountain Wave', 'MOUNTAIN WAVE'),
+    JETBLAST_UPSET: createSupplementalEnvironmentFailure('jetblast_upset', 'Jet Blast Upset', 'JET BLAST'),
+    CABIN_SMOKE: createSupplementalEnvironmentFailure('cabin_smoke', 'Cabin Smoke Event', 'CABIN SMOKE')
+};
+
+export default {
+    ...EnvironmentFailures,
+    ...SupplementalEnvironmentFailures
+};

@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
 import RealisticFlightPhysicsService from '../src/services/RealisticFlightPhysicsService.js';
 import { createCanonicalFailureGraph } from '../src/services/failures/CanonicalFailureGraph.js';
+import { validateFailureGraphArtifact } from '../src/services/failures/FailureGraphArtifact.js';
 import { failureGraphManager } from '../src/services/skylinetragedy/FailureGraphManager.js';
 
 const require = createRequire(import.meta.url);
@@ -89,6 +90,19 @@ test('canonical failure graph normalizes runtime and legacy identifiers', () => 
   assert.equal(graph.aliasToRuntimeId.get('ENGINE_FIRE'), 'engine_fire');
 });
 
+test('canonical failure graph expands to validated local offline graph', () => {
+  const graph = createCanonicalFailureGraph();
+  const validation = validateFailureGraphArtifact(graph);
+  const runtimeIds = graph.nodes.map(node => node.runtimeId);
+  const uniqueRuntimeIds = new Set(runtimeIds);
+
+  assert.equal(validation.valid, true, validation.errors.join('\n'));
+  assert.ok(graph.nodes.length >= 100, `expected >=100 nodes, got ${graph.nodes.length}`);
+  assert.ok(graph.edges.length >= 100, `expected >=100 edges, got ${graph.edges.length}`);
+  assert.equal(uniqueRuntimeIds.size, runtimeIds.length, 'runtime ids must be unique');
+  assert.equal(graph.edges.every(edge => edge.sourceRuntimeId && edge.targetRuntimeId), true);
+});
+
 test('failure graph manager exposes canonical runtime fallback artifact', () => {
   failureGraphManager.loadRuntimeFallback();
   const artifact = failureGraphManager.getGraphArtifact();
@@ -109,31 +123,6 @@ test('engine fire cascade reaches hydraulic failure after stage/time guard', () 
   });
 });
 
-test('rookie mode blocks catastrophic uncontained engine cascades', () => {
-  withFixedRandom(0.0, () => {
-    const rookieService = createServiceForDifficulty('rookie');
-    rookieService.failureSystem.triggerFailure('uncontained_engine_failure', { engineIndex: 0 });
-    runFailureTicks(rookieService, 20);
-
-    assert.equal(rookieService.failureSystem.activeFailures.has('major_hydraulic_failure'), false);
-    assert.equal(rookieService.failureSystem.activeFailures.has('total_flight_control_failure'), false);
-  });
-});
-
-test('intermediate mode allows uncontained engine catastrophic cascades', () => {
-  withFixedRandom(0.0, () => {
-    const service = createServiceForDifficulty('intermediate');
-    service.failureSystem.triggerFailure('uncontained_engine_failure', { engineIndex: 0 });
-    runFailureTicks(service, 20);
-
-    assert.equal(service.failureSystem.activeFailures.has('major_hydraulic_failure'), true);
-    assert.equal(service.failureSystem.activeFailures.has('total_flight_control_failure'), true);
-  });
-});
-
-after(() => {
-  setTimeout(() => process.exit(0), 0);
-});
 test('rookie mode blocks catastrophic uncontained engine cascades', () => {
   withFixedRandom(0.0, () => {
     const rookieService = createServiceForDifficulty('rookie');
@@ -165,6 +154,31 @@ test('intermediate mode still allows uncontained engine catastrophic cascades', 
     assert.equal(hydraulicCascade.effectiveDelay, 2);
     assert.equal(service.failureSystem.activeFailures.has('major_hydraulic_failure'), true);
     assert.equal(service.failureSystem.activeFailures.has('total_flight_control_failure'), true);
+  });
+});
+
+test('engine start switch auto returns from GRD to CONT after self-sustaining start', () => {
+  withFixedRandom(0.5, () => {
+    const service = new RealisticFlightPhysicsService(aircraft, 0, 0, 'pro');
+    service.setAutopilot(false);
+    service.performSystemAction('electrical', 'battery', true);
+    service.performSystemAction('apu', 'master', true);
+    service.performSystemAction('apu', 'start', true);
+
+    for (let i = 0; i < 80; i += 1) {
+      service.update({}, 0.25);
+    }
+
+    service.performSystemAction('apu', 'bleed', true);
+    service.performSystemAction('engines', 'eng2_fuel');
+    service.performSystemAction('engines', 'eng2_start_toggle');
+
+    for (let i = 0; i < 160; i += 1) {
+      service.update({}, 0.25);
+    }
+
+    assert.equal(service.systems.engines.eng2.startSwitch, 'CONT');
+    assert.equal(service.systems.engines.eng2.n2 >= 55 || service.engines[1].state.running, true);
   });
 });
 
