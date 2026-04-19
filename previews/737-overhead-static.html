@@ -277,10 +277,56 @@
           <div class="hardware-column"><div class="annunciator amber">LOW<br>PRESS</div><div class="toggle"></div><div class="switch-label">ELEC 2</div></div>
         </div>
       </div>
-      <div class="subpanel window-heat"><div class="panel-title">WINDOW HEAT</div><span class="screw tl"></span><span class="screw tr"></span><span class="screw bl"></span><span class="screw br"></span></div>
-      <div class="subpanel air-cond"><div class="panel-title">AIR COND</div><span class="screw tl"></span><span class="screw tr"></span><span class="screw bl"></span><span class="screw br"></span></div>
-      <div class="subpanel bleed"><div class="panel-title">BLEED</div><span class="screw tl"></span><span class="screw tr"></span><span class="screw bl"></span><span class="screw br"></span></div>
-      <div class="subpanel press"><div class="panel-title">PRESSURIZATION</div><span class="screw tl"></span><span class="screw tr"></span><span class="screw bl"></span><span class="screw br"></span></div>
+      <div class="subpanel window-heat">
+        <div class="panel-title">WINDOW HEAT</div><span class="screw tl"></span><span class="screw tr"></span><span class="screw bl"></span><span class="screw br"></span>
+        <div class="hardware-row" style="margin-top:28px; gap:7px;">
+          <div class="hardware-column"><div class="annunciator green on">ON</div><div class="toggle"></div><div class="switch-label">L SIDE</div></div>
+          <div class="hardware-column"><div class="annunciator amber">OVER<br>HEAT</div><div class="toggle"></div><div class="switch-label">L FWD</div></div>
+          <div class="hardware-column"><div class="annunciator amber">OVER<br>HEAT</div><div class="toggle"></div><div class="switch-label">R FWD</div></div>
+          <div class="hardware-column"><div class="annunciator green on">ON</div><div class="toggle"></div><div class="switch-label">R SIDE</div></div>
+        </div>
+        <div class="hardware-row" style="margin-top:18px; gap:12px;">
+          <div class="hardware-column"><div class="knob" style="--angle:-24deg"></div><div class="switch-label">TEMP<br>CONTROL</div></div>
+          <div class="hardware-column"><div class="gauge" style="--angle:18deg"></div><div class="switch-label">DUCT<br>PRESS</div></div>
+          <div class="hardware-column"><div class="knob" style="--angle:44deg"></div><div class="switch-label">WING<br>ANTI-ICE</div></div>
+        </div>
+      </div>
+      <div class="subpanel air-cond">
+        <div class="panel-title">AIR COND</div><span class="screw tl"></span><span class="screw tr"></span><span class="screw bl"></span><span class="screw br"></span>
+        <div class="hardware-column" style="margin-top:32px; gap:12px;">
+          <div class="knob" style="--angle:-40deg"></div><div class="switch-label">TEMP<br>SELECT</div>
+          <div class="knob" style="--angle:8deg"></div><div class="switch-label">TRIM AIR</div>
+          <div class="annunciator amber">ZONE<br>TEMP</div>
+          <div class="toggle"></div><div class="switch-label">PACK L</div>
+          <div class="toggle down"></div><div class="switch-label">PACK R</div>
+          <div class="annunciator blue on">AUTO</div>
+        </div>
+      </div>
+      <div class="subpanel bleed">
+        <div class="panel-title">BLEED</div><span class="screw tl"></span><span class="screw tr"></span><span class="screw bl"></span><span class="screw br"></span>
+        <div class="hardware-row" style="margin-top:28px; gap:12px;">
+          <div class="hardware-column"><div class="gauge" style="--angle:-22deg"></div><div class="switch-label">DUCT<br>PRESS</div></div>
+          <div class="hardware-column"><div class="annunciator amber on">BLEED<br>TRIP OFF</div><div class="toggle"></div><div class="switch-label">ENG 1<br>BLEED</div></div>
+          <div class="hardware-column"><div class="annunciator blue">VALVE<br>OPEN</div><div class="toggle right"></div><div class="switch-label">APU<br>BLEED</div></div>
+          <div class="hardware-column"><div class="annunciator amber">BLEED<br>TRIP OFF</div><div class="toggle"></div><div class="switch-label">ENG 2<br>BLEED</div></div>
+        </div>
+        <div class="hardware-row" style="margin-top:12px; gap:14px;">
+          <div class="hardware-column"><div class="knob" style="--angle:-58deg"></div><div class="switch-label">ISOLATION<br>VALVE</div></div>
+          <div class="hardware-column"><div class="annunciator amber">PACK</div><div class="annunciator amber">WING<br>BODY</div></div>
+        </div>
+      </div>
+      <div class="subpanel press">
+        <div class="panel-title">PRESSURIZATION</div><span class="screw tl"></span><span class="screw tr"></span><span class="screw bl"></span><span class="screw br"></span>
+        <div class="hardware-row" style="margin-top:28px; gap:12px;">
+          <div class="hardware-column"><div class="gauge" style="--angle:38deg"></div><div class="switch-label">CABIN<br>ALT</div></div>
+          <div class="hardware-column"><div class="seven-seg">7234</div><div class="seven-seg">1234</div><div class="switch-label">FLT ALT<br>LAND ALT</div></div>
+          <div class="hardware-column"><div class="knob" style="--angle:20deg"></div><div class="switch-label">AUTO<br>RATE</div></div>
+        </div>
+        <div class="hardware-row" style="margin-top:12px; gap:12px;">
+          <div class="hardware-column"><div class="annunciator amber">AUTO<br>FAIL</div><div class="toggle"></div><div class="switch-label">MODE<br>SELECT</div></div>
+          <div class="hardware-column"><div class="annunciator green on">MAN</div><div class="toggle down"></div><div class="switch-label">OUTFLOW<br>VALVE</div></div>
+        </div>
+      </div>
       <div class="subpanel lights-left"><div class="panel-title">LIGHTS</div><span class="screw tl"></span><span class="screw tr"></span><span class="screw bl"></span><span class="screw br"></span></div>
       <div class="subpanel engine-start"><div class="panel-title">ENGINE START</div><span class="screw tl"></span><span class="screw tr"></span><span class="screw bl"></span><span class="screw br"></span></div>
       <div class="subpanel wipers"><div class="panel-title">WIPERS</div><span class="screw tl"></span><span class="screw tr"></span><span class="screw bl"></span><span class="screw br"></span></div>
