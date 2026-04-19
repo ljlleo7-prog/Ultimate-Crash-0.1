@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Boeing 737 Overhead Static Preview</title>
+  <style>
+    :root {
+      --panel-bg: #667078;
+      --panel-bg-dark: #4d565d;
+      --panel-bg-light: #7b858c;
+      --engrave: #12181c;
+      --label: #e6ecef;
+      --amber: #ffb238;
+      --blue: #4da6ff;
+      --green: #64d46b;
+      --white-lit: #f4f7ec;
+      --red-guard: #c62828;
+      --shadow: rgba(0, 0, 0, 0.55);
+    }
+
+    * { box-sizing: border-box; }
+    body { margin: 0; min-height: 100vh; display: grid; place-items: center; background: radial-gradient(circle at 50% 12%, rgba(255, 255, 255, 0.16), transparent 28%), linear-gradient(145deg, #15191d, #07090b 68%); color: var(--label); font-family: "DIN Condensed", "Arial Narrow", "Helvetica Neue Condensed", sans-serif; letter-spacing: 0.04em; overflow: auto; }
+    .preview-wrap { padding: 36px; }
+    .overhead-shell { width: 980px; height: 1040px; position: relative; border-radius: 10px 10px 42px 42px; background: linear-gradient(90deg, rgba(255,255,255,0.08), transparent 18%, rgba(0,0,0,0.16) 80%), repeating-linear-gradient(0deg, rgba(255,255,255,0.025) 0 1px, transparent 1px 5px), var(--panel-bg); box-shadow: inset 0 0 0 3px #222a30, inset 0 0 36px rgba(255,255,255,0.08), 0 28px 70px rgba(0, 0, 0, 0.78); padding: 18px; }
+    .overhead-shell::after { content: ""; position: absolute; inset: 0; pointer-events: none; opacity: 0.14; background-image: radial-gradient(circle at 12% 20%, #fff 0 0.7px, transparent 0.9px), radial-gradient(circle at 84% 72%, #000 0 0.8px, transparent 1px); background-size: 19px 23px, 17px 21px; mix-blend-mode: overlay; }
+    .subpanel { position: absolute; padding: 10px 8px; border: 1px solid rgba(20, 28, 34, 0.92); background: linear-gradient(145deg, rgba(255,255,255,0.08), rgba(0,0,0,0.1)), var(--panel-bg-dark); box-shadow: inset 1px 1px 0 rgba(255,255,255,0.18), inset -2px -2px 5px rgba(0,0,0,0.32), 0 2px 6px rgba(0,0,0,0.24); }
+    .panel-title { position: absolute; top: 4px; left: 0; right: 0; text-align: center; color: var(--engrave); font-size: 10px; font-weight: 800; text-shadow: 0 1px rgba(255,255,255,0.18); letter-spacing: 0.12em; }
+    .label { color: var(--label); font-size: 8px; line-height: 1.05; text-align: center; text-shadow: 0 1px 1px #000; }
+    .screw { position: absolute; width: 11px; height: 11px; border-radius: 50%; background: linear-gradient(135deg, #aab2b6, #4e565c 48%, #161b1f 52%, #788086); box-shadow: inset 0 0 2px #000, 0 1px 1px rgba(255,255,255,0.16); }
+    .screw::after { content: ""; position: absolute; left: 2px; right: 2px; top: 5px; height: 1px; background: rgba(15,18,20,0.8); transform: rotate(-18deg); }
+    .screw.tl { top: 6px; left: 6px; } .screw.tr { top: 6px; right: 6px; } .screw.bl { bottom: 6px; left: 6px; } .screw.br { bottom: 6px; right: 6px; }
+    .elec { left: 230px; top: 18px; width: 215px; height: 275px; } .fuel { left: 30px; top: 355px; width: 210px; height: 255px; } .hyd { left: 250px; top: 600px; width: 185px; height: 165px; } .window-heat { left: 610px; top: 22px; width: 235px; height: 275px; } .air-cond { left: 445px; top: 22px; width: 150px; height: 420px; } .bleed { left: 610px; top: 315px; width: 250px; height: 220px; } .press { left: 690px; top: 555px; width: 245px; height: 255px; } .lights-left { left: 30px; top: 650px; width: 200px; height: 200px; } .engine-start { left: 445px; top: 785px; width: 250px; height: 155px; } .wipers { left: 710px; top: 820px; width: 225px; height: 120px; }
+  </style>
+</head>
+<body>
+  <main class="preview-wrap" aria-label="Static preview of a Boeing 737 overhead panel">
+    <section class="overhead-shell">
+      <div class="subpanel elec"><div class="panel-title">ELECTRICAL</div><span class="screw tl"></span><span class="screw tr"></span><span class="screw bl"></span><span class="screw br"></span></div>
+      <div class="subpanel fuel"><div class="panel-title">FUEL</div><span class="screw tl"></span><span class="screw tr"></span><span class="screw bl"></span><span class="screw br"></span></div>
+      <div class="subpanel hyd"><div class="panel-title">HYDRAULIC</div><span class="screw tl"></span><span class="screw tr"></span><span class="screw bl"></span><span class="screw br"></span></div>
+      <div class="subpanel window-heat"><div class="panel-title">WINDOW HEAT</div><span class="screw tl"></span><span class="screw tr"></span><span class="screw bl"></span><span class="screw br"></span></div>
+      <div class="subpanel air-cond"><div class="panel-title">AIR COND</div><span class="screw tl"></span><span class="screw tr"></span><span class="screw bl"></span><span class="screw br"></span></div>
+      <div class="subpanel bleed"><div class="panel-title">BLEED</div><span class="screw tl"></span><span class="screw tr"></span><span class="screw bl"></span><span class="screw br"></span></div>
+      <div class="subpanel press"><div class="panel-title">PRESSURIZATION</div><span class="screw tl"></span><span class="screw tr"></span><span class="screw bl"></span><span class="screw br"></span></div>
+      <div class="subpanel lights-left"><div class="panel-title">LIGHTS</div><span class="screw tl"></span><span class="screw tr"></span><span class="screw bl"></span><span class="screw br"></span></div>
+      <div class="subpanel engine-start"><div class="panel-title">ENGINE START</div><span class="screw tl"></span><span class="screw tr"></span><span class="screw bl"></span><span class="screw br"></span></div>
+      <div class="subpanel wipers"><div class="panel-title">WIPERS</div><span class="screw tl"></span><span class="screw tr"></span><span class="screw bl"></span><span class="screw br"></span></div>
+    </section>
+  </main>
+</body>
+</html>
