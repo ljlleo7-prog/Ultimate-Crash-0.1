@@ -239,9 +239,44 @@
 <body>
   <main class="preview-wrap" aria-label="Static preview of a Boeing 737 overhead panel">
     <section class="overhead-shell">
-      <div class="subpanel elec"><div class="panel-title">ELECTRICAL</div><span class="screw tl"></span><span class="screw tr"></span><span class="screw bl"></span><span class="screw br"></span></div>
-      <div class="subpanel fuel"><div class="panel-title">FUEL</div><span class="screw tl"></span><span class="screw tr"></span><span class="screw bl"></span><span class="screw br"></span></div>
-      <div class="subpanel hyd"><div class="panel-title">HYDRAULIC</div><span class="screw tl"></span><span class="screw tr"></span><span class="screw bl"></span><span class="screw br"></span></div>
+      <div class="subpanel elec">
+        <div class="panel-title">ELECTRICAL</div><span class="screw tl"></span><span class="screw tr"></span><span class="screw bl"></span><span class="screw br"></span>
+        <div class="hardware-row" style="margin-top:28px; gap:10px;">
+          <div class="hardware-column"><div class="annunciator amber on">BAT<br>DISCHARGE</div><div class="toggle"></div><div class="switch-label">BAT</div></div>
+          <div class="hardware-column"><div class="annunciator amber">TR UNIT</div><div class="toggle down"></div><div class="switch-label">CAB/UTIL</div></div>
+          <div class="hardware-column"><div class="annunciator amber">ELEC</div><div class="toggle"></div><div class="switch-label">IFE/PASS<br>SEAT</div></div>
+        </div>
+        <div class="hardware-row" style="margin-top:14px;">
+          <div class="seven-seg">23</div>
+          <div class="seven-seg">456</div>
+        </div>
+        <div class="hardware-row" style="margin-top:10px; gap:12px;">
+          <div class="hardware-column"><div class="knob" style="--angle:-38deg"></div><div class="switch-label">DC<br>METER</div></div>
+          <div class="hardware-column"><div class="knob" style="--angle:32deg"></div><div class="switch-label">AC<br>METER</div></div>
+          <div class="hardware-column"><div class="toggle right"></div><div class="switch-label">STANDBY<br>POWER</div></div>
+        </div>
+      </div>
+      <div class="subpanel fuel">
+        <div class="panel-title">FUEL</div><span class="screw tl"></span><span class="screw tr"></span><span class="screw bl"></span><span class="screw br"></span>
+        <div class="hardware-row" style="margin-top:30px; gap:9px;">
+          <div class="hardware-column"><div class="annunciator blue on">LOW<br>PRESS</div><div class="toggle"></div><div class="switch-label">FWD<br>PUMP</div></div>
+          <div class="hardware-column"><div class="annunciator blue on">LOW<br>PRESS</div><div class="toggle"></div><div class="switch-label">AFT<br>PUMP</div></div>
+          <div class="hardware-column"><div class="gauge" style="--angle:-34deg"></div><div class="switch-label">FUEL TEMP</div></div>
+        </div>
+        <div class="hardware-row" style="margin-top:12px; gap:9px;">
+          <div class="hardware-column"><div class="annunciator blue">LOW<br>PRESS</div><div class="toggle down"></div><div class="switch-label">CTR L<br>PUMP</div></div>
+          <div class="hardware-column"><div class="annunciator amber on">FILTER<br>BYPASS</div><div class="toggle"></div><div class="switch-label">CROSS<br>FEED</div></div>
+          <div class="hardware-column"><div class="annunciator blue">LOW<br>PRESS</div><div class="toggle down"></div><div class="switch-label">CTR R<br>PUMP</div></div>
+        </div>
+      </div>
+      <div class="subpanel hyd">
+        <div class="panel-title">HYDRAULIC</div><span class="screw tl"></span><span class="screw tr"></span><span class="screw bl"></span><span class="screw br"></span>
+        <div class="hardware-row" style="margin-top:30px; gap:10px;">
+          <div class="hardware-column"><div class="annunciator amber">LOW<br>PRESS</div><div class="toggle"></div><div class="switch-label">ELEC 1</div></div>
+          <div class="hardware-column"><div class="annunciator amber on">OVER<br>HEAT</div><div class="toggle down"></div><div class="switch-label">ENG 1</div></div>
+          <div class="hardware-column"><div class="annunciator amber">LOW<br>PRESS</div><div class="toggle"></div><div class="switch-label">ELEC 2</div></div>
+        </div>
+      </div>
       <div class="subpanel window-heat"><div class="panel-title">WINDOW HEAT</div><span class="screw tl"></span><span class="screw tr"></span><span class="screw bl"></span><span class="screw br"></span></div>
       <div class="subpanel air-cond"><div class="panel-title">AIR COND</div><span class="screw tl"></span><span class="screw tr"></span><span class="screw bl"></span><span class="screw br"></span></div>
       <div class="subpanel bleed"><div class="panel-title">BLEED</div><span class="screw tl"></span><span class="screw tr"></span><span class="screw bl"></span><span class="screw br"></span></div>
