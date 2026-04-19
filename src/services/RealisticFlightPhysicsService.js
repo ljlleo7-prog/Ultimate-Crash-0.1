@@ -1804,25 +1804,30 @@ class RealisticFlightPhysicsService {
     setWheelBrakes(val) { this.controls.wheelBrakes = Math.max(0, Math.min(1, Number.isFinite(val) ? val : 0)); }
     setTrim(val) { this.controls.trim = val; }
     setAutopilot(engaged, targets) {
-        // If targets provided, set them
+        const explicitTargets = targets ? { ...targets } : null;
         if (targets) {
             this.autopilot.setTargets(targets);
         }
-        // Set engagement
         if (typeof engaged === 'boolean') {
             const v_earth = this.state.quat.rotate(this.state.vel);
             const airspeeds = this.calculateAirspeeds();
             const euler = this.state.quat.toEuler();
-            
             const currentState = {
                 airspeed: airspeeds.indicatedAirspeed,
                 verticalSpeed: -v_earth.z * 196.85,
                 pitch: euler.theta,
                 roll: euler.phi,
-                altitude: -this.state.pos.z * 3.28084
+                altitude: -this.state.pos.z * 3.28084,
+                heading: (euler.psi * 180 / Math.PI + 360) % 360,
+                beta: this.debugData?.beta || 0,
+                throttle: this.controls.throttle,
+                elevator: this.controls.elevator,
+                aileron: this.controls.aileron,
+                rudder: this.controls.rudder,
+                trim: this.controls.trim
             };
-            
-            this.autopilot.setEngaged(engaged, currentState);
+
+            this.autopilot.setEngaged(engaged, currentState, { explicitTargets });
         }
     }
 
@@ -2358,13 +2363,13 @@ class RealisticFlightPhysicsService {
     
     updateAutopilotTargets(targets) {
         this.autopilot.setTargets(targets);
+        return this.getAutopilotStatus();
     }
     
     updateFlightPlan(newFlightPlan) {
         console.log('🔄 Updating Flight Plan:', newFlightPlan);
-        
+
         let newWaypoints = [];
-        // Extract waypoints array to ensure consistency
         if (Array.isArray(newFlightPlan)) {
             newWaypoints = newFlightPlan;
         } else if (newFlightPlan && Array.isArray(newFlightPlan.waypoints)) {
@@ -2374,28 +2379,26 @@ class RealisticFlightPhysicsService {
             this.flightPlan = [];
             return;
         }
-        
-        // Smart Index Preservation: If length matches, keep index. 
-        // This allows property updates (like 'isHold') without resetting progress.
-        const preserveIndex = (this.flightPlan && this.flightPlan.length === newWaypoints.length);
+
+        const incomingIndex = Number.isInteger(newFlightPlan?.currentWaypointIndex)
+          ? newFlightPlan.currentWaypointIndex
+          : null;
+        const preserveIndex = (this.flightPlan && this.flightPlan.length === newWaypoints.length && incomingIndex === null);
         const oldIndex = this.currentWaypointIndex;
 
         this.flightPlan = newWaypoints;
-        
-        if (preserveIndex) {
+
+        if (incomingIndex !== null) {
+            this.currentWaypointIndex = incomingIndex;
+        } else if (preserveIndex) {
             this.currentWaypointIndex = oldIndex;
         } else {
-            // Reset index to start from the beginning of the new plan
             this.currentWaypointIndex = 0;
         }
-        
-        // Optionally reset index if it was invalid, or keep it if within bounds
+
         if (this.currentWaypointIndex >= this.flightPlan.length) {
             this.currentWaypointIndex = Math.max(0, this.flightPlan.length - 1);
         }
-        
-        // If we want to "Direct To", the UI should have already set the waypoints list appropriately.
-        // If the new plan has waypoints, ensure we are targeting something valid.
     }
 
     loadFlightState(data) {
@@ -2731,7 +2734,8 @@ class RealisticFlightPhysicsService {
         return {
             engaged: this.autopilot.engaged,
             mode: this.autopilot.mode,
-            targets: this.autopilot.targets
+            targets: this.autopilot.targets,
+            fma: this.autopilot.fmaStatus || null
         };
     }
 

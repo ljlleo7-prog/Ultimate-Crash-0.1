@@ -56,6 +56,7 @@ export function useFlightState() {
   const [flightData, setFlightData] = useState({
     altitude: 0,
     airspeed: 0,
+    trueAirspeed: 0,
     indicatedAirspeed: 0,
     verticalSpeed: 0,
     pitch: 0,
@@ -135,6 +136,7 @@ export function useFlightState() {
       return {
         altitude,
         airspeed: trueAirspeed,
+        trueAirspeed,
         indicatedAirspeed,
         groundSpeed,
         verticalSpeed: Number.isFinite(physicsState.verticalSpeed) ? physicsState.verticalSpeed : (prev.verticalSpeed ?? 0),

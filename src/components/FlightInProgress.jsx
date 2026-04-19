@@ -24,6 +24,9 @@ import { initializeATCPhraseologyTemplates } from '../data/atcResponseDatabase';
 import { npcService } from '../services/NPCService';
 import { regionControlService } from '../services/RegionControlService';
 import { checkStartupRequirements, StartupPhases } from '../services/StartupChecklist';
+import { Checklists } from '../services/ChecklistData.js';
+import { evaluateNormalChecklist, resolveAbnormalChecklist } from '../services/autoflight/NPCChecklistService.js';
+import { buildNPCSystemSnapshot, formatNPCSystemReport } from '../services/autoflight/NPCReportingService.js';
 import { skylinetragedyService } from '../services/skylinetragedy/SkylinetragedyService.js';
 import { npcCrewService } from '../services/NPCCrewService';
 import CrewPanel from './CrewPanel';
@@ -32,10 +35,13 @@ import MultiplayerTrafficPanel from './MultiplayerTrafficPanel.jsx';
 import usePhysicsMotionControl from '../hooks/flight/usePhysicsMotionControl.js';
 import useEventBusSubscriptions from '../hooks/flight/useEventBusSubscriptions.js';
 import useStartupChecklist from '../hooks/flight/useStartupChecklist.js';
+import useAutoCloudSave from '../hooks/flight/useAutoCloudSave.js';
 import { multiplayerSessionService } from '../services/multiplayer/MultiplayerSessionService.js';
 import { trafficSyncService } from '../services/multiplayer/TrafficSyncService.js';
 import { playerSettingsService } from '../services/playerSettingsService.js';
-import useAutoCloudSave from '../hooks/flight/useAutoCloudSave.js';
+import { getNPCDifficultyProfile, getNPCResponseDelay, shouldNPCIntroduceNoise } from '../services/autoflight/NPCDifficultyProfile.js';
+import { getNPCQuickCommands, parseNPCCommand } from '../services/autoflight/NPCCommandService.js';
+import { NPCOrderStatus, createNPCOrder, summarizeNPCOrder, transitionNPCOrder } from '../services/autoflight/NPCOrderService.js';
 
 const FlightInProgress = ({
   callsign,
@@ -65,6 +71,7 @@ const FlightInProgress = ({
   physicsModel = 'realistic',
   routeDetails,
   isTutorial = false,
+  activeTutorial = null,
   onTutorialClose,
   offlineMode = false
 }) => {
@@ -85,22 +92,129 @@ const FlightInProgress = ({
   const flightPlanFuelWeight = flightPlan && flightPlan.fuel && typeof flightPlan.fuel.totalFuel === 'number'
     ? flightPlan.fuel.totalFuel
     : 0;
+  const tutorialSpawnPreset = activeTutorial?.launchConfig?.spawnPreset || null;
+
+  const offsetPointFromReference = React.useCallback((reference, headingDeg, distanceNm) => {
+    if (!reference || !Number.isFinite(reference.latitude) || !Number.isFinite(reference.longitude)) {
+      return null;
+    }
+
+    const distanceMeters = (distanceNm || 0) * 1852;
+    const headingRad = headingDeg * Math.PI / 180;
+    const metersPerLat = 111111;
+    const metersPerLon = 111111 * Math.cos(reference.latitude * Math.PI / 180);
+
+    return {
+      latitude: reference.latitude + (distanceMeters * Math.cos(headingRad)) / metersPerLat,
+      longitude: reference.longitude + (distanceMeters * Math.sin(headingRad)) / metersPerLon
+    };
+  }, []);
 
   // Calculate initial heading from runway
   const runwayName = (routeDetails?.departureRunway) || (flightPlan?.departure?.runways?.[0]?.name) || '36L';
   const isEastward = selectedArrival && selectedDeparture ? selectedArrival.longitude > selectedDeparture.longitude : null;
-  let runwayHeadingDeg = getRunwayHeading(runwayName, isEastward);
+  const baseRunwayHeadingDeg = getRunwayHeading(runwayName, isEastward);
+
+  const tutorialSpawn = useMemo(() => {
+    if (!isTutorial || !tutorialSpawnPreset) {
+      return null;
+    }
+
+    const departureCode = selectedDeparture?.iata || selectedDeparture?.icao;
+    const arrivalCode = selectedArrival?.iata || selectedArrival?.icao;
+    const departureRunwayName = (routeDetails?.departureRunway) || (flightPlan?.departure?.runways?.[0]?.name) || '36L';
+    const arrivalRunwayName = (routeDetails?.landingRunway) || (flightPlan?.arrival?.runways?.[0]?.name);
+    const departureGeometry = departureCode ? airportService.getRunwayGeometry(departureCode, departureRunwayName) : null;
+    const arrivalGeometry = arrivalCode && arrivalRunwayName ? airportService.getRunwayGeometry(arrivalCode, arrivalRunwayName) : null;
+
+    if (tutorialSpawnPreset.type === 'runway' && departureGeometry?.thresholdStart) {
+      const runwayPoint = offsetPointFromReference(
+        departureGeometry.thresholdStart,
+        departureGeometry.heading,
+        0.054
+      );
+
+      return {
+        latitude: runwayPoint?.latitude ?? departureGeometry.thresholdStart.latitude,
+        longitude: runwayPoint?.longitude ?? departureGeometry.thresholdStart.longitude,
+        heading: departureGeometry.heading,
+        altitude: undefined,
+        speed: undefined
+      };
+    }
+
+    if (tutorialSpawnPreset.type === 'departure-airborne' && departureGeometry?.thresholdStart) {
+      const airbornePoint = offsetPointFromReference(
+        departureGeometry.thresholdStart,
+        departureGeometry.heading,
+        tutorialSpawnPreset.distanceNm || 8
+      );
+
+      return {
+        latitude: airbornePoint?.latitude ?? departureGeometry.thresholdStart.latitude,
+        longitude: airbornePoint?.longitude ?? departureGeometry.thresholdStart.longitude,
+        heading: departureGeometry.heading,
+        altitude: tutorialSpawnPreset.altitude ?? 9000,
+        speed: tutorialSpawnPreset.speed ?? 240
+      };
+    }
+
+    if (tutorialSpawnPreset.type === 'approach-final' && arrivalGeometry?.thresholdStart) {
+      const reciprocalHeading = (arrivalGeometry.heading + 180) % 360;
+      const finalPoint = offsetPointFromReference(
+        arrivalGeometry.thresholdStart,
+        reciprocalHeading,
+        tutorialSpawnPreset.distanceNm || 10
+      );
+
+      return {
+        latitude: finalPoint?.latitude ?? arrivalGeometry.thresholdStart.latitude,
+        longitude: finalPoint?.longitude ?? arrivalGeometry.thresholdStart.longitude,
+        heading: arrivalGeometry.heading,
+        altitude: tutorialSpawnPreset.altitude ?? 3000,
+        speed: tutorialSpawnPreset.speed ?? 180
+      };
+    }
+
+    if (tutorialSpawnPreset.type === 'enroute-midpoint' && selectedDeparture && selectedArrival) {
+      const midpoint = {
+        latitude: (selectedDeparture.latitude + selectedArrival.latitude) / 2,
+        longitude: (selectedDeparture.longitude + selectedArrival.longitude) / 2
+      };
+      const heading = departureGeometry?.heading ?? baseRunwayHeadingDeg;
+
+      return {
+        latitude: midpoint.latitude,
+        longitude: midpoint.longitude,
+        heading,
+        altitude: tutorialSpawnPreset.altitude ?? 20000,
+        speed: tutorialSpawnPreset.speed ?? 280
+      };
+    }
+
+    return null;
+  }, [
+    activeTutorial,
+    isTutorial,
+    tutorialSpawnPreset,
+    selectedDeparture,
+    selectedArrival,
+    routeDetails,
+    flightPlan,
+    baseRunwayHeadingDeg,
+    offsetPointFromReference
+  ]);
+
+  let runwayHeadingDeg = baseRunwayHeadingDeg;
   let runwayHeadingRad = runwayHeadingDeg * Math.PI / 180;
 
   // Calculate Spawn Position (Runway Threshold)
-  let initialLat = initialDeparture?.latitude || 37.6188;
-  let initialLon = initialDeparture?.longitude || -122.3750;
+  let initialLat = tutorialSpawn?.latitude ?? initialDeparture?.latitude ?? 37.6188;
+  let initialLon = tutorialSpawn?.longitude ?? initialDeparture?.longitude ?? -122.3750;
 
-  if (isTutorial && selectedDeparture && selectedArrival) {
-      const tutorialLatBias = (selectedArrival.latitude - selectedDeparture.latitude) * 0.12;
-      const tutorialLonBias = (selectedArrival.longitude - selectedDeparture.longitude) * 0.12;
-      initialLat = selectedDeparture.latitude + tutorialLatBias;
-      initialLon = selectedDeparture.longitude + tutorialLonBias;
+  if (tutorialSpawn) {
+      runwayHeadingDeg = Number.isFinite(tutorialSpawn.heading) ? tutorialSpawn.heading : runwayHeadingDeg;
+      runwayHeadingRad = runwayHeadingDeg * Math.PI / 180;
   } else if (initialDeparture && runwayName) {
       // Try to get runway geometry to spawn at the threshold
       // Pass the airport code (IATA or ICAO)
@@ -144,10 +258,10 @@ const FlightInProgress = ({
       : 0,
     initialLatitude: initialLat,
     initialLongitude: initialLon,
-    initialHeading: runwayHeadingDeg,
+    initialHeading: tutorialSpawn?.heading ?? runwayHeadingDeg,
     airportElevation: initialDeparture?.elevation || 0,
-    initialAltitude: isTutorial ? 10000 : undefined,
-    initialSpeed: isTutorial ? 250 : undefined,
+    initialAltitude: tutorialSpawn?.altitude,
+    initialSpeed: tutorialSpawn?.speed,
     flightPlan: activeRouteWaypoints,
     departure: selectedDeparture,
     arrival: selectedArrival,
@@ -230,6 +344,7 @@ const FlightInProgress = ({
   const [, setThrottleControl] = useState(0); // Initialize at IDLE
   const [commandInput, setCommandInput] = useState('');
   const [radioMessages, setRadioMessages] = useState([]);
+  const [npcOrders, setNpcOrders] = useState([]);
   const [currentFreq, setCurrentFreq] = useState(121.500);
   const [useRealWeather] = useState(!offlineMode);
   const [sceneState, setSceneState] = useState(
@@ -257,7 +372,38 @@ const FlightInProgress = ({
   const physicsServiceRef = useRef(physicsService);
   const physicsStateRef = useRef(physicsState);
   const [narrative, setNarrative] = useState(null);
-  const [activeFailures, setActiveFailures] = useState([]);
+  const [activeFailures, setActiveFailures] = useState(sceneState?.activeFailures || []);
+  const npcProfile = useMemo(() => getNPCDifficultyProfile(difficulty), [difficulty]);
+  const npcQuickCommands = useMemo(() => getNPCQuickCommands(), []);
+
+  const appendCrewMessage = React.useCallback((content, overrides = {}) => {
+    const payload = {
+      sender: overrides.sender || 'Copilot',
+      content,
+      timestamp: Date.now(),
+      stress: overrides.stress,
+      role: overrides.role || 'FO'
+    };
+    eventBus.publish(eventBus.Types.NPC_CREW_MESSAGE, payload);
+    return payload;
+  }, []);
+
+  const getChecklistContext = React.useCallback((checklistId) => {
+    if (checklistId === 'ENG START' || checklistId === 'ENGINE_START') {
+      return checkStartupRequirements(
+        StartupPhases.ENGINE_START,
+        physicsState?.systems,
+        physicsState?.systems?.engines || physicsState?.engines
+      );
+    }
+
+    return checkStartupRequirements(
+      StartupPhases.POWER_UP,
+      physicsState?.systems,
+      physicsState?.systems?.engines || physicsState?.engines
+    );
+  }, [physicsState]);
+
   const [phaseName, setPhaseName] = useState('');
   const [showDebugPhysics, setShowDebugPhysics] = useState(false);
   const [showFailurePanel, setShowFailurePanel] = useState(false);
@@ -477,8 +623,7 @@ const FlightInProgress = ({
     };
   }, [isTutorial, offlineMode, callsign, aircraftModel, difficulty, failureType, selectedDeparture, selectedArrival]);
 
-  // Radio Message Handler
-  const handleRadioTransmit = (messageDataOrText, type, templateId, params) => {
+  const submitRadioTransmission = (messageDataOrText, type, templateId, params, senderOverride) => {
     // Check if channel is busy
     if (atcManager.isBusy(currentFreq)) {
         setRadioMessages(prev => [...prev, {
@@ -487,10 +632,10 @@ const FlightInProgress = ({
             timestamp: Date.now(),
             type: 'system'
         }]);
-        return;
+        return false;
     }
 
-    let messageText, messageType, messageTemplateId, messageParams;
+    let messageText, messageType, messageTemplateId, messageParams, messageSender;
 
     // Handle both object (from RadioActionPanel) and legacy string arguments
     if (typeof messageDataOrText === 'object' && messageDataOrText !== null) {
@@ -498,34 +643,39 @@ const FlightInProgress = ({
         messageType = messageDataOrText.type;
         messageTemplateId = messageDataOrText.templateId;
         messageParams = messageDataOrText.params;
+        messageSender = messageDataOrText.sender;
     } else {
         messageText = messageDataOrText;
         messageType = type;
         messageTemplateId = templateId;
         messageParams = params;
+        messageSender = senderOverride;
     }
 
-    // Add pilot message
+    // Add pilot/copilot message
     const freqType = getFrequencyType(currentFreq);
     const newMessage = {
-      sender: callsign,
+      sender: messageSender || callsign,
       text: messageText,
       timestamp: Date.now(),
       type: messageType || 'transmission',
+      templateId: messageTemplateId,
+      params: messageParams,
       frequency: freqType
     };
-    
+
     setRadioMessages(prev => [...prev, newMessage]);
-    
+
     // Process with ATC Logic
     const context = {
         callsign: callsign,
         altitude: Math.round(flightData?.altitude ?? 0),
         heading: Math.round(flightData?.heading ?? 0),
-        weather: weatherData, // Pass weather data to ATC context
+        weather: weatherData,
         frequencyType: freqType,
         language,
-        phaseOfFlight: sceneState.phaseType
+        phaseOfFlight: sceneState.phaseType,
+        difficulty
     };
 
     atcManager.processMessage(
@@ -533,8 +683,7 @@ const FlightInProgress = ({
         context,
         (response) => {
             setRadioMessages(prev => [...prev, { ...response, frequency: freqType }]);
-            
-            // Event Bus Trigger for Takeoff Clearance
+
             if (messageTemplateId === 'req_takeoff') {
                 console.log('🛫 Takeoff Clearance Received - Triggering Event');
                 eventBus.publish('atc.clearance.takeoff', {
@@ -544,6 +693,13 @@ const FlightInProgress = ({
             }
         }
     );
+
+    return true;
+  };
+
+  // Radio Message Handler
+  const handleRadioTransmit = (messageDataOrText, type, templateId, params) => {
+    submitRadioTransmission(messageDataOrText, type, templateId, params);
   };
 
   // Startup Checklist Logic (advisory-only)
@@ -647,26 +803,28 @@ const FlightInProgress = ({
   // Handle Flight Plan Update
    const handleUpdateFlightPlan = (newPlan) => {
      console.log("📝 Flight Plan Updated:", newPlan);
-     
+
      let updatedPlanObject;
      if (Array.isArray(newPlan)) {
-         // If we received just an array of waypoints, merge it into the existing plan object
          updatedPlanObject = {
              ...(activeFlightPlan || {}),
              waypoints: newPlan
          };
      } else {
-         // If we received a full object, use it
          updatedPlanObject = newPlan;
      }
 
      setActiveFlightPlan(updatedPlanObject);
-     
-     // Update Physics Service
+
      if (updateFlightPlan) {
-         // Physics service handles both array and object, but let's pass the array if that's what changed,
-         // or just pass the full object which the service also handles.
-         updateFlightPlan(updatedPlanObject);
+         const activePlanForPhysics = Array.isArray(updatedPlanObject?.fms?.activePlan?.waypoints)
+           ? {
+               ...updatedPlanObject,
+               waypoints: updatedPlanObject.fms.activePlan.waypoints,
+               currentWaypointIndex: updatedPlanObject.fms.currentWaypointIndex ?? updatedPlanObject.currentWaypointIndex ?? 0
+             }
+           : updatedPlanObject;
+         updateFlightPlan(activePlanForPhysics);
      }
    };
   
@@ -1144,6 +1302,233 @@ const FlightInProgress = ({
     }
   };
 
+  const runNPCChecklist = React.useCallback((checklistId) => {
+    const systems = physicsState?.systems;
+    const flightSnapshot = {
+      flapsValue: flightData?.flaps ?? flightData?.flapsValue ?? physicsState?.controls?.flaps,
+      gearValue: flightData?.gear ?? flightData?.gearValue ?? physicsState?.controls?.gear,
+      airBrakesValue: flightData?.airBrakes ?? flightData?.airBrakesValue ?? physicsState?.controls?.airBrakes,
+      engineN2: Array.isArray(physicsState?.engines)
+        ? physicsState.engines.map(engine => engine?.n2 ?? engine?.state?.n2 ?? 0)
+        : [],
+      throttleLevers: Array.isArray(flightData?.engines)
+        ? flightData.engines.map(engine => engine?.throttle ?? 0)
+        : []
+    };
+
+    if (checklistId === 'ABNORMAL') {
+      const abnormal = resolveAbnormalChecklist(activeFailures);
+      const checklistItems = abnormal.items.map(item => ({
+        ...item,
+        complete: typeof item.validate === 'function' ? !!item.validate(systems, flightSnapshot) : false
+      }));
+      appendCrewMessage(abnormal.intro, { stress: npcCrewService.crewState.FO.stress });
+      checklistItems.forEach(item => {
+        const prefix = item.complete ? 'Checked' : item.severity === 'critical' ? 'Memory item' : 'Pending';
+        appendCrewMessage(`${prefix}: ${item.label}.`, { stress: npcCrewService.crewState.FO.stress });
+      });
+      const pending = checklistItems.filter(item => !item.complete).map(item => item.label);
+      if (pending.length === 0) {
+        appendCrewMessage(`${abnormal.name} checklist complete.`, { stress: npcCrewService.crewState.FO.stress });
+        return { blocked: false, missingItems: [], name: abnormal.name };
+      }
+      appendCrewMessage(`${abnormal.name} checklist outstanding items: ${pending.join(', ')}.`, { stress: npcCrewService.crewState.FO.stress });
+      return { blocked: true, missingItems: pending, name: abnormal.name };
+    }
+
+    const checklistItems = evaluateNormalChecklist(checklistId, systems, flightSnapshot);
+
+    const startupContext = getChecklistContext(checklistId);
+    const missingItems = checklistItems.filter(item => !item.complete).map(item => item.label);
+    const startupMissing = startupContext?.missingItems || [];
+    const combinedMissing = Array.from(new Set([...missingItems, ...startupMissing]));
+
+    if (combinedMissing.length === 0) {
+      if (npcProfile.explanationLevel === 'full') {
+        appendCrewMessage(`${checklistId} checklist complete. We are configured and ready.`, { stress: npcCrewService.crewState.FO.stress });
+      } else {
+        appendCrewMessage(`${checklistId} checklist complete.`, { stress: npcCrewService.crewState.FO.stress });
+      }
+      return { blocked: false, missingItems: [] };
+    }
+
+    const lead = npcProfile.diagnosticDepth === 'detailed'
+      ? `${checklistId} checklist incomplete. Missing:`
+      : `${checklistId} incomplete:`;
+    appendCrewMessage(`${lead} ${combinedMissing.join(', ')}.`, { stress: npcCrewService.crewState.FO.stress });
+
+    if (npcProfile.suggestions && combinedMissing[0]) {
+      appendCrewMessage(`Next item I would fix: ${combinedMissing[0]}.`, { stress: npcCrewService.crewState.FO.stress });
+    }
+
+    return { blocked: true, missingItems: combinedMissing };
+  }, [activeFailures, appendCrewMessage, flightData, getChecklistContext, npcProfile, physicsState]);
+
+  const buildNPCStatusReport = React.useCallback(() => {
+    const startupContext = getChecklistContext(sceneState.phaseType === 'pushback' ? 'ENG START' : 'PREFLIGHT');
+    const snapshot = buildNPCSystemSnapshot({
+      difficulty,
+      currentFreq,
+      currentFreqType: getFrequencyType(currentFreq),
+      sceneState,
+      startupContext,
+      activeFailures,
+      physicsState,
+      flightData
+    });
+
+    return formatNPCSystemReport(snapshot, npcProfile.diagnosticDepth === 'detailed' ? 'full' : 'brief');
+  }, [activeFailures, currentFreq, difficulty, flightData, getChecklistContext, npcProfile.diagnosticDepth, physicsState, sceneState]);
+
+  const executeNPCIntent = React.useCallback((intent) => {
+    const order = createNPCOrder(intent);
+    setNpcOrders(prev => [...prev, order]);
+    const acknowledgedOrder = transitionNPCOrder(order, NPCOrderStatus.ACKNOWLEDGED, { summary: summarizeNPCOrder(order) });
+    setNpcOrders(prev => prev.map(item => item.id === order.id ? acknowledgedOrder : item));
+
+    if (intent.type !== 'QUERY_HELP') {
+      appendCrewMessage(
+        npcProfile.explanationLevel === 'full'
+          ? `Copy. Working ${summarizeNPCOrder(order)}.`
+          : `Copy.`,
+        { stress: npcCrewService.crewState.FO.stress }
+      );
+    }
+
+    const finalizeOrder = (status, patch = {}) => {
+      setNpcOrders(prev => prev.map(item => item.id === order.id ? transitionNPCOrder(item, status, patch) : item));
+    };
+
+    const delay = getNPCResponseDelay(npcProfile);
+
+    window.setTimeout(() => {
+      switch (intent.type) {
+        case 'ORDER_ACTION': {
+          finalizeOrder(NPCOrderStatus.EXECUTING);
+          if (intent.action === 'flaps' && intent.value !== null) {
+            handleFlapsControl(intent.value);
+            appendCrewMessage(`Flaps set ${intent.value}.`, { stress: npcCrewService.crewState.FO.stress });
+            finalizeOrder(NPCOrderStatus.COMPLETED);
+            return;
+          }
+          if (intent.action === 'gear') {
+            handleGearControl(intent.value);
+            appendCrewMessage(intent.value === 1 ? 'Gear down.' : 'Gear up.', { stress: npcCrewService.crewState.FO.stress });
+            finalizeOrder(NPCOrderStatus.COMPLETED);
+            return;
+          }
+          if (intent.action === 'airBrakes') {
+            handleAirBrakesControl(intent.value);
+            appendCrewMessage(intent.token === 'arm' || intent.token === 'armed' ? 'Speedbrake armed.' : 'Speedbrake set.', { stress: npcCrewService.crewState.FO.stress });
+            finalizeOrder(NPCOrderStatus.COMPLETED);
+            return;
+          }
+          if (intent.action === 'radio') {
+            const stations = {
+              tower: 118.700,
+              ground: 121.900,
+              approach: 124.700,
+              departure: 124.700,
+              center: currentRegion ? Number(currentRegion.frequency) : 127.800
+            };
+            const nextFreq = intent.value || stations[intent.target] || currentFreq;
+            setCurrentFreq(Math.round(nextFreq * 1000) / 1000);
+            appendCrewMessage(`Tuned ${Number(nextFreq).toFixed(3)}.`, { stress: npcCrewService.crewState.FO.stress });
+            finalizeOrder(NPCOrderStatus.COMPLETED);
+            return;
+          }
+          appendCrewMessage('Unable to execute that action right now.', { stress: npcCrewService.crewState.FO.stress });
+          finalizeOrder(NPCOrderStatus.FAILED);
+          return;
+        }
+        case 'RUN_CHECKLIST': {
+          finalizeOrder(NPCOrderStatus.EXECUTING);
+          const result = runNPCChecklist(intent.checklistId);
+          finalizeOrder(result.blocked ? NPCOrderStatus.BLOCKED : NPCOrderStatus.COMPLETED, { details: result.missingItems });
+          return;
+        }
+        case 'REPORT_STATUS': {
+          finalizeOrder(NPCOrderStatus.EXECUTING);
+          appendCrewMessage(buildNPCStatusReport(), { stress: npcCrewService.crewState.FO.stress });
+          finalizeOrder(NPCOrderStatus.COMPLETED);
+          return;
+        }
+        case 'DIAGNOSE_ISSUE': {
+          finalizeOrder(NPCOrderStatus.EXECUTING);
+          const report = buildNPCStatusReport();
+          const noisy = shouldNPCIntroduceNoise(npcProfile, 'high');
+          appendCrewMessage(noisy ? `${report} I may be missing something obvious.` : report, { stress: npcCrewService.crewState.FO.stress });
+          finalizeOrder(NPCOrderStatus.COMPLETED, { noisy });
+          return;
+        }
+        case 'REQUEST_RADIO_CALL': {
+          finalizeOrder(NPCOrderStatus.EXECUTING);
+          const templateMap = {
+            req_taxi: { text: `${Number.isFinite(currentFreq) ? currentFreq.toFixed(3) : 'Ground'}, ${callsign} ready for taxi.`, type: 'request', params: {} },
+            req_startup: { text: `${Number.isFinite(currentFreq) ? currentFreq.toFixed(3) : 'Ground'}, ${callsign} ready for startup and pushback.`, type: 'request', params: {} },
+            req_takeoff: { text: `${Number.isFinite(currentFreq) ? currentFreq.toFixed(3) : 'Tower'}, ${callsign} ready for takeoff, runway ${(routeDetails?.departureRunway) || (flightPlan?.departure?.runways?.[0]?.name) || 'active'}.`, type: 'request', params: { runway: (routeDetails?.departureRunway) || (flightPlan?.departure?.runways?.[0]?.name) || 'active' } },
+            inf_mayday: { text: `MAYDAY MAYDAY MAYDAY, ${(Number.isFinite(currentFreq) ? currentFreq.toFixed(3) : 'Tower')}, ${callsign} declaring emergency due to ${activeFailures[0]?.type || 'unknown issue'}.`, type: 'inform', params: { failure: activeFailures[0]?.type || 'unknown issue' } }
+          };
+          const template = templateMap[intent.templateId];
+          if (!template) {
+            appendCrewMessage('I do not have a radio template for that call.', { stress: npcCrewService.crewState.FO.stress });
+            finalizeOrder(NPCOrderStatus.FAILED);
+            return;
+          }
+          const ok = submitRadioTransmission({
+            text: template.text,
+            type: template.type,
+            templateId: intent.templateId,
+            params: template.params,
+            sender: 'Copilot'
+          });
+          if (ok) {
+            appendCrewMessage('Radio call transmitted.', { stress: npcCrewService.crewState.FO.stress });
+            finalizeOrder(NPCOrderStatus.COMPLETED);
+          } else {
+            appendCrewMessage('Channel is busy. Unable to transmit.', { stress: npcCrewService.crewState.FO.stress });
+            finalizeOrder(NPCOrderStatus.BLOCKED);
+          }
+          return;
+        }
+        case 'QUERY_HELP': {
+          finalizeOrder(NPCOrderStatus.EXECUTING);
+          appendCrewMessage('Available commands: status, diagnose, run startup checklist, run abnormal checklist, run before takeoff checklist, set flaps 5, gear down, request taxi, request takeoff clearance, declare emergency.', { stress: npcCrewService.crewState.FO.stress });
+          finalizeOrder(NPCOrderStatus.COMPLETED);
+          return;
+        }
+        default: {
+          appendCrewMessage('I did not understand that command.', { stress: npcCrewService.crewState.FO.stress });
+          finalizeOrder(NPCOrderStatus.FAILED);
+        }
+      }
+    }, delay);
+  }, [activeFailures, appendCrewMessage, buildNPCStatusReport, callsign, currentFreq, flightPlan, npcProfile, routeDetails, runNPCChecklist, submitRadioTransmission, currentRegion]);
+
+  const submitNPCCommand = React.useCallback((rawCommand) => {
+    const intent = parseNPCCommand(rawCommand);
+    if (intent.type === 'UNKNOWN') {
+      appendCrewMessage('Unable to parse that. Try status, diagnose, checklist, flaps, gear, or radio requests.', { stress: npcCrewService.crewState.FO.stress });
+      return intent;
+    }
+
+    eventBus.publish('command.input', {
+      raw: rawCommand,
+      sceneId: sceneState.sceneId,
+      scenarioId: sceneState.scenarioId,
+      parsedIntent: intent
+    });
+
+    executeNPCIntent(intent);
+    return intent;
+  }, [appendCrewMessage, executeNPCIntent, sceneState.sceneId, sceneState.scenarioId]);
+
+  const handleQuickNPCCommand = React.useCallback((command) => {
+    if (!command) return;
+    setCommandInput(command);
+    submitNPCCommand(command);
+  }, [submitNPCCommand]);
+
   const handleCommandSubmit = (event) => {
     event.preventDefault();
     const trimmed = commandInput.trim();
@@ -1151,11 +1536,7 @@ const FlightInProgress = ({
       return;
     }
     console.log('🧭 COMMAND INPUT:', trimmed);
-    eventBus.publish('command.input', {
-      raw: trimmed,
-      sceneId: sceneState.sceneId,
-      scenarioId: sceneState.scenarioId
-    });
+    submitNPCCommand(trimmed);
     setCommandInput('');
   };
 
@@ -1398,7 +1779,7 @@ const FlightInProgress = ({
           )}
 
           <div style={{ pointerEvents: 'auto' }}>
-            <CrewPanel difficulty={difficulty} />
+            <CrewPanel difficulty={difficulty} quickCommands={npcQuickCommands} onQuickCommand={handleQuickNPCCommand} />
           </div>
         </div>
 
@@ -1406,6 +1787,8 @@ const FlightInProgress = ({
           <FlightPanelModular
             flightData={{
               ...flightData,
+              trueAirspeed: flightData?.trueAirspeed ?? flightData?.derived?.airspeed,
+              groundSpeed: flightData?.groundSpeed ?? flightData?.derived?.groundSpeed,
               physicsActive: sceneState.physicsActive,
               narrativeHistory: sceneState.narrativeHistory,
               phaseName: sceneState.phaseName,
@@ -1598,9 +1981,13 @@ const FlightInProgress = ({
         </div>
       )}
       {isTutorial && flightData && (
-        <TutorialOverlay 
-          physicsState={flightData} 
-          onClose={onTutorialClose} 
+        <TutorialOverlay
+          tutorial={activeTutorial}
+          physicsState={flightData}
+          radioMessages={radioMessages}
+          currentFrequency={currentFreq}
+          frequencyType={getFrequencyType(currentFreq)}
+          onClose={onTutorialClose}
         />
       )}
     </div>

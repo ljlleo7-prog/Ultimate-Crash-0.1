@@ -1,6 +1,10 @@
 import { useMemo } from 'react';
 import PropTypes from 'prop-types';
 import VSpeedCalculator from '../../services/VSpeedCalculator';
+import { calculateRouteProgress } from '../../services/efb/RouteProgress.js';
+import { calculateFuelPlan } from '../../services/efb/FuelPlanning.js';
+import { buildWeatherBriefing } from '../../services/efb/EFBDataService.js';
+import { formatNumber, formatDuration } from '../../services/efb/UnitConversion.js';
 
 const clampNumber = (value, fallback = 0, min = 0) => {
   const parsed = Number(value);
@@ -8,12 +12,7 @@ const clampNumber = (value, fallback = 0, min = 0) => {
   return Math.max(min, parsed);
 };
 
-const formatNumber = (value, suffix = '') => {
-  if (!Number.isFinite(value)) return '—';
-  return `${Math.round(value).toLocaleString()}${suffix}`;
-};
-
-const FMCPerformance = ({ preflightConfig, aircraftData, flightState, weatherData, onUpdatePreflight, readiness }) => {
+const FMCPerformance = ({ preflightConfig, aircraftData, flightState, weatherData, onUpdatePreflight, readiness, flightPlan }) => {
   const pax = clampNumber(preflightConfig?.pax, 0, 0);
   const payload = clampNumber(preflightConfig?.payload, 0, 0);
   const fuelReserve = clampNumber(preflightConfig?.fuelReserve, 0, 0);
@@ -25,12 +24,11 @@ const FMCPerformance = ({ preflightConfig, aircraftData, flightState, weatherDat
   const takeoffReferenceWeight = clampNumber(aircraftData?.maxTakeoffWeight, 79000, 1);
   const landingReferenceWeight = clampNumber(aircraftData?.maxLandingWeight || aircraftData?.maxTakeoffWeight * 0.85, 66000, 1);
   const stallSpeed = clampNumber(aircraftData?.stallSpeed, 118, 1);
-  const temperature = weatherData?.temperature || 15;
-  const windSpeed = weatherData?.windSpeed || 0;
-  const windDirection = weatherData?.windDirection || 0;
-  const heading = flightState?.heading || 0;
-  const windAngle = (windDirection - heading + 360) % 360;
-  const headwind = windSpeed * Math.cos(windAngle * Math.PI / 180);
+  const weatherBriefing = buildWeatherBriefing({ weatherData, runwayHeading: flightState?.heading });
+  const temperature = weatherBriefing.temperature ?? 15;
+  const headwind = weatherBriefing.windComponents?.headwind ?? 0;
+  const routeProgress = calculateRouteProgress({ flightPlan, flightState });
+  const fuelPlan = calculateFuelPlan({ flightState, routeProgress, preflightConfig, aircraftData });
 
   const derivedTakeoffPerformance = useMemo(() => VSpeedCalculator.calculateTakeoff({
     weight: estimatedTakeoffWeight,
@@ -83,50 +81,25 @@ const FMCPerformance = ({ preflightConfig, aircraftData, flightState, weatherDat
         <div className="fmc-edit-grid">
           <div className="fmc-input-group">
             <label>Passengers</label>
-            <input
-              type="number"
-              min="0"
-              max="400"
-              value={pax}
-              onChange={(e) => handleChange('pax', e.target.value, 0)}
-            />
+            <input type="number" min="0" max="400" value={pax} onChange={(e) => handleChange('pax', e.target.value, 0)} />
             <small>Passenger count used for load and takeoff estimates.</small>
           </div>
 
           <div className="fmc-input-group">
             <label>Payload (kg)</label>
-            <input
-              type="number"
-              min="0"
-              step="100"
-              value={payload}
-              onChange={(e) => handleChange('payload', e.target.value, 0)}
-            />
+            <input type="number" min="0" step="100" value={payload} onChange={(e) => handleChange('payload', e.target.value, 0)} />
             <small>Cargo and baggage payload included in fuel planning.</small>
           </div>
 
           <div className="fmc-input-group">
             <label>Reserve factor</label>
-            <input
-              type="number"
-              min="0"
-              max="1"
-              step="0.01"
-              value={fuelReserve}
-              onChange={(e) => handleChange('fuelReserve', e.target.value, 0)}
-            />
+            <input type="number" min="0" max="1" step="0.01" value={fuelReserve} onChange={(e) => handleChange('fuelReserve', e.target.value, 0)} />
             <small>Contingency multiplier used by flight-plan fuel calculation.</small>
           </div>
 
           <div className="fmc-input-group">
             <label>Cruise altitude (ft)</label>
-            <input
-              type="number"
-              min="1000"
-              step="1000"
-              value={cruiseHeight}
-              onChange={(e) => handleChange('cruiseHeight', e.target.value, 1000)}
-            />
+            <input type="number" min="1000" step="1000" value={cruiseHeight} onChange={(e) => handleChange('cruiseHeight', e.target.value, 1000)} />
             <small>Target cruise altitude handed off into the flight runtime.</small>
           </div>
         </div>
@@ -135,48 +108,34 @@ const FMCPerformance = ({ preflightConfig, aircraftData, flightState, weatherDat
       <div className="fmc-section">
         <div className="fmc-label">Flight plan fuel</div>
         <div className="fmc-route-summary-grid">
-          <div className="fmc-stat-card">
-            <span className="fmc-stat-label">Trip fuel</span>
-            <span className="fmc-stat-value">{formatNumber(flightPlanFuel.tripFuel, ' kg')}</span>
-          </div>
-          <div className="fmc-stat-card">
-            <span className="fmc-stat-label">Reserve fuel</span>
-            <span className="fmc-stat-value">{formatNumber(flightPlanFuel.reserveFuel, ' kg')}</span>
-          </div>
-          <div className="fmc-stat-card">
-            <span className="fmc-stat-label">Total fuel</span>
-            <span className="fmc-stat-value">{formatNumber(flightPlanFuel.totalFuel, ' kg')}</span>
-          </div>
-          <div className="fmc-stat-card">
-            <span className="fmc-stat-label">Flight time</span>
-            <span className="fmc-stat-value">
-              {Number.isFinite(preflightConfig?.flightPlan?.time?.hours)
-                ? `${preflightConfig.flightPlan.time.hours}h ${preflightConfig.flightPlan.time.minutes}m`
-                : '—'}
-            </span>
-          </div>
+          <div className="fmc-stat-card"><span className="fmc-stat-label">Trip fuel</span><span className="fmc-stat-value">{formatNumber(flightPlanFuel.tripFuel, 0, ' kg')}</span></div>
+          <div className="fmc-stat-card"><span className="fmc-stat-label">Reserve fuel</span><span className="fmc-stat-value">{formatNumber(flightPlanFuel.reserveFuel, 0, ' kg')}</span></div>
+          <div className="fmc-stat-card"><span className="fmc-stat-label">Total fuel</span><span className="fmc-stat-value">{formatNumber(flightPlanFuel.totalFuel, 0, ' kg')}</span></div>
+          <div className="fmc-stat-card"><span className="fmc-stat-label">Flight time</span><span className="fmc-stat-value">{Number.isFinite(preflightConfig?.flightPlan?.time?.hours) ? `${preflightConfig.flightPlan.time.hours}h ${preflightConfig.flightPlan.time.minutes}m` : '—'}</span></div>
         </div>
       </div>
 
       <div className="fmc-section">
-        <div className="fmc-label">Derived weights</div>
+        <div className="fmc-label">Live fuel and weight</div>
         <div className="fmc-route-summary-grid">
-          <div className="fmc-stat-card">
-            <span className="fmc-stat-label">Dry operating</span>
-            <span className="fmc-stat-value">{formatNumber(dryOperatingMass, ' kg')}</span>
-          </div>
-          <div className="fmc-stat-card">
-            <span className="fmc-stat-label">Estimated TOW</span>
-            <span className="fmc-stat-value">{formatNumber(estimatedTakeoffWeight, ' kg')}</span>
-          </div>
-          <div className="fmc-stat-card">
-            <span className="fmc-stat-label">Estimated landing</span>
-            <span className="fmc-stat-value">{formatNumber(estimatedLandingWeight, ' kg')}</span>
-          </div>
-          <div className="fmc-stat-card">
-            <span className="fmc-stat-label">Headwind</span>
-            <span className="fmc-stat-value">{`${Math.round(headwind)} kt`}</span>
-          </div>
+          <div className="fmc-stat-card"><span className="fmc-stat-label">Fuel flow</span><span className="fmc-stat-value">{fuelPlan.dataQuality?.hasFuelFlow ? `${formatNumber(fuelPlan.fuelFlowKgH, 0)} kg/h` : '—'}</span></div>
+          <div className="fmc-stat-card"><span className="fmc-stat-label">Endurance</span><span className="fmc-stat-value">{fuelPlan.enduranceText}</span></div>
+          <div className="fmc-stat-card"><span className="fmc-stat-label">Dest fuel</span><span className="fmc-stat-value">{fuelPlan.destinationFuel !== null ? `${formatNumber(fuelPlan.destinationFuel, 0)} kg` : '—'}</span></div>
+          <div className="fmc-stat-card"><span className="fmc-stat-label">Reserve margin</span><span className="fmc-stat-value">{fuelPlan.reserveMargin !== null ? `${formatNumber(fuelPlan.reserveMargin, 0)} kg` : '—'}</span></div>
+          <div className="fmc-stat-card"><span className="fmc-stat-label">Airborne weight</span><span className="fmc-stat-value">{`${formatNumber(fuelPlan.airborneWeight, 0)} kg`}</span></div>
+          <div className="fmc-stat-card"><span className="fmc-stat-label">Landing weight</span><span className="fmc-stat-value">{fuelPlan.destinationFuel !== null ? `${formatNumber(dryOperatingMass + fuelPlan.destinationFuel, 0)} kg` : '—'}</span></div>
+        </div>
+      </div>
+
+      <div className="fmc-section">
+        <div className="fmc-label">Derived weights and environment</div>
+        <div className="fmc-route-summary-grid">
+          <div className="fmc-stat-card"><span className="fmc-stat-label">Dry operating</span><span className="fmc-stat-value">{formatNumber(dryOperatingMass, 0, ' kg')}</span></div>
+          <div className="fmc-stat-card"><span className="fmc-stat-label">Estimated TOW</span><span className="fmc-stat-value">{formatNumber(estimatedTakeoffWeight, 0, ' kg')}</span></div>
+          <div className="fmc-stat-card"><span className="fmc-stat-label">Estimated landing</span><span className="fmc-stat-value">{formatNumber(estimatedLandingWeight, 0, ' kg')}</span></div>
+          <div className="fmc-stat-card"><span className="fmc-stat-label">Headwind</span><span className="fmc-stat-value">{`${formatNumber(headwind, 0)} kt`}</span></div>
+          <div className="fmc-stat-card"><span className="fmc-stat-label">Crosswind</span><span className="fmc-stat-value">{weatherBriefing.windComponents?.crosswind !== null ? `${formatNumber(Math.abs(weatherBriefing.windComponents.crosswind), 0)} kt` : '—'}</span></div>
+          <div className="fmc-stat-card"><span className="fmc-stat-label">ETE destination</span><span className="fmc-stat-value">{routeProgress.eteDestinationHours !== null ? formatDuration(routeProgress.eteDestinationHours) : '—'}</span></div>
         </div>
       </div>
 
@@ -209,13 +168,6 @@ const FMCPerformance = ({ preflightConfig, aircraftData, flightState, weatherDat
           <div className="fmc-input-group"><label>VAPP (kt)</label><input type="number" value={landingPerformance.vapp || 0} readOnly /></div>
         </div>
       </div>
-
-      {flightState && (
-        <div className="fmc-section">
-          <div className="fmc-label">Current airborne weight</div>
-          <div className="fmc-value">{((aircraftData?.mass || 0) + (flightState.fuel || 0)).toFixed(0)} KG</div>
-        </div>
-      )}
     </div>
   );
 };
@@ -228,7 +180,8 @@ FMCPerformance.propTypes = {
   onUpdatePreflight: PropTypes.func,
   readiness: PropTypes.shape({
     isLoadoutReady: PropTypes.bool
-  })
+  }),
+  flightPlan: PropTypes.any
 };
 
 export default FMCPerformance;

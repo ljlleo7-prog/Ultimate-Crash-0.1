@@ -2,8 +2,8 @@
     position: fixed;
     top: 20px;
     right: 20px;
-    width: 350px;
-    background: rgba(0, 0, 0, 0.85);
+    width: 380px;
+    background: rgba(0, 0, 0, 0.88);
     color: white;
     border-radius: 8px;
     border: 1px solid rgba(255, 255, 255, 0.2);
@@ -14,19 +14,27 @@
 }
 
 .tutorial-overlay.minimized {
-    width: 200px;
-    height: 50px;
+    width: 220px;
+    height: 58px;
     overflow: hidden;
 }
 
 .tutorial-header {
     display: flex;
     justify-content: space-between;
-    align-items: center;
+    align-items: flex-start;
     padding: 10px 15px;
     background: rgba(255, 255, 255, 0.1);
     border-bottom: 1px solid rgba(255, 255, 255, 0.1);
     border-radius: 8px 8px 0 0;
+}
+
+.tutorial-label {
+    margin: 0 0 4px;
+    font-size: 0.65rem;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    color: #94a3b8;
 }
 
 .tutorial-header h3 {
@@ -52,6 +60,14 @@
     padding: 15px;
 }
 
+.tutorial-step-count {
+    margin: 0 0 8px;
+    font-size: 0.75rem;
+    color: #94a3b8;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+}
+
 .tutorial-instruction {
     font-size: 1rem;
     line-height: 1.5;
@@ -66,10 +82,26 @@
     margin-bottom: 15px;
 }
 
+.tutorial-topic-strip {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-bottom: 15px;
+}
+
+.tutorial-topic-strip span {
+    font-size: 0.7rem;
+    padding: 4px 7px;
+    border: 1px solid rgba(148, 163, 184, 0.35);
+    color: #cbd5e1;
+    text-transform: uppercase;
+}
+
 .tutorial-footer {
     display: flex;
     justify-content: space-between;
     align-items: center;
+    gap: 12px;
 }
 
 .tutorial-next-btn {

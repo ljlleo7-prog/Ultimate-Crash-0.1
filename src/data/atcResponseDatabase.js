@@ -221,6 +221,33 @@ const renderPhraseTemplate = (template, params, context) => {
     });
 };
 
+const buildAtisWeatherLine = (weather = {}) => {
+  const windDirection = Number.isFinite(weather.windDirection) ? ((Math.round(weather.windDirection) % 360 + 360) % 360) : 0;
+  const windSpeed = Math.max(0, Math.round(Number(weather.windSpeed) || 0));
+  const windGust = Math.max(windSpeed, Math.round(Number(weather.windGust) || windSpeed));
+  const visibilityMeters = Number.isFinite(weather.visibility) ? Math.max(0, Math.round(weather.visibility)) : 10000;
+  const temperature = Math.round(Number.isFinite(weather.temperature) ? weather.temperature : 15);
+  const dewpoint = Math.round(Number.isFinite(weather.humidity)
+    ? (weather.temperature - ((100 - weather.humidity) / 5))
+    : temperature - 3);
+  const qnh = Math.max(850, Math.min(1085, Math.round(Number(weather.pressure) || 1013)));
+  const cloudCover = Number.isFinite(weather.cloudCover) ? weather.cloudCover : 0;
+
+  const windText = windSpeed <= 1
+    ? 'WIND CALM'
+    : `WIND ${String(windDirection).padStart(3, '0')} AT ${windSpeed}${windGust > windSpeed + 4 ? ` GUSTING ${windGust}` : ''} KNOTS`;
+  const visibilityText = visibilityMeters >= 10000
+    ? 'VISIBILITY 10 KILOMETERS OR MORE'
+    : `VISIBILITY ${visibilityMeters} METERS`;
+
+  let skyText = 'SKY CLEAR';
+  if (cloudCover >= 90) skyText = 'OVERCAST';
+  else if (cloudCover >= 60) skyText = 'BROKEN';
+  else if (cloudCover >= 25) skyText = 'SCATTERED';
+
+  return `${windText}. ${visibilityText}. ${skyText}. TEMPERATURE ${temperature}, DEWPOINT ${dewpoint}. QNH ${qnh}.`;
+};
+
 export const ATC_RESPONSES = {
   // Requests
   'req_alt': (params, context) => {
@@ -264,15 +291,11 @@ export const ATC_RESPONSES = {
   },
   'req_atis': (params, context) => {
       if (context && context.weather) {
-          const w = context.weather;
-          const wind = `${Math.round(w.windDirection || 0)} at ${Math.round(w.windSpeed || 0)} knots`;
-          const vis = (w.visibility || 10000) > 9000 ? '10km or more' : `${Math.round(w.visibility)} meters`;
-          const temp = Math.round(w.temperature || 15);
-          const qnh = Math.round(w.pressure || 1013);
-          // Simplified ATIS
-          return `Current Weather: Wind ${wind}, Visibility ${vis}, Temperature ${temp}, QNH ${qnh}. {callsign}.`;
+          const infoCode = context.infoCode || 'KILO';
+          const station = context.station || context.airport || 'AIRPORT';
+          return `INFORMATION ${infoCode}. ${station}. ${buildAtisWeatherLine(context.weather)} ADVISE ON INITIAL CONTACT YOU HAVE INFORMATION ${infoCode}.`;
       }
-      return `Information Kilo. Wind Calm, Visibility 10km, Sky Clear, Temperature 15, QNH 1013. {callsign}.`;
+      return 'INFORMATION KILO. AIRPORT. WIND CALM. VISIBILITY 10 KILOMETERS OR MORE. SKY CLEAR. TEMPERATURE 15, DEWPOINT 12. QNH 1013. ADVISE ON INITIAL CONTACT YOU HAVE INFORMATION KILO.';
   },
   'req_freq_change': (params, context) => {
       const nextFreq = (118 + Math.random() * 10).toFixed(3);

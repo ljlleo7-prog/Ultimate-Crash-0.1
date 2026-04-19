@@ -1,10 +1,10 @@
 
-import { useState, useEffect, useRef } from 'react';
+import { useMemo, useState, useEffect, useRef } from 'react';
 import eventBus from '../services/eventBus';
 import { npcCrewService } from '../services/NPCCrewService';
 import './CrewPanel.css';
 
-const CrewPanel = () => {
+const CrewPanel = ({ difficulty, quickCommands = [], onQuickCommand }) => {
     const [messages, setMessages] = useState([]);
     const [foStress, setFoStress] = useState(0);
     const [cabinStress, setCabinStress] = useState(0);
@@ -41,6 +41,13 @@ const CrewPanel = () => {
         }
     }, [messages]);
 
+    const visibleQuickCommands = useMemo(() => {
+        if (!Array.isArray(quickCommands)) {
+            return [];
+        }
+        return quickCommands.filter(command => difficulty !== 'devil' || command.category !== 'checklist');
+    }, [difficulty, quickCommands]);
+
     const handleSummonFO = () => {
         npcCrewService.summon('FO');
     };
@@ -50,7 +57,7 @@ const CrewPanel = () => {
     };
 
     const getSenderClass = (sender) => {
-        if (sender === 'First Officer') return 'sender-fo';
+        if (sender === 'First Officer' || sender === 'Copilot') return 'sender-fo';
         if (sender === 'Cabin Crew') return 'sender-cabin';
         return 'sender-system';
     };
@@ -70,34 +77,57 @@ const CrewPanel = () => {
                 </div>
             </div>
 
-            {/* Message Log */}
-            <div className="crew-panel-messages">
-                {messages.length === 0 && (
-                    <div className="crew-panel-empty">
-                        No recent communications.
-                    </div>
-                )}
-                {messages.map((msg, idx) => (
-                    <div key={idx} className="crew-message-item" style={{ alignItems: msg.sender === 'System' ? 'center' : 'flex-start' }}>
-                        <span className={`crew-message-sender ${getSenderClass(msg.sender)}`}>
-                            {msg.sender}
-                        </span>
-                        <div className="crew-message-content">
-                            {msg.content}
+            <div className="crew-panel-body">
+                {/* Message Log */}
+                <div className="crew-panel-messages">
+                    {messages.length === 0 && (
+                        <div className="crew-panel-empty">
+                            No recent communications.
+                        </div>
+                    )}
+                    {messages.map((msg, idx) => (
+                        <div key={idx} className="crew-message-item" style={{ alignItems: msg.sender === 'System' ? 'center' : 'flex-start' }}>
+                            <span className={`crew-message-sender ${getSenderClass(msg.sender)}`}>
+                                {msg.sender}
+                            </span>
+                            <div className="crew-message-content">
+                                {msg.content}
+                            </div>
+                        </div>
+                    ))}
+                    <div ref={messagesEndRef} />
+                </div>
+
+                <div className="crew-panel-sidebar">
+                    {visibleQuickCommands.length > 0 && (
+                        <div className="crew-panel-quick-commands">
+                            <div className="crew-panel-section-title">COMMANDS</div>
+                            <div className="crew-panel-command-grid">
+                                {visibleQuickCommands.map((command) => (
+                                    <button
+                                        key={command.id}
+                                        className="crew-btn crew-btn-fo"
+                                        onClick={() => onQuickCommand?.(command.command)}
+                                    >
+                                        {command.label}
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+
+                    <div className="crew-panel-actions">
+                        <div className="crew-panel-section-title">CALL</div>
+                        <div className="crew-panel-command-grid">
+                            <button className="crew-btn crew-btn-fo" onClick={handleSummonFO}>
+                                CALL FO
+                            </button>
+                            <button className="crew-btn crew-btn-cabin" onClick={handleSummonCabin}>
+                                CALL CABIN
+                            </button>
                         </div>
                     </div>
-                ))}
-                <div ref={messagesEndRef} />
-            </div>
-
-            {/* Controls */}
-            <div className="crew-panel-controls">
-                <button className="crew-btn crew-btn-fo" onClick={handleSummonFO}>
-                    CALL FO
-                </button>
-                <button className="crew-btn crew-btn-cabin" onClick={handleSummonCabin}>
-                    CALL CABIN
-                </button>
+                </div>
             </div>
         </div>
     );

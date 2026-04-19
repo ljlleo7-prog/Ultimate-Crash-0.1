@@ -94,8 +94,8 @@ const FlightPanel = ({ onActionRequest, aircraftModel, flightData }) => {
   const [flightState, setFlightState] = useState({
     // Navigation
     heading: flightData?.heading || 0,
-    trueAirspeed: flightData?.airspeed || 0,
-    groundSpeed: flightData?.airspeed || 0,
+    trueAirspeed: flightData?.trueAirspeed || flightData?.airspeed || 0,
+    groundSpeed: flightData?.groundSpeed || 0,
     indicatedAirspeed: flightData?.indicatedAirspeed || 0,
     
     // Flight Pose
@@ -131,8 +131,8 @@ const FlightPanel = ({ onActionRequest, aircraftModel, flightData }) => {
         ...prevState,
         // Navigation
         heading: flightData.heading,
-        trueAirspeed: flightData.airspeed,
-        groundSpeed: flightData.airspeed,
+        trueAirspeed: flightData.trueAirspeed ?? flightData.airspeed,
+        groundSpeed: flightData.groundSpeed,
         indicatedAirspeed: flightData.indicatedAirspeed,
         
         // Flight Pose

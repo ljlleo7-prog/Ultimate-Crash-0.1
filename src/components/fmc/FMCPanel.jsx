@@ -6,6 +6,8 @@ import FMCRoute from './FMCRoute';
 import FMCLegs from './FMCLegs';
 import FMCProgress from './FMCProgress';
 import FMCPerformance from './FMCPerformance';
+import FMCWeather from './FMCWeather';
+import FMCUtilities from './FMCUtilities';
 import './FMCPanel.css';
 
 const FMCPanel = ({
@@ -29,23 +31,36 @@ const FMCPanel = ({
 }) => {
   const [activePage, setActivePage] = useState(preflightMode ? 'init' : 'progress');
   const fmcService = useMemo(() => new FMCService(), []);
+  const planView = useMemo(() => fmcService.getPlanView(flightPlan), [fmcService, flightPlan]);
 
   const pages = [
     { id: 'init', label: 'Overview', icon: '🧾' },
     { id: 'route', label: 'Route', icon: '🗺️' },
     { id: 'legs', label: 'Legs', icon: '📍' },
     { id: 'progress', label: 'Live', icon: '📊' },
-    { id: 'perf', label: 'Load', icon: '✈️' }
+    { id: 'perf', label: 'Load', icon: '✈️' },
+    { id: 'weather', label: 'Weather', icon: '🌦️' },
+    { id: 'tools', label: 'Tools', icon: '🧮' }
   ];
 
   const visiblePages = preflightMode ? pages.filter((page) => page.id !== 'progress' || !preflightMode) : pages;
 
-  const handleUpdateLegs = (waypoints) => {
+  const handleUpdateLegs = (nextFlightPlan) => {
     if (preflightMode) {
-      onUpdateRouteDetails?.({ waypoints });
+      onUpdateRouteDetails?.({ waypoints: nextFlightPlan?.waypoints || [] });
       return;
     }
-    onUpdateFlightPlan?.(waypoints);
+    onUpdateFlightPlan?.(nextFlightPlan);
+  };
+
+  const handleExecuteTemporaryPlan = () => {
+    if (preflightMode) return;
+    onUpdateFlightPlan?.(fmcService.executeTemporaryPlan(flightPlan));
+  };
+
+  const handleDiscardTemporaryPlan = () => {
+    if (preflightMode) return;
+    onUpdateFlightPlan?.(fmcService.discardTemporaryPlan(flightPlan));
   };
 
   return (
@@ -76,6 +91,15 @@ const FMCPanel = ({
       </div>
 
       <div className="fmc-content">
+        {!preflightMode && planView.validation.execPending && (
+          <div className="fmc-banner warning" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px' }}>
+            <span>TEMPY {planView.validation.pendingChanges > 0 ? `· ${planView.validation.pendingChanges} pending change${planView.validation.pendingChanges === 1 ? '' : 's'}` : ''}</span>
+            <div style={{ display: 'flex', gap: '8px' }}>
+              <button onClick={handleDiscardTemporaryPlan}>CANCEL MOD</button>
+              <button onClick={handleExecuteTemporaryPlan}>EXEC</button>
+            </div>
+          </div>
+        )}
         {activePage === 'init' && <FMCInit aircraftData={aircraftData} preflightConfig={preflightConfig} onUpdatePreflight={onUpdatePreflight} aircraftSuggestions={aircraftSuggestions} />}
         {activePage === 'route' && (
           <FMCRoute
@@ -90,8 +114,24 @@ const FMCPanel = ({
             routeValidation={routeValidation}
           />
         )}
-        {activePage === 'legs' && <FMCLegs flightPlan={flightPlan} onUpdateFlightPlan={handleUpdateLegs} flightState={flightState} />}
-        {!preflightMode && activePage === 'progress' && <FMCProgress fmcService={fmcService} flightPlan={flightPlan} flightState={flightState} />}
+        {activePage === 'legs' && (
+          <FMCLegs
+            flightPlan={flightPlan}
+            flightState={flightState}
+            fmcService={fmcService}
+            planView={planView}
+            onUpdateFlightPlan={handleUpdateLegs}
+          />
+        )}
+        {!preflightMode && activePage === 'progress' && (
+          <FMCProgress
+            fmcService={fmcService}
+            flightPlan={flightPlan}
+            flightState={flightState}
+            preflightConfig={preflightConfig}
+            aircraftData={aircraftData}
+          />
+        )}
         {activePage === 'perf' && (
           <FMCPerformance
             preflightConfig={preflightConfig}
@@ -100,8 +140,11 @@ const FMCPanel = ({
             weatherData={weatherData}
             onUpdatePreflight={onUpdatePreflight}
             readiness={tabletReadiness}
+            flightPlan={flightPlan}
           />
         )}
+        {!preflightMode && activePage === 'weather' && <FMCWeather weatherData={weatherData} flightState={flightState} />}
+        {!preflightMode && activePage === 'tools' && <FMCUtilities />}
       </div>
     </div>
   );

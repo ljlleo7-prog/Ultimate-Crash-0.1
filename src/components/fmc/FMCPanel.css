@@ -382,6 +382,36 @@
   letter-spacing: 0.08em;
 }
 
+.fmc-tag-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.fmc-tag {
+  display: inline-flex;
+  align-items: center;
+  padding: 6px 10px;
+  border-radius: 999px;
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  background: #1f2937;
+  color: #cbd5e1;
+}
+
+.fmc-tag.warning {
+  background: rgba(245, 158, 11, 0.16);
+  color: #fbbf24;
+  border: 1px solid rgba(245, 158, 11, 0.22);
+}
+
+.fmc-briefing-copy {
+  color: #e2e8f0;
+  font-size: 13px;
+  line-height: 1.6;
+}
+
 .fmc-inline-action {
   width: auto;
 }

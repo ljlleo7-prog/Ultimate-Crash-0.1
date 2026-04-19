@@ -6,6 +6,8 @@
  * Focus: Smooth Speed and Vertical Speed (VS) control.
  */
 
+import FMAService from './autoflight/FMAService.js';
+
 class PIDController {
     constructor(kp, ki, kd, min, max, smoothing = 1.0) {
         this.kp = kp;
@@ -14,7 +16,7 @@ class PIDController {
         this.min = min;
         this.max = max;
         this.smoothing = smoothing; // 1.0 = No smoothing, 0.1 = Heavy smoothing
-        
+
         this.integral = 0;
         this.prevError = 0;
         this.prevDerivative = 0;
@@ -24,6 +26,32 @@ class PIDController {
         this.integral = 0;
         this.prevError = 0;
         this.prevDerivative = 0;
+    }
+
+    initialize(output, setpoint = 0, measured = setpoint) {
+        const safeOutput = Number.isFinite(output) ? output : 0;
+        const safeSetpoint = Number.isFinite(setpoint) ? setpoint : 0;
+        const safeMeasured = Number.isFinite(measured) ? measured : safeSetpoint;
+        const error = safeSetpoint - safeMeasured;
+        const proportional = this.kp * error;
+        const derivative = 0;
+        const remaining = safeOutput - proportional - (this.kd * derivative);
+
+        if (this.ki !== 0) {
+            this.integral = remaining / this.ki;
+        } else {
+            this.integral = 0;
+        }
+
+        const maxIntegral = this.ki !== 0 ? Math.max(this.min / this.ki, this.max / this.ki) : 0;
+        const minIntegral = this.ki !== 0 ? Math.min(this.min / this.ki, this.max / this.ki) : 0;
+        if (this.ki !== 0) {
+            if (this.integral > maxIntegral) this.integral = maxIntegral;
+            if (this.integral < minIntegral) this.integral = minIntegral;
+        }
+
+        this.prevError = error;
+        this.prevDerivative = derivative;
     }
 
     update(setpoint, measured, dt) {
@@ -64,7 +92,7 @@ class RealisticAutopilotService {
 
         // Vertical Speed (VS -> Pitch)
         // Softer outer-loop pitch target prevents step changes from becoming elevator snaps.
-        this.vsPID = new PIDController(0.000075, 0.000025, 0.000025, -12 * Math.PI/180, 15 * Math.PI/180, 0.45);
+        this.vsPID = new PIDController(0.000075, 0.000025, 0.000025, -14 * Math.PI/180, 18 * Math.PI/180, 0.45);
 
         // Altitude Hold (Altitude -> Target VS)
         // Used when not in ILS GS mode but Altitude Target is set.
@@ -75,11 +103,11 @@ class RealisticAutopilotService {
         this.pitchPID = new PIDController(-1.55, -0.35, -0.45, -0.85, 0.85, 0.35);
 
         // Roll Hold (Roll -> Aileron)
-        this.rollPID = new PIDController(1.15, 0.12, 0.16, -0.85, 0.85, 0.35);
+        this.rollPID = new PIDController(0.88, 0.07, 0.12, -0.68, 0.68, 0.24);
 
         // Heading Hold (Heading -> Roll)
-        // Outer Loop: Smooths the roll commands.
-        this.headingPID = new PIDController(0.75, 0.008, 0.16, -25 * Math.PI / 180, 25 * Math.PI / 180, 0.35);
+        // Outer loop permits a larger steady bank target while keeping soft buildup via roll-rate limiting.
+        this.headingPID = new PIDController(0.58, 0.005, 0.08, -24 * Math.PI / 180, 24 * Math.PI / 180, 0.24);
 
         // Turn Coordination
         this.rudderPID = new PIDController(0.28, 0.035, 0.16, -0.65, 0.65, 0.3);
@@ -97,7 +125,7 @@ class RealisticAutopilotService {
         this.runwayGeometry = null;
         this.nav1Frequency = 0; // Currently tuned NAV1 Frequency
         this.prevTargetRoll = 0;
-        this.maxRollRate = 20.0 * Math.PI / 180;
+        this.maxRollRate = 12.0 * Math.PI / 180;
 
         this.targets = {
             speed: 0, // Knots
@@ -121,13 +149,34 @@ class RealisticAutopilotService {
         this.navState = { preTurnEngaged: false };
         this.filteredState = null;
         this.outputState = null;
+        this.targetSteps = {
+            speed: 5,
+            vs: 100,
+            altitude: 100
+        };
+        this.altitudeMode = 'idle';
+        this.lastAltitudeError = null;
+        this.speedControlState = {
+            shapedTarget: null,
+            prevAirspeed: null,
+            prevThrottle: null
+        };
         this.inputFilterTau = 0.8;
         this.outputRateLimits = {
             throttle: 0.35,
             elevator: 0.55,
-            aileron: 0.75,
+            aileron: 0.42,
             rudder: 0.55
         };
+        this.engagementBlendDuration = 0.6;
+        this.engagementBlendRemaining = 0;
+        this.fmaService = new FMAService();
+        this.fmaStatus = this.fmaService.buildStatus({
+            engaged: this.engaged,
+            autopilotMode: this.mode,
+            autopilotDebug: this.debugState,
+            targets: this.targets
+        });
     }
 
     setRunwayGeometry(geometry) {
@@ -149,10 +198,78 @@ class RealisticAutopilotService {
         this.navState = { preTurnEngaged: false };
     }
 
-    setTargets(targets) {
-        if (targets.mode) {
+    clamp(value, min, max) {
+        return Math.min(max, Math.max(min, value));
+    }
+
+    snapValue(value, step) {
+        if (!Number.isFinite(value) || !Number.isFinite(step) || step <= 0) return value;
+        return Math.round(value / step) * step;
+    }
+
+    normalizeHeading(value, fallback = 0) {
+        if (!Number.isFinite(value)) return fallback;
+        const normalized = ((value % 360) + 360) % 360;
+        return normalized === 0 ? 360 : normalized;
+    }
+
+    normalizeSpeedTarget(value, fallback = 0) {
+        if (!Number.isFinite(value)) return fallback;
+        return this.clamp(this.snapValue(value, this.targetSteps.speed), 120, 350);
+    }
+
+    normalizeVerticalSpeedTarget(value, fallback = 0) {
+        if (!Number.isFinite(value)) return fallback;
+        return this.clamp(this.snapValue(value, this.targetSteps.vs), -4000, 4000);
+    }
+
+    normalizeAltitudeTarget(value, fallback = 0) {
+        if (!Number.isFinite(value)) return fallback;
+        return this.clamp(this.snapValue(value, this.targetSteps.altitude), 0, 45000);
+    }
+
+    normalizeTargets(rawTargets = {}) {
+        const normalized = { ...rawTargets };
+
+        if (rawTargets.ias !== undefined || rawTargets.speed !== undefined) {
+            const speedValue = rawTargets.ias !== undefined ? rawTargets.ias : rawTargets.speed;
+            normalized.speed = this.normalizeSpeedTarget(speedValue, this.targets.speed || 0);
+            normalized.ias = normalized.speed;
+        }
+
+        if (rawTargets.vs !== undefined) {
+            normalized.vs = this.normalizeVerticalSpeedTarget(rawTargets.vs, this.targets.vs || 0);
+        }
+
+        if (rawTargets.altitude !== undefined) {
+            normalized.altitude = this.normalizeAltitudeTarget(rawTargets.altitude, this.targets.altitude || 0);
+        }
+
+        if (rawTargets.heading !== undefined) {
+            normalized.heading = this.normalizeHeading(rawTargets.heading, this.targets.heading || 360);
+        }
+
+        return normalized;
+    }
+
+    resetAltitudeCapture() {
+        this.altitudeMode = 'idle';
+        this.lastAltitudeError = null;
+    }
+
+    armAltitudeCapture() {
+        this.altitudeMode = 'armed';
+        this.lastAltitudeError = null;
+    }
+
+    setTargets(targets, options = {}) {
+        const prevTargets = { ...this.targets };
+        const normalizedTargets = this.normalizeTargets(targets);
+        const preserveExisting = options.preserveExisting === true;
+
+        if (normalizedTargets.mode) {
             // Auto-tune Logic: If ILS mode is requested and we have a runway geometry, tune the frequency
-            if (targets.mode === 'ILS' && this.runwayGeometry && this.runwayGeometry.ilsFrequency) {
+            if (normalizedTargets.mode === 'ILS' && this.runwayGeometry && this.runwayGeometry.ilsFrequency) {
                 // Only auto-tune if we aren't already tuned (or force it? Force is safer for user experience)
                 if (this.nav1Frequency !== this.runwayGeometry.ilsFrequency) {
                     this.setNavFrequency(this.runwayGeometry.ilsFrequency);
@@ -161,24 +278,34 @@ class RealisticAutopilotService {
                 }
             }
 
-            this.mode = targets.mode;
-        }
-        
-        // Handle alias: ias -> speed (UI uses ias, Logic uses speed)
-        if (targets.ias !== undefined) {
-            targets.speed = targets.ias;
-        }
-        // Handle alias: speed -> ias (Ensure UI gets the updated value)
-        if (targets.speed !== undefined) {
-            targets.ias = targets.speed;
+            this.mode = normalizedTargets.mode;
         }
 
-        this.targets = { ...this.targets, ...targets };
+        this.targets = preserveExisting
+            ? { ...normalizedTargets, ...this.targets }
+            : { ...this.targets, ...normalizedTargets };
+
+        if (normalizedTargets.speed !== undefined && normalizedTargets.ias === undefined) {
+            this.targets.ias = normalizedTargets.speed;
+        }
+        if (normalizedTargets.ias !== undefined && normalizedTargets.speed === undefined) {
+            this.targets.speed = normalizedTargets.ias;
+        }
+
+        const altitudeProvided = Object.prototype.hasOwnProperty.call(normalizedTargets, 'altitude');
+        const vsProvided = Object.prototype.hasOwnProperty.call(normalizedTargets, 'vs');
+        const nextAltitude = altitudeProvided ? normalizedTargets.altitude : this.targets.altitude;
+        const altitudeChanged = altitudeProvided && nextAltitude !== prevTargets.altitude;
+
+        if (altitudeProvided && nextAltitude <= 0) {
+            this.resetAltitudeCapture();
+        } else if (nextAltitude > 0 && (altitudeChanged || (vsProvided && normalizedTargets.vs !== 0))) {
+            this.armAltitudeCapture();
+        }
     }
 
-    setEngaged(engaged, currentState = null) {
+    setEngaged(engaged, currentState = null, options = {}) {
         if (engaged && !this.engaged) {
-            // Reset PIDs on engagement to avoid jumps
             this.speedPID.reset();
             this.vsPID.reset();
             this.pitchPID.reset();
@@ -186,24 +313,67 @@ class RealisticAutopilotService {
             this.headingPID.reset();
             this.glideslopePID.reset();
             this.localizerPID.reset();
+            this.altitudePID.reset();
+            this.rudderPID.reset();
             this.finalApproachDrift = null;
-            this.prevTargetRoll = 0; // Reset rate limiter state
             this.filteredState = null;
             this.outputState = null;
+            this.speedControlState = {
+                shapedTarget: null,
+                prevAirspeed: null,
+                prevThrottle: null
+            };
+            this.resetAltitudeCapture();
 
-            // If we have current state, capture targets if they are currently 0
+            const explicitTargets = options.explicitTargets || {};
+            const captureTargets = {};
             if (currentState) {
-                if (this.targets.speed === 0) {
-                    this.targets.speed = Math.round(currentState.airspeed);
-                    this.targets.ias = this.targets.speed;
+                if (explicitTargets.speed === undefined && explicitTargets.ias === undefined) {
+                    captureTargets.speed = this.normalizeSpeedTarget(currentState.airspeed, this.targets.speed || 150);
+                    captureTargets.ias = captureTargets.speed;
                 }
-                if (this.targets.vs === 0) this.targets.vs = Math.round(currentState.verticalSpeed / 100) * 100;
-                if (this.targets.altitude === 0) this.targets.altitude = Math.round(currentState.altitude / 100) * 100;
-                if (this.targets.heading === 0) {
-                    const heading = (currentState.heading !== undefined) ? currentState.heading : 0;
-                    this.targets.heading = heading === 0 ? 360 : heading;
+                if (explicitTargets.vs === undefined) {
+                    captureTargets.vs = this.normalizeVerticalSpeedTarget(currentState.verticalSpeed, 0);
                 }
+                if (explicitTargets.altitude === undefined) {
+                    captureTargets.altitude = this.normalizeAltitudeTarget(currentState.altitude, 0);
+                }
+                if (explicitTargets.heading === undefined) {
+                    captureTargets.heading = this.normalizeHeading(currentState.heading, 360);
+                }
+                this.setTargets(captureTargets, { preserveExisting: true });
+
+                const targetSpeed = Number.isFinite(this.targets.speed) ? this.targets.speed : captureTargets.speed ?? 150;
+                const targetVS = Number.isFinite(this.targets.vs) ? this.targets.vs : captureTargets.vs ?? 0;
+                const targetHeading = Number.isFinite(this.targets.heading) ? this.targets.heading : captureTargets.heading ?? 360;
+
+                this.speedPID.initialize(currentState.throttle, targetSpeed, currentState.airspeed);
+                this.vsPID.initialize(currentState.pitch, targetVS, currentState.verticalSpeed);
+                this.pitchPID.initialize(currentState.elevator, currentState.pitch, currentState.pitch);
+
+                const headingError = ((targetHeading - currentState.heading + 540) % 360) - 180;
+                this.headingPID.initialize(currentState.roll, headingError * Math.PI / 180, 0);
+                this.rollPID.initialize(currentState.aileron, currentState.roll, currentState.roll);
+                this.rudderPID.initialize(currentState.rudder ?? 0, currentState.beta || 0, 0);
+
+                this.prevTargetRoll = Number.isFinite(currentState.roll) ? currentState.roll : 0;
+                this.outputState = {
+                    throttle: Number.isFinite(currentState.throttle) ? currentState.throttle : 0,
+                    elevator: Number.isFinite(currentState.elevator) ? currentState.elevator : 0,
+                    aileron: Number.isFinite(currentState.aileron) ? currentState.aileron : 0,
+                    rudder: Number.isFinite(currentState.rudder) ? currentState.rudder : 0
+                };
+                this.speedControlState.prevThrottle = this.outputState.throttle;
+            } else {
+                this.prevTargetRoll = 0;
             }
+
+            this.engagementBlendRemaining = this.engagementBlendDuration;
+            if (this.targets.altitude > 0) {
+                this.armAltitudeCapture();
+            }
+        } else if (!engaged) {
+            this.engagementBlendRemaining = 0;
         }
         this.engaged = engaged;
     }
@@ -230,6 +400,67 @@ class RealisticAutopilotService {
         if (delta > maxDelta) delta = maxDelta;
         if (delta < -maxDelta) delta = -maxDelta;
         return prev + delta;
+    }
+
+    computePredictiveThrottle(targetSpeed, currentSpeed, targetVS, dt) {
+        const prevState = this.speedControlState;
+        const speedTrend = Number.isFinite(prevState.prevAirspeed) && dt > 0
+            ? (currentSpeed - prevState.prevAirspeed) / dt
+            : 0;
+        const targetDeltaLimit = 6 * dt;
+        const shapedTarget = prevState.shapedTarget === null
+            ? targetSpeed
+            : this.rateLimit(prevState.shapedTarget, targetSpeed, targetDeltaLimit, dt);
+        const speedError = shapedTarget - currentSpeed;
+        const verticalDemand = Number.isFinite(targetVS) ? targetVS : 0;
+        const baseThrottle = this.clamp(
+            0.5
+            + ((shapedTarget - 220) * 0.0035)
+            + (this.clamp(verticalDemand, -2000, 2500) / 12000),
+            0.18,
+            0.9
+        );
+        const correction = this.speedPID.update(shapedTarget, currentSpeed, dt);
+        const predictiveDamping = this.clamp(speedTrend * 0.04, -0.18, 0.18);
+        const throttleCmd = this.clamp(baseThrottle + (correction * 0.55) - predictiveDamping, 0.0, 1.0);
+
+        this.speedControlState = {
+            shapedTarget,
+            prevAirspeed: currentSpeed,
+            prevThrottle: throttleCmd
+        };
+
+        return {
+            throttleCmd,
+            shapedTarget,
+            speedTrend,
+            baseThrottle,
+            correction,
+            predictiveDamping
+        };
+    }
+
+    applyThrottleEnvelope(rawThrottle, targetSpeed, currentSpeed, targetVS) {
+        const speedError = targetSpeed - currentSpeed;
+        const climbBias = this.clamp((Number.isFinite(targetVS) ? targetVS : 0) / 6000, 0, 0.12);
+        let minThrottle = 0.5;
+        let maxThrottle = 0.8 + climbBias;
+
+        if (speedError < -10) {
+            const overspeedFactor = this.clamp((-speedError - 10) / 60, 0, 1);
+            minThrottle = this.clamp(0.5 - overspeedFactor * 0.45, 0.05, 0.5);
+            maxThrottle = this.clamp(0.8 - overspeedFactor * 0.72, 0.08, 0.8);
+        } else if (speedError > 25) {
+            const lowEnergyFactor = this.clamp((speedError - 25) / 55, 0, 1);
+            maxThrottle = this.clamp(maxThrottle + lowEnergyFactor * 0.2, 0.8, 1.0);
+        }
+
+        return {
+            throttleCmd: this.clamp(rawThrottle, minThrottle, maxThrottle),
+            minThrottle,
+            maxThrottle,
+            speedError
+        };
     }
 
     filterState(state, dt) {
@@ -284,16 +515,16 @@ class RealisticAutopilotService {
         
         // Ensure targets are initialized if they were somehow left at 0
         if (this.targets.speed === 0) {
-            this.targets.speed = Math.round(fAirspeed);
+            this.targets.speed = this.normalizeSpeedTarget(fAirspeed, 150);
             this.targets.ias = this.targets.speed;
         } else if (this.targets.ias === undefined) {
              this.targets.ias = this.targets.speed;
         }
-        if (this.targets.vs === 0 && Math.abs(fVerticalSpeed) > 100) {
-             this.targets.vs = Math.round(fVerticalSpeed / 100) * 100;
+        if (this.targets.vs === 0 && Math.abs(fVerticalSpeed) > 100 && this.altitudeMode !== 'hold') {
+             this.targets.vs = this.normalizeVerticalSpeedTarget(fVerticalSpeed, 0);
         }
         if (this.targets.heading === 0) {
-            this.targets.heading = fHeading === 0 ? 360 : fHeading;
+            this.targets.heading = this.normalizeHeading(fHeading, 360);
         }
 
         // --- LNAV with Pre-Turn Logic ---
@@ -581,18 +812,16 @@ class RealisticAutopilotService {
                  
                  // PID Controller for Localizer (Angular)
                   // Input: Deviation (deg). Output: Heading Correction (deg).
-                  // Limit to +/- 60 deg (Aggressive Intercept)
-                  
-                  const maxIntercept = 60;
+                  // Limit to +/- 28 deg to avoid snap-roll style intercepts
+
+                  const maxIntercept = 28;
                   let desiredInterceptAngle = 0;
-                  
+
                   // Smooth transition: Use PID update but clamp output
-                  
+
                   if (Math.abs(deviationDeg) > 1.5) {
-                      // Pure Proportional for intercept (Simple and Stable)
-                      // Gain 10.0: 3 deg error -> 30 deg correction.
-                      // Clamp at 60.
-                      let correction = -deviationDeg * 10.0;
+                      // Pure proportional intercept, but intentionally gentle.
+                      let correction = -deviationDeg * 4.5;
                       if (correction > maxIntercept) correction = maxIntercept;
                       if (correction < -maxIntercept) correction = -maxIntercept;
                       desiredInterceptAngle = correction;
@@ -681,33 +910,52 @@ class RealisticAutopilotService {
         if (ilsDebug.message) this.debugState.ilsMessage = ilsDebug.message;
 
         // Altitude Hold Logic (When not on Glideslope AND not in LNAV VNAV)
-        // Only override VS if we are actively HOLDING altitude (close to target)
-        // or if the user is not actively managing VS (hard to detect, so we default to user authority outside hold band).
-        
-        // Check if LNAV is handling VS (implied by previous block modification)
         const lnavHandlingVS = (this.mode === 'LNAV' && this.navPlan && this.navPlan.fix && typeof this.navPlan.fix.altitude === 'number');
+        const altitudeControlActive = !ilsDebug.gsCaptured && !lnavHandlingVS && this.targets.altitude > 0;
 
-        if (!ilsDebug.gsCaptured && !lnavHandlingVS && this.targets.altitude > 0) {
-             const altError = this.targets.altitude - altitude;
-             
-             // Capture/Hold Band: 50ft
-             // If we are within 50ft, we force altitude hold (VS=0 or PID)
-             if (Math.abs(altError) < 50) {
-                 // Hold Altitude
-                 // Use PID to maintain exact altitude (VS small corrections)
-                 let pidVS = this.altitudePID.update(this.targets.altitude, altitude, dt);
-                 this.targets.vs = pidVS;
-             } else {
-                 // Outside Capture Band: Respect User VS
-                 // Reset PID so it's ready for capture
-                 this.altitudePID.reset();
-             }
+        if (!altitudeControlActive) {
+            this.resetAltitudeCapture();
+            this.altitudePID.reset();
+        } else {
+            const altError = this.targets.altitude - altitude;
+            const previousAltError = this.lastAltitudeError;
+            const captureBand = 80;
+            const holdBand = 40;
+            const verticalTrend = Number.isFinite(fVerticalSpeed) ? fVerticalSpeed : 0;
+            const movingTowardTarget = Math.abs(verticalTrend) > 100 && Math.sign(verticalTrend) === Math.sign(altError);
+            const passedTarget = previousAltError !== null && Math.sign(previousAltError) !== Math.sign(altError) && Math.abs(previousAltError) > holdBand;
+            const nearTarget = Math.abs(altError) <= captureBand;
+
+            if (this.altitudeMode === 'idle') {
+                this.armAltitudeCapture();
+            }
+
+            if (this.altitudeMode !== 'hold' && (passedTarget || nearTarget || (Math.abs(altError) <= 200 && movingTowardTarget))) {
+                this.altitudeMode = nearTarget ? 'capture' : 'hold';
+            }
+
+            if (this.altitudeMode === 'capture' || this.altitudeMode === 'hold') {
+                const pidVS = this.altitudePID.update(this.targets.altitude, altitude, dt);
+                const leveledVS = this.clamp(pidVS, -800, 800);
+                this.targets.vs = Math.abs(altError) <= holdBand ? 0 : leveledVS;
+                if (Math.abs(altError) <= holdBand || passedTarget) {
+                    this.altitudeMode = 'hold';
+                    this.targets.vs = 0;
+                }
+            } else {
+                this.altitudePID.reset();
+            }
+
+            this.lastAltitudeError = altError;
         }
 
         const { speed: targetSpeed, vs: targetVS, heading: targetHeading } = this.targets;
 
-        // 1. Auto-Throttle (Speed Control)
-        const throttleCmd = this.speedPID.update(targetSpeed, fAirspeed, dt);
+        // 1. Auto-Throttle (Predictive Speed Control)
+        const speedControl = this.computePredictiveThrottle(targetSpeed, fAirspeed, targetVS, dt);
+        const rawThrottleCmd = speedControl.throttleCmd;
+        const throttleEnvelope = this.applyThrottleEnvelope(rawThrottleCmd, targetSpeed, fAirspeed, targetVS);
+        const throttleCmd = throttleEnvelope.throttleCmd;
 
         // 2. Vertical Speed Control (VS -> Pitch -> Trim)
         const targetPitch = this.vsPID.update(targetVS, fVerticalSpeed, dt);
@@ -793,6 +1041,18 @@ class RealisticAutopilotService {
             rudder: limitedRudder
         };
 
+        const blendAlpha = this.engagementBlendRemaining > 0
+            ? this.clamp(1 - (this.engagementBlendRemaining / this.engagementBlendDuration), 0, 1)
+            : 1;
+        this.engagementBlendRemaining = Math.max(0, this.engagementBlendRemaining - dt);
+
+        const currentTrimCommand = Number.isFinite(currentControls.trim) ? currentControls.trim : 0;
+        const blendedThrottle = currentControls.throttle + ((limitedThrottle - currentControls.throttle) * blendAlpha);
+        const blendedElevator = currentControls.elevator + ((limitedElevator - currentControls.elevator) * blendAlpha);
+        const blendedAileron = currentControls.aileron + ((limitedAileron - currentControls.aileron) * blendAlpha);
+        const blendedRudder = currentControls.rudder + ((limitedRudder - currentControls.rudder) * blendAlpha);
+        const blendedTrim = currentTrimCommand + ((newTrim - currentTrimCommand) * blendAlpha);
+
         // Update Debug State
         this.debugState = {
             headingError,
@@ -800,25 +1060,41 @@ class RealisticAutopilotService {
             pitchError: (targetPitch - fPitch) * 180 / Math.PI,
             targetPitch: targetPitch * 180 / Math.PI,
             speedError: targetSpeed - fAirspeed,
-            throttleCmd: limitedThrottle,
+            throttleCmd: blendedThrottle,
+            throttleRawCommand: throttleCmd,
+            throttleEnvelopeMin: throttleEnvelope.minThrottle,
+            throttleEnvelopeMax: throttleEnvelope.maxThrottle,
+            shapedSpeedTarget: speedControl.shapedTarget,
+            speedTrend: speedControl.speedTrend,
+            throttleFeedForward: speedControl.baseThrottle,
+            throttleCorrection: speedControl.correction,
+            throttlePredictiveDamping: speedControl.predictiveDamping,
             vsError: targetVS - fVerticalSpeed,
-            aileronCmd: limitedAileron,
-            elevatorCmd: limitedElevator,
-            rudderCmd: limitedRudder,
+            aileronCmd: blendedAileron,
+            elevatorCmd: blendedElevator,
+            rudderCmd: blendedRudder,
             beta: fBeta,
             mode: this.mode,
             engaged: this.engaged,
+            altitudeMode: this.altitudeMode,
+            normalizedTargets: { ...this.targets },
             ils: ilsDebug,
             lnav: this.debugState.lnav,
             lnavMessage: this.debugState.lnavMessage || ''
         };
+        this.fmaStatus = this.fmaService.buildStatus({
+            engaged: this.engaged,
+            autopilotMode: this.mode,
+            autopilotDebug: this.debugState,
+            targets: this.targets
+        });
 
         return {
-            throttle: isFinite(limitedThrottle) ? limitedThrottle : 0,
-            elevator: isFinite(limitedElevator) ? limitedElevator : 0,
-            trim: isFinite(newTrim) ? newTrim : 0,
-            aileron: isFinite(limitedAileron) ? limitedAileron : 0,
-            rudder: isFinite(limitedRudder) ? limitedRudder : 0
+            throttle: isFinite(blendedThrottle) ? blendedThrottle : 0,
+            elevator: isFinite(blendedElevator) ? blendedElevator : 0,
+            trim: isFinite(blendedTrim) ? blendedTrim : 0,
+            aileron: isFinite(blendedAileron) ? blendedAileron : 0,
+            rudder: isFinite(blendedRudder) ? blendedRudder : 0
         };
     }
 }

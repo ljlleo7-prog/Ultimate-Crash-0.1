@@ -60,8 +60,33 @@ class AircraftService {
   // Get aircraft by model name
   async getAircraftByModel(modelName) {
     const db = await this.initialize();
-    return db.find(aircraft => 
-      aircraft.model.toLowerCase() === modelName.trim().toLowerCase()
+    const normalized = modelName?.trim().toLowerCase();
+    if (!normalized) {
+      return undefined;
+    }
+
+    const exact = db.find(aircraft => aircraft.model.toLowerCase() === normalized);
+    if (exact) {
+      return exact;
+    }
+
+    const aliasMap = {
+      'b737-800': 'boeing 737-800',
+      '737-800': 'boeing 737-800',
+      'b738': 'boeing 737-800',
+      'b737': 'boeing 737-800',
+      'a320': 'airbus a320-200',
+      'a320-200': 'airbus a320-200'
+    };
+
+    const aliased = aliasMap[normalized];
+    if (aliased) {
+      return db.find(aircraft => aircraft.model.toLowerCase() === aliased);
+    }
+
+    return db.find(aircraft =>
+      aircraft.iata?.toLowerCase() === normalized ||
+      aircraft.icao?.toLowerCase() === normalized
     );
   }
 

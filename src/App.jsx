@@ -15,8 +15,10 @@ import { LanguageProvider } from './contexts/LanguageContext';
 import LanguageSwitcher from './components/LanguageSwitcher';
 import Header from './components/Header';
 import HomePage from './components/HomePage';
+import TutorialHub from './components/TutorialHub';
 import FMCPanel from './components/fmc/FMCPanel';
 import { airportService } from './services/airportService';
+import { TUTORIALS } from './data/tutorialCatalog';
 import { cloudSaveService } from './services/cloudSaveService.js';
 import { getSupabaseUser, supabase } from './services/skylinetragedy/SupabaseClient.js';
 
@@ -169,6 +171,7 @@ function App() {
   });
 
   const [flightInitialized, setFlightInitialized] = useState(false);
+  const [activeTutorial, setActiveTutorial] = useState(null);
   const [resumeSave, setResumeSave] = useState(null);
   const [resumeCheckLoading, setResumeCheckLoading] = useState(false);
   const [resumeCheckError, setResumeCheckError] = useState(null);
@@ -594,26 +597,51 @@ function App() {
   const handleStartSinglePlayer = () => {
     setAppMode('init');
     setIsTutorial(false);
+    setActiveTutorial(null);
   };
 
   const handleStartTutorial = () => {
-    setIsTutorial(true);
+    setAppMode('tutorial-hub');
+    setIsTutorial(false);
+    setActiveTutorial(null);
+  };
 
-    const dep = getAirportByCode('KSFO');
-    const arr = getAirportByCode('KLAX');
+  const handleLaunchTutorial = (tutorial) => {
+    const dep = getAirportByCode(tutorial.departureCode);
+    const arr = getAirportByCode(tutorial.arrivalCode);
 
-    if (dep && arr) {
-      setPreflightDeparture(dep);
-      setPreflightArrival(arr);
-      setCinematicPhase('none');
-
-      setTimeout(() => {
-        setFlightInitialized(true);
-        setAppMode('simulation');
-      }, 100);
-    } else {
+    if (!dep || !arr) {
       alert('Could not load tutorial airports. Please try again.');
+      return;
     }
+
+    const launchRouteDetails = normalizeRouteDetails(
+      tutorial.launchConfig?.routeDetails || DEFAULT_ROUTE_DETAILS,
+      dep,
+      arr
+    );
+
+    setIsTutorial(true);
+    setActiveTutorial(tutorial);
+    setDifficulty(tutorial.launchConfig?.difficulty || 'rookie');
+    setFailureType(tutorial.launchConfig?.failureType || 'none');
+    setWeatherData(tutorial.launchConfig?.weatherData || DEFAULT_WEATHER);
+    setPreflightDeparture(dep);
+    setPreflightArrival(arr);
+    setPreflightConfig((prev) => ({
+      ...prev,
+      aircraftModel: tutorial.launchConfig?.aircraftModel || prev.aircraftModel,
+      weatherData: tutorial.launchConfig?.weatherData || DEFAULT_WEATHER,
+      selectedDeparture: dep,
+      selectedArrival: arr,
+      routeDetails: launchRouteDetails
+    }));
+    setCinematicPhase('none');
+
+    setTimeout(() => {
+      setFlightInitialized(true);
+      setAppMode('simulation');
+    }, 100);
   };
 
   const handleOpenSettings = () => {
@@ -634,6 +662,7 @@ function App() {
 
   const handleTutorialClose = () => {
     setIsTutorial(false);
+    setActiveTutorial(null);
     setFlightInitialized(false);
     setAppMode('home');
     updatePreflightConfig({ flightPlan: null, routeDetails: DEFAULT_ROUTE_DETAILS });
@@ -729,6 +758,7 @@ function App() {
           crewCount={crewCount}
           routeDetails={runtimeRouteDetails}
           isTutorial={isTutorial}
+          activeTutorial={activeTutorial}
           onTutorialClose={handleTutorialClose}
           offlineMode={offlineMode}
         />
@@ -808,6 +838,19 @@ function App() {
             <p>©2026, GeeksProductionStudio. All Rights Reserved.</p>
           </footer>
         </div>
+      </LanguageProvider>
+    );
+  }
+
+  if (appMode === 'tutorial-hub') {
+    return (
+      <LanguageProvider>
+        <LanguageSwitcher style={{ position: 'fixed', top: '20px', right: '20px', zIndex: 2000 }} />
+        <TutorialHub
+          tutorials={TUTORIALS}
+          onLaunchTutorial={handleLaunchTutorial}
+          onBack={() => setAppMode('home')}
+        />
       </LanguageProvider>
     );
   }

@@ -43,7 +43,14 @@ export class ATCLogic {
       if (this.atisTimer <= 0) {
         this.atisTimer = 60; // Reset to 60s
         const liveWeather = flightState.weatherData ?? flightState.weather ?? null;
-        const msg = getATCResponse('req_atis', {}, { weather: liveWeather, callsign: 'ALL STATIONS', frequencyType: 'ATIS', language: flightState.language });
+        const msg = getATCResponse('req_atis', {}, {
+          weather: liveWeather,
+          callsign: 'ALL STATIONS',
+          frequencyType: 'ATIS',
+          language: flightState.language,
+          station: freqInfo.station,
+          infoCode: 'KILO'
+        });
         onMessage({
           sender: 'ATIS',
           text: msg,

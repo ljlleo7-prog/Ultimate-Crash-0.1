@@ -32,8 +32,10 @@ export default class EnvironmentService {
         const windShear = envData.windShear ?? this.environment?.windShear ?? 0;
         const speedMs = windSpeed * 0.514444;
         const dirRad = windDirection * Math.PI / 180;
+        const gustFloorMs = Math.max(0, speedMs);
+        const gustCeilingMs = Math.max(gustFloorMs, windGust * 0.514444);
+        const gustAmplitudeMs = Math.max(0, gustCeilingMs - gustFloorMs);
         const gustSpeed = Math.max(0, windGust - windSpeed);
-        const gustStrengthMs = gustSpeed * 0.514444;
         const shearInput = windShear;
         const shearStrengthMs = (shearInput > 0 ? shearInput : gustSpeed * 0.6) * 0.514444;
         const difficultyScale = this.getDifficultyScale();
@@ -46,7 +48,9 @@ export default class EnvironmentService {
             ...this.environment,
             wind: baseWind,
             baseWind,
-            gustStrength: gustStrengthMs * (1 + difficultyScale),
+            gustStrength: gustAmplitudeMs * (1 + difficultyScale),
+            gustFloorMs,
+            gustCeilingMs,
             shearStrength: shearStrengthMs * (1 + difficultyScale),
             gust: this.environment?.gust || 0,
             gustTarget: this.environment?.gustTarget || 0,
@@ -79,7 +83,7 @@ export default class EnvironmentService {
             this.environment.gustTimer -= dt;
             if (this.environment.gustTimer <= 0) {
                 this.environment.gustTimer = 0.6 + Math.random() * 1.6;
-                this.environment.gustTarget = (Math.random() * 2 - 1) * gustStrength;
+                this.environment.gustTarget = Math.random() * gustStrength;
             }
             const gustBlend = 1 - Math.exp(-dt * 2.2);
             this.environment.gust += (this.environment.gustTarget - this.environment.gust) * gustBlend;
@@ -119,7 +123,8 @@ export default class EnvironmentService {
                 : new Vector3(-Math.cos(this.environment.windDirection * Math.PI / 180), -Math.sin(this.environment.windDirection * Math.PI / 180), 0);
             gustVector = dir.scale(this.environment.gust);
         }
-        this.environment.wind = baseWind.add(gustVector).add(this.environment.shear || new Vector3(0, 0, 0));
+        const steadyWind = baseMag > 0.01 ? baseWind.normalize().scale(this.environment.gustFloorMs || baseMag) : baseWind;
+        this.environment.wind = steadyWind.add(gustVector).add(this.environment.shear || new Vector3(0, 0, 0));
     }
 
     updateIcing(dt, systems, onGround, icingState) {

@@ -22,11 +22,21 @@ import SystemStatusPanel from './SystemStatusPanel';
 import CircuitBreakerPanel from './CircuitBreakerPanel';
 import SensoryFeedback from './SensoryFeedback';
 import SettingsPanel from './SettingsPanel';
+import FMA from './autoflight/FMA.jsx';
 import { useLanguage } from '../contexts/LanguageContext';
 import './FlightPanel.css';
 
 const FlightPanelModular = ({ flightData, physicsState, physicsService, weatherData, onActionRequest, aircraftModel, aircraftData, selectedArrival, flightPlan, radioMessages, onRadioFreqChange, npcs, frequencyContext, currentRegion, timeScale, setTimeScale, onUpdateFlightPlan, availableRunways, startupStatus, playerSettings, playerSettingsError, autoSaveStatus, onUpdatePlayerSettings }) => {
   const { t } = useLanguage();
+  const resolvedTrueAirspeed = Number.isFinite(flightData?.trueAirspeed)
+    ? flightData.trueAirspeed
+    : (Number.isFinite(flightData?.derived?.airspeed) ? flightData.derived.airspeed : (Number.isFinite(flightData?.airspeed) ? flightData.airspeed : 450));
+  const resolvedGroundSpeed = Number.isFinite(flightData?.groundSpeed)
+    ? flightData.groundSpeed
+    : (Number.isFinite(flightData?.derived?.groundSpeed) ? flightData.derived.groundSpeed : 430);
+  const resolvedIndicatedAirspeed = Number.isFinite(flightData?.indicatedAirspeed)
+    ? flightData.indicatedAirspeed
+    : (Number.isFinite(flightData?.derived?.airspeed) ? flightData.derived.airspeed : 280);
   // Use flightData from parent component instead of creating own physics service
   const [showOverhead, setShowOverhead] = useState(false);
   const [showCircuitBreakers, setShowCircuitBreakers] = useState(false);
@@ -35,9 +45,9 @@ const FlightPanelModular = ({ flightData, physicsState, physicsService, weatherD
   const [flightState, setFlightState] = useState({
     // Navigation
     heading: flightData?.heading ?? 270,
-    trueAirspeed: flightData?.airspeed ?? 450,
-    groundSpeed: flightData?.groundSpeed ?? flightData?.airspeed ?? 430,
-    indicatedAirspeed: flightData?.indicatedAirspeed ?? 280,
+    trueAirspeed: resolvedTrueAirspeed,
+    groundSpeed: resolvedGroundSpeed,
+    indicatedAirspeed: resolvedIndicatedAirspeed,
     latitude: (flightData && flightData.position && typeof flightData.position.latitude === 'number') ? flightData.position.latitude : 0,
     longitude: (flightData && flightData.position && typeof flightData.position.longitude === 'number') ? flightData.position.longitude : 0,
     radioFreq: 121.5,
@@ -80,7 +90,9 @@ const FlightPanelModular = ({ flightData, physicsState, physicsService, weatherD
       vs: 1200,
       altitude: 35000
     },
-    
+    autopilotFma: flightData?.autopilot?.fma || null,
+    derived: flightData?.derived ?? null,
+
     // Surface Controls State
     flapsPosition: 'up',
     gearPosition: 'up',
@@ -109,9 +121,9 @@ const FlightPanelModular = ({ flightData, physicsState, physicsService, weatherD
           ...prevState,
           // Navigation
           heading: flightData.heading ?? prevState.heading,
-          trueAirspeed: flightData.airspeed ?? prevState.trueAirspeed,
-          groundSpeed: flightData.groundSpeed ?? prevState.groundSpeed,
-          indicatedAirspeed: flightData.indicatedAirspeed ?? prevState.indicatedAirspeed,
+          trueAirspeed: resolvedTrueAirspeed,
+          groundSpeed: resolvedGroundSpeed,
+          indicatedAirspeed: resolvedIndicatedAirspeed,
           radioFreq: prevState.radioFreq,
           latitude: (flightData && flightData.position && typeof flightData.position.latitude === 'number') ? flightData.position.latitude : prevState.latitude,
           longitude: (flightData && flightData.position && typeof flightData.position.longitude === 'number') ? flightData.position.longitude : prevState.longitude,
@@ -180,9 +192,11 @@ const FlightPanelModular = ({ flightData, physicsState, physicsService, weatherD
           altitudeHold: prevState.altitudeHold,
           headingHold: prevState.headingHold,
           autopilotTargets: flightData.autopilotTargets ?? prevState.autopilotTargets,
+          autopilotFma: flightData.autopilot?.fma ?? prevState.autopilotFma ?? null,
           frame: typeof flightData.frame === 'number' ? flightData.frame : prevState.frame,
           systems: flightData.systems ?? prevState.systems ?? {},
-          currentWaypointIndex: flightData.currentWaypointIndex !== undefined ? flightData.currentWaypointIndex : (prevState.currentWaypointIndex || 0)
+          currentWaypointIndex: flightData.currentWaypointIndex !== undefined ? flightData.currentWaypointIndex : (prevState.currentWaypointIndex || 0),
+          derived: flightData.derived ?? prevState.derived ?? null
         };
 
         return nextState;
@@ -526,9 +540,19 @@ const FlightPanelModular = ({ flightData, physicsState, physicsService, weatherD
           alignItems: 'stretch'
         } 
       },
-        React.createElement(ModernAutopilotModule, { 
-          flightState, 
-          setAutopilotTargets, 
+        React.createElement('div', {
+        style: {
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '8px',
+          flex: 1,
+          minWidth: 0
+        }
+      },
+        React.createElement(FMA, { fma: flightState.autopilotFma }),
+        React.createElement(ModernAutopilotModule, {
+          flightState,
+          setAutopilotTargets,
           toggleAutopilot,
           setAutopilotMode,
           setAltimeter: (val) => setFlightState(prev => ({ ...prev, altimeter: val })),
@@ -536,7 +560,8 @@ const FlightPanelModular = ({ flightData, physicsState, physicsService, weatherD
           availableRunways,
           selectedArrival,
           setILSRunway
-        }),
+        })
+      ),
         React.createElement(CommunicationModule, {
           flightState,
           setRadioFreq: (freq) => {

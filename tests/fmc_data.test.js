@@ -5,6 +5,7 @@
 
 import { describe, it } from 'node:test';
 import assert from 'node:assert';
+import FMCService from '../src/services/FMCService.js';
 
 describe('FMC Data Integration', () => {
   it('should receive aircraft data from physics service', async () => {
@@ -23,7 +24,6 @@ describe('FMC Data Integration', () => {
 
     const physics = new RealisticFlightPhysicsService(testAircraft, 37.6188, -122.3750, 'rookie');
 
-    // Verify aircraft data is accessible
     assert.ok(physics.aircraft, 'Aircraft data should exist');
     assert.strictEqual(physics.aircraft.name, 'Boeing 737-800', 'Aircraft name should match');
     assert.ok(physics.aircraft.mass > 0, 'Aircraft mass should be positive');
@@ -52,7 +52,6 @@ describe('FMC Data Integration', () => {
     const lon = -122.3750;
     const physics = new RealisticFlightPhysicsService(testAircraft, lat, lon, 'rookie');
 
-    // Verify position
     assert.strictEqual(physics.state.geo.lat, lat, 'Latitude should match');
     assert.strictEqual(physics.state.geo.lon, lon, 'Longitude should match');
 
@@ -64,8 +63,8 @@ describe('FMC Data Integration', () => {
 
     const testAircraft = {
       name: 'Boeing 737-800',
-      mass: 70000,
       fuelWeight: 10000,
+      mass: 70000,
       wingspan: 35.8,
       wingArea: 125,
       maxThrust: 121000,
@@ -79,7 +78,6 @@ describe('FMC Data Integration', () => {
     const fuel = physics.state.fuel || 0;
     const weight = physics.aircraft.mass + fuel;
 
-    // Improved V-speed estimation (matching FMCPerformance)
     const vr = Math.sqrt(weight) * 0.6;
     const v2 = vr * 1.13;
     const vref = Math.sqrt(weight) * 0.55;
@@ -95,6 +93,42 @@ describe('FMC Data Integration', () => {
     assert.ok(weight > physics.aircraft.mass, 'Total weight should include fuel');
     assert.ok(vr > 100 && vr < 200, 'VR should be reasonable (100-200kt)');
     assert.ok(v2 > vr, 'V2 should be greater than VR');
+  });
+
+  it('tracks temporary plan edits until EXEC', () => {
+    const service = new FMCService();
+    const flightPlan = {
+      waypoints: [
+        { id: 'A', label: 'A', latitude: 34.0, longitude: -118.0 },
+        { id: 'B', label: 'B', latitude: 35.0, longitude: -117.0 }
+      ]
+    };
+
+    const modified = service.updateLegConstraints(flightPlan, 1, { altConstraint: 12000, spdConstraint: 250 });
+    const planView = service.getPlanView(modified);
+
+    assert.equal(planView.validation.execPending, true);
+    assert.equal(modified.waypoints[1].altConstraint, null);
+    assert.equal(modified.fms.temporaryPlan.waypoints[1].altConstraint, 12000);
+    assert.equal(modified.fms.temporaryPlan.waypoints[1].spdConstraint, 250);
+  });
+
+  it('promotes temporary plan into active plan on EXEC', () => {
+    const service = new FMCService();
+    const flightPlan = {
+      waypoints: [
+        { id: 'A', label: 'A', latitude: 34.0, longitude: -118.0 },
+        { id: 'B', label: 'B', latitude: 35.0, longitude: -117.0 }
+      ]
+    };
+
+    const modified = service.insertDiscontinuity(flightPlan, 1);
+    const executed = service.executeTemporaryPlan(modified);
+
+    assert.equal(executed.fms.execPending, false);
+    assert.equal(executed.waypoints.length, 3);
+    assert.equal(executed.waypoints[1].type, 'discontinuity');
+    assert.equal(executed.fms.activePlan.waypoints[1].type, 'discontinuity');
   });
 });
 

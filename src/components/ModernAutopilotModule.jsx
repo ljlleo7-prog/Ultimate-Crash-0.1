@@ -1,5 +1,34 @@
 import React, { useState, useEffect } from 'react';
 
+const TARGET_STEPS = {
+  ias: 5,
+  vs: 100,
+  altitude: 100,
+  heading: 5
+};
+
+const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
+const snap = (value, step) => Math.round(value / step) * step;
+const normalizeHeading = (value) => {
+  const normalized = ((value % 360) + 360) % 360;
+  return normalized === 0 ? 360 : normalized;
+};
+const normalizeTargetValue = (type, value) => {
+  if (!Number.isFinite(value)) return value;
+  switch (type) {
+    case 'ias':
+      return clamp(snap(value, TARGET_STEPS.ias), 120, 350);
+    case 'vs':
+      return clamp(snap(value, TARGET_STEPS.vs), -4000, 4000);
+    case 'altitude':
+      return clamp(snap(value, TARGET_STEPS.altitude), 0, 45000);
+    case 'heading':
+      return normalizeHeading(snap(value, TARGET_STEPS.heading));
+    default:
+      return value;
+  }
+};
+
 const ModernAutopilotModule = ({ flightState, setAutopilotTargets, toggleAutopilot, setAutopilotMode, setAltimeter, frequencyContext }) => {
   const initialTargets = flightState?.autopilotTargets
     ? {
@@ -20,8 +49,9 @@ const ModernAutopilotModule = ({ flightState, setAutopilotTargets, toggleAutopil
   // Only sync targets from flightState if they are explicitly provided by the physics service
   // and differ from our local state. We remove current airspeed/alt/vs from dependencies
   // to prevent the target from "following" the current state.
-  const currentMode = flightState.autopilotMode || 'LNAV';
+  const currentMode = flightState.autopilotMode || flightState.autopilotFma?.sourceMode || 'LNAV';
   const approachTelemetry = flightState.approachTelemetry;
+  const fma = flightState.autopilotFma;
 
   useEffect(() => {
     if (flightState?.autopilotTargets) {
@@ -46,7 +76,8 @@ const ModernAutopilotModule = ({ flightState, setAutopilotTargets, toggleAutopil
    }, [flightState?.autopilotTargets, currentMode]);
 
   const updateTarget = (type, value) => {
-    const newTargets = { ...targets, [type]: value };
+    const normalizedValue = normalizeTargetValue(type, value);
+    const newTargets = { ...targets, [type]: normalizedValue };
     setTargets(newTargets);
     if (setAutopilotTargets) {
       setAutopilotTargets(newTargets);
@@ -155,7 +186,7 @@ const ModernAutopilotModule = ({ flightState, setAutopilotTargets, toggleAutopil
           fontWeight: 'bold',
           letterSpacing: '0.05em'
         }
-      }, flightState.autopilot ? '● ACTIVE' : '○ STANDBY'),
+      }, flightState.autopilot ? `● ${fma?.vertical?.active?.label || 'ACTIVE'}` : '○ STANDBY'),
 
       currentMode === 'ILS' && approachTelemetry && React.createElement('div', {
         style: {
