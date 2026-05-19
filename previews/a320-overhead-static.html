@@ -1,0 +1,831 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Airbus A320 Overhead Static Preview</title>
+  <style>
+    :root {
+      --shell: #59626a;
+      --panel: #566069;
+      --panel-edge: #31373d;
+      --text: #d9dde0;
+      --muted: #aab0b6;
+      --line: #d2db70;
+      --amber: #ffb347;
+      --green: #7cff89;
+      --blue: #6bc8ff;
+      --red: #ff6158;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      display: grid;
+      place-items: center;
+      background: #c8c6c0;
+      font-family: Aptos, Monospace, sans-serif;
+      color: var(--text);
+    }
+
+    .preview-wrap { padding: 18px; }
+
+    .overhead-shell {
+      position: relative;
+      width: 1040px;
+      height: 980px;
+      background: linear-gradient(180deg, #656f77 0%, var(--shell) 18%, #535d65 100%);
+      border: 3px solid #23282d;
+      clip-path: polygon(1.2% 0, 98.8% 0, 98.8% 82.7%, 75.4% 100%, 24.6% 100%, 1.2% 82.7%);
+      box-shadow: 0 26px 60px rgba(0, 0, 0, 0.42);
+      overflow: hidden;
+    }
+
+    .overhead-shell::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background: repeating-linear-gradient(0deg, rgba(255,255,255,.02) 0 1px, transparent 1px 6px);
+      pointer-events: none;
+      opacity: .35;
+    }
+
+    .rail {
+      position: absolute;
+      top: 0;
+      bottom: 74px;
+      width: 6px;
+      background: linear-gradient(180deg, #252b31, #4d565e 25%, #252b31 100%);
+      box-shadow: inset 1px 0 0 rgba(255,255,255,.08), inset -1px 0 0 rgba(0,0,0,.5);
+    }
+
+
+    .panel {
+      position: absolute;
+      background: linear-gradient(180deg, #66707a 0%, var(--panel) 9%, #4f5961 100%);
+      border: 2px solid var(--panel-edge);
+      border-radius: 6px;
+      box-shadow: inset 0 1px 0 rgba(255,255,255,.12), inset 0 -1px 0 rgba(0,0,0,.32), 0 5px 10px rgba(0,0,0,.18);
+      overflow: hidden;
+    }
+
+    .panel::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      border: 1px solid rgba(255,255,255,.06);
+      pointer-events: none;
+    }
+
+    .panel-title {
+      position: absolute;
+      top: 8px;
+      left: 0;
+      right: 0;
+      text-align: center;
+      font-size: 10px;
+      letter-spacing: .14em;
+      font-weight: 700;
+      color: #e1e4e7;
+      text-transform: uppercase;
+    }
+
+    .screw {
+      position: absolute;
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: radial-gradient(circle at 30% 30%, #8b949d, #3f464d 60%, #14191d 100%);
+      border: 1px solid #21272b;
+      box-shadow: inset 0 1px 1px rgba(255,255,255,.15);
+    }
+
+    .screw.tl { top: 4px; left: 4px; }
+    .screw.tr { top: 4px; right: 4px; }
+    .screw.bl { bottom: 4px; left: 4px; }
+    .screw.br { bottom: 4px; right: 4px; }
+
+    .pb-grid {
+      position: absolute;
+      display: grid;
+      gap: 10px 10px;
+      justify-items: center;
+    }
+
+    .pb-grid.two { grid-template-columns: repeat(2, 1fr); }
+    .pb-grid.four { grid-template-columns: repeat(4, 1fr); }
+
+    .pb {
+      width: 32px;
+      height: 32px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 1px;
+      margin: 1px;
+      padding: 2px;
+      background: #111;
+      border: 1.5px solid #444;
+      border-radius: 2px;
+      box-shadow: inset 0 0 5px rgba(0,0,0,.8);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .pb .legend,
+    .pb-stack {
+      display: none;
+    }
+
+    .pb .window,
+    .pb::after {
+      width: 100%;
+      height: 10px;
+      background: #000;
+      border: 1px solid #222;
+      border-radius: 1px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 5px;
+      font-weight: 800;
+      line-height: 1;
+      text-transform: uppercase;
+      letter-spacing: 0;
+      box-shadow: none;
+      padding: 1px 0;
+    }
+
+    .pb::after {
+      content: attr(data-bottom);
+      color: #2a2a2a;
+    }
+
+    .pb .window {
+      color: #2a2a2a;
+    }
+
+    .pb.white .window { color: #ccc; text-shadow: none; }
+    .pb.amber .window { color: #fa0; text-shadow: none; }
+    .pb.green .window { color: #0d4; text-shadow: none; }
+    .pb.blue .window { color: #0cf; text-shadow: none; }
+    .pb.dark .window { color: #2a2a2a; text-shadow: none; }
+
+    .pb.bottom-white::after { color: #ccc; text-shadow: none; }
+    .pb.bottom-amber::after { color: #fa0; text-shadow: none; }
+    .pb.bottom-green::after { color: #0d4; text-shadow: none; }
+    .pb.bottom-blue::after { color: #0cf; text-shadow: none; }
+    .pb.bottom-dark::after { color: #2a2a2a; text-shadow: none; }
+
+    .mini-ann {
+      min-width: 32px;
+      padding: 2px 4px;
+      border: 1px solid #14181c;
+      background: rgba(0,0,0,.72);
+      font-size: 7px;
+      text-align: center;
+      font-weight: 700;
+      line-height: 1.05;
+      text-transform: uppercase;
+    }
+
+    .mini-ann.amber { color: var(--amber); text-shadow: 0 0 4px rgba(255,179,71,.75); }
+    .mini-ann.white { color: #fff; text-shadow: 0 0 4px rgba(255,255,255,.65); }
+
+    .double-ann {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      align-items: center;
+    }
+
+    .single-ann {
+      width: 42px;
+      height: 18px;
+      background: #000;
+      border: 1px solid #ff8400;
+      border-radius: 1px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 6px;
+      font-weight: 800;
+      line-height: 1;
+      text-transform: uppercase;
+      box-shadow: none;
+      padding: 2px 2px;
+    }
+
+    .single-ann.amb { color: #fa0; }
+    .single-ann.wht { color: #ccc; }
+
+    .fire-panel {
+      position: absolute;
+      top: 28px;
+      left: 34px;
+      right: 34px;
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 18px;
+    }
+
+    .fire-zone {
+      position: relative;
+      height: 110px;
+      border: 2px solid #4b545b;
+      background: linear-gradient(180deg, #49525a 0%, #404851 100%);
+      border-radius: 4px;
+      padding-top: 10px;
+    }
+
+    .fire-zone .cap {
+      text-align: center;
+      font-size: 10px;
+      font-weight: 700;
+      color: #dbe1e6;
+      letter-spacing: .08em;
+      margin-bottom: 8px;
+      text-transform: uppercase;
+    }
+
+    .fire-handle {
+      position: relative;
+      width: 64px;
+      height: 42px;
+      margin: 0 auto;
+      border-radius: 8px 8px 18px 18px;
+      background: linear-gradient(180deg, #ff8b86 0%, #ec514c 30%, #bc1f1a 100%);
+      border: 3px solid #6e1b17;
+      box-shadow: 0 0 14px rgba(255,96,88,.5), inset 0 2px 5px rgba(255,255,255,.3);
+    }
+
+    .fire-handle::before,
+    .fire-handle::after {
+      content: "";
+      position: absolute;
+      top: 8px;
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      background: rgba(255,255,255,.9);
+      box-shadow: 0 0 10px rgba(255,255,255,.85);
+    }
+
+    .fire-handle::before { left: 10px; }
+    .fire-handle::after { right: 10px; }
+
+    .fire-zone .lower-labels {
+      display: flex;
+      justify-content: space-between;
+      margin: 7px 10px 0;
+      font-size: 7px;
+      color: #cfd5d9;
+      font-weight: 700;
+      letter-spacing: .06em;
+    }
+
+    .sys-lines {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+    }
+
+    .section-label,
+    .tiny-label,
+    .tiny-header,
+    .mode-side,
+    .adirs-top-label,
+    .adirs-bottom-label {
+      font-size: 7px;
+      font-weight: 700;
+      letter-spacing: .06em;
+      text-transform: uppercase;
+      color: #dfe3e6;
+      text-align: center;
+      line-height: 1.05;
+    }
+
+    .section-label { position: absolute; }
+
+    .knob {
+      position: relative;
+      width: 42px;
+      height: 42px;
+      border-radius: 50%;
+      background: #e6e6de;
+      border: 2px solid #70757a;
+      box-shadow: inset 0 1px 0 rgba(255,255,255,.22), inset 0 -2px 3px rgba(0,0,0,.18), 0 2px 4px rgba(0,0,0,.22);
+    }
+
+    .knob::before {
+      content: "";
+      position: absolute;
+      inset: 5px;
+      border-radius: 50%;
+      border: 1px solid rgba(60,66,72,.22);
+      box-shadow: inset 0 0 0 1px rgba(255,255,255,.18);
+    }
+
+    .knob::after {
+      content: "";
+      position: absolute;
+      width: 3px;
+      height: 13px;
+      background: #4f5358;
+      top: 4px;
+      left: 17.5px;
+      border-radius: 1px;
+      transform: rotate(var(--angle, 0deg));
+      transform-origin: 50% 17px;
+      box-shadow: none;
+    }
+
+    .guarded {
+      width: 48px;
+      height: 32px;
+      border-radius: 4px 4px 2px 2px;
+      border: 1px solid #6c1816;
+      background: linear-gradient(180deg, #c33 0%, #891717 100%);
+      position: relative;
+      box-shadow: inset 0 1px 0 rgba(255,255,255,.2);
+    }
+
+    .guarded::before {
+      content: "";
+      position: absolute;
+      top: -8px;
+      left: 8px;
+      right: 8px;
+      height: 10px;
+      border: 1px solid #6c1816;
+      border-bottom: none;
+      border-radius: 4px 4px 0 0;
+      background: linear-gradient(180deg, #d64646 0%, #a11f1f 100%);
+    }
+
+    .rotary-strip {
+      position: absolute;
+      display: flex;
+      gap: 24px;
+      align-items: flex-start;
+    }
+
+    .rotary-unit {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .dial-box {
+      width: 66px;
+      height: 28px;
+      background: #0b0d10;
+      border: 1px solid #333a40;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--amber);
+      font-family: 'Courier New', monospace;
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: 1px;
+      box-shadow: inset 0 0 6px rgba(0,0,0,.85);
+    }
+
+    .freq-panel {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      right: 10px;
+      bottom: 10px;
+      padding-top: 16px;
+    }
+
+    .freq-stack {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+      margin-top: 8px;
+    }
+
+    .freq-box {
+      background: #0d1013;
+      border: 1px solid #363d43;
+      padding: 7px 6px 6px;
+      border-radius: 2px;
+      box-shadow: inset 0 0 6px rgba(0,0,0,.7);
+    }
+
+    .freq-box .cap {
+      font-size: 7px;
+      color: #9ea5ac;
+      font-weight: 700;
+      text-transform: uppercase;
+      margin-bottom: 2px;
+      letter-spacing: .08em;
+    }
+
+    .freq-box .val {
+      font-family: 'Courier New', monospace;
+      font-size: 22px;
+      font-weight: 700;
+      color: var(--amber);
+      letter-spacing: 1px;
+    }
+
+    .freq-box .sub {
+      font-family: 'Courier New', monospace;
+      font-size: 10px;
+      color: #8b5d19;
+    }
+
+    .tiny-button-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 6px;
+      margin-top: 10px;
+    }
+
+    .tiny-button {
+      min-height: 26px;
+      background: #101418;
+      border: 1px solid #444c53;
+      box-shadow: inset 0 1px 1px rgba(255,255,255,.03), inset 0 -2px 2px rgba(0,0,0,.45);
+      display: grid;
+      place-items: center;
+      font-size: 7px;
+      font-weight: 700;
+      text-transform: uppercase;
+      color: #d4d7db;
+      text-align: center;
+      line-height: 1.05;
+      padding: 1px;
+    }
+
+    .footer-knobs {
+      position: absolute;
+      left: 18px;
+      right: 18px;
+      bottom: 18px;
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-end;
+    }
+
+
+  </style>
+</head>
+<body>
+  <main class="preview-wrap">
+    <section class="overhead-shell">
+
+      <section class="panel" style="left:18px;top:20px;width:240px;height:438px;">
+        <span class="screw tl"></span><span class="screw tr"></span><span class="screw bl"></span><span class="screw br"></span>
+        <div class="tiny-header" style="position:absolute;top:14px;right:18px;width:42px;font-size:6px;font-weight:800;line-height:1.05;letter-spacing:.06em;">CCTV<br>Door Video</div>
+        <div class="pb white bottom-white" data-bottom="OFF" style="position:absolute;top:30px;right:20px;"><div class="window">O   O</div></div>
+
+        <div style="position:absolute;left:14px;right:14px;top:84px;height:2px;background:rgba(217,221,224,.75);"></div>
+        <div style="position:absolute;top:92px;left:0;right:0;text-align:center;font-size:10px;font-weight:700;color:#dfe3e6;letter-spacing:.08em;text-transform:uppercase;">Adirs</div>
+        <div class="single-ann amb" style="position:absolute;top:110px;left:101px;">On Bat</div>
+
+        <div style="position:absolute;top:140px;left:20px;right:20px;height:178px;">
+          <div style="position:absolute;top:0;width:58px;height:178px;left:0;">
+            <div class="adirs-top-label" style="position:absolute;top:0;left:0;width:58px;">Ir1</div>
+            <div class="pb amber bottom-white" data-bottom="ALIGN" style="position:absolute;top:10px;left:13px;"><div class="window">Fault</div></div>
+            <div style="position:absolute;top:58px;left:10px;width:58px;height:72px;">
+              <div class="mode-side" style="position:absolute;top:5px;left:-12px;">Off</div>
+              <div class="mode-side" style="position:absolute;top:-7px;left:13px;">Nav</div>
+              <div class="knob" style="width:42px;height:42px;--angle:-28deg"></div>
+              <div class="mode-side" style="position:absolute;top:5px;left:40px;">Att</div>
+            </div>
+            <div class="adirs-bottom-label" style="position:absolute;top:126px;left:0;width:58px;">Adr1</div>
+            <div class="pb amber bottom-white" data-bottom="OFF" style="position:absolute;top:107px;left:13px;"><div class="window">Fault</div></div>
+          </div>
+
+          <div style="position:absolute;top:0;height:178px;left:71px;">
+            <div style="position:absolute;top:0;width:58px;height:178px;left:0;">
+            <div class="adirs-top-label" style="position:absolute;top:0;left:0;width:58px;">Ir3</div>
+            <div class="pb amber bottom-white" data-bottom="ALIGN" style="position:absolute;top:10px;left:13px;"><div class="window">Fault</div></div>
+            <div style="position:absolute;top:58px;left:10px;width:58px;height:72px;">
+              <div class="mode-side" style="position:absolute;top:5px;left:-12px;">Off</div>
+              <div class="mode-side" style="position:absolute;top:-7px;left:13px;">Nav</div>
+              <div class="knob" style="width:42px;height:42px;--angle:-28deg"></div>
+              <div class="mode-side" style="position:absolute;top:5px;left:40px;">Att</div>
+            </div>
+            <div class="adirs-bottom-label" style="position:absolute;top:126px;left:0;width:58px;">Adr3</div>
+            <div class="pb amber bottom-white" data-bottom="OFF" style="position:absolute;top:107px;left:13px;"><div class="window">Fault</div></div>
+          </div>
+
+          <div style="position:absolute;top:0;height:178px;left:71px;">
+            <div style="position:absolute;top:0;width:58px;height:178px;left:0;">
+            <div class="adirs-top-label" style="position:absolute;top:0;left:0;width:58px;">Ir2</div>
+            <div class="pb amber bottom-white" data-bottom="ALIGN" style="position:absolute;top:10px;left:13px;"><div class="window">Fault</div></div>
+            <div style="position:absolute;top:58px;left:10px;width:58px;height:72px;">
+              <div class="mode-side" style="position:absolute;top:5px;left:-12px;">Off</div>
+              <div class="mode-side" style="position:absolute;top:-7px;left:13px;">Nav</div>
+              <div class="knob" style="width:42px;height:42px;--angle:-28deg"></div>
+              <div class="mode-side" style="position:absolute;top:5px;left:40px;">Att</div>
+            </div>
+            <div class="adirs-bottom-label" style="position:absolute;top:126px;left:0;width:58px;">Adr2</div>
+            <div class="pb amber bottom-white" data-bottom="OFF" style="position:absolute;top:107px;left:13px;"><div class="window">Fault</div></div>
+          </div>
+        </div>
+
+        <div style="position:absolute;left:14px;right:14px;top:338px;height:2px;background:rgba(217,221,224,.75);"></div>
+        <div style="position:absolute;top:342px;left:0;right:0;text-align:center;font-size:10px;font-weight:700;color:#dfe3e6;letter-spacing:.08em;text-transform:uppercase;">Flt Ctl</div>
+        <div style="position:absolute;top:386px;left:42px;right:42px;height:44px;">
+          <div style="position:absolute;top:0;left:0;width:42px;height:44px;">
+            <div class="tiny-label">Elac 1</div>
+            <div class="pb amber bottom-white" data-bottom="OFF" style="position:absolute;top:14px;left:5px;"><div class="window">Fault</div></div>
+          </div>
+          <div style="position:absolute;top:0;left:56px;width:42px;height:44px;">
+            <div class="tiny-label">Sec 1</div>
+            <div class="pb amber bottom-white" data-bottom="OFF" style="position:absolute;top:14px;left:5px;"><div class="window">Fault</div></div>
+          </div>
+          <div style="position:absolute;top:0;left:112px;width:42px;height:44px;">
+            <div class="tiny-label">Fac 1</div>
+            <div class="pb amber bottom-white" data-bottom="OFF" style="position:absolute;top:14px;left:5px;"><div class="window">Fault</div></div>
+          </div>
+        </div>
+      </section>
+
+      <section class="panel" style="left:18px;top:462px;width:240px;height:394px;">
+        <span class="screw tl"></span><span class="screw tr"></span><span class="screw bl"></span><span class="screw br"></span>
+
+        <div style="position:absolute;top:14px;left:12px;right:12px;height:28px;font-size:7px;font-weight:700;color:#dfe4e8;text-transform:uppercase;letter-spacing:.06em;line-height:1.05;">
+          <div style="position:absolute;top:0;left:0;">Evac</div>
+          <div style="position:absolute;top:0;right:0;width:84px;text-align:center;">Command<br>Shut Off Capt &amp; Purs</div>
+        </div>
+        <div class="pb amber bottom-white" data-bottom="OFF" style="position:absolute;top:34px;left:58px;"><div class="window">On</div></div>
+        <div style="position:absolute;top:24px;right:24px;"><div class="tiny-knob" style="--angle:18deg"></div></div>
+
+        <div style="position:absolute;left:14px;right:14px;top:78px;height:2px;background:rgba(217,221,224,.75);"></div>
+        <div style="position:absolute;top:88px;left:0;right:0;text-align:center;font-size:10px;font-weight:700;color:#dfe3e6;letter-spacing:.08em;text-transform:uppercase;">Emer Elec Pwr</div>
+        <div style="position:absolute;top:98px;left:18px;right:18px;height:52px;">
+          <div style="position:absolute;top:0;left:0;width:58px;height:52px;">
+            <div class="tiny-label" style="position:absolute;top:0;left:0;width:100%;">Emer Gen Test</div>
+            <div class="square-test" style="position:absolute;top:17px;left:12px;"></div>
+          </div>
+          <div style="position:absolute;top:0;left:73px;width:58px;height:52px;">
+            <div class="tiny-label" style="position:absolute;top:0;left:0;width:100%;">Line</div>
+            <div class="pb amber bottom-white" data-bottom="OFF" style="position:absolute;top:17px;left:13px;"><div class="window">Fault</div></div>
+          </div>
+          <div style="position:absolute;top:0;left:146px;width:58px;height:52px;">
+            <div class="tiny-label" style="position:absolute;top:0;left:0;width:100%;">Man On</div>
+            <div class="guarded" style="position:absolute;top:18px;left:10px;width:38px;height:30px;"></div>
+          </div>
+        </div>
+
+        <div style="position:absolute;top:172px;left:18px;right:18px;height:52px;">
+          <div style="position:absolute;top:0;left:0;width:42px;height:52px;"><div class="tiny-label" style="position:absolute;top:0;left:0;width:100%;">Terr</div><div class="pb amber bottom-white" data-bottom="OFF" style="position:absolute;top:17px;left:5px;"><div class="window">Fault</div></div></div>
+          <div style="position:absolute;top:0;left:54px;width:42px;height:52px;"><div class="tiny-label" style="position:absolute;top:0;left:0;width:100%;">Sys</div><div class="pb amber bottom-white" data-bottom="OFF" style="position:absolute;top:17px;left:5px;"><div class="window">Fault</div></div></div>
+          <div style="position:absolute;top:0;left:108px;width:42px;height:52px;"><div class="tiny-label" style="position:absolute;top:0;left:0;width:100%;">Mode</div><div class="pb amber bottom-white" data-bottom="OFF" style="position:absolute;top:17px;left:5px;"><div class="window">Fault</div></div></div>
+          <div style="position:absolute;top:0;left:162px;width:42px;height:52px;"><div class="tiny-label" style="position:absolute;top:0;left:0;width:100%;">Ldg Flap 3</div><div class="pb amber bottom-white" data-bottom="OFF" style="position:absolute;top:17px;left:5px;"><div class="window">Fault</div></div></div>
+        </div>
+
+        <div style="position:absolute;top:232px;left:18px;right:18px;height:46px;">
+          <div style="position:absolute;top:0;left:0;width:66px;height:46px;"><div class="tiny-label" style="position:absolute;top:0;left:0;width:100%;">Gnd Ctl</div><div class="tiny-knob" style="position:absolute;top:18px;left:19px;--angle:-18deg;"></div></div>
+          <div style="position:absolute;top:0;left:66px;width:72px;height:46px;">
+            <div class="tiny-label" style="position:absolute;top:0;left:0;width:100%;">Rcdr</div>
+            <div style="position:absolute;top:18px;left:-18px;width:108px;height:46px;">
+              <div style="position:absolute;top:0;left:0;width:46px;height:46px;"><div class="tiny-label" style="position:absolute;top:0;left:0;width:46px;">Cvr Erase</div><div class="tiny-knob" style="position:absolute;top:16px;left:9px;--angle:-10deg;"></div></div>
+              <div style="position:absolute;top:0;left:62px;width:46px;height:46px;"><div class="tiny-label" style="position:absolute;top:0;left:0;width:46px;">Cvr Test</div><div class="tiny-knob" style="position:absolute;top:16px;left:9px;--angle:12deg;"></div></div>
+            </div>
+          </div>
+          <div style="position:absolute;top:0;left:138px;width:66px;height:46px;"></div>
+        </div>
+
+        <div style="position:absolute;left:14px;right:14px;top:284px;height:2px;background:rgba(217,221,224,.75);"></div>
+        <div style="position:absolute;top:294px;left:0;right:0;text-align:center;font-size:10px;font-weight:700;color:#dfe3e6;letter-spacing:.08em;text-transform:uppercase;">Oxygen</div>
+        <div style="position:absolute;top:320px;left:18px;right:18px;height:48px;">
+          <div style="position:absolute;top:0;left:0;width:58px;height:48px;">
+            <div class="tiny-label" style="position:absolute;top:0;left:0;width:58px;">Mask Man On</div>
+            <div class="guarded" style="position:absolute;top:17px;left:9px;width:40px;height:32px;"></div>
+          </div>
+          <div style="position:absolute;top:0;left:74px;width:58px;height:48px;">
+            <div class="tiny-label" style="position:absolute;top:0;left:0;width:58px;">Passenger</div>
+            <div class="pb amber bottom-white" data-bottom="OFF" style="position:absolute;top:17px;left:13px;"><div class="window">On</div></div>
+          </div>
+          <div style="position:absolute;top:0;left:146px;width:58px;height:48px;">
+            <div class="tiny-label" style="position:absolute;top:0;left:0;width:58px;">Copy Supply</div>
+            <div class="double-ann" style="position:absolute;top:17px;left:11px;">
+              <div class="mini-ann white">Regul</div>
+              <div class="mini-ann amber">On</div>
+            </div>
+          </div>
+        </div>
+
+        <div style="position:absolute;left:14px;right:14px;top:332px;height:2px;background:rgba(217,221,224,.75);"></div>
+        <div style="position:absolute;top:356px;left:0;right:0;text-align:center;font-size:10px;font-weight:700;color:#dfe3e6;letter-spacing:.08em;text-transform:uppercase;">Calls</div>
+        <div style="position:absolute;top:374px;left:18px;right:18px;display:grid;grid-template-columns:repeat(4,1fr);justify-items:center;">
+          <div><div class="tiny-label" style="margin-bottom:6px;">Mech</div><div class="tiny-knob" style="--angle:-16deg"></div></div>
+          <div><div class="tiny-label" style="margin-bottom:6px;">Fwd</div><div class="tiny-knob" style="--angle:0deg"></div></div>
+          <div><div class="tiny-label" style="margin-bottom:6px;">Aft</div><div class="tiny-knob" style="--angle:0deg"></div></div>
+          <div><div class="tiny-label" style="margin-bottom:6px;">Emer</div><div class="pb amber bottom-white" data-bottom="OFF"><div class="window">On</div></div></div>
+        </div>
+
+        <div style="position:absolute;left:14px;right:14px;top:430px;height:2px;background:rgba(217,221,224,.75);"></div>
+        <div style="position:absolute;left:0;right:0;bottom:18px;height:88px;">
+          <div>
+            <div class="tiny-label" style="margin-bottom:8px;">Rain Rplnt</div>
+            <div class="tiny-knob" style="--angle:-12deg;margin:0 auto;"></div>
+          </div>
+          <div>
+            <div class="tiny-label" style="margin-bottom:6px;">Wiper</div>
+            <div style="position:absolute;left:0;top:14px;width:80px;height:80px;">
+              <div style="position:absolute;top:-2px;left:30px;font-size:7px;font-weight:700;color:#dfe3e6;text-transform:uppercase;letter-spacing:.06em;">Off</div>
+              <div style="position:absolute;top:30px;right:-2px;font-size:7px;font-weight:700;color:#dfe3e6;text-transform:uppercase;letter-spacing:.06em;">Slow</div>
+              <div style="position:absolute;bottom:2px;right:10px;font-size:7px;font-weight:700;color:#dfe3e6;text-transform:uppercase;letter-spacing:.06em;">Fast</div>
+              <div class="knob" style="position:absolute;left:14px;top:12px;width:42px;height:42px;--angle:10deg"></div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="panel" style="left: 262px; top: 20px; width: 500px; height: 188px;">
+        <span class="screw tl"></span><span class="screw tr"></span><span class="screw bl"></span><span class="screw br"></span>
+        <div class="fire-panel">
+          <div class="fire-zone">
+            <div class="cap">Eng 1</div>
+            <div class="fire-handle"></div>
+            <div class="lower-labels"><span>Agent 1</span><span>Agent 2</span></div>
+          </div>
+          <div class="fire-zone">
+            <div class="cap">Apu</div>
+            <div class="fire-handle"></div>
+            <div class="lower-labels"><span>Disch</span><span>Test</span></div>
+          </div>
+          <div class="fire-zone">
+            <div class="cap">Eng 2</div>
+            <div class="fire-handle"></div>
+            <div class="lower-labels"><span>Agent 1</span><span>Agent 2</span></div>
+          </div>
+        </div>
+      </section>
+
+      <section class="panel" style="left: 262px; top: 214px; width: 500px; height: 168px;">
+        <span class="screw tl"></span><span class="screw tr"></span><span class="screw bl"></span><span class="screw br"></span>
+        <div class="panel-title">Hydraulic / Fuel / Air Distribution</div>
+        <svg class="sys-lines" viewBox="0 0 500 168" preserveAspectRatio="none">
+          <line x1="72" y1="52" x2="530" y2="52" stroke="#d7de76" stroke-width="2"/>
+          <line x1="72" y1="104" x2="530" y2="104" stroke="#d7de76" stroke-width="2"/>
+          <line x1="184" y1="52" x2="184" y2="134" stroke="#d7de76" stroke-width="2"/>
+          <line x1="300" y1="52" x2="300" y2="134" stroke="#d7de76" stroke-width="2"/>
+          <line x1="416" y1="52" x2="416" y2="134" stroke="#d7de76" stroke-width="2"/>
+        </svg>
+        <div class="section-label" style="left: 88px; top: 28px;">Hyd 1</div>
+        <div class="section-label" style="left: 198px; top: 28px;">Rat Man On</div>
+        <div class="section-label" style="left: 285px; top: 28px;">Apu</div>
+        <div class="section-label" style="left: 394px; top: 28px;">Hyd 2</div>
+        <div class="section-label" style="left: 492px; top: 28px;">Fuel X Feed</div>
+        <div style="position:absolute;left:34px;right:34px;top:56px;display:grid;grid-template-columns:repeat(5,1fr);gap:10px;justify-items:center;">
+          <div class="pb white bottom-white" data-bottom="OFF"><div class="legend">Eng 1<br>Pump</div><div class="window">FAULT</div></div>
+          <div class="pb dark bottom-white" data-bottom="OFF"><div class="legend">Rat Man<br>On</div><div class="window">&nbsp;</div></div>
+          <div class="pb green bottom-white" data-bottom="OFF"><div class="legend">Apu<br>Bleed</div><div class="window">On</div></div>
+          <div class="pb white bottom-white" data-bottom="OFF"><div class="legend">Eng 2<br>Pump</div><div class="window">FAULT</div></div>
+          <div class="pb dark bottom-white" data-bottom="OFF"><div class="legend">X Bleed</div><div class="window">&nbsp;</div></div>
+        </div>
+      </section>
+
+      <section class="panel" style="left: 262px; top: 388px; width: 500px; height: 176px;">
+        <span class="screw tl"></span><span class="screw tr"></span><span class="screw bl"></span><span class="screw br"></span>
+        <div class="panel-title">Electrical</div>
+        <svg class="sys-lines" viewBox="0 0 500 176" preserveAspectRatio="none">
+          <line x1="120" y1="62" x2="482" y2="62" stroke="#d7de76" stroke-width="2"/>
+          <line x1="120" y1="116" x2="482" y2="116" stroke="#d7de76" stroke-width="2"/>
+          <line x1="180" y1="62" x2="180" y2="140" stroke="#d7de76" stroke-width="2"/>
+          <line x1="300" y1="62" x2="300" y2="140" stroke="#d7de76" stroke-width="2"/>
+          <line x1="422" y1="62" x2="422" y2="140" stroke="#d7de76" stroke-width="2"/>
+        </svg>
+        <div class="dial-box" style="position:absolute;top:36px;left:246px;width:110px;height:34px;font-size:18px;">26.0</div>
+        <div class="tiny-label" style="position:absolute;top:72px;left:246px;right:246px;">Ac Ess Feed</div>
+        <div class="pb-grid four" style="left:40px;right:40px;top:86px;gap:14px 22px;">
+          <div class="pb amber bottom-white" data-bottom="OFF"><div class="legend">Bat 1</div><div class="window">FAULT</div></div>
+          <div class="pb dark bottom-white" data-bottom="OFF"><div class="legend">Gen 1</div><div class="window">&nbsp;</div></div>
+          <div class="pb dark bottom-white" data-bottom="OFF"><div class="legend">Gen 2</div><div class="window">&nbsp;</div></div>
+          <div class="pb amber bottom-white" data-bottom="OFF"><div class="legend">Bat 2</div><div class="window">FAULT</div></div>
+        </div>
+      </section>
+
+      <section class="panel" style="left: 262px; top: 570px; width: 500px; height: 168px;">
+        <span class="screw tl"></span><span class="screw tr"></span><span class="screw bl"></span><span class="screw br"></span>
+        <div class="panel-title">Air Conditioning</div>
+        <div class="rotary-strip" style="left: 194px; top: 48px; gap: 34px;">
+          <div class="rotary-unit">
+            <div class="tiny-label">Temp Cockpit</div>
+            <div class="knob" style="--angle:-26deg"></div>
+          </div>
+          <div class="rotary-unit">
+            <div class="tiny-label">Temp Fwd Cab</div>
+            <div class="knob" style="--angle:0deg"></div>
+          </div>
+          <div class="rotary-unit">
+            <div class="tiny-label">Temp Aft Cab</div>
+            <div class="knob" style="--angle:22deg"></div>
+          </div>
+        </div>
+        <div class="pb-grid four" style="left:24px; right:24px; bottom:18px; gap:10px 14px;">
+          <div class="pb white bottom-white" data-bottom="OFF"><div class="legend">Pack 1</div><div class="window">FAULT</div></div>
+          <div class="pb dark bottom-white" data-bottom="OFF"><div class="legend">Hot<br>Air</div><div class="window">&nbsp;</div></div>
+          <div class="pb dark bottom-white" data-bottom="OFF"><div class="legend">Trim<br>Air</div><div class="window">&nbsp;</div></div>
+          <div class="pb white bottom-white" data-bottom="OFF"><div class="legend">Pack 2</div><div class="window">FAULT</div></div>
+        </div>
+      </section>
+
+      <section class="panel" style="left: 262px; top: 744px; width: 500px; height: 262px;">
+        <span class="screw tl"></span><span class="screw tr"></span><span class="screw bl"></span><span class="screw br"></span>
+        <div class="panel-title">Anti Ice / Probe / Pressurization</div>
+        <div class="pb-grid four" style="left:24px; right:24px; top:42px; gap:12px 18px;">
+          <div class="pb dark bottom-white" data-bottom="OFF"><div class="legend">Wing<br>Anti Ice</div><div class="window">&nbsp;</div></div>
+          <div class="pb dark bottom-white" data-bottom="OFF"><div class="legend">Probe /<br>Window</div><div class="window">&nbsp;</div></div>
+          <div class="pb dark bottom-white" data-bottom="OFF"><div class="legend">Eng 1<br>Anti Ice</div><div class="window">&nbsp;</div></div>
+          <div class="pb dark bottom-white" data-bottom="OFF"><div class="legend">Eng 2<br>Anti Ice</div><div class="window">&nbsp;</div></div>
+        </div>
+        <div class="footer-knobs">
+          <div class="rotary-unit"><div class="tiny-label">Cabin Press</div><div class="knob" style="width:46px;height:46px;--angle:-18deg"></div></div>
+          <div class="rotary-unit"><div class="tiny-label">Mode Sel</div><div class="knob" style="width:46px;height:46px;--angle:16deg"></div></div>
+          <div class="rotary-unit"><div class="tiny-label">Man V/S Ctl</div><div class="knob" style="width:46px;height:46px;--angle:2deg"></div></div>
+        </div>
+      </section>
+
+      <section class="panel" style="left: 766px; top: 20px; width: 240px; height: 236px;">
+        <span class="screw tl"></span><span class="screw tr"></span><span class="screw bl"></span><span class="screw br"></span>
+        <div class="panel-title">ATC / COM</div>
+        <div class="freq-panel">
+          <div class="freq-stack">
+            <div class="freq-box">
+              <div class="cap">Active</div>
+              <div class="val">240.00</div>
+              <div class="sub">STD BY 121.50</div>
+            </div>
+            <div class="freq-box">
+              <div class="cap">Active</div>
+              <div class="val">240.00</div>
+              <div class="sub">STD BY 240.80</div>
+            </div>
+          </div>
+          <div style="display:flex;justify-content:center;margin:10px 0 8px;">
+            <div class="knob" style="width:56px;height:56px;--angle:10deg"></div>
+          </div>
+          <div class="tiny-button-grid">
+            <div class="tiny-button">VHF 1</div>
+            <div class="tiny-button">VHF 2</div>
+            <div class="tiny-button">HF 1</div>
+            <div class="tiny-button">HF 2</div>
+            <div class="tiny-button">Nav</div>
+            <div class="tiny-button">Tel</div>
+            <div class="tiny-button">Cab</div>
+            <div class="tiny-button">PA</div>
+          </div>
+        </div>
+      </section>
+
+      <section class="panel" style="left: 766px; top: 262px; width: 240px; height: 202px;">
+        <span class="screw tl"></span><span class="screw tr"></span><span class="screw bl"></span><span class="screw br"></span>
+        <div class="panel-title">Flight Control</div>
+        <div class="pb-grid two" style="left:16px; right:16px; top:38px; gap:10px 10px;">
+          <div class="pb dark bottom-white" data-bottom="OFF"><div class="legend">Elac 1</div><div class="window">&nbsp;</div></div>
+          <div class="pb dark bottom-white" data-bottom="OFF"><div class="legend">Elac 2</div><div class="window">&nbsp;</div></div>
+          <div class="pb dark bottom-white" data-bottom="OFF"><div class="legend">Sec 1</div><div class="window">&nbsp;</div></div>
+          <div class="pb dark bottom-white" data-bottom="OFF"><div class="legend">Sec 2</div><div class="window">&nbsp;</div></div>
+          <div class="pb dark bottom-white" data-bottom="OFF"><div class="legend">Sec 3</div><div class="window">&nbsp;</div></div>
+          <div class="pb dark bottom-white" data-bottom="OFF"><div class="legend">F/Ctl</div><div class="window">&nbsp;</div></div>
+        </div>
+      </section>
+
+      <section class="panel" style="left: 766px; top: 470px; width: 240px; height: 196px;">
+        <span class="screw tl"></span><span class="screw tr"></span><span class="screw bl"></span><span class="screw br"></span>
+        <div class="panel-title">Ventilation</div>
+        <div style="position:absolute;left:0;right:0;top:42px;display:flex;justify-content:center;gap:12px;">
+          <div class="rotary-unit"><div class="tiny-label">Blower</div><div class="knob" style="width:44px;height:44px;--angle:-24deg"></div></div>
+          <div class="rotary-unit"><div class="tiny-label">Extract</div><div class="knob" style="width:44px;height:44px;--angle:20deg"></div></div>
+        </div>
+        <div class="pb-grid two" style="left:16px; right:16px; bottom:16px; gap:10px 10px;">
+          <div class="pb amber bottom-white" data-bottom="OFF"><div class="legend">Cab Fans</div><div class="window">FAULT</div></div>
+          <div class="pb dark bottom-white" data-bottom="OFF"><div class="legend">Avncs<br>Vent</div><div class="window">&nbsp;</div></div>
+        </div>
+      </section>
+
+      <section class="panel" style="left: 766px; top: 672px; width: 240px; height: 184px;">
+        <span class="screw tl"></span><span class="screw tr"></span><span class="screw bl"></span><span class="screw br"></span>
+        <div class="panel-title">Window Heat</div>
+        <div class="pb-grid two" style="left:16px; right:16px; top:40px; gap:10px 10px;">
+          <div class="pb blue bottom-white" data-bottom="OFF"><div class="legend">L Side</div><div class="window">On</div></div>
+          <div class="pb blue bottom-white" data-bottom="OFF"><div class="legend">R Side</div><div class="window">On</div></div>
+          <div class="pb blue bottom-white" data-bottom="OFF"><div class="legend">L Fwd</div><div class="window">On</div></div>
+          <div class="pb blue bottom-white" data-bottom="OFF"><div class="legend">R Fwd</div><div class="window">On</div></div>
+        </div>
+        <div style="position:absolute;left:0;right:0;bottom:16px;display:flex;justify-content:center;gap:14px;">
+          <div class="rotary-unit"><div class="tiny-label">Windshld</div><div class="knob" style="width:42px;height:42px;--angle:-10deg"></div></div>
+        </div>
+      </section>
+    </section>
+  </main>
+</body>
+</html>

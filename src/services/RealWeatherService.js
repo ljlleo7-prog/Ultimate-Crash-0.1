@@ -10,7 +10,63 @@ const BASE_URL = 'https://api.open-meteo.com/v1/forecast';
 class RealWeatherService {
   constructor() {
     this.cache = {};
-    this.CACHE_DURATION = 15 * 60 * 1000; // 15 minutes
+    this.CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
+  }
+
+  clamp(value, min, max) {
+    if (!Number.isFinite(value)) return min;
+    return Math.min(max, Math.max(min, value));
+  }
+
+  coerceNumber(value, fallback = 0) {
+    const numeric = Number(value);
+    return Number.isFinite(numeric) ? numeric : fallback;
+  }
+
+  getPressureHpa(current) {
+    const pressure = [current.pressure_msl, current.sea_level_pressure, current.surface_pressure]
+      .map(value => Number(value))
+      .find(value => Number.isFinite(value) && value > 0);
+    return pressure ?? 1013.25;
+  }
+
+  normalizeWeatherData(current = {}, currentUnits = {}) {
+    const temperature = this.coerceNumber(current.temperature_2m, 15);
+    const humidity = this.clamp(this.coerceNumber(current.relative_humidity_2m, 50), 0, 100);
+    const pressure = this.getPressureHpa(current);
+    const windSpeed = Math.max(0, this.coerceNumber(current.wind_speed_10m, 0));
+    const rawWindGust = Math.max(0, this.coerceNumber(current.wind_gusts_10m, windSpeed));
+    const windGust = Math.max(windSpeed, rawWindGust);
+    const windDirection = ((this.coerceNumber(current.wind_direction_10m, 0) % 360) + 360) % 360;
+    const cloudCover = this.clamp(this.coerceNumber(current.cloud_cover, 0), 0, 100);
+    const precipitation = Math.max(0, this.coerceNumber(current.precipitation, 0));
+    const weatherCode = this.coerceNumber(current.weather_code, 0);
+
+    const windUnit = currentUnits.wind_speed_10m || currentUnits.wind_gusts_10m;
+    if (windUnit && windUnit !== 'kn') {
+      console.warn(`Unexpected Open-Meteo wind unit: ${windUnit}`);
+    }
+
+    const pressureUnit = currentUnits.pressure_msl || currentUnits.sea_level_pressure || currentUnits.surface_pressure;
+    if (pressureUnit && pressureUnit !== 'hPa') {
+      console.warn(`Unexpected Open-Meteo pressure unit: ${pressureUnit}`);
+    }
+
+    return {
+      temperature,
+      humidity,
+      pressure,
+      pressureInHg: pressure * 0.02953,
+      windSpeed,
+      windDirection,
+      windGust,
+      windShear: Math.max(0, windGust - windSpeed) * 0.6,
+      cloudCover,
+      precipitation,
+      weatherCode,
+      visibility: this.estimateVisibility(weatherCode, cloudCover),
+      turbulence: this.estimateTurbulence(windSpeed, windGust, weatherCode)
+    };
   }
 
   /**
@@ -58,23 +114,7 @@ class RealWeatherService {
       }
 
       const data = await response.json();
-      const current = data.current;
-
-      const weatherData = {
-        temperature: current.temperature_2m, // Celsius
-        humidity: current.relative_humidity_2m, // %
-        pressure: current.pressure_msl, // hPa
-        pressureInHg: current.pressure_msl * 0.02953, // inHg
-        windSpeed: current.wind_speed_10m, // knots
-        windDirection: current.wind_direction_10m, // degrees
-        windGust: current.wind_gusts_10m, // knots
-        windShear: Math.max(0, current.wind_gusts_10m - current.wind_speed_10m) * 0.6, // knots
-        cloudCover: current.cloud_cover, // %
-        precipitation: current.precipitation, // mm
-        weatherCode: current.weather_code, // WMO code
-        visibility: this.estimateVisibility(current.weather_code, current.cloud_cover), // meters
-        turbulence: this.estimateTurbulence(current.wind_speed_10m, current.wind_gusts_10m, current.weather_code) // 0-1 scale
-      };
+      const weatherData = this.normalizeWeatherData(data.current, data.current_units);
 
       this.cache[cacheKey] = {
         timestamp: now,
@@ -89,6 +129,7 @@ class RealWeatherService {
         temperature: 15,
         humidity: 50,
         pressure: 1013.25,
+        pressureInHg: 1013.25 * 0.02953,
         windSpeed: 0,
         windDirection: 0,
         windGust: 0,

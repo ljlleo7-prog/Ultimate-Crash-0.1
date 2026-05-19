@@ -1,5 +1,5 @@
 
-import { useMemo, useState, useEffect, useRef } from 'react';
+import { useMemo, useState, useEffect, useRef, useCallback } from 'react';
 import eventBus from '../services/eventBus';
 import { npcCrewService } from '../services/NPCCrewService';
 import './CrewPanel.css';
@@ -8,7 +8,11 @@ const CrewPanel = ({ difficulty, quickCommands = [], onQuickCommand }) => {
     const [messages, setMessages] = useState([]);
     const [foStress, setFoStress] = useState(0);
     const [cabinStress, setCabinStress] = useState(0);
+    const [minimized, setMinimized] = useState(false);
+    const [position, setPosition] = useState({ x: null, y: null });
     const messagesEndRef = useRef(null);
+    const panelRef = useRef(null);
+    const dragState = useRef(null);
 
     useEffect(() => {
         // Subscribe to crew messages
@@ -41,6 +45,40 @@ const CrewPanel = ({ difficulty, quickCommands = [], onQuickCommand }) => {
         }
     }, [messages]);
 
+    const handleMouseDown = useCallback((e) => {
+        if (e.target.closest('.crew-panel-header')) {
+            dragState.current = {
+                startX: e.clientX,
+                startY: e.clientY,
+                initialX: position.x ?? panelRef.current.offsetLeft,
+                initialY: position.y ?? panelRef.current.offsetTop
+            };
+        }
+    }, [position]);
+
+    useEffect(() => {
+        const handleMouseMove = (e) => {
+            if (!dragState.current) return;
+            const dx = e.clientX - dragState.current.startX;
+            const dy = e.clientY - dragState.current.startY;
+            setPosition({
+                x: dragState.current.initialX + dx,
+                y: dragState.current.initialY + dy
+            });
+        };
+
+        const handleMouseUp = () => {
+            dragState.current = null;
+        };
+
+        document.addEventListener('mousemove', handleMouseMove);
+        document.addEventListener('mouseup', handleMouseUp);
+        return () => {
+            document.removeEventListener('mousemove', handleMouseMove);
+            document.removeEventListener('mouseup', handleMouseUp);
+        };
+    }, []);
+
     const visibleQuickCommands = useMemo(() => {
         if (!Array.isArray(quickCommands)) {
             return [];
@@ -62,22 +100,37 @@ const CrewPanel = ({ difficulty, quickCommands = [], onQuickCommand }) => {
         return 'sender-system';
     };
 
+    const panelStyle = position.x !== null
+        ? { position: 'fixed', left: position.x, top: position.y, bottom: 'auto', right: 'auto' }
+        : {};
+
     return (
-        <div className="crew-panel">
+        <div className="crew-panel" ref={panelRef} style={panelStyle} onMouseDown={handleMouseDown}>
             {/* Header */}
-            <div className="crew-panel-header">
+            <div className="crew-panel-header" style={{ cursor: 'grab' }}>
                 <span className="crew-panel-title">CREW INTERCOM</span>
                 <div className="crew-panel-stress-container">
-                    <span className={`crew-stress-indicator ${foStress > 50 ? 'stress-high' : 'stress-low'}`}>
-                        FO: {foStress}%
-                    </span>
-                    <span className={`crew-stress-indicator ${cabinStress > 50 ? 'stress-high' : 'stress-low'}`}>
-                        CABIN: {cabinStress}%
-                    </span>
+                    {!minimized && (
+                        <>
+                            <span className={`crew-stress-indicator ${foStress > 50 ? 'stress-high' : 'stress-low'}`}>
+                                FO: {foStress}%
+                            </span>
+                            <span className={`crew-stress-indicator ${cabinStress > 50 ? 'stress-high' : 'stress-low'}`}>
+                                CABIN: {cabinStress}%
+                            </span>
+                        </>
+                    )}
+                    <button
+                        className="crew-panel-toggle"
+                        onClick={(e) => { e.stopPropagation(); setMinimized(m => !m); }}
+                        title={minimized ? 'Expand' : 'Minimize'}
+                    >
+                        {minimized ? '▲' : '▼'}
+                    </button>
                 </div>
             </div>
 
-            <div className="crew-panel-body">
+            {!minimized && <div className="crew-panel-body">
                 {/* Message Log */}
                 <div className="crew-panel-messages">
                     {messages.length === 0 && (
@@ -128,7 +181,7 @@ const CrewPanel = ({ difficulty, quickCommands = [], onQuickCommand }) => {
                         </div>
                     </div>
                 </div>
-            </div>
+            </div>}
         </div>
     );
 };

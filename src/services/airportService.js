@@ -1,4 +1,5 @@
 import airportDatabase from '../data/airportDatabase.json' with { type: "json" };
+import { fetchOpenAipReferences } from './routes/adapters/openAipAdapter.js';
 
 class AirportService {
   constructor(apiKey = '') {
@@ -200,11 +201,28 @@ class AirportService {
     const airport = this.getAirportByCode(airportCode);
     if (!airport) return null;
 
+    const requestedRunway = String(runwayName || '').trim().toUpperCase();
+    const splitRunwayEnds = (name) => String(name || '')
+      .split(/[\/-]/)
+      .map((part) => part.trim().toUpperCase())
+      .filter(Boolean);
+
     let runway = null;
-    if (runwayName && airport.runways) {
-      runway = airport.runways.find(r => r.name === runwayName);
+    let matchedRunwayEnd = '';
+
+    if (airport.runways && Array.isArray(airport.runways)) {
+      if (requestedRunway) {
+        runway = airport.runways.find((r) => String(r.name || '').trim().toUpperCase() === requestedRunway) || null;
+      }
+
+      if (!runway && requestedRunway) {
+        runway = airport.runways.find((r) => splitRunwayEnds(r.name).includes(requestedRunway)) || null;
+        if (runway) {
+          matchedRunwayEnd = requestedRunway;
+        }
+      }
     }
-    
+
     // Fallback to first runway or a mock if not found
     if (!runway) {
       if (airport.runways && Array.isArray(airport.runways) && airport.runways.length > 0) {
@@ -216,18 +234,23 @@ class AirportService {
       }
     }
 
-    // Parse heading
-    // Name format: "09", "09L", "09R", "09C"
-    // Extract first 2 digits
-    const headingMatch = runway.name.match(/^(\d{2})/);
-    let headingDeg = 0;
-    if (headingMatch) {
-      headingDeg = parseInt(headingMatch[1]) * 10;
-    }
+    const runwayEnds = splitRunwayEnds(runway.name);
+    const primaryRunwayEnd = runwayEnds[0] || String(runway.name || '').trim().toUpperCase() || '09';
+    const reciprocalRunwayEnd = runwayEnds[1] || '';
+    const selectedRunwayEnd = matchedRunwayEnd || (runwayEnds.includes(requestedRunway) ? requestedRunway : '');
+
+    const parseRunwayHeading = (designator) => {
+      const headingMatch = String(designator || '').match(/^(\d{2})/);
+      if (!headingMatch) return 0;
+      const runwayNumber = parseInt(headingMatch[1], 10);
+      return runwayNumber === 36 ? 360 : runwayNumber * 10;
+    };
+
+    const primaryHeadingDeg = parseRunwayHeading(primaryRunwayEnd);
 
     // Dimensions
     // Assuming length is in feet (standard in aviation databases here), convert to meters
-    const lengthM = (runway.length || 8000) * 0.3048; 
+    const lengthM = (runway.length || 8000) * 0.3048;
     const widthM = 45; // Standard width in meters
 
     // Calculate endpoints
@@ -240,68 +263,36 @@ class AirportService {
     // Calculate offsets from midpoint to ends (half length)
     // We assume the runway is centered at the airport coordinates
     const halfLength = lengthM / 2;
-    
-    // Heading is direction OF the runway. 
-    // Start point is "behind" the midpoint, End point is "ahead".
-    // But which end is which depends on the runway name used (e.g. 09 vs 27).
-    
-    // 1. Determine the PRIMARY heading from the database object (e.g. "06/24" -> 06 -> 60deg)
-    // This defines the physical orientation of the strip in the DB.
-    // Vector P points from Start(06) to End(24).
-    const primaryHeadingMatch = runway.name.match(/^(\d{2})/);
-    let primaryHeadingDeg = 0;
-    if (primaryHeadingMatch) {
-      primaryHeadingDeg = parseInt(primaryHeadingMatch[1]) * 10;
-    }
-    
-    // 2. Determine the REQUESTED heading from the user input (runwayName)
-    // e.g. "24" -> 240deg.
-    let requestedHeadingDeg = primaryHeadingDeg;
-    if (runwayName) {
-        const reqMatch = runwayName.match(/^(\d{2})/);
-        if (reqMatch) {
-            requestedHeadingDeg = parseInt(reqMatch[1]) * 10;
-        }
-    }
 
-    // 3. Calculate geometry based on PRIMARY heading first
+    // Primary direction follows the first listed runway end in the database name.
     const dLat = (halfLength * Math.cos(primaryHeadingDeg * toRad)) / R * toDeg;
     const dLon = (halfLength * Math.sin(primaryHeadingDeg * toRad)) / (R * Math.cos(airport.latitude * toRad)) * toDeg;
 
-    // Primary Start (e.g. 06 Threshold) is "behind" the center relative to 06 heading
     const p1 = {
       latitude: airport.latitude - dLat,
       longitude: airport.longitude - dLon,
       elevation: Number(airport.elevation) || 0
     };
-    
-    // Primary End (e.g. 24 Threshold) is "ahead" of the center
+
     const p2 = {
       latitude: airport.latitude + dLat,
       longitude: airport.longitude + dLon,
       elevation: Number(airport.elevation) || 0
     };
 
-    // 4. Decide which point is Start/End based on Requested Heading
-    // If requested heading is close to primary (e.g. 06 vs 06), use p1->p2
-    // If requested heading is opposite (e.g. 24 vs 06), use p2->p1
-    
-    let diff = Math.abs(requestedHeadingDeg - primaryHeadingDeg);
-    if (diff > 180) diff = 360 - diff;
-    
-    let start, end, finalHeading;
-    
-    if (diff > 90) {
-        // Opposite direction requested
-        start = p2;
-        end = p1;
-        finalHeading = requestedHeadingDeg;
-    } else {
-        // Same direction requested
-        start = p1;
-        end = p2;
-        finalHeading = requestedHeadingDeg; // Use requested (e.g. might be slightly different if needed, but usually same block)
-        // If the DB says "06" and user asks "06", heading is 60.
+    let start = p1;
+    let end = p2;
+    let finalHeading = primaryHeadingDeg;
+    let finalRunwayName = selectedRunwayEnd || requestedRunway || primaryRunwayEnd || runway.name;
+
+    if (selectedRunwayEnd && selectedRunwayEnd === reciprocalRunwayEnd) {
+      start = p2;
+      end = p1;
+      finalHeading = parseRunwayHeading(reciprocalRunwayEnd);
+      finalRunwayName = reciprocalRunwayEnd;
+    } else if (selectedRunwayEnd && selectedRunwayEnd === primaryRunwayEnd) {
+      finalHeading = parseRunwayHeading(primaryRunwayEnd);
+      finalRunwayName = primaryRunwayEnd;
     }
 
     // Lookup ILS Frequency
@@ -346,15 +337,22 @@ class AirportService {
     };
 
     let ilsFrequency = null;
-    if (ILS_FREQUENCIES[airportCode] && ILS_FREQUENCIES[airportCode][runwayName]) {
-        ilsFrequency = ILS_FREQUENCIES[airportCode][runwayName];
+    if (ILS_FREQUENCIES[airportCode] && ILS_FREQUENCIES[airportCode][finalRunwayName]) {
+        ilsFrequency = ILS_FREQUENCIES[airportCode][finalRunwayName];
     } else {
-        // Deterministic generation for others: 108.00 + (First Digit + Last Digit)/10
-        // Just a placeholder so it's not null
-        ilsFrequency = 110.00; 
+        const runwayKey = String(finalRunwayName || runway.name || '').trim().toUpperCase();
+        const airportKey = String(airportCode || airport.iata || airport.icao || '').trim().toUpperCase();
+        const seedSource = `${airportKey}:${runwayKey}`;
+        let seed = 0;
+        for (let i = 0; i < seedSource.length; i++) {
+          seed = (seed * 31 + seedSource.charCodeAt(i)) % 200000;
+        }
+        const channel = seed % 40; // 108.10 -> 111.95 in 0.10-ish distinct slots for UI purposes
+        ilsFrequency = Number((108.10 + (channel * 0.1)).toFixed(2));
     }
 
     return {
+      airportCode: String(airportCode || airport.iata || airport.icao || '').trim().toUpperCase(),
       airportLat: airport.latitude,
       airportLon: airport.longitude,
       heading: finalHeading,
@@ -362,14 +360,51 @@ class AirportService {
       width: widthM,
       thresholdStart: start,
       thresholdEnd: end,
-      runwayName: runwayName || runway.name,
+      runwayName: finalRunwayName,
       ilsFrequency: ilsFrequency
     };
   }
 
-  getDatabaseStats() {
-    return airportDatabase.metadata.statistics;
+  async getRouteReferenceAirportData(airportCode) {
+    const airport = this.getAirportByCode(airportCode);
+    if (!airport) return null;
+
+    const response = await fetchOpenAipReferences({
+      query: airport.icao || airport.iata || airport.name,
+      type: 'airport'
+    });
+
+    if (response?.status !== 'ok' || !Array.isArray(response.references) || !response.references.length) {
+      return {
+        airport,
+        references: [],
+        source: 'local',
+        billing: response?.billing || { chargedTokens: 0 },
+        status: response?.status || 'ok'
+      };
+    }
+
+    const matchedReference = response.references.find((reference) =>
+      reference.icaoCode === String(airport.icao || '').toUpperCase() ||
+      reference.iataCode === String(airport.iata || '').toUpperCase() ||
+      reference.identifier === String(airport.icao || '').toUpperCase() ||
+      reference.identifier === String(airport.iata || '').toUpperCase()
+    ) || response.references[0];
+
+    return {
+      airport: {
+        ...airport,
+        latitude: matchedReference.latitude ?? airport.latitude,
+        longitude: matchedReference.longitude ?? airport.longitude,
+        openAipReference: matchedReference
+      },
+      references: response.references,
+      source: 'openaip',
+      billing: response.billing || { chargedTokens: 1 },
+      status: response.status
+    };
   }
+
 }
 
 export const airportService = new AirportService();

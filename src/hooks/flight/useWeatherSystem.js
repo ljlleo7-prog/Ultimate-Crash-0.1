@@ -9,7 +9,8 @@ export default function useWeatherSystem(selectedRoute, realWeatherService) {
 
         const fetchWeather = async () => {
             try {
-                const weather = await realWeatherService?.fetchWeather?.(selectedRoute.departure);
+                const dep = selectedRoute.departure;
+                const weather = await realWeatherService?.getWeather?.(dep?.latitude, dep?.longitude);
                 setWeatherData(weather);
             } catch (err) {
                 console.warn('Weather fetch failed:', err);

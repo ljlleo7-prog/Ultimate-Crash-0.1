@@ -12,7 +12,12 @@ export default class EnvironmentService {
         let temp = this.CONSTANTS.SEA_LEVEL_TEMP + (this.CONSTANTS.TEMP_LAPSE_RATE * h);
         if (temp < 216.65) temp = 216.65;
         const envTempC = this.environment?.temperature;
-        if (envTempC != null) temp = envTempC + 273.15;
+        // Apply surface temperature as an ISA deviation, not a flat override at all altitudes.
+        // ISA deviation = envTempC - ISA_SL_temp_C (15°C). Add deviation to lapse-rate result.
+        if (envTempC != null) {
+            const isaDev = envTempC - 15;
+            temp = Math.max(216.65, temp + isaDev);
+        }
 
         const pressure = this.CONSTANTS.SEA_LEVEL_PRESSURE * Math.pow(temp / this.CONSTANTS.SEA_LEVEL_TEMP, -this.CONSTANTS.G / (this.CONSTANTS.TEMP_LAPSE_RATE * this.CONSTANTS.R_GAS));
         const density = pressure / (this.CONSTANTS.R_GAS * temp);

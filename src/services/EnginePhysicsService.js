@@ -13,10 +13,16 @@ class EnginePhysicsService {
             bypassRatio: config.bypassRatio || 5.0,
             tsfc: config.specificFuelConsumption || 0.000011, // kg/(N*s) base at SL
             idleN1: 20, // %
-            maxN1: 102, // %
-            spoolUpRate: 15, // % per second
-            spoolDownRate: 20, // % per second
+            maxN1: 102, // structural / absolute ceiling
+            operationalMaxN1: config.operationalMaxN1 || 98.4, // normal max commanded N1
+            emergencyMaxN1: config.emergencyMaxN1 || config.maxN1 || 102, // OEI / emergency ceiling
+            egtYellow: 750, // °C yellow arc
+            egtRed: 850,    // °C red line
+            spoolUpRate: 15,  // restored — normal throttle response
+            spoolDownRate: 20,
             responsiveness: config.responsiveness || 1.0, // Multiplier for spool rate (0.95-1.05)
+            // reverseCapable: true by default; set false per-engine for A380 outer engines
+            reverseCapable: config.reverseCapable !== undefined ? config.reverseCapable : true,
             ...config
         };
         
@@ -29,7 +35,7 @@ class EnginePhysicsService {
         this.state = {
             n1: 20, // Fan Speed % (Idle)
             n2: 22, // Core Speed %
-            egt: 400, // Exhaust Gas Temp (C) - Idle
+            egt: 15, // Exhaust Gas Temp (C) - starts at ambient
             thrust: 0, // Newtons
             fuelFlow: 0, // kg/s
             oilPressure: 45, // psi
@@ -42,10 +48,13 @@ class EnginePhysicsService {
             pneumaticPressure: false,
             fuelAvailable: false,
             ignition: false,
-            egtOffset: 0 // External offset for failures/fires
+            egtOffset: 0, // External offset for failures/fires
+            emergencyBoostAllowed: false
         };
         
         this._prevFuelFlow = 0;
+        this._fuelUnavailableTime = 0;
+        this._lightoffN2Threshold = 20;
 
         // Failure Parameters
         this.failureParams = {
@@ -81,6 +90,10 @@ class EnginePhysicsService {
         this.state.ignition = ignition;
     }
 
+    setEmergencyBoostAllowed(allowed) {
+        this.state.emergencyBoostAllowed = allowed === true;
+    }
+
     update(dt, throttleInput, mach, altitude, airDensityRatio, ambientTemp) {
         if (this.state.failed) {
             this.spoolDown(dt);
@@ -91,19 +104,21 @@ class EnginePhysicsService {
         const throttle = (throttleInput !== undefined) ? throttleInput : this.state.throttleCommand;
         this.state.throttleCommand = throttle;
 
-        // Auto-Start Logic (Transition from Cranking to Running)
-        // Requirements: N2 > 20%, Fuel Available, Ignition (or Cont)
-        if (!this.state.running && this.state.fuelAvailable && this.state.n2 > 15) {
-             // In a real jet, you need ignition. 
-             // We'll assume ignition is auto/on if we are in this state (simplified) or passed in.
-             // If we have fuel and rotation, LIGHTOFF!
+        // Auto-Start Logic (Transition from Cranking/Windmilling to Running)
+        // Requirements: Fuel, ignition, and sufficient N2 for lightoff/self-sustain.
+        if (!this.state.running && this.state.fuelAvailable && this.state.ignition && this.state.n2 >= this._lightoffN2Threshold) {
              this.state.running = true;
              this.state.egt += 100; // Initial spike
         }
 
-        // Shutdown Logic: If fuel is cut, engine stops running (flameout)
+        // Shutdown Logic: If fuel is cut, engine stops running after a short grace period
         if (this.state.running && !this.state.fuelAvailable) {
-            this.state.running = false;
+            this._fuelUnavailableTime += dt;
+            if (this._fuelUnavailableTime > 1.0) {
+                this.state.running = false;
+            }
+        } else {
+            this._fuelUnavailableTime = 0;
         }
 
         // Target N2 based on throttle (Core Speed drives the engine)
@@ -120,10 +135,19 @@ class EnginePhysicsService {
                 // Forward Thrust
                 // User Request: Throttle controls N1 directly (Linear).
                 // Idle N1 = 20%, Max N1 = 102%.
-                const idleN1 = 20.0;
-                const maxN1 = 102.0;
-                
-                // Linear N1 Target
+                const idleN1 = this.config.idleN1;
+                const normalMaxN1 = this.config.operationalMaxN1;
+                const emergencyMaxN1 = this.config.emergencyMaxN1;
+                const emergencyRequested = this.state.emergencyBoostAllowed && throttle >= 0.93;
+                const ambientC = Number.isFinite(ambientTemp) ? ambientTemp : 15;
+                const densityPenalty = Math.max(-0.03, Math.min(0.03, (airDensityRatio - 1) * 0.08));
+                const tempPenalty = Math.max(-0.03, Math.min(0.03, -(ambientC - 15) * 0.0015));
+                const environmentalAdjustment = densityPenalty + tempPenalty;
+                const normalAvailableN1 = Math.max(idleN1, normalMaxN1 * (1 + environmentalAdjustment));
+                const emergencyAvailableN1 = Math.max(normalAvailableN1, Math.min(emergencyMaxN1, this.config.maxN1));
+                const maxN1 = emergencyRequested ? emergencyAvailableN1 : Math.min(this.config.maxN1, normalAvailableN1);
+
+                // Linear N1 Target within commanded authority
                 const targetN1 = idleN1 + throttle * (maxN1 - idleN1);
                 
                 // Drive N2 (Core) from Target N1 using inverse of N1-curve
@@ -131,13 +155,18 @@ class EnginePhysicsService {
                 targetN2 = 10 * Math.sqrt(Math.max(0, targetN1));
                 
             } else {
-                // Reverse Thrust
-                // Throttle -1 -> N2 ~ 75%
-                isReverse = true;
-                const idleN2 = 45; // ~20% N1
-                const maxReverseN2 = 75;
-                const reverseRatio = Math.min(1, Math.abs(throttle) / 0.7);
-                targetN2 = idleN2 + reverseRatio * (maxReverseN2 - idleN2);
+                // Reverse Thrust — only if this engine has a reverser
+                if (this.config.reverseCapable) {
+                    isReverse = true;
+                    const idleN2 = 45;
+                    const maxReverseN2 = 75;
+                    const reverseRatio = Math.min(1, Math.abs(throttle) / 0.7);
+                    targetN2 = idleN2 + reverseRatio * (maxReverseN2 - idleN2);
+                } else {
+                    // No reverser — stay at idle
+                    const idleN1 = this.config.idleN1;
+                    targetN2 = 10 * Math.sqrt(Math.max(0, idleN1));
+                }
             }
         } else {
             // Not running
@@ -176,7 +205,7 @@ class EnginePhysicsService {
             if (pressure === false) pressure = 0;
             
             const efficiency = Math.min(1.2, Math.max(0, (pressure - 5) / 25));
-            n2Rate = 5.0 * efficiency; // 5% per second at nominal pressure
+            n2Rate = 1.5 * efficiency; // slow starter motor (~τ=17s, reaches 25% in ~10s)
             
         } else if (n2Diff < 0) {
             n2Rate = this.config.spoolDownRate;
@@ -221,7 +250,7 @@ class EnginePhysicsService {
         // Apply Reverse Thrust Logic
         if (isReverse && throttle < -0.01) { 
              // User requirement: -70% Thrust at Max Reverse (75% N1)
-             const reverseScalar = 1.55; 
+             const reverseScalar = 1.85; 
              thrustFactor = -1 * thrustFactor * reverseScalar;
         }
 
@@ -255,15 +284,23 @@ class EnginePhysicsService {
         this.state.fuelFlow = Math.max(idleFlow, smoothed);
         this._prevFuelFlow = this.state.fuelFlow;
 
-        // EGT
-        const baseEGT = ambientTemp; 
-        const runningEGT = 400 + (this.state.n2 * 4); // EGT correlates well with N2 (Core)
-        const totalEGT = runningEGT + (this.state.egtOffset || 0);
-        this.state.egt = this.state.running ? totalEGT : baseEGT + (this.state.egt - baseEGT) * 0.99;
+        // EGT — thermal model: heat inflow from combustion, natural cooling toward ambient
+        const ambT = Number.isFinite(ambientTemp)
+            ? (ambientTemp > 150 ? ambientTemp - 273.15 : ambientTemp)
+            : 15;
+        const targetRunningEGT = ambT + Math.pow(this.state.n2 / 100, 0.8) * 800;
+        const heatInflow = this.state.running
+            ? (targetRunningEGT - this.state.egt) * 2.5 * dt
+            : 0;
+        const cooling = (this.state.egt - ambT) * (1 / 30) * dt;
+        this.state.egt += heatInflow - cooling + (this.state.egtOffset || 0) * dt;
+        if (this.state.egt < ambT) this.state.egt = ambT;
+        if (this.state.egt > 1400) this.state.egt = 1400; // physical ceiling
 
-        // Apply EGT Rate from failure
+        // Accumulate EGT offset from failure — logarithmic rise (fast spike, slow sustained heat)
         if (this.failureParams.egt_rate !== 0) {
-            this.state.egtOffset = (this.state.egtOffset || 0) + this.failureParams.egt_rate * dt;
+            const t = (this.state.egtOffset || 0) / this.failureParams.egt_rate;
+            this.state.egtOffset = this.failureParams.egt_rate * Math.log1p(t + dt);
         }
 
         return this.getOutput();

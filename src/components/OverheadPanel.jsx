@@ -2,6 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { useLanguage } from '../contexts/LanguageContext.jsx';
 import './FlightPanel.css';
+import B738OverheadPanel from '../data/aircraft/b738/overheadPanel.jsx';
 
 const OverheadPanel = ({ onClose, flightState, onSystemAction, aircraftModel }) => {
   const { t } = useLanguage();
@@ -299,7 +300,7 @@ const OverheadPanel = ({ onClose, flightState, onSystemAction, aircraftModel }) 
       // Inactive (false) = Vertical (Closed/Off)
       return (
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', margin: '8px' }}>
-            <div 
+            <div
                 onClick={enabled ? onClick : undefined}
                 style={{
                     width: '36px', height: '36px', borderRadius: '50%',
@@ -330,6 +331,85 @@ const OverheadPanel = ({ onClose, flightState, onSystemAction, aircraftModel }) 
             </div>
             <div style={{ fontSize: '9px', marginTop: '4px', color: '#eee', fontWeight: 'bold' }}>{label}</div>
             {subLabel && <div style={{ fontSize: '8px', color: '#aaa' }}>{subLabel}</div>}
+        </div>
+      );
+  };
+
+  const ThreePositionVerticalSwitch = ({ label, value, onChange, enabled = true, annunciator }) => {
+      const positions = ['BAT', 'OFF', 'AUTO'];
+      const currentIndex = Math.max(0, positions.indexOf(value));
+      const leverTop = [6, 23, 40][currentIndex] ?? 23;
+
+      return (
+        <div className="metallic-switch-wrapper" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', margin: '4px 8px 8px' }}>
+          {annunciator && (
+            <div style={{ marginBottom: '6px' }}>
+              <Annunciator label={annunciator.label} active={annunciator.active} color={annunciator.color} />
+            </div>
+          )}
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '10px', fontSize: '8px', color: '#bfbfbf', fontWeight: 'bold', lineHeight: 1, minWidth: '26px' }}>
+              <span>BAT</span>
+              <span>OFF</span>
+              <span>AUTO</span>
+            </div>
+
+            <div
+              onClick={enabled ? () => onChange(positions[(currentIndex + 1) % positions.length]) : undefined}
+              style={{
+                width: '30px',
+                height: '64px',
+                position: 'relative',
+                cursor: enabled ? 'pointer' : 'default',
+                opacity: enabled ? 1 : 0.6
+              }}
+            >
+              <div style={{
+                position: 'absolute',
+                inset: '0',
+                background: 'linear-gradient(180deg, #8c8c8c, #4e4e4e 12%, #2b2b2b 88%, #111)',
+                border: '1px solid #5a5a5a',
+                borderRadius: '10px',
+                boxShadow: 'inset 0 0 10px #000, 0 1px 2px rgba(255,255,255,0.08)'
+              }}></div>
+              <div style={{
+                position: 'absolute',
+                left: '14px',
+                top: '8px',
+                bottom: '8px',
+                width: '2px',
+                background: 'rgba(255,255,255,0.14)'
+              }}></div>
+              {[8, 25, 42].map((top) => (
+                <div key={top} style={{
+                  position: 'absolute',
+                  left: '8px',
+                  top: `${top}px`,
+                  width: '14px',
+                  height: '1px',
+                  background: 'rgba(255,255,255,0.18)'
+                }}></div>
+              ))}
+              <div style={{
+                position: 'absolute',
+                top: `${leverTop}px`,
+                left: '5px',
+                width: '20px',
+                height: '18px',
+                background: 'linear-gradient(90deg, #c8c8c8, #fbfbfb, #9e9e9e)',
+                borderRadius: '9px',
+                border: '1px solid #7a7a7a',
+                boxShadow: '0 4px 6px rgba(0,0,0,0.55)',
+                transition: 'top 0.15s cubic-bezier(0.4, 0, 0.2, 1)',
+                zIndex: 2
+              }}>
+                <div style={{ width: '100%', height: '4px', background: 'rgba(255,255,255,0.85)', borderRadius: '9px 9px 0 0' }}></div>
+              </div>
+            </div>
+          </div>
+
+          <span style={{ fontSize: '10px', marginTop: '6px', color: '#eee', textAlign: 'center', fontWeight: 'bold', letterSpacing: '0.05em', textShadow: '0 1px 2px #000' }}>{label}</span>
         </div>
       );
   };
@@ -372,10 +452,10 @@ const OverheadPanel = ({ onClose, flightState, onSystemAction, aircraftModel }) 
                     {/* Vertical Lines Right */}
                     <line x1="62.5%" y1="25%" x2="62.5%" y2="50%" stroke={cPumpsOn ? '#0f0' : '#444'} strokeWidth="2" />
                     <line x1="87.5%" y1="25%" x2="87.5%" y2="75%" stroke={rPumpsOn ? '#0f0' : '#444'} strokeWidth="2" />
-                    
+
                     {/* Horizontal Crossfeed Manifold - Aligned with Row 2 (75%) */}
                     <line x1="12.5%" y1="75%" x2="87.5%" y2="75%" stroke={xFeedOpen ? '#0f0' : '#444'} strokeWidth="3" />
-                    
+
                     {/* Crossfeed Valve Circle */}
                     <circle cx="50%" cy="75%" r="18" stroke={xFeedOpen ? '#0f0' : '#444'} strokeWidth="2" fill="#1a1a1a" />
                  </svg>
@@ -424,76 +504,80 @@ const OverheadPanel = ({ onClose, flightState, onSystemAction, aircraftModel }) 
   const B737ElectricalPanel = () => {
     const dcVolts = getSys('electrical.dcVolts', 0);
     const acVolts = getSys('electrical.acVolts', 0);
-    const bat = getSys('electrical.battery');
-    
+    const batterySelector = getSys('electrical.batterySelector', getSys('electrical.battery') ? 'AUTO' : 'OFF');
+    const bat = batterySelector !== 'OFF';
+
     // Line Logic
     const gen1 = getSys('electrical.gen1');
     const gen2 = getSys('electrical.gen2');
     const apuGen = getSys('electrical.apuGen');
-    const busPowered = gen1 || gen2 || apuGen || bat;
+    const busPowered = dcVolts > 15 || acVolts > 100;
 
     return (
         <div className="panel-section" style={{ position: 'relative', display: 'flex', flexDirection: 'column' }}>
              <h4 className="panel-title">{t('ui.systems.electrics')}</h4>
-             
+
              {/* Meters */}
              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr auto 1fr 1fr', gap: '5px', marginBottom: '15px', background: '#111', padding: '5px', border: '1px solid #444' }}>
                  <div style={{ textAlign: 'center' }}>
                      <div style={{ fontSize: '9px', color: '#ccc' }}>DC AMPS</div>
-                     <div style={{ fontSize: '14px', color: '#0f0', fontFamily: 'monospace' }}>0</div>
+                     <div style={{ fontSize: '14px', color: '#0f0', fontFamily: 'monospace' }}>{busPowered ? '0' : ''}</div>
                  </div>
                  <div style={{ textAlign: 'center' }}>
                      <div style={{ fontSize: '9px', color: '#ccc' }}>DC VOLTS</div>
-                     <div style={{ fontSize: '14px', color: '#0f0', fontFamily: 'monospace' }}>{Math.round(dcVolts)}</div>
+                     <div style={{ fontSize: '14px', color: '#0f0', fontFamily: 'monospace' }}>{busPowered ? Math.round(dcVolts) : ''}</div>
                  </div>
                  <div style={{ width: '1px', background: '#444' }}></div>
                  <div style={{ textAlign: 'center' }}>
                      <div style={{ fontSize: '9px', color: '#ccc' }}>AC FREQ</div>
-                     <div style={{ fontSize: '14px', color: '#0f0', fontFamily: 'monospace' }}>400</div>
+                     <div style={{ fontSize: '14px', color: '#0f0', fontFamily: 'monospace' }}>{busPowered ? '400' : ''}</div>
                  </div>
                  <div style={{ textAlign: 'center' }}>
                      <div style={{ fontSize: '9px', color: '#ccc' }}>AC VOLTS</div>
-                     <div style={{ fontSize: '14px', color: '#0f0', fontFamily: 'monospace' }}>{Math.round(acVolts)}</div>
+                     <div style={{ fontSize: '14px', color: '#0f0', fontFamily: 'monospace' }}>{busPowered ? Math.round(acVolts) : ''}</div>
                  </div>
              </div>
 
              {/* Main Switch Grid */}
              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', rowGap: '20px', position: 'relative', paddingBottom: '10px' }}>
-                 
+
                  {/* Lines Overlay - Dynamic Green */}
                  <svg style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', pointerEvents: 'none', opacity: 0.8 }}>
                      {/* Battery Bus (Top) */}
                      <line x1="16.67%" y1="25%" x2="83.33%" y2="25%" stroke={bat ? '#0f0' : '#444'} strokeWidth="2" />
-                     
+
                      {/* Main Bus (Middle) */}
                      <line x1="16.67%" y1="50%" x2="83.33%" y2="50%" stroke={busPowered ? '#0f0' : '#444'} strokeWidth="2" />
-                     
+
                      {/* Gen 1 Line */}
-                     <line x1="16.67%" y1="75%" x2="16.67%" y2="50%" stroke={gen1 ? '#0f0' : '#444'} strokeWidth="2" />
-                     
+                     <line x1="16.67%" y1="75%" x2="16.67%" y2="50%" stroke={gen1 && busPowered ? '#0f0' : '#444'} strokeWidth="2" />
+
                      {/* Gen 2 Line */}
-                     <line x1="83.33%" y1="75%" x2="83.33%" y2="50%" stroke={gen2 ? '#0f0' : '#444'} strokeWidth="2" />
-                     
+                     <line x1="83.33%" y1="75%" x2="83.33%" y2="50%" stroke={gen2 && busPowered ? '#0f0' : '#444'} strokeWidth="2" />
+
                      {/* APU Gen Line */}
-                     <line x1="50%" y1="75%" x2="50%" y2="50%" stroke={apuGen ? '#0f0' : '#444'} strokeWidth="2" />
+                     <line x1="50%" y1="75%" x2="50%" y2="50%" stroke={apuGen && busPowered ? '#0f0' : '#444'} strokeWidth="2" />
                  </svg>
 
                  {/* Row 1: Battery & Standby */}
-                 <div style={{ justifySelf: 'center', zIndex: 1 }}>
-                     <Switch label="BAT" active={bat} onClick={() => onSystemAction('electrical', 'battery')} 
+                 <div style={{ justifySelf: 'center', zIndex: 1, marginTop: '6px' }}>
+                     <Switch label="BAT" active={bat} onClick={() => onSystemAction('electrical', 'batterySelector', bat ? 'OFF' : 'AUTO')}
                         subLabel={t('ui.systems.on')}
-                        annunciator={{ label: t('ui.systems.discharge'), active: !getSys('electrical.gen1') && bat, color: 'amber' }} 
+                        annunciator={{ label: t('ui.systems.discharge'), active: bat && !busPowered, color: 'amber' }}
                      />
                  </div>
-                 
-                 <div style={{ justifySelf: 'center', zIndex: 1 }}>
-                     {/* Empty Center Top */}
+
+                 <div style={{ justifySelf: 'center', zIndex: 1, marginTop: '2px' }}>
+                     <ThreePositionVerticalSwitch
+                        label="STBY PWR"
+                        value={batterySelector}
+                        onChange={(nextValue) => onSystemAction('electrical', 'batterySelector', nextValue)}
+                        annunciator={{ label: 'OFF', active: false, color: 'amber' }}
+                     />
                  </div>
 
                  <div style={{ justifySelf: 'center', zIndex: 1 }}>
-                     <RotarySelector label="STBY PWR" active={getSys('electrical.stbyPower')} onClick={() => onSystemAction('electrical', 'stbyPower')} 
-                        subLabel={t('ui.systems.auto')} 
-                     />
+                     <div style={{ width: '40px' }}></div>
                  </div>
 
                  {/* Row 2: Generators */}
@@ -726,8 +810,7 @@ const OverheadPanel = ({ onClose, flightState, onSystemAction, aircraftModel }) 
                      enabled={hasPower}
                 />
                 <div style={{ marginTop: '10px' }}>
-                    <Switch label="X-FEED" active={getSys('fuel.crossfeed')} onClick={() => onSystemAction('fuel', 'crossfeed')} subLabel="VALVE OPEN" 
-                        annunciator={{ label: 'VALVE OPEN', active: getSys('fuel.crossfeed'), color: 'blue' }}
+                    <RotarySelector label="X-FEED" active={getSys('fuel.crossfeed')} onClick={() => onSystemAction('fuel', 'crossfeed')} subLabel="VALVE"
                         enabled={hasPower}
                     />
                 </div>
@@ -1161,14 +1244,15 @@ const OverheadPanel = ({ onClose, flightState, onSystemAction, aircraftModel }) 
   };
 
   const B737IcePanel = () => {
+      const windowHeat = getSys('ice.windowHeat', false);
       return (
           <div className="panel-section">
               <h4 className="panel-title">WINDOW HEAT</h4>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '4px', marginBottom: '8px' }}>
-                  <Switch label="L SIDE" active={true} onClick={() => {}} subLabel="ON" />
-                  <Switch label="L FWD" active={true} onClick={() => {}} subLabel="ON" />
-                  <Switch label="R FWD" active={true} onClick={() => {}} subLabel="ON" />
-                  <Switch label="R SIDE" active={true} onClick={() => {}} subLabel="ON" />
+                  <Switch label="L SIDE" active={windowHeat} onClick={() => onSystemAction('ice', 'windowHeat')} subLabel="ON" />
+                  <Switch label="L FWD" active={windowHeat} onClick={() => onSystemAction('ice', 'windowHeat')} subLabel="ON" />
+                  <Switch label="R FWD" active={windowHeat} onClick={() => onSystemAction('ice', 'windowHeat')} subLabel="ON" />
+                  <Switch label="R SIDE" active={windowHeat} onClick={() => onSystemAction('ice', 'windowHeat')} subLabel="ON" />
               </div>
               <div style={{ display: 'flex', justifyContent: 'center', gap: '10px', marginBottom: '8px', borderTop: '1px solid #444', paddingTop: '4px' }}>
                   <Switch label="PROBE A" active={getSys('ice.probeHeat', true)} onClick={() => onSystemAction('ice', 'probeHeat')} subLabel="ON" />
@@ -1242,8 +1326,8 @@ const OverheadPanel = ({ onClose, flightState, onSystemAction, aircraftModel }) 
                       <Switch label="NO SMOKE" active={getSys('signs.noSmoking')} onClick={() => onSystemAction('signs', 'noSmoking')} 
                           subLabel="ON" invertLight={true}
                       />
-                      <Switch label="ATTEND" active={false} onClick={() => {}} subLabel="CALL" />
-                      <Switch label="GRD CALL" active={false} onClick={() => {}} subLabel="CALL" />
+                      <Switch label="ATTEND" active={getSys('signs.attend')} onClick={() => onSystemAction('signs', 'attend')} subLabel="CALL" />
+                      <Switch label="GRD CALL" active={getSys('signs.groundCall')} onClick={() => onSystemAction('signs', 'groundCall')} subLabel="CALL" />
                   </div>
               </div>
           </div>
@@ -1339,6 +1423,7 @@ const OverheadPanel = ({ onClose, flightState, onSystemAction, aircraftModel }) 
                    <PneumaticPanel />
                    <B737MiscPanel />
                    <LightsPanel />
+                   <WipersPanel />
               </div>
           </div>
       );
@@ -1424,7 +1509,7 @@ const OverheadPanel = ({ onClose, flightState, onSystemAction, aircraftModel }) 
                </div>
              )}
             {is737 && !isAirbus && (
-              <B737Overhead />
+              <B738OverheadPanel flightState={flightState} onSystemAction={onSystemAction} onClose={onClose} />
             )}
             {isOtherBoeing && !isAirbus && !is737 && (
               <BoeingOverhead />

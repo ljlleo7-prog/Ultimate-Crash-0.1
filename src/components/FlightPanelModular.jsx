@@ -9,6 +9,8 @@ import ModernAutopilotModule from './ModernAutopilotModule';
 import CommunicationModule from './CommunicationModule';
 import FlightPosePanel from './FlightPosePanel';
 import NavigationPanel from './NavigationPanel';
+import BoeingRadar from './radar/BoeingRadar';
+import AirbusRadar from './radar/AirbusRadar';
 import CentralPanel from './CentralPanel';
 import ControlSurfacePanel from './ControlSurfacePanel';
 import OverheadPanel from './OverheadPanel';
@@ -26,17 +28,22 @@ import FMA from './autoflight/FMA.jsx';
 import { useLanguage } from '../contexts/LanguageContext';
 import './FlightPanel.css';
 
-const FlightPanelModular = ({ flightData, physicsState, physicsService, weatherData, onActionRequest, aircraftModel, aircraftData, selectedArrival, flightPlan, radioMessages, onRadioFreqChange, npcs, frequencyContext, currentRegion, timeScale, setTimeScale, onUpdateFlightPlan, availableRunways, startupStatus, playerSettings, playerSettingsError, autoSaveStatus, onUpdatePlayerSettings }) => {
+const FlightPanelModular = ({ flightData, physicsState, physicsService, weatherData, onActionRequest, aircraftModel, aircraftData, selectedArrival, flightPlan, radioMessages, onRadioFreqChange, npcs, frequencyContext, currentRegion, timeScale, setTimeScale, onUpdateFlightPlan, availableRunways, startupStatus, playerSettings, playerSettingsError, autoSaveStatus, onUpdatePlayerSettings, ilsRunwayOptions = [] }) => {
   const { t } = useLanguage();
+  const isAirbus = ((aircraftModel || '').toLowerCase().includes('a3') || (aircraftModel || '').toLowerCase().includes('airbus'));
+  const efisFontClass = isAirbus ? 'efis-font-airbus' : 'efis-font-boeing';
+  const efisFontFamily = isAirbus ? 'Courier New, monospace' : 'monospace';
   const resolvedTrueAirspeed = Number.isFinite(flightData?.trueAirspeed)
     ? flightData.trueAirspeed
-    : (Number.isFinite(flightData?.derived?.airspeed) ? flightData.derived.airspeed : (Number.isFinite(flightData?.airspeed) ? flightData.airspeed : 450));
+    : (Number.isFinite(flightData?.derived?.trueAirspeed) ? flightData.derived.trueAirspeed : 450);
   const resolvedGroundSpeed = Number.isFinite(flightData?.groundSpeed)
     ? flightData.groundSpeed
     : (Number.isFinite(flightData?.derived?.groundSpeed) ? flightData.derived.groundSpeed : 430);
   const resolvedIndicatedAirspeed = Number.isFinite(flightData?.indicatedAirspeed)
     ? flightData.indicatedAirspeed
-    : (Number.isFinite(flightData?.derived?.airspeed) ? flightData.derived.airspeed : 280);
+    : (Number.isFinite(flightData?.derived?.indicatedAirspeed)
+        ? flightData.derived.indicatedAirspeed
+        : (Number.isFinite(flightData?.airspeed) ? flightData.airspeed : 280));
   // Use flightData from parent component instead of creating own physics service
   const [showOverhead, setShowOverhead] = useState(false);
   const [showCircuitBreakers, setShowCircuitBreakers] = useState(false);
@@ -92,6 +99,7 @@ const FlightPanelModular = ({ flightData, physicsState, physicsService, weatherD
     },
     autopilotFma: flightData?.autopilot?.fma || null,
     derived: flightData?.derived ?? null,
+    environment: flightData?.environment ?? {},
 
     // Surface Controls State
     flapsPosition: 'up',
@@ -196,7 +204,8 @@ const FlightPanelModular = ({ flightData, physicsState, physicsService, weatherD
           frame: typeof flightData.frame === 'number' ? flightData.frame : prevState.frame,
           systems: flightData.systems ?? prevState.systems ?? {},
           currentWaypointIndex: flightData.currentWaypointIndex !== undefined ? flightData.currentWaypointIndex : (prevState.currentWaypointIndex || 0),
-          derived: flightData.derived ?? prevState.derived ?? null
+          derived: flightData.derived ?? prevState.derived ?? null,
+          environment: flightData.environment ?? prevState.environment ?? {}
         };
 
         return nextState;
@@ -368,7 +377,7 @@ const FlightPanelModular = ({ flightData, physicsState, physicsService, weatherD
     // Show this mode if physics is off OR if we are in a narrative-heavy phase (like Boarding)
     const isNarrativePhase = ['BOARDING', 'DEPARTURE_CLEARANCE'].includes(flightState.flightPhase);
     
-    if (!flightState.physicsActive || isNarrativePhase) {
+    if (!flightState.physicsActive && !showOverhead) {
       return React.createElement('div', { 
         className: 'immersive-mode',
         style: {
@@ -557,6 +566,7 @@ const FlightPanelModular = ({ flightData, physicsState, physicsService, weatherD
           setAutopilotMode,
           setAltimeter: (val) => setFlightState(prev => ({ ...prev, altimeter: val })),
           frequencyContext, // Pass frequency context for ILS availability
+          efisFontFamily,
           availableRunways,
           selectedArrival,
           setILSRunway
@@ -576,16 +586,18 @@ const FlightPanelModular = ({ flightData, physicsState, physicsService, weatherD
       ),
       
       // Three parallel panels
-      React.createElement('div', { className: 'main-panels' },
+      React.createElement('div', { className: `main-panels ${efisFontClass}` },
         // Flight Pose Panel (Left)
-        React.createElement(FlightPosePanel, { flightState }),
-        
+        React.createElement(FlightPosePanel, { flightState, efisFontFamily }),
+
         // Navigation Panel (Middle)
-        React.createElement(NavigationPanel, { flightState, selectedArrival, flightPlan, npcs }),
-        
+        React.createElement(isAirbus ? AirbusRadar : BoeingRadar, { flightState, selectedArrival, flightPlan, npcs, weatherData, efisFontFamily }),
+
         // Central Panel (Right)
-        React.createElement(CentralPanel, { 
+        React.createElement(CentralPanel, {
           flightState,
+          aircraftModel,
+          efisFontFamily,
           onToggleSystems: () => setShowOverhead(prev => !prev),
           onToggleBreakers: () => setShowCircuitBreakers(prev => !prev)
         })
@@ -602,7 +614,7 @@ const FlightPanelModular = ({ flightData, physicsState, physicsService, weatherD
           React.createElement(RudderPedal, { controlYaw, flightState })
         ),
         React.createElement('div', { className: 'thrust-manager-wrapper' },
-          React.createElement(ThrustManager, { controlThrust, flightState })
+          React.createElement(ThrustManager, { controlThrust, flightState, onSystemAction: handleSystemAction })
         ),
         React.createElement(ControlSurfacePanel, {
           controlFlaps,
@@ -610,8 +622,10 @@ const FlightPanelModular = ({ flightData, physicsState, physicsService, weatherD
           controlAirBrakes,
           controlWheelBrakes,
           controlTrim: (payload) => onActionRequest('trim', payload),
+          controlNavFrequency: (payload) => onActionRequest('set-nav-frequency', payload),
           flightState,
-          aircraftModel
+          aircraftModel,
+          ilsRunwayOptions
         })
       )
     );

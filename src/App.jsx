@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import './App.css';
 import useAirportSearch from './hooks/useAirportSearch';
 import aircraftService from './services/aircraftService';
@@ -8,7 +8,7 @@ import FlightInProgress from './components/FlightInProgress.jsx';
 import RouteSelectionFrame from './components/RouteSelectionFrame.jsx';
 import NarrativeScene from './components/NarrativeScene.jsx';
 import { generateInitialWeather } from './services/weatherService';
-import { getRunwayHeading } from './utils/routeGenerator';
+import { generateGate, generateSID, generateSTAR, generateSmartRouteDetails, generateTaxiway, getLastProcedureWaypoint, getRunways, getRunwayHeading } from './utils/routeGenerator';
 
 import { FadeOverlay, CinematicReview } from './components/CinematicComponents.jsx';
 import { LanguageProvider } from './contexts/LanguageContext';
@@ -16,9 +16,11 @@ import LanguageSwitcher from './components/LanguageSwitcher';
 import Header from './components/Header';
 import HomePage from './components/HomePage';
 import TutorialHub from './components/TutorialHub';
+import ChallengesHub from './components/ChallengesHub';
 import FMCPanel from './components/fmc/FMCPanel';
 import { airportService } from './services/airportService';
 import { TUTORIALS } from './data/tutorialCatalog';
+import { CHALLENGES } from './data/challengeCatalog';
 import { cloudSaveService } from './services/cloudSaveService.js';
 import { getSupabaseUser, supabase } from './services/skylinetragedy/SupabaseClient.js';
 
@@ -111,13 +113,39 @@ const normalizeRouteDetails = (routeDetails, selectedDeparture, selectedArrival)
 
   const baseWaypoints = (normalized.waypoints || []).map(normalizeWaypoint).filter(Boolean);
   const hasRunwayFix = baseWaypoints.some((waypoint) => waypoint.type === 'RUNWAY_FIX' || waypoint.name === normalized.landingRunway);
-  const finalWaypoints = normalized.landingRunway && !hasRunwayFix
-    ? [...baseWaypoints, ...buildApproachWaypoints(selectedArrival, selectedDeparture, normalized.landingRunway)]
-    : baseWaypoints;
+  const approachWaypoints = normalized.landingRunway && !hasRunwayFix
+    ? buildApproachWaypoints(selectedArrival, selectedDeparture, normalized.landingRunway)
+    : [];
+  const finalWaypoints = [...baseWaypoints, ...approachWaypoints];
+  const baseRouteObject = normalized.routeObject || null;
+  const routeObject = baseRouteObject ? {
+    ...baseRouteObject,
+    waypoints: finalWaypoints,
+    legs: [
+      ...(Array.isArray(baseRouteObject.legs) ? baseRouteObject.legs : []),
+      ...approachWaypoints.map((waypoint, index) => ({
+        from: index === 0 ? (baseWaypoints[baseWaypoints.length - 1]?.name || selectedDeparture?.icao || selectedDeparture?.iata || 'ENROUTE') : approachWaypoints[index - 1]?.name,
+        to: waypoint.name,
+        type: waypoint.type || 'fix',
+        altitude: waypoint.altitude || null,
+        speed: waypoint.speed || null,
+        source: baseRouteObject.source || normalized.routeSource || 'Built-in',
+        provider: baseRouteObject.source || normalized.routeSource || 'Built-in',
+        latitude: waypoint.latitude,
+        longitude: waypoint.longitude,
+        sequence: (baseRouteObject.legs?.length || 0) + index + 1
+      }))
+    ]
+  } : null;
 
   return {
     ...normalized,
-    waypoints: finalWaypoints
+    waypoints: finalWaypoints,
+    routeObject,
+    routeSource: normalized.routeSource || routeObject?.source || '',
+    routeFallbackUsed: Boolean(normalized.routeFallbackUsed || routeObject?.fallbackUsed),
+    routeDebug: normalized.routeDebug || routeObject?.debug || [],
+    routeBilling: normalized.routeBilling || routeObject?.billing || null
   };
 };
 
@@ -126,12 +154,17 @@ const mergeFlightPlanWithRoute = (flightPlan, routeDetails) => {
 
   const normalizedRoute = routeDetails ? {
     ...routeDetails,
-    waypoints: (routeDetails.waypoints || []).map(normalizeWaypoint).filter(Boolean)
+    waypoints: (routeDetails.waypoints || []).map(normalizeWaypoint).filter(Boolean),
+    routeObject: routeDetails.routeObject ? {
+      ...routeDetails.routeObject,
+      waypoints: (routeDetails.routeObject.waypoints || []).map(normalizeWaypoint).filter(Boolean)
+    } : null
   } : null;
 
   return {
     ...flightPlan,
     waypoints: normalizedRoute?.waypoints?.length ? normalizedRoute.waypoints : (flightPlan.waypoints || []).map(normalizeWaypoint).filter(Boolean),
+    routeObject: normalizedRoute?.routeObject || null,
     departure: {
       ...flightPlan.departure,
       runways: normalizedRoute?.departureRunway ? [{ name: normalizedRoute.departureRunway }] : flightPlan.departure?.runways
@@ -144,6 +177,51 @@ const mergeFlightPlanWithRoute = (flightPlan, routeDetails) => {
 };
 
 const isPositiveNumber = (value) => Number.isFinite(Number(value)) && Number(value) > 0;
+
+const isSameAirport = (departure, arrival) => {
+  if (!departure || !arrival) return false;
+  const departureCode = departure.icao || departure.iata || departure.name;
+  const arrivalCode = arrival.icao || arrival.iata || arrival.name;
+  return departureCode && arrivalCode && departureCode === arrivalCode;
+};
+
+const buildAutoRouteDetails = async (departure, arrival, previousRouteDetails = DEFAULT_ROUTE_DETAILS) => {
+  if (!departure || !arrival || isSameAirport(departure, arrival)) {
+    return normalizeRouteDetails(previousRouteDetails, departure, arrival);
+  }
+
+  const routeObject = await generateSmartRouteDetails(departure, arrival);
+  const waypoints = (routeObject.waypoints || []).map(normalizeWaypoint).filter(Boolean);
+  const firstWaypoint = waypoints[0]?.name || waypoints[0]?.label || '';
+  const lastWaypoint = getLastProcedureWaypoint(waypoints);
+  const isEastward = arrival.longitude > departure.longitude;
+  const departureRunways = getRunways(departure);
+  const arrivalRunways = getRunways(arrival);
+  const departureRunway = departureRunways[0] || '';
+  const landingRunway = arrivalRunways.find((runway) => {
+    const heading = getRunwayHeading(runway, isEastward);
+    return isEastward ? heading < 180 : heading >= 180;
+  }) || arrivalRunways[0] || '';
+
+  return normalizeRouteDetails({
+    ...DEFAULT_ROUTE_DETAILS,
+    alternate: previousRouteDetails?.alternate || null,
+    departureGate: generateGate(),
+    departureTaxiway: generateTaxiway(),
+    departureRunway,
+    sid: firstWaypoint ? generateSID(firstWaypoint) : '',
+    waypoints,
+    star: lastWaypoint ? generateSTAR(lastWaypoint) : '',
+    landingRunway,
+    landingTaxiway: generateTaxiway(),
+    arrivalGate: generateGate(),
+    routeObject,
+    routeSource: routeObject.source,
+    routeFallbackUsed: routeObject.fallbackUsed,
+    routeDebug: routeObject.debug || [],
+    routeBilling: routeObject.billing || null
+  }, departure, arrival);
+};
 
 function App() {
   const [devMode, setDevMode] = useState(false);
@@ -172,6 +250,7 @@ function App() {
 
   const [flightInitialized, setFlightInitialized] = useState(false);
   const [activeTutorial, setActiveTutorial] = useState(null);
+  const [activeChallenge, setActiveChallenge] = useState(null);
   const [resumeSave, setResumeSave] = useState(null);
   const [resumeCheckLoading, setResumeCheckLoading] = useState(false);
   const [resumeCheckError, setResumeCheckError] = useState(null);
@@ -205,6 +284,7 @@ function App() {
   const [departureQuery, setDepartureQuery] = useState('');
   const [arrivalQuery, setArrivalQuery] = useState('');
   const [alternateQuery, setAlternateQuery] = useState('');
+  const routeGenerationRequestRef = useRef(0);
 
   const offlineMode = appSettings.offlineMode;
 
@@ -234,24 +314,47 @@ function App() {
     }));
   };
 
+  const regenerateRouteDetails = async (departure, arrival, previousRouteDetails) => {
+    const requestId = routeGenerationRequestRef.current + 1;
+    routeGenerationRequestRef.current = requestId;
+    const nextRouteDetails = await buildAutoRouteDetails(departure, arrival, previousRouteDetails);
+    if (routeGenerationRequestRef.current !== requestId) return;
+    setPreflightConfig((prev) => ({
+      ...prev,
+      routeDetails: nextRouteDetails
+    }));
+  };
+
   const setPreflightDeparture = (airport) => {
     selectDeparture(airport);
     setDepartureQuery('');
+    const routeDetails = normalizeRouteDetails(preflightConfig.routeDetails, airport, preflightConfig.selectedArrival);
     setPreflightConfig((prev) => ({
       ...prev,
       selectedDeparture: airport,
-      routeDetails: normalizeRouteDetails(prev.routeDetails, airport, prev.selectedArrival)
+      routeDetails
     }));
+    if (airport && preflightConfig.selectedArrival && !isSameAirport(airport, preflightConfig.selectedArrival)) {
+      regenerateRouteDetails(airport, preflightConfig.selectedArrival, routeDetails);
+    } else {
+      routeGenerationRequestRef.current += 1;
+    }
   };
 
   const setPreflightArrival = (airport) => {
     selectArrival(airport);
     setArrivalQuery('');
+    const routeDetails = normalizeRouteDetails(preflightConfig.routeDetails, preflightConfig.selectedDeparture, airport);
     setPreflightConfig((prev) => ({
       ...prev,
       selectedArrival: airport,
-      routeDetails: normalizeRouteDetails(prev.routeDetails, prev.selectedDeparture, airport)
+      routeDetails
     }));
+    if (preflightConfig.selectedDeparture && airport && !isSameAirport(preflightConfig.selectedDeparture, airport)) {
+      regenerateRouteDetails(preflightConfig.selectedDeparture, airport, routeDetails);
+    } else {
+      routeGenerationRequestRef.current += 1;
+    }
   };
 
   const setPreflightAlternate = (airport) => {
@@ -557,7 +660,7 @@ function App() {
     }
 
     const departureAirport = preflightConfig.selectedDeparture;
-    if (departureAirport) {
+    if (departureAirport && offlineMode) {
       const initialWeather = generateInitialWeather(
         departureAirport.latitude,
         departureAirport.longitude,
@@ -598,43 +701,80 @@ function App() {
     setAppMode('init');
     setIsTutorial(false);
     setActiveTutorial(null);
+    setActiveChallenge(null);
   };
 
   const handleStartTutorial = () => {
     setAppMode('tutorial-hub');
     setIsTutorial(false);
     setActiveTutorial(null);
+    setActiveChallenge(null);
   };
 
-  const handleLaunchTutorial = (tutorial) => {
-    const dep = getAirportByCode(tutorial.departureCode);
-    const arr = getAirportByCode(tutorial.arrivalCode);
+  const handleStartChallenges = () => {
+    setAppMode('challenge-hub');
+    setIsTutorial(false);
+    setActiveTutorial(null);
+    setActiveChallenge(null);
+  };
+
+  const launchScenario = async (scenario, mode = 'tutorial') => {
+    const dep = getAirportByCode(scenario.departureCode);
+    const arr = getAirportByCode(scenario.arrivalCode);
 
     if (!dep || !arr) {
-      alert('Could not load tutorial airports. Please try again.');
+      alert(`Could not load ${mode} airports. Please try again.`);
       return;
     }
 
     const launchRouteDetails = normalizeRouteDetails(
-      tutorial.launchConfig?.routeDetails || DEFAULT_ROUTE_DETAILS,
+      scenario.launchConfig?.routeDetails || DEFAULT_ROUTE_DETAILS,
       dep,
       arr
     );
 
-    setIsTutorial(true);
-    setActiveTutorial(tutorial);
-    setDifficulty(tutorial.launchConfig?.difficulty || 'rookie');
-    setFailureType(tutorial.launchConfig?.failureType || 'none');
-    setWeatherData(tutorial.launchConfig?.weatherData || DEFAULT_WEATHER);
+    let scenarioFlightPlan = null;
+    try {
+      scenarioFlightPlan = await calculateFlightPlan(
+        dep,
+        arr,
+        scenario.launchConfig?.aircraftModel || aircraftModel,
+        preflightConfig.payload,
+        preflightConfig.fuelReserve
+      );
+    } catch (error) {
+      console.error(`Error calculating ${mode} flight plan:`, error);
+    }
+
+    if (!scenarioFlightPlan?.fuel?.totalFuel) {
+      scenarioFlightPlan = {
+        ...(scenarioFlightPlan || {}),
+        fuel: {
+          ...(scenarioFlightPlan?.fuel || {}),
+          totalFuel: 12000,
+          reserveFuel: scenarioFlightPlan?.fuel?.reserveFuel ?? 1200,
+          tripFuel: scenarioFlightPlan?.fuel?.tripFuel ?? 10800,
+          fuelSufficient: true
+        }
+      };
+    }
+
+    setIsTutorial(mode === 'tutorial');
+    setActiveTutorial(mode === 'tutorial' ? scenario : null);
+    setActiveChallenge(mode === 'challenge' ? scenario : null);
+    setDifficulty(scenario.launchConfig?.difficulty || 'rookie');
+    setFailureType(scenario.launchConfig?.failureType || 'none');
+    setWeatherData(scenario.launchConfig?.weatherData || DEFAULT_WEATHER);
     setPreflightDeparture(dep);
     setPreflightArrival(arr);
     setPreflightConfig((prev) => ({
       ...prev,
-      aircraftModel: tutorial.launchConfig?.aircraftModel || prev.aircraftModel,
-      weatherData: tutorial.launchConfig?.weatherData || DEFAULT_WEATHER,
+      aircraftModel: scenario.launchConfig?.aircraftModel || prev.aircraftModel,
+      weatherData: scenario.launchConfig?.weatherData || DEFAULT_WEATHER,
       selectedDeparture: dep,
       selectedArrival: arr,
-      routeDetails: launchRouteDetails
+      routeDetails: launchRouteDetails,
+      flightPlan: scenarioFlightPlan
     }));
     setCinematicPhase('none');
 
@@ -642,6 +782,14 @@ function App() {
       setFlightInitialized(true);
       setAppMode('simulation');
     }, 100);
+  };
+
+  const handleLaunchTutorial = async (tutorial) => {
+    await launchScenario(tutorial, 'tutorial');
+  };
+
+  const handleLaunchChallenge = async (challenge) => {
+    await launchScenario(challenge, 'challenge');
   };
 
   const handleOpenSettings = () => {
@@ -663,6 +811,7 @@ function App() {
   const handleTutorialClose = () => {
     setIsTutorial(false);
     setActiveTutorial(null);
+    setActiveChallenge(null);
     setFlightInitialized(false);
     setAppMode('home');
     updatePreflightConfig({ flightPlan: null, routeDetails: DEFAULT_ROUTE_DETAILS });
@@ -759,6 +908,7 @@ function App() {
           routeDetails={runtimeRouteDetails}
           isTutorial={isTutorial}
           activeTutorial={activeTutorial}
+          activeChallenge={activeChallenge}
           onTutorialClose={handleTutorialClose}
           offlineMode={offlineMode}
         />
@@ -855,11 +1005,25 @@ function App() {
     );
   }
 
+  if (appMode === 'challenge-hub') {
+    return (
+      <LanguageProvider>
+        <LanguageSwitcher style={{ position: 'fixed', top: '20px', right: '20px', zIndex: 2000 }} />
+        <ChallengesHub
+          challenges={CHALLENGES}
+          onLaunchChallenge={handleLaunchChallenge}
+          onBack={() => setAppMode('home')}
+        />
+      </LanguageProvider>
+    );
+  }
+
   return (
     <LanguageProvider>
       <HomePage
         onStartSinglePlayer={handleStartSinglePlayer}
         onStartTutorial={handleStartTutorial}
+        onStartChallenges={handleStartChallenges}
         onOpenSettings={handleOpenSettings}
       />
       {showSettings && (

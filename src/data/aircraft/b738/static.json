@@ -1,0 +1,163 @@
+{
+  "model": "Boeing 737-800",
+  "type": "Narrow-body",
+  "manufacturer": "Boeing",
+  "iata": "738",
+  "icao": "B738",
+  "overheadLayoutId": "boeing_737_800_overhead",
+  "maxRange": 3200,
+  "cruiseSpeed": 450,
+  "fuelConsumption": 2500,
+  "maxFuelCapacity": 26020,
+  "maxPayload": 18900,
+  "maxPassengers": 189,
+  "typicalFuelBurn": 5.4,
+  "takeoffDistance": 2400,
+  "landingDistance": 1600,
+  "engineType": "CFM56-7B",
+  "engineCount": 2,
+  "hydraulicCount": 2,
+  "category": "Medium-haul",
+  "wingArea": 125,
+  "wingSpan": 35.8,
+  "aspectRatio": 9.4,
+  "maxLiftCoefficient": 1.6,
+  "stallSpeed": 125,
+  "maxOperatingMach": 0.82,
+  "emptyWeight": 41400,
+  "maxTakeoffWeight": 79000,
+  "maxThrustPerEngine": 120000,
+  "maxN1": 102.7,
+  "operationalMaxN1": 98.4,
+  "emergencyMaxN1": 102.7,
+  "egtYellow": 750,
+  "egtRed": 850,
+  "fadec": false,
+  "liftCurveSlope": 5.7,
+  "zeroLiftDragCoefficient": 0.025,
+  "inducedDragFactor": 0.04,
+  "basicLiftCoefficient": 0.5,
+  "horizontalStabilizerArea": 25,
+  "horizontalStabilizerCL": -0.08,
+  "horizontalStabilizerMomentArm": 12.5,
+  "aerodynamicCenterPosition": 0.25,
+  "centerOfGravityPosition": 0.15,
+  "dragCenterPosition": 0.75,
+  "controlPower": {
+    "x": 1.2,
+    "y": 1.5,
+    "z": 1
+  },
+  "specificFuelConsumption": 0.000013,
+  "elevatorEffectiveness": 0.00105,
+  "aileronEffectiveness": 0.00052,
+  "rudderEffectiveness": 0.00031,
+  "sideForceCoefficient": 0.00021,
+  "initialCruiseThrottle": 0.56,
+  "pidParameters": {
+    "altitude": {
+      "Kp": 0.00082,
+      "Ki": 0.000105,
+      "Kd": 0.0021,
+      "min": -0.31,
+      "max": 0.31
+    },
+    "speed": {
+      "Kp": 0.52,
+      "Ki": 0.052,
+      "Kd": 0.105,
+      "min": -0.52,
+      "max": 0.52
+    },
+    "heading": {
+      "Kp": 0.82,
+      "Ki": 0.105,
+      "Kd": 0.31,
+      "min": -0.52,
+      "max": 0.52
+    }
+  },
+  "momentOfInertiaRoll": 30000,
+  "momentOfInertiaPitch": 50000,
+  "momentOfInertiaYaw": 80000,
+  "flapProfile": {
+    "positions": [
+      {
+        "angle": 0,
+        "clIncrement": 0,
+        "cdIncrement": 0,
+        "label": "UP"
+      },
+      {
+        "angle": 1,
+        "clIncrement": 0.3,
+        "cdIncrement": 0.002,
+        "label": "1"
+      },
+      {
+        "angle": 5,
+        "clIncrement": 0.4,
+        "cdIncrement": 0.005,
+        "label": "5"
+      },
+      {
+        "angle": 10,
+        "clIncrement": 0.8,
+        "cdIncrement": 0.01,
+        "label": "10"
+      },
+      {
+        "angle": 15,
+        "clIncrement": 1,
+        "cdIncrement": 0.02,
+        "label": "15"
+      },
+      {
+        "angle": 25,
+        "clIncrement": 1.5,
+        "cdIncrement": 0.04,
+        "label": "25"
+      },
+      {
+        "angle": 30,
+        "clIncrement": 1.8,
+        "cdIncrement": 0.06,
+        "label": "30"
+      },
+      {
+        "angle": 40,
+        "clIncrement": 2.2,
+        "cdIncrement": 0.08,
+        "label": "40"
+      }
+    ]
+  },
+  "airbrakeProfile": {
+    "positions": [
+      {
+        "label": "RET",
+        "dragIncrement": 0,
+        "liftDecrement": 0
+      },
+      {
+        "label": "ARM",
+        "dragIncrement": 0.01,
+        "liftDecrement": -0.02
+      },
+      {
+        "label": "FLT",
+        "dragIncrement": 0.1,
+        "liftDecrement": -0.1
+      },
+      {
+        "label": "GND",
+        "dragIncrement": 0.25,
+        "liftDecrement": -0.2
+      }
+    ]
+  },
+  "minNoseGearFailedPitch": -0.2,
+  "maxGroundPitch": 0.3,
+  "groundCollisionPitchTorqueFactor": 0.5,
+  "gearHeight": 3.5
+}

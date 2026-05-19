@@ -1,26 +1,39 @@
 import React, { useRef, useEffect, useState, useMemo } from 'react';
+import LocalRouteMap from './LocalRouteMap';
 import { calculateDistance } from '../utils/distanceCalculator';
 import { airportService } from '../services/airportService';
 import { terrainRadarService } from '../services/TerrainRadarService';
+import { weatherRadarService } from '../services/WeatherRadarService';
 
 // Navigation Panel Component
-const NavigationPanel = ({ flightState, selectedArrival, flightPlan, npcs = [] }) => {
+const NavigationPanel = ({ flightState, selectedArrival, flightPlan, npcs = [], runwayGeometry, autopilotMode, weatherData, theme, showRangeRings = true, planeStyle = 'filled', efisFontFamily }) => {
   const radarCanvasRef = useRef(null);
   const lastTerrainUpdateRef = useRef(0);
+  const lastWeatherUpdateRef = useRef(0);
   const [mapRange, setMapRange] = useState(40); // Default 40nm
+  const [displayMode, setDisplayMode] = useState('terrain');
+  const [showLocalRouteMap, setShowLocalRouteMap] = useState(false);
 
   const groundSpeed = Number.isFinite(flightState?.groundSpeed)
     ? flightState.groundSpeed
     : (Number.isFinite(flightState?.derived?.groundSpeed) ? flightState.derived.groundSpeed : 0);
   const trueAirspeed = Number.isFinite(flightState?.trueAirspeed)
     ? flightState.trueAirspeed
-    : (Number.isFinite(flightState?.derived?.airspeed) ? flightState.derived.airspeed : (Number.isFinite(flightState?.airspeed) ? flightState.airspeed : 0));
+    : (Number.isFinite(flightState?.derived?.trueAirspeed)
+        ? flightState.derived.trueAirspeed
+        : 0);
+  const indicatedAirspeed = Number.isFinite(flightState?.indicatedAirspeed)
+    ? flightState.indicatedAirspeed
+    : (Number.isFinite(flightState?.derived?.indicatedAirspeed) ? flightState.derived.indicatedAirspeed : trueAirspeed);
   const heading = Number.isFinite(flightState?.heading) ? flightState.heading : 0;
   const altitude = Number.isFinite(flightState?.altitude) ? flightState.altitude : 0;
 
   const waypoints = useMemo(() => (
     Array.isArray(flightPlan?.waypoints) ? flightPlan.waypoints : []
   ), [flightPlan?.waypoints]);
+  const navigationPath = useMemo(() => (
+    Array.isArray(flightState?.navigationPath) ? flightState.navigationPath : []
+  ), [flightState?.navigationPath]);
 
   // Range options (Exponential)
   const rangeOptions = [5, 10, 20, 40, 80, 160, 320, 640];
@@ -54,11 +67,22 @@ const NavigationPanel = ({ flightState, selectedArrival, flightPlan, npcs = [] }
         // Clamp range to 80nm to prevent massive queue buildup and lag
         // The user can zoom out to 640nm, but we only fetch detailed terrain within 80nm
         const fetchRange = Math.min(mapRange, 80);
-        terrainRadarService.update(flightState.latitude, flightState.longitude, fetchRange);
+        terrainRadarService.update(flightState.latitude, flightState.longitude, fetchRange, heading);
         lastTerrainUpdateRef.current = now;
     }
     
   }, [flightState?.latitude, flightState?.longitude, mapRange]);
+
+  // Effect to update Weather Radar (throttled, coarser grid)
+  useEffect(() => {
+    if (!flightState?.latitude || !flightState?.longitude) return;
+    const now = Date.now();
+    if (now - lastWeatherUpdateRef.current > 30000) { // 30s — weather changes slowly
+      weatherRadarService.update(flightState.latitude, flightState.longitude, Math.min(mapRange, 160));
+      lastWeatherUpdateRef.current = now;
+    }
+  }, [flightState?.latitude, flightState?.longitude, mapRange]);
+
   const distanceToWaypoint = useMemo(() => {
     if (!flightState || !selectedArrival) {
       return 0;
@@ -136,7 +160,9 @@ const NavigationPanel = ({ flightState, selectedArrival, flightPlan, npcs = [] }
 
     const size = canvas.width;
     const center = size / 2;
-    const radius = size / 2 - 10;
+    const arcOriginY = size - 20;
+    const arcOriginX = center;
+    const radius = arcOriginY - 40;
 
     const toRad = (d) => d * Math.PI / 180;
     const toDeg = (r) => r * 180 / Math.PI;
@@ -167,11 +193,12 @@ const NavigationPanel = ({ flightState, selectedArrival, flightPlan, npcs = [] }
       return `rgba(0, 100, 0, ${alpha})`;
     };
 
+
     const drawRadar = () => {
       ctx.clearRect(0, 0, size, size);
 
       ctx.save();
-      ctx.translate(center, center);
+      ctx.translate(arcOriginX, arcOriginY);
       ctx.rotate((-heading * Math.PI / 180));
 
       // --- Draw Terrain ---
@@ -235,7 +262,38 @@ const NavigationPanel = ({ flightState, selectedArrival, flightPlan, npcs = [] }
       }
       // --- End Draw Terrain ---
 
-      // --- Draw Traffic (TCAS) ---
+      // --- Draw Weather Radar (WXR mode) ---
+      if (displayMode === 'weather' && flightState?.latitude && flightState?.longitude) {
+        const pxPerNm = radius / mapRange;
+        const gridSizeNm = weatherRadarService.GRID_SIZE * 60;
+        const gridSizePx = Math.ceil(gridSizeNm * pxPerNm);
+        const rangeDeg = mapRange / 60;
+        const startIdx = weatherRadarService.getGridIndices(flightState.latitude - rangeDeg, flightState.longitude - rangeDeg);
+        const endIdx   = weatherRadarService.getGridIndices(flightState.latitude + rangeDeg, flightState.longitude + rangeDeg);
+        for (let i = startIdx.latIdx; i <= endIdx.latIdx; i++) {
+          for (let j = startIdx.lonIdx; j <= endIdx.lonIdx; j++) {
+            const tileLat = (i + 0.5) * weatherRadarService.GRID_SIZE;
+            const tileLon = (j + 0.5) * weatherRadarService.GRID_SIZE;
+            const wx = weatherRadarService.getWeather(tileLat, tileLon);
+            if (!wx) continue;
+            const dLatNm = (tileLat - flightState.latitude) * 60;
+            const dLonNm = (tileLon - flightState.longitude) * 60 * Math.cos(flightState.latitude * Math.PI / 180);
+            const x = dLonNm * pxPerNm;
+            const y = -dLatNm * pxPerNm;
+            if (x*x + y*y >= radius*radius) continue;
+            // Color: green=light cloud, yellow=moderate, red=heavy precip
+            let color = null;
+            if (wx.precip > 5)       color = `rgba(255,0,0,${Math.min(0.85, 0.4 + wx.precip / 20)})`;
+            else if (wx.precip > 1)  color = `rgba(255,200,0,${Math.min(0.75, 0.3 + wx.precip / 10)})`;
+            else if (wx.cloud > 60)  color = `rgba(0,200,0,${Math.min(0.6, wx.cloud / 200)})`;
+            if (color) {
+              ctx.fillStyle = color;
+              ctx.fillRect(x - gridSizePx/2, y - gridSizePx/2, gridSizePx, gridSizePx);
+            }
+          }
+        }
+      }
+      // --- End Draw Weather Radar ---
       if (npcs && npcs.length > 0) {
           npcs.forEach(npc => {
             // Calculate relative position
@@ -309,25 +367,27 @@ const NavigationPanel = ({ flightState, selectedArrival, flightPlan, npcs = [] }
           });
       }
 
+
+      // Background fill + outer ring
       ctx.beginPath();
       ctx.arc(0, 0, radius, 0, Math.PI * 2);
-      // ctx.fillStyle = 'rgba(0, 50, 0, 0.5)'; // Old background
-      ctx.fillStyle = 'rgba(0, 20, 0, 0.2)'; // More transparent to see terrain
+      ctx.fillStyle = theme?.backgroundFill || 'rgba(0, 10, 20, 0.2)';
       ctx.fill();
-      ctx.strokeStyle = '#00ff00';
+      ctx.strokeStyle = theme?.outerRing || '#ffffff';
       ctx.lineWidth = 2;
       ctx.stroke();
-
-      ctx.strokeStyle = '#00aa00';
-      ctx.lineWidth = 1;
-      const ringCount = 4; // 4 rings
-      for (let i = 1; i <= ringCount; i++) {
-        ctx.beginPath();
-        ctx.arc(0, 0, radius * i / ringCount, 0, Math.PI * 2);
-        ctx.stroke();
+      if (showRangeRings) {
+        ctx.strokeStyle = theme?.ringColor || 'rgba(255,255,255,0.5)';
+        ctx.lineWidth = 1;
+        const ringCount = 4;
+        for (let i = 1; i <= ringCount; i++) {
+          ctx.beginPath();
+          ctx.arc(0, 0, radius * i / ringCount, 0, Math.PI * 2);
+          ctx.stroke();
+        }
       }
 
-      ctx.fillStyle = '#00ff00';
+      ctx.fillStyle = theme?.outerRing || '#ffffff';
       ctx.font = '12px Arial';
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
@@ -351,28 +411,36 @@ const NavigationPanel = ({ flightState, selectedArrival, flightPlan, npcs = [] }
           else if (i === 90) label = 'E';
           else if (i === 180) label = 'S';
           else if (i === 270) label = 'W';
-          
+
           ctx.save();
           ctx.translate(x, y);
           ctx.rotate(-angle);
-          ctx.rotate(heading * Math.PI / 180); // Counter-rotate to keep text upright
+          ctx.rotate(heading * Math.PI / 180);
           ctx.fillText(label, 0, 0);
           ctx.restore();
         } else if (i % 30 === 0) {
-          const numLabel = i.toString();
           ctx.save();
           ctx.translate(x, y);
           ctx.rotate(-angle);
-          ctx.rotate(heading * Math.PI / 180); // Counter-rotate
-          ctx.fillText(numLabel, 0, 0);
+          ctx.rotate(heading * Math.PI / 180);
+          ctx.fillText(i.toString(), 0, 0);
           ctx.restore();
         }
       }
 
       let alignmentBarData = null;
+      const ilsData = flightState?.autopilotDebug?.ils || null;
+      const ilsGuidanceActive = !!(ilsData?.active && Number.isFinite(ilsData?.locDeviationDeg));
       
-      // Draw Airports and Runways
-      if (nearbyRunways.length > 0 && typeof flightState?.latitude === 'number') {
+      if (ilsGuidanceActive) {
+        const relBearing = Math.max(-45, Math.min(45, -(ilsData.locDeviationDeg || 0) * 12));
+        alignmentBarData = {
+          relBearing,
+          source: 'ILS',
+          gsDeviationDeg: Number.isFinite(ilsData.gsDeviationDeg) ? ilsData.gsDeviationDeg : null,
+          runway: ilsData.runway || ''
+        };
+      } else if (nearbyRunways.length > 0 && typeof flightState?.latitude === 'number') {
         let closestRw = null;
         let minRwDist = Infinity;
         
@@ -455,12 +523,33 @@ const NavigationPanel = ({ flightState, selectedArrival, flightPlan, npcs = [] }
           if (relBearing > 180) relBearing -= 360;
 
           // Store for drawing outside rotation context
-          alignmentBarData = { relBearing };
+          alignmentBarData = { relBearing, source: 'RUNWAY' };
         }
       }
 
-      if (Array.isArray(waypoints) && waypoints.length > 0 && typeof flightState?.latitude === 'number' && typeof flightState?.longitude === 'number') {
-        const maxRangeNm = mapRange; 
+      if (Array.isArray(navigationPath) && navigationPath.length > 0 && typeof flightState?.latitude === 'number' && typeof flightState?.longitude === 'number') {
+        const maxRangeNm = mapRange;
+        const points = navigationPath.map((wp) => {
+          const distNm = calculateDistance(flightState.latitude, flightState.longitude, wp.latitude, wp.longitude);
+          const brg = bearingTo(flightState.latitude, flightState.longitude, wp.latitude, wp.longitude) * Math.PI / 180;
+          const r = Math.min(1, distNm / maxRangeNm) * radius;
+          const x = r * Math.sin(brg);
+          const y = -r * Math.cos(brg);
+          return { x, y, name: wp.name || wp.label || 'WPT', distNm };
+        });
+        if (points.length > 0) {
+          ctx.strokeStyle = '#d8b4fe';
+          ctx.lineWidth = 1.5;
+          ctx.beginPath();
+          ctx.setLineDash([]);
+          ctx.moveTo(0, 0);
+          for (let i = 0; i < points.length; i++) {
+            ctx.lineTo(points[i].x, points[i].y);
+          }
+          ctx.stroke();
+        }
+      } else if (Array.isArray(waypoints) && waypoints.length > 0 && typeof flightState?.latitude === 'number' && typeof flightState?.longitude === 'number') {
+        const maxRangeNm = mapRange;
         const points = waypoints.map(wp => {
           const distNm = calculateDistance(flightState.latitude, flightState.longitude, wp.latitude, wp.longitude);
           const brg = bearingTo(flightState.latitude, flightState.longitude, wp.latitude, wp.longitude) * Math.PI / 180;
@@ -470,9 +559,10 @@ const NavigationPanel = ({ flightState, selectedArrival, flightPlan, npcs = [] }
           return { x, y, name: wp.label || wp.name || 'WPT', distNm };
         });
         if (points.length > 0) {
-          ctx.strokeStyle = '#00ff88';
+          ctx.strokeStyle = '#d8b4fe';
           ctx.lineWidth = 1.5;
           ctx.beginPath();
+          ctx.setLineDash([]);
           ctx.moveTo(0, 0);
           for (let i = 0; i < points.length; i++) {
             ctx.lineTo(points[i].x, points[i].y);
@@ -480,88 +570,100 @@ const NavigationPanel = ({ flightState, selectedArrival, flightPlan, npcs = [] }
           ctx.stroke();
           for (let i = 0; i < points.length; i++) {
             const isNext = points[i].name === currentNextWaypointName;
-            ctx.beginPath();
-            ctx.arc(points[i].x, points[i].y, isNext ? 5 : 3, 0, Math.PI * 2);
-            ctx.fillStyle = isNext ? '#ffdd00' : '#00ff88';
-            ctx.fill();
-
-            // Draw label
-            ctx.save();
-            ctx.translate(points[i].x, points[i].y);
-            // Counter-rotate the label so it appears upright on screen
-            ctx.rotate(heading * Math.PI / 180);
-            
-            ctx.fillStyle = '#ffffff';
-            ctx.font = '10px Arial';
-            ctx.textAlign = 'center';
-            ctx.textBaseline = 'bottom';
-            ctx.fillText(points[i].name, 0, -8);
-            ctx.restore();
+            if (isNext) {
+              ctx.beginPath();
+              ctx.arc(points[i].x, points[i].y, 4, 0, Math.PI * 2);
+              ctx.fillStyle = '#d8b4fe';
+              ctx.fill();
+            }
           }
         }
       }
 
-      ctx.restore();
+      // Draw ILS approach path when ILS mode active
+      if (autopilotMode === 'ILS' && runwayGeometry && typeof flightState?.latitude === 'number') {
+        const { thresholdStart, heading: rwHdg } = runwayGeometry;
+        const approachHdg = (rwHdg + 180) % 360;
+        const pathLengthNm = 15;
+        const latRad = thresholdStart.latitude * Math.PI / 180;
+        const mPerLat = 111132.92;
+        const mPerLon = 111412.84 * Math.cos(latRad);
+        const dNorth = Math.cos(approachHdg * Math.PI / 180) * pathLengthNm * 1852;
+        const dEast = Math.sin(approachHdg * Math.PI / 180) * pathLengthNm * 1852;
+        const farLat = thresholdStart.latitude + dNorth / mPerLat;
+        const farLon = thresholdStart.longitude + dEast / mPerLon;
 
-      // Draw Runway Alignment Bar (Fixed on Screen)
-      if (alignmentBarData) {
-        const { relBearing } = alignmentBarData;
-        const barY = 20;
-        const barWidth = size * 0.8;
-        const barX = (size - barWidth) / 2;
-        
-        // Background Bar
+        const brgThresh = bearingTo(flightState.latitude, flightState.longitude, thresholdStart.latitude, thresholdStart.longitude) * Math.PI / 180;
+        const distThreshNm = calculateDistance(flightState.latitude, flightState.longitude, thresholdStart.latitude, thresholdStart.longitude);
+        const rThresh = Math.min(distThreshNm / mapRange, 2) * radius;
+        const xThresh = rThresh * Math.sin(brgThresh);
+        const yThresh = -rThresh * Math.cos(brgThresh);
+
+        const brgFar = bearingTo(flightState.latitude, flightState.longitude, farLat, farLon) * Math.PI / 180;
+        const distFarNm = calculateDistance(flightState.latitude, flightState.longitude, farLat, farLon);
+        const rFar = Math.min(distFarNm / mapRange, 2) * radius;
+        const xFar = rFar * Math.sin(brgFar);
+        const yFar = -rFar * Math.cos(brgFar);
+
+        ctx.strokeStyle = '#f59e0b';
+        ctx.lineWidth = 1.5;
+        ctx.setLineDash([8, 4]);
         ctx.beginPath();
-        ctx.rect(barX, barY - 2, barWidth, 4);
-        ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
-        ctx.fill();
-        ctx.strokeStyle = '#aaaaaa';
-        ctx.lineWidth = 1;
+        ctx.moveTo(xThresh, yThresh);
+        ctx.lineTo(xFar, yFar);
         ctx.stroke();
-        
-        // Center Tick (Straight Ahead)
-        ctx.beginPath();
-        ctx.moveTo(size / 2, barY - 5);
-        ctx.lineTo(size / 2, barY + 5);
-        ctx.strokeStyle = '#ffffff';
-        ctx.stroke();
-
-        // Indicator Position
-        const maxDeflection = 45; // Degrees for full scale
-        let xOffset = relBearing * (barWidth / 2) / maxDeflection;
-        
-        // Clamp
-        if (xOffset > barWidth / 2) xOffset = barWidth / 2;
-        if (xOffset < -barWidth / 2) xOffset = -barWidth / 2;
-        
-        const indX = size / 2 + xOffset;
-
-        // Color Logic
-        let indColor = '#00ff00';
-        if (Math.abs(relBearing) > 5) indColor = '#ffff00';
-        if (Math.abs(relBearing) > 15) indColor = '#ff0000';
-
-        // Draw Indicator (Rectangle/Diamond)
-        ctx.beginPath();
-        ctx.rect(indX - 4, barY - 6, 8, 12);
-        ctx.fillStyle = indColor;
-        ctx.fill();
-        ctx.strokeStyle = '#ffffff';
-        ctx.stroke();
+        ctx.setLineDash([]);
+        ctx.fillStyle = '#f59e0b';
+        ctx.font = '9px monospace';
+        ctx.fillText(`ILS ${rwHdg}°`, xFar + 4, yFar);
       }
 
+      ctx.restore();
+
+      // Runway alignment bar intentionally omitted from ND for cleaner layout
+
       ctx.save();
-      ctx.translate(center, center);
-      
+      ctx.translate(arcOriginX, arcOriginY);
+
       // Draw Aircraft Symbol (Fixed Upwards)
+      if (planeStyle === 'triangle') {
+        ctx.beginPath();
+        ctx.moveTo(0, -10);
+        ctx.lineTo(6, 5);
+        ctx.lineTo(-6, 5);
+        ctx.closePath();
+        ctx.strokeStyle = '#ffffff';
+        ctx.lineWidth = 1.5;
+        ctx.stroke();
+      } else if (planeStyle === 'airbus') {
+        // Small Airbus-like glyph resembling 士
+        ctx.strokeStyle = '#ffffff';
+        ctx.lineWidth = 1.4;
+        ctx.beginPath();
+        ctx.moveTo(0, -10);
+        ctx.lineTo(0, 8);
+        ctx.moveTo(-7, -2);
+        ctx.lineTo(7, -2);
+        ctx.moveTo(-4, 5);
+        ctx.lineTo(4, 5);
+        ctx.stroke();
+      } else {
+        ctx.beginPath();
+        ctx.moveTo(0, -10);
+        ctx.lineTo(6, 5);
+        ctx.lineTo(-6, 5);
+        ctx.closePath();
+        ctx.fillStyle = '#ffffff';
+        ctx.fill();
+      }
+
+      // White centerline
       ctx.beginPath();
-      ctx.moveTo(0, -10);
-      ctx.lineTo(6, 5);
-      ctx.lineTo(0, 0);
-      ctx.lineTo(-6, 5);
-      ctx.closePath();
-      ctx.fillStyle = '#ff0000'; // Red plane for visibility
-      ctx.fill();
+      ctx.moveTo(0, 0);
+      ctx.lineTo(0, -radius);
+      ctx.strokeStyle = theme?.centerline || '#ffffff';
+      ctx.lineWidth = 1;
+      ctx.stroke();
 
       ctx.restore();
       
@@ -577,103 +679,128 @@ const NavigationPanel = ({ flightState, selectedArrival, flightPlan, npcs = [] }
     };
 
     drawRadar();
-  }, [flightState, heading, altitude, waypoints, currentNextWaypointName, mapRange, nearbyRunways]);
+  }, [flightState, heading, altitude, waypoints, navigationPath, currentNextWaypointName, mapRange, nearbyRunways, displayMode]);
   
-  return React.createElement('div', { className: 'navigation-panel' },
+  const panelStyle = {
+    borderColor: theme?.panelBorder || '#666',
+    background: theme?.panelBackground || 'linear-gradient(135deg, #080c10 0%, #1a2030 100%)',
+    fontFamily: efisFontFamily || theme?.fontFamily || 'monospace'
+  };
+  const windDirection = Math.round(weatherData?.windDirection ?? flightState?.environment?.windDirection ?? 0);
+  const windSpeed = Math.round(weatherData?.windSpeed ?? flightState?.environment?.windSpeed ?? 0);
+  const infoColor = theme?.infoColor || '#ffffff';
+  const accentColor = theme?.accentColor || '#d8b4fe';
+  return React.createElement('div', { className: 'navigation-panel', style: panelStyle },
     React.createElement('div', { className: 'radar-display-container' },
-      React.createElement('div', { className: 'radar-top-info' },
-        React.createElement('div', { className: 'radar-speed-info' },
-          React.createElement('span', { className: 'label' }, 'TAS'),
-          React.createElement('span', { className: 'value' }, `${trueAirspeed.toFixed(0)}kts`),
-          React.createElement('span', { className: 'label' }, 'GS'),
-          React.createElement('span', { className: 'value' }, `${groundSpeed.toFixed(0)}kts`)
+      React.createElement('div', {
+        className: 'radar-top-info',
+        style: {
+          color: infoColor,
+          justifyContent: 'space-between',
+          alignItems: 'flex-start',
+          gap: '8px'
+        }
+      },
+        React.createElement('div', { style: { display: 'flex', flexDirection: 'column', gap: '2px', alignItems: 'flex-start', fontSize: '11px', color: infoColor } },
+          React.createElement('div', null, `GS ${groundSpeed.toFixed(0)}   TAS ${trueAirspeed.toFixed(0)}`),
+          React.createElement('div', null, `${String(((windDirection % 360) + 360) % 360).padStart(3, '0')}/${windSpeed}`)
         ),
-        React.createElement('div', { className: 'radar-heading-info' },
-          React.createElement('span', { className: 'value' }, `${heading.toFixed(0)}°`)
+        React.createElement('div', {
+          className: 'radar-heading-info',
+          style: {
+            border: `1px solid ${theme?.headingBorder || '#ffffff'}`,
+            padding: '2px 8px',
+            borderRadius: '2px',
+            color: theme?.headingText || '#ffffff',
+            background: 'rgba(0,0,0,0.35)',
+            fontWeight: 'bold',
+            lineHeight: 1.1,
+            textAlign: 'center'
+          }
+        },
+          React.createElement('div', { style: { fontSize: '10px', color: accentColor } }, 'HDG'),
+          React.createElement('div', { style: { fontSize: '18px' } }, `${Math.round(heading).toString().padStart(3, '0')}`)
         ),
-        React.createElement('div', { className: 'radar-waypoint-info' },
-          React.createElement('span', { className: 'label' }, 'NEXT WP'),
-          React.createElement('span', { className: 'value' }, `${currentNextWaypointName}`)
+        React.createElement('div', { style: { display: 'flex', flexDirection: 'column', gap: '2px', alignItems: 'flex-end', fontSize: '11px', color: infoColor } },
+          React.createElement('div', null, currentNextWaypointName),
+          React.createElement('div', null, `${currentDistanceToNextWaypoint.toFixed(1)} NM`)
         )
       ),
-      React.createElement('canvas', { ref: radarCanvasRef, className: 'radial-radar-canvas' })
+      React.createElement('canvas', {
+        ref: radarCanvasRef,
+        className: 'radial-radar-canvas',
+        style: { display: showLocalRouteMap ? 'none' : 'block' }
+      }),
+      showLocalRouteMap && React.createElement('div', {
+        style: {
+          position: 'absolute',
+          inset: 0,
+          paddingTop: '54px',
+          background: '#020617'
+        }
+      },
+        React.createElement(LocalRouteMap, {
+          departure: flightPlan?.departure,
+          arrival: selectedArrival || flightPlan?.arrival,
+          waypoints,
+          routeObject: flightPlan?.routeObject,
+          height: '100%',
+          followAircraft: true,
+          aircraftPosition: flightState
+        })
+      )
     ),
     React.createElement('div', {
       style: {
-        marginTop: '15px',
+        marginTop: '8px',
         display: 'flex',
-        gap: '5px',
-        height: '90px'
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        color: infoColor,
+        fontSize: '11px',
+        padding: '0 4px',
+        gap: '8px'
       }
     },
-      // Waypoint List
-      React.createElement('div', {
+      React.createElement('button', {
+        onClick: cycleRange,
         style: {
-          flex: 1,
-          padding: '5px',
-          background: 'rgba(0, 0, 0, 0.4)',
-          borderRadius: '8px',
-          overflowY: 'auto',
-          border: '1px solid #00aa00'
+          background: '#0b140b',
+          border: `1px solid ${theme?.controlBorder || '#ffffff'}`,
+          color: infoColor,
+          borderRadius: '2px',
+          padding: '2px 8px',
+          fontSize: '10px',
+          cursor: 'pointer',
+          fontWeight: 'bold'
         }
-      },
-        React.createElement('h4', { style: { color: '#00ff00', marginBottom: '5px', textAlign: 'center', fontSize: '12px', margin: '0 0 5px 0' } }, 'Flight Plan'),
-        waypoints.length > 0 ? (
-          React.createElement('ul', { style: { listStyleType: 'none', padding: 0, margin: 0 } },
-            waypoints.map((wp, index) =>
-              React.createElement('li', {
-                key: index,
-                style: {
-                  color: '#e6e6e6',
-                  fontSize: '11px',
-                  padding: '2px 0',
-                  borderBottom: index < waypoints.length - 1 ? '1px dashed rgba(0, 170, 0, 0.3)' : 'none',
-                  display: 'flex',
-                  justifyContent: 'space-between'
-                }
-              },
-                React.createElement('span', { style: { fontWeight: 'bold', color: (wp.label || wp.name) === currentNextWaypointName ? '#ffdd00' : '#00ff00' } }, wp.label || wp.name || 'WPT'),
-                React.createElement('span', { style: { color: '#aaaaaa' } }, `${wp.latitude.toFixed(2)}, ${wp.longitude.toFixed(2)}`)
-              )
-            )
-          )
-        ) : (
-          React.createElement('p', { style: { color: '#e6e6e6', fontSize: '12px', textAlign: 'center' } }, 'No Waypoints')
-        )
-      ),
-      
-      // Range Switch
-      React.createElement('div', {
+      }, `${mapRange} NM`),
+      React.createElement('button', {
+        onClick: () => setShowLocalRouteMap(prev => !prev),
         style: {
-            display: 'flex',
-            flexDirection: 'column',
-            justifyContent: 'center',
-            alignItems: 'center',
-            width: '50px',
-            background: 'rgba(0, 0, 0, 0.4)',
-            borderRadius: '8px',
-            border: '1px solid #00aa00',
-            padding: '2px'
+          background: showLocalRouteMap ? '#102a43' : '#0b140b',
+          border: `1px solid ${theme?.controlBorder || '#ffffff'}`,
+          color: infoColor,
+          borderRadius: '2px',
+          padding: '2px 8px',
+          fontSize: '10px',
+          cursor: 'pointer',
+          fontWeight: 'bold'
         }
-      },
-        React.createElement('span', { style: { color: '#00ff00', fontSize: '10px', marginBottom: '4px', fontWeight: 'bold' } }, 'RNG'),
-        React.createElement('button', {
-            onClick: cycleRange,
-            style: {
-                background: '#003300',
-                border: '1px solid #00ff00',
-                color: '#00ff00',
-                borderRadius: '4px',
-                padding: '4px 2px',
-                fontSize: '11px',
-                cursor: 'pointer',
-                width: '40px',
-                textAlign: 'center',
-                fontWeight: 'bold',
-                boxShadow: '0 0 5px rgba(0, 255, 0, 0.3)'
-            }
-        }, mapRange)
-      )
+      }, showLocalRouteMap ? 'MAP' : 'EFIS'),
+      React.createElement('button', {
+        onClick: () => setDisplayMode(prev => prev === 'terrain' ? 'weather' : 'terrain'),
+        style: {
+          background: '#0b140b',
+          border: `1px solid ${theme?.controlBorder || '#ffffff'}`,
+          color: infoColor,
+          borderRadius: '2px',
+          padding: '2px 8px',
+          fontSize: '10px',
+          cursor: 'pointer',
+          fontWeight: 'bold'
+        }
+      }, displayMode === 'terrain' ? 'TERR' : 'WXR')
     )
   );
 };

@@ -1,0 +1,102 @@
+{
+  "model": "Embraer E190",
+  "type": "Regional",
+  "manufacturer": "Embraer",
+  "iata": "E90",
+  "icao": "E190",
+  "maxRange": 2400,
+  "cruiseSpeed": 447,
+  "fuelConsumption": 1800,
+  "maxFuelCapacity": 12800,
+  "maxPayload": 10800,
+  "maxPassengers": 114,
+  "typicalFuelBurn": 4,
+  "takeoffDistance": 1800,
+  "landingDistance": 1200,
+  "engineType": "GE CF34-10E",
+  "engineCount": 2,
+  "category": "Regional",
+  "wingArea": 92,
+  "wingSpan": 28.7,
+  "aspectRatio": 8.9,
+  "maxLiftCoefficient": 1.5,
+  "stallSpeed": 110,
+  "maxOperatingMach": 0.82,
+  "emptyWeight": 28000,
+  "maxTakeoffWeight": 50790,
+  "maxThrustPerEngine": 82000,
+  "maxN1": 104,
+  "egtYellow": 750,
+  "egtRed": 870,
+  "fadec": true,
+  "liftCurveSlope": 5.5,
+  "zeroLiftDragCoefficient": 0.027,
+  "inducedDragFactor": 0.042,
+  "basicLiftCoefficient": 0.41,
+  "hydraulicCount": 3,
+  "horizontalStabilizerArea": 18,
+  "horizontalStabilizerCL": -0.13,
+  "horizontalStabilizerMomentArm": 9,
+  "aerodynamicCenterPosition": 0.25,
+  "centerOfGravityPosition": 0.15,
+  "dragCenterPosition": 0.75,
+  "controlPower": {
+    "x": 1.2,
+    "y": 1.5,
+    "z": 1
+  },
+  "momentOfInertiaRoll": 18000,
+  "momentOfInertiaPitch": 28000,
+  "momentOfInertiaYaw": 42000,
+  "flapProfile": {
+    "positions": [
+      {
+        "angle": 0,
+        "clIncrement": 0,
+        "cdIncrement": 0,
+        "label": "UP"
+      },
+      {
+        "angle": 10,
+        "clIncrement": 0.1,
+        "cdIncrement": 0.002,
+        "label": "1"
+      },
+      {
+        "angle": 20,
+        "clIncrement": 0.2,
+        "cdIncrement": 0.005,
+        "label": "2"
+      },
+      {
+        "angle": 35,
+        "clIncrement": 0.3,
+        "cdIncrement": 0.01,
+        "label": "FULL"
+      }
+    ]
+  },
+  "airbrakeProfile": {
+    "positions": [
+      {
+        "label": "CL",
+        "dragIncrement": 0,
+        "liftDecrement": 0
+      },
+      {
+        "label": "OP",
+        "dragIncrement": 0.05,
+        "liftDecrement": -0.1
+      },
+      {
+        "label": "GND",
+        "dragIncrement": 0.15,
+        "liftDecrement": -0.25
+      }
+    ]
+  },
+  "minNoseGearFailedPitch": -0.2,
+  "maxGroundPitch": 0.3,
+  "groundCollisionPitchTorqueFactor": 0.5,
+  "gearHeight": 3
+}

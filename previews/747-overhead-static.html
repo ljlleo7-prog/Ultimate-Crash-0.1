@@ -1,0 +1,944 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Boeing 747 Overhead Static Preview</title>
+  <style>
+    :root {
+      --panel: #c8a96e;
+      --panel-dark: #b99257;
+      --panel-lite: #d3b47b;
+      --panel-border: #7a5a28;
+      --title: #ffffff;
+      --label: #1a1000;
+      --amber: #fa0;
+      --green: #0d4;
+      --blue: #0cf;
+      --red: #cc2200;
+      --face: #111;
+      --face-2: #171717;
+      --metal-1: #b0b0b0;
+      --metal-2: #e8e8e8;
+      --metal-3: #888;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      display: grid;
+      place-items: center;
+      background: #8b8a84;
+      font-family: Aptos, sans-serif;
+    }
+
+    .preview-wrap { padding: 20px; }
+
+    .overhead-shell {
+      position: relative;
+      width: 980px;
+      height: 820px;
+      background: linear-gradient(180deg, #cfb17a 0%, var(--panel) 26%, #c3a268 100%);
+      border: 3px solid #5d4318;
+      clip-path: polygon(1.1% 0, 98.9% 0, 99.6% 93.7%, 99.2% 100%, 0.8% 100%, 0.4% 93.7%);
+      box-shadow: 0 22px 48px rgba(0,0,0,.48);
+      overflow: hidden;
+    }
+
+    .overhead-shell::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      background:
+        repeating-linear-gradient(0deg, rgba(255,255,255,.05) 0 1px, transparent 1px 5px),
+        repeating-linear-gradient(90deg, rgba(0,0,0,.02) 0 1px, transparent 1px 9px);
+      opacity: .55;
+    }
+
+    .sp {
+      position: absolute;
+      background: linear-gradient(180deg, #c29c5f 0%, var(--panel-dark) 100%);
+      border: 2px solid var(--panel-border);
+      border-radius: 4px;
+      padding: 6px;
+      color: var(--label);
+      overflow: hidden;
+      box-shadow: inset 0 0 0 1px rgba(255,255,255,.08), inset 0 0 12px rgba(0,0,0,.06);
+    }
+
+    .sp::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      background: linear-gradient(180deg, rgba(255,255,255,.05), transparent 14%, transparent 86%, rgba(0,0,0,.07));
+    }
+
+    .pt {
+      margin: 0 0 4px;
+      padding-bottom: 2px;
+      font-size: 7.2px;
+      font-weight: 800;
+      letter-spacing: .12em;
+      text-align: center;
+      color: var(--title);
+      border-bottom: 1px solid var(--panel-border);
+      text-transform: uppercase;
+    }
+
+    .st {
+      font-size: 6.2px;
+      font-weight: 800;
+      letter-spacing: .08em;
+      text-align: center;
+      color: var(--title);
+      text-transform: uppercase;
+    }
+
+    .micro {
+      font-size: 5px;
+      font-weight: 700;
+      color: var(--label);
+      text-transform: uppercase;
+      letter-spacing: .05em;
+      line-height: 1.05;
+      text-align: center;
+    }
+
+    .tiny {
+      font-size: 6px;
+      font-weight: 700;
+      color: #f9eede;
+      text-transform: uppercase;
+      line-height: 1.05;
+      text-align: center;
+    }
+
+    .row { display: flex; align-items: flex-start; justify-content: center; gap: 3px; }
+    .row.tight { gap: 2px; }
+    .col { display: flex; flex-direction: column; align-items: center; }
+
+    .sc {
+      position: absolute;
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: #a27a3f;
+      border: 1px solid #684815;
+      box-shadow: inset 0 0 1px rgba(255,255,255,.3);
+    }
+    .sc.tl { top: 3px; left: 3px; }
+    .sc.tr { top: 3px; right: 3px; }
+    .sc.bl { bottom: 3px; left: 3px; }
+    .sc.br { bottom: 3px; right: 3px; }
+
+    .divider-v { width: 1px; background: var(--panel-border); align-self: stretch; opacity: .8; }
+    .divider-h { height: 1px; background: var(--panel-border); width: 100%; margin: 4px 0; }
+
+    .annbar {
+      min-width: 28px;
+      padding: 2.5px 4px;
+      border-radius: 2px;
+      border: 0.5px solid #ffdfbd;
+      background: #0a0a0a;
+      color: #2c2c2c;
+      font-size: 5px;
+      line-height: 1.05;
+      text-align: center;
+      font-weight: 800;
+      text-transform: uppercase;
+    }
+    .annbar.amb { color: var(--amber); }
+    .annbar.grn { color: var(--green); }
+    .annbar.blu { color: var(--blue); }
+    .annbar.wht { color: #d7d7d7; }
+    .annbar.off { color: #2a2a2a; }
+
+    .seg {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 18px;
+      padding: 2px 6px;
+      background: #020202;
+      border: 2px solid #343434;
+      border-radius: 3px;
+      color: #8dff68;
+      font-family: "Courier New", monospace;
+      font-size: 10px;
+      font-weight: 800;
+      letter-spacing: 2px;
+      box-shadow: inset 0 0 8px rgba(0,255,100,.08);
+    }
+    .seg.small { font-size: 8px; min-height: 14px; padding: 1px 4px; letter-spacing: 1px; }
+    .seg.big { font-size: 12px; min-height: 22px; }
+
+    .pb {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 2px;
+      margin: 1px;
+    }
+    .pb-face {
+      width: 28px;
+      height: 20px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: linear-gradient(180deg, #3f3f3f, #1f1f1f);
+      border: 1.5px solid #555;
+      border-radius: 2px;
+      box-shadow: inset 0 0 5px rgba(0,0,0,.6);
+    }
+    .pb-face span {
+      font-size: 5px;
+      font-weight: 800;
+      color: #ddd;
+      line-height: 1;
+      text-transform: uppercase;
+      text-align: center;
+    }
+    .pb-lbl {
+      font-size: 5.3px;
+      color: var(--label);
+      font-weight: 800;
+      text-transform: uppercase;
+      line-height: 1.05;
+      text-align: center;
+    }
+
+    .mini-sw {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 1px;
+      margin: 1px;
+    }
+    .mini-slot {
+      width: 16px;
+      height: 20px;
+      position: relative;
+      background: #454545;
+      border: 1px solid #2b2b2b;
+      border-radius: 2px;
+      box-shadow: inset 0 0 4px rgba(0,0,0,.75);
+    }
+    .mini-lever {
+      position: absolute;
+      left: 5px;
+      width: 6px;
+      height: 11px;
+      background: linear-gradient(90deg, var(--metal-1), var(--metal-2), var(--metal-3));
+      border-radius: 3px;
+      box-shadow: 0 1px 3px rgba(0,0,0,.45);
+    }
+    .mini-lever.up { top: 1px; }
+    .mini-lever.mid { top: 4px; }
+    .mini-lever.dn { top: 8px; }
+    .mini-lbl {
+      font-size: 5px;
+      color: var(--label);
+      font-weight: 800;
+      text-transform: uppercase;
+      line-height: 1;
+      text-align: center;
+    }
+
+    .dann { display:flex; flex-direction:column; align-items:center; margin:1px; }
+    .dann-face {
+      width:28px; height:28px;
+      background:#111; border:1.5px solid #444; border-radius:2px;
+      display:flex; flex-direction:column; align-items:center; justify-content:center;
+      gap:1px; padding:2px;
+      box-shadow: inset 0 0 5px rgba(0,0,0,.8);
+    }
+    .dann-vert {
+      position: relative;
+      width: 28px;
+      height: 28px;
+      background: #111;
+      border: 1px solid #5b4a28;
+      border-radius: 2px;
+      box-shadow: none;
+    }
+    .dann-vert-a {
+      position: absolute;
+      top: 4px;
+      width: 10px;
+      height: 18px;
+      border-radius: 1px;
+      background: #000;
+      border: none;
+      box-shadow: none;
+      color: #f1a100;
+      font-size: 4px;
+      line-height: 1;
+      font-weight: 800;
+      text-transform: uppercase;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      letter-spacing: .02em;
+      writing-mode: vertical-rl;
+      text-orientation: mixed;
+      padding: 0px 0;
+    }
+    .dann-vert-a.left { left: 3px; }
+    .dann-vert-a.right { right: 3px; color: #ffffff; }
+    .dann-a {
+      font-size:5px; font-weight:bold; width:100%; text-align:center;
+      background:#000; border:1px solid #222; padding:1px 0; line-height:1; border-radius:1px;
+      text-transform: uppercase;
+    }
+    .dann-a.amb { color:#fa0; }
+    .dann-a.grn { color:#0d4; }
+    .dann-a.off { color:#2a2a2a; }
+    .dann-a.wht { color:#ccc; }
+    .dann-a.blu { color:#0cf; }
+    .dann-lever {
+      width:8px; height:12px; background:linear-gradient(90deg,#b0b0b0,#e8e8e8,#888);
+      border-radius:3px; margin-top:2px; box-shadow:0 2px 3px rgba(0,0,0,.5);
+    }
+    .dann-lbl {
+      font-size:5.5px; margin-top:1px; color:#1a1000; text-align:center; font-weight:bold; line-height:1.05;
+      text-transform: uppercase;
+    }
+
+    .sann { display:flex; flex-direction:column; align-items:center; margin:1px; }
+    .sann-face {
+      width:28px; height:18px;
+      background:#111; border:1.5px solid #444; border-radius:2px;
+      display:flex; align-items:center; justify-content:center; padding:2px;
+      box-shadow: inset 0 0 5px rgba(0,0,0,.8);
+    }
+    .sann-a {
+      font-size:5px; font-weight:bold; width:100%; text-align:center;
+      background:#000; border:1px solid #222; padding:1px 0; line-height:1; border-radius:1px;
+      text-transform: uppercase;
+    }
+    .sann-a.amb { color:#fa0; }
+    .sann-a.grn { color:#0d4; }
+    .sann-a.off { color:#2a2a2a; }
+    .sann-a.wht { color:#ccc; }
+    .sann-a.blu { color:#0cf; }
+    .sann-lever {
+      width:8px; height:12px; background:linear-gradient(90deg,#b0b0b0,#e8e8e8,#888);
+      border-radius:3px; margin-top:2px; box-shadow:0 2px 3px rgba(0,0,0,.5);
+    }
+    .sann-lbl {
+      font-size:5.5px; margin-top:1px; color:#1a1000; text-align:center; font-weight:bold; line-height:1.05;
+      text-transform: uppercase;
+    }
+
+    .lrot {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      margin: 1px;
+    }
+    .lrot-face {
+      width: 38px;
+      height: 38px;
+      border-radius: 50%;
+      position: relative;
+      background: radial-gradient(circle at 50% 50%, #fbf8ef 0 54%, #ddd5c4 54% 72%, #b8ad96 72% 82%, #f6f1e4 82% 100%);
+      border: 2px solid #75684e;
+      box-shadow: inset 0 0 0 2px rgba(255,255,255,.38), inset 0 1px 3px rgba(255,255,255,.32), 0 1px 2px rgba(0,0,0,.18);
+    }
+    .lrot-face::before {
+      content: "";
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      width: 9px;
+      height: 9px;
+      border-radius: 50%;
+      background: #f3ecda;
+      border: 1px solid #7c6e52;
+      transform: translate(-50%, -50%);
+      box-shadow: inset 0 0 0 1px rgba(255,255,255,.28);
+    }
+    .lrot-face::after {
+      content: "";
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      width: 4px;
+      height: 15px;
+      border-radius: 2px;
+      background: #ffffff;
+      border: 1px solid #8d836f;
+      transform: translate(-50%, -100%) rotate(var(--ang, 0deg));
+      transform-origin: 50% 100%;
+      box-shadow: 0 0 1px rgba(255,255,255,.55);
+    }
+    .lrot-lbl {
+      font-size: 5.6px;
+      margin-top: 2px;
+      color: var(--label);
+      font-weight: 800;
+      text-transform: uppercase;
+      line-height: 1.05;
+      text-align: center;
+    }
+    .lrot-sub {
+      font-size: 4.8px;
+      color: #5f4214;
+      line-height: 1;
+      text-transform: uppercase;
+      text-align: center;
+    }
+
+    .fire-ext { display:flex; flex-direction:column; align-items:center; margin:2px; }
+    .fire-ext-body {
+      width:46px; height:58px;
+      background:#0a0a0a; border:2px solid #cc2200; border-radius:3px;
+      display:flex; flex-direction:column; align-items:center; justify-content:center;
+      box-shadow:inset 0 0 8px #000, 0 0 4px rgba(200,0,0,.3);
+      position: relative;
+    }
+    .fire-ext-body::before {
+      content: "";
+      position: absolute;
+      top: -7px;
+      left: 7px;
+      right: 7px;
+      height: 8px;
+      background: linear-gradient(180deg, #1d1d1d, #070707);
+      border: 2px solid #cc2200;
+      border-bottom: none;
+      border-radius: 3px 3px 0 0;
+    }
+    .fire-ext-body::after {
+      content: "";
+      position: absolute;
+      bottom: -6px;
+      left: 11px;
+      right: 11px;
+      height: 6px;
+      background: #111;
+      border: 1px solid #7a0e00;
+      border-radius: 0 0 2px 2px;
+    }
+    .fire-ext-num { font-size:30px; font-weight:900; color:#cc2200; font-family:'Arial Black',Arial,sans-serif; line-height:1; }
+    .fire-ext-lbl { font-size:5.5px; margin-top:2px; color:#1a1000; text-align:center; font-weight:bold; text-transform: uppercase; }
+
+    .meter-box {
+      background: #040404;
+      border: 2px solid #373737;
+      border-radius: 3px;
+      padding: 3px 5px;
+      box-shadow: inset 0 0 7px rgba(0,255,100,.06);
+    }
+
+    .pipe-svg text {
+      font-family: Arial, sans-serif;
+      font-weight: 800;
+    }
+  </style>
+</head>
+<body>
+<main class="preview-wrap">
+  <section class="overhead-shell">
+
+    <div class="sp" style="left:10px; top:8px; width:285px; height:110px;">
+      <span class="sc tl"></span><span class="sc tr"></span><span class="sc bl"></span><span class="sc br"></span>
+      <div style="position:relative; height:100%;">
+        <div class="tiny" style="position:absolute; right:16px; top:65px; color:#f1e2ba; letter-spacing:.14em; font-size:6px">ON&nbsp;&nbsp;ARMED&nbsp;&nbsp;RESET</div>
+        <div class="mini-sw" style="position:absolute; right:22px; top:71px;"><div class="mini-slot" style="width:50px; height:24px; border:2px solid #efe6d0; background:#0e0e0e;"><div class="mini-lever mid" style="left:19px; top:7px; width:16px; height:12px; border-radius:2px;"></div></div></div>
+      </div>
+    </div>
+
+    <div class="sp" style="left:10px; top:124px; width:285px; height:76px;">
+      <span class="sc tl"></span><span class="sc tr"></span><span class="sc bl"></span><span class="sc br"></span>
+      <div class="pt">ELEC ENG CONTROL</div>
+      <div style="position:relative; width:100%; height:44px; margin-top:9px;">
+        <div style="position:absolute; left:68px; top:2px; width:88px; height:42px; border:2px solid #fae4c2; box-shadow:inset 0 0 0 1px rgba(255,255,255,.14); background:rgba(0,0,0,.05);">
+          <div class="tiny" style="position:absolute; left:20px; top:-7px; color:#f1e2ba;">1</div>
+          <div class="tiny" style="position:absolute; left:56px; top:-7px; color:#f1e2ba;">2</div>
+          <div class="dann-face" style="position:absolute; left:8px; top:3px; width:34px; height:34px; border-color:#6d6d6d;"><div class="dann-a wht">NORM</div><div class="dann-a amb">ALTN</div></div>
+          <div class="dann-face" style="position:absolute; left:44px; top:3px; width:34px; height:34px; border-color:#6d6d6d;"><div class="dann-a wht">NORM</div><div class="dann-a amb">ALTN</div></div>
+        </div>
+        <div style="position:absolute; left:164px; top:2px; width:88px; height:42px; border:2px solid #fae4c2; box-shadow:inset 0 0 0 1px rgba(255,255,255,.14); background:rgba(0,0,0,.05);">
+          <div class="tiny" style="position:absolute; left:20px; top:-7px; color:#f1e2ba;">3</div>
+          <div class="tiny" style="position:absolute; left:56px; top:-7px; color:#f1e2ba;">4</div>
+          <div class="dann-face" style="position:absolute; left:8px; top:3px; width:34px; height:34px; border-color:#6d6d6d;"><div class="dann-a wht">NORM</div><div class="dann-a amb">ALTN</div></div>
+          <div class="dann-face" style="position:absolute; left:44px; top:3px; width:34px; height:34px; border-color:#6d6d6d;"><div class="dann-a wht">NORM</div><div class="dann-a amb">ALTN</div></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="sp" style="left:10px; top:206px; width:285px; height:70px;">
+      <span class="sc tl"></span><span class="sc tr"></span><span class="sc bl"></span><span class="sc br"></span>
+      <div class="pt" style="position:absolute; top:4px; left:80px; align-items:center;">IRS</div>
+      <div class="pt" style="position:absolute; top:4px; right:80px; align-items:center;">IRS</div>
+      <div style="position:absolute; width:100%; height:82px; top:7px;">
+        <div class="tiny" style="position:absolute; left:41px; top:0; letter-spacing:.12em;">L</div>
+        <div class="tiny" style="position:absolute; left:135px; top:0; letter-spacing:.12em;">C</div>
+        <div class="tiny" style="position:absolute; left:229px; top:0; letter-spacing:.12em;">R</div>
+
+        <div style="position:absolute; left:22px; top:10px;">
+          <div class="tiny" style="position:absolute; top:24px; left:-10px; font-size:6px;">OFF</div>
+          <div class="tiny" style="position:absolute; top:10px; left:-10px; font-size:6px;">ALIGN</div>
+          <div class="tiny" style="position:absolute; top:0px; left:17px; font-size:6px;">NAV</div>
+          <div class="tiny" style="position:absolute; top:10px; left:37px; font-size:6px;">ATT</div>
+        </div>
+        <div style="position:absolute; left:116px; top:10px;">
+          <div class="tiny" style="position:absolute; top:24px; left:-10px; font-size:6px;">OFF</div>
+          <div class="tiny" style="position:absolute; top:10px; left:-10px; font-size:6px;">ALIGN</div>
+          <div class="tiny" style="position:absolute; top:0px; left:17px; font-size:6px;">NAV</div>
+          <div class="tiny" style="position:absolute; top:10px; left:37px; font-size:6px;">ATT</div>
+        </div>
+        <div style="position:absolute; left:210px; top:10px;">
+          <div class="tiny" style="position:absolute; top:24px; left:-10px; font-size:6px;">OFF</div>
+          <div class="tiny" style="position:absolute; top:10px; left:-10px; font-size:6px;">ALIGN</div>
+          <div class="tiny" style="position:absolute; top:0px; left:17px; font-size:6px;">NAV</div>
+          <div class="tiny" style="position:absolute; top:10px; left:37px; font-size:6px;">ATT</div>
+        </div>
+        <div style="position:absolute; left:28px; top:22px; width:34px; height:34px;">
+          <div class="lrot-face" style="position:absolute; left:0; top:0; width:34px; height:34px; --ang:-18deg;"></div>
+          <div style="position:absolute; left:14px; top:-7px; width:6px; height:10px; background:#f0e1bb; border-radius:2px;"></div>
+        </div>
+        <div style="position:absolute; left:122px; top:22px; width:34px; height:34px;">
+          <div class="lrot-face" style="position:absolute; left:0; top:0; width:34px; height:34px; --ang:-14deg;"></div>
+          <div style="position:absolute; left:14px; top:-7px; width:6px; height:10px; background:#f0e1bb; border-radius:2px;"></div>
+        </div>
+        <div style="position:absolute; left:216px; top:22px; width:34px; height:34px;">
+          <div class="lrot-face" style="position:absolute; left:0; top:0; width:34px; height:34px; --ang:-16deg;"></div>
+          <div style="position:absolute; left:14px; top:-7px; width:6px; height:10px; background:#f0e1bb; border-radius:2px;"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="sp" style="left:10px; top:282px; width:285px; height:284px;">
+      <span class="sc tl"></span><span class="sc tr"></span><span class="sc bl"></span><span class="sc br"></span>
+      <div class="pt">POWER</div>
+      <div style="position:absolute; width:100%; height:228px; top:15px;">
+        <div class="tiny" style="position:absolute; left:18px; top:2px;">STANDBY POWER</div>
+        <div class="tiny" style="position:absolute; left:118px; top:2px;">L------UTILITY------R</div>
+        <div class="tiny" style="position:absolute; right:43px; top:2px;">APU</div>
+
+        <div style="position:absolute; left:18px; top:10px; width:56px; height:64px;">
+          <div class="tiny" style="position:absolute; left:14px; top:0;">AUTO</div>
+          <div class="tiny" style="position:absolute; left:-10px; top:10px;">OFF</div>
+          <div class="tiny" style="position:absolute; left:41px; top:10px;">BAT</div>
+          <div class="lrot-face" style="position:absolute; left:5px; top:10px; width:34px; height:34px; --ang:-18deg;"></div>
+        </div>
+
+        <div style="position:absolute; left:98px; top:12px; width:88px; height:42px; border:2px solid #fae4c2; box-shadow:inset 0 0 0 1px rgba(255,255,255,.14); background:rgba(0,0,0,.05);">
+          <div class="dann-face" style="position:absolute; left:8px; top:3px; width:34px; height:34px; border-color:#6d6d6d;"><div class="dann-a wht">ON</div><div class="dann-a amb">OFF</div></div>
+          <div class="dann-face" style="position:absolute; left:44px; top:3px; width:34px; height:34px; border-color:#6d6d6d;"><div class="dann-a wht">ON</div><div class="dann-a amb">OFF</div></div>
+        </div>
+
+        <div style="position:absolute; right:15px; top:10px; width:56px; height:64px;">
+          <div class="tiny" style="position:absolute; left:17px; top:0;">ON</div>
+          <div class="tiny" style="position:absolute; left:-10px; top:10px;">OFF</div>
+          <div class="tiny" style="position:absolute; left:39px; top:10px;">START</div>
+          <div class="lrot-face" style="position:absolute; left:5px; top:10px; width:34px; height:34px; --ang:18deg;"></div>
+        </div>
+
+        <svg class="pipe-svg" style="position:absolute; left:14px; top:98px; width:252px; height:108px;" viewBox="0 0 252 108" preserveAspectRatio="none">
+          <line x1="16" y1="0" x2="16" y2="20" stroke="#fff" stroke-width="4"></line>
+          <line x1="62" y1="0" x2="62" y2="10" stroke="#fff" stroke-width="4"></line>
+          <line x1="199" y1="0" x2="199" y2="10" stroke="#fff" stroke-width="4"></line>
+          <line x1="246" y1="0" x2="246" y2="10" stroke="#fff" stroke-width="4"></line>
+          <line x1="76" y1="10" x2="76" y2="20" stroke="#fff" stroke-width="4"></line>
+          <line x1="168" y1="10" x2="168" y2="20" stroke="#fff" stroke-width="4"></line>
+          <line x1="228" y1="10" x2="228" y2="20" stroke="#fff" stroke-width="4"></line>
+          <line x1="16" y1="10" x2="246" y2="10" stroke="#fff" stroke-width="5"></line>
+          <line x1="16" y1="40" x2="16" y2="58" stroke="#fff" stroke-width="4"></line>
+          <line x1="76" y1="40" x2="76" y2="58" stroke="#fff" stroke-width="4"></line>
+          <line x1="168" y1="40" x2="168" y2="58" stroke="#fff" stroke-width="4"></line>
+          <line x1="228" y1="40" x2="228" y2="58" stroke="#fff" stroke-width="4"></line>
+          <line x1="16" y1="51" x2="5" y2="51" stroke="#fff" stroke-width="4"></line>
+          <line x1="76" y1="51" x2="65" y2="51" stroke="#fff" stroke-width="4"></line>
+          <line x1="168" y1="51" x2="179" y2="51" stroke="#fff" stroke-width="4"></line>
+          <line x1="228" y1="51" x2="239" y2="51" stroke="#fff" stroke-width="4"></line>
+        </svg>
+
+        <div class="tiny" style="position:absolute; left:10px; top:60px;">EXT PWR 1</div>
+        <div class="tiny" style="position:absolute; left:56px; top:60px;">APU GEN 1</div>
+        <div class="tiny" style="position:absolute; left:193px; top:60px;">APU GEN 2</div>
+        <div class="tiny" style="position:absolute; left:240px; top:60px;">EXT PWR 2</div>
+        <div style="position:absolute; left:10px; top:70px;"><div class="dann-vert"><div class="dann-vert-a left">AVAIL</div><div class="dann-vert-a right">===ON===</div></div></div>
+        <div style="position:absolute; left:57px; top:70px;"><div class="dann-vert"><div class="dann-vert-a left">AVAIL</div><div class="dann-vert-a right">===ON===</div></div></div>
+
+        <div class="tiny" style="position:absolute; left:127px; top:57px;">BATTERY</div>
+        <div class="dann-face" style="position:absolute; left:125px; top:65px; width:32px; height:32px;"><div class="dann-a wht">ON</div><div class="dann-a amb">OFF</div></div>
+
+        <div style="position:absolute; right:60px; top:70px;"><div class="dann-vert"><div class="dann-vert-a left">AVAIL</div><div class="dann-vert-a right">===ON===</div></div></div>
+        <div style="position:absolute; right:13px; top:70px;"><div class="dann-vert"><div class="dann-vert-a left">AVAIL</div><div class="dann-vert-a right">===ON===</div></div></div>
+
+        <div class="dann-face" style="position:absolute; left:16px; top:115px;"><div class="dann-a wht">AUTO</div><div class="dann-a amb">ISLN</div></div>
+        <div class="dann-face" style="position:absolute; left:76px; top:115px;"><div class="dann-a wht">AUTO</div><div class="dann-a amb">ISLN</div></div>
+        <div class="tiny" style="position:absolute; left:131px; top:120px;">BUS<br>TIE</div>
+        <div class="dann-face" style="position:absolute; right:86px; top:115px;"><div class="dann-a wht">AUTO</div><div class="dann-a amb">ISLN</div></div>
+        <div class="dann-face" style="position:absolute; right:26px; top:115px;"><div class="dann-a wht">AUTO</div><div class="dann-a amb">ISLN</div></div>
+
+        <div class="tiny" style="position:absolute; left:2px; top: 144px; width:18px; height:9px; border:2px solid #fae4c2; box-shadow:inset 0 0 0 1px rgba(255,255,255,.14); background:rgba(0,0,0,.05);">BUS</div>
+        <div class="tiny" style="position:absolute; left:62px; top: 144px; width:18px; height:9px; border:2px solid #fae4c2; box-shadow:inset 0 0 0 1px rgba(255,255,255,.14); background:rgba(0,0,0,.05);">BUS</div>
+        <div class="tiny" style="position:absolute; right:72px; top: 144px; width:18px; height:9px; border:2px solid #fae4c2; box-shadow:inset 0 0 0 1px rgba(255,255,255,.14); background:rgba(0,0,0,.05);">BUS</div>
+        <div class="tiny" style="position:absolute; right:12px; top: 144px; width:18px; height:9px; border:2px solid #fae4c2; box-shadow:inset 0 0 0 1px rgba(255,255,255,.14); background:rgba(0,0,0,.05);">BUS</div>
+
+        <div class="dann-face" style="position:absolute; left:16px; top:160px;"><div class="dann-a wht">ON</div><div class="dann-a amb">OFF</div></div>
+        <div class="dann-face" style="position:absolute; left:76px; top:160px;"><div class="dann-a wht">ON</div><div class="dann-a amb">OFF</div></div>
+        <div class="tiny" style="position:absolute; left:128px; top:165px;">GEN<br>CONT</div>
+        <div class="dann-face" style="position:absolute; right:86px; top:160px;"><div class="dann-a wht">ON</div><div class="dann-a amb">OFF</div></div>
+        <div class="dann-face" style="position:absolute; right:26px; top:160px;"><div class="dann-a wht">ON</div><div class="dann-a amb">OFF</div></div>
+
+        <div class="dann-face" style="position:absolute; left:16px; top:205px;"><div class="dann-a wht">------</div><div class="dann-a amb">DRIVE</div></div>
+        <div class="dann-face" style="position:absolute; left:76px; top:205px;"><div class="dann-a wht">------</div><div class="dann-a amb">DRIVE</div></div>
+        <div class="tiny" style="position:absolute; left:127px; top:210px;">DRIVE<br>DISC</div>
+        <div class="dann-face" style="position:absolute; right:86px; top:205px;"><div class="dann-a wht">------</div><div class="dann-a amb">DRIVE</div></div>
+        <div class="dann-face" style="position:absolute; right:26px; top:205px;"><div class="dann-a wht">------</div><div class="dann-a amb">DRIVE</div></div>
+      
+        <div style="position:absolute; left:8px; top:155px; width:42px; height:44px; border:2px solid #fae4c2; box-shadow:inset 0 0 0 1px rgba(255,255,255,.14); background:rgba(0,0,0,.05);"></div>
+        <div style="position:absolute; left:68px; top:155px; width:42px; height:44px; border:2px solid #fae4c2; box-shadow:inset 0 0 0 1px rgba(255,255,255,.14); background:rgba(0,0,0,.05);"></div>
+        <div style="position:absolute; right:78px; top:155px; width:42px; height:44px; border:2px solid #fae4c2; box-shadow:inset 0 0 0 1px rgba(255,255,255,.14); background:rgba(0,0,0,.05);"></div>
+        <div style="position:absolute; right:18px; top:155px; width:42px; height:44px; border:2px solid #fae4c2; box-shadow:inset 0 0 0 1px rgba(255,255,255,.14); background:rgba(0,0,0,.05);"></div>
+        
+        <div style="position:absolute; left:7px; top:197px; width:45px; height:47px; border:2px solid #fae4c2; box-shadow:inset 0 0 0 1px rgba(255,255,255,.14); background:rgba(0,0,0,.05);"></div>
+        <div style="position:absolute; left:67px; top:197px; width:45px; height:47px; border:2px solid #fae4c2; box-shadow:inset 0 0 0 1px rgba(255,255,255,.14); background:rgba(0,0,0,.05);"></div>
+        <div style="position:absolute; right:77px; top:197px; width:45px; height:47px; border:2px solid #fae4c2; box-shadow:inset 0 0 0 1px rgba(255,255,255,.14); background:rgba(0,0,0,.05);"></div>
+        <div style="position:absolute; right:17px; top:197px; width:45px; height:47px; border:2px solid #fae4c2; box-shadow:inset 0 0 0 1px rgba(255,255,255,.14); background:rgba(0,0,0,.05);"></div>
+
+        <div style="position:absolute; left:24px; top:192px; width:10px; height:10px; border-radius:50%; border:1.5px solid #000000; background:#fff0d7; display:flex; align-items:center; justify-content:center; font-size:5px; font-weight:800; color:#000000;">1</div>
+        <div style="position:absolute; left:84px; top:192px; width:10px; height:10px; border-radius:50%; border:1.5px solid #000000; background:#fff0d7; display:flex; align-items:center; justify-content:center; font-size:5px; font-weight:800; color:#000000;">2</div>
+        <div style="position:absolute; right:94px; top:192px; width:10px; height:10px; border-radius:50%; border:1.5px solid #000000; background:#fff0d7; display:flex; align-items:center; justify-content:center; font-size:5px; font-weight:800; color:#000000;">3</div>
+        <div style="position:absolute; right:34px; top:192px; width:10px; height:10px; border-radius:50%; border:1.5px solid #000000; background:#fff0d7; display:flex; align-items:center; justify-content:center; font-size:5px; font-weight:800; color:#000000;">4</div>
+
+
+      </div>
+    </div>
+
+    <div class="sp" style="left:10px; top:572px; width:285px; height:162px;">
+      <span class="sc tl"></span><span class="sc tr"></span><span class="sc bl"></span><span class="sc br"></span>
+      <div class="pt">HYDRAULICS</div>
+      <!-- row: PRESS annunciators -->
+      <div style="position:absolute; left:24px; top:18px; width:36px;"><div class="annbar amb">SYS<br>FAULT</div></div>
+      <div style="position:absolute; left:90px; top:18px; width:36px;"><div class="annbar amb">SYS<br>FAULT</div></div>
+      <div style="position:absolute; left:156px; top:18px; width:36px;"><div class="annbar amb">SYS<br>FAULT</div></div>
+      <div style="position:absolute; left:222px; top:18px; width:36px;"><div class="annbar amb">SYS<br>FAULT</div></div>
+      <!-- row: LOW annunciators -->
+      <div style="position:absolute; left:24px; top:40px; width:36px;"><div class="annbar amb">PRESS</div></div>
+      <div style="position:absolute; left:90px; top:40px; width:36px;"><div class="annbar amb">PRESS</div></div>
+      <div style="position:absolute; left:156px; top:40px; width:36px;"><div class="annbar amb">PRESS</div></div>
+      <div style="position:absolute; left:222px; top:40px; width:36px;"><div class="annbar amb">PRESS</div></div>
+      <!-- row: rotaries -->
+      <div style="position:absolute; left:25px; top:65px;"><div class="lrot-face" style="width:34px; height:34px; --ang:-8deg;"></div></div>
+      <div style="position:absolute; left:91px; top:65px;"><div class="lrot-face" style="width:34px; height:34px; --ang:-2deg;"></div></div>
+      <div style="position:absolute; left:157px; top:65px;"><div class="lrot-face" style="width:34px; height:34px; --ang:6deg;"></div></div>
+      <div style="position:absolute; left:223px; top:65px;"><div class="lrot-face" style="width:34px; height:34px; --ang:12deg;"></div></div>
+      
+      <div style="position:absolute; left:37px; top:105px; width:10px; height:10px; border-radius:50%; border:1.5px solid #000000; background:#fff0d7; display:flex; align-items:center; justify-content:center; font-size:5px; font-weight:800; color:#000000;">1</div>
+      <div style="position:absolute; left:103px; top:105px; width:10px; height:10px; border-radius:50%; border:1.5px solid #000000; background:#fff0d7; display:flex; align-items:center; justify-content:center; font-size:5px; font-weight:800; color:#000000;">2</div>
+      <div style="position:absolute; left:169px; top:105px; width:10px; height:10px; border-radius:50%; border:1.5px solid #000000; background:#fff0d7; display:flex; align-items:center; justify-content:center; font-size:5px; font-weight:800; color:#000000;">3</div>
+      <div style="position:absolute; left:235px; top:105px; width:10px; height:10px; border-radius:50%; border:1.5px solid #000000; background:#fff0d7; display:flex; align-items:center; justify-content:center; font-size:5px; font-weight:800; color:#000000;">4</div>
+
+      <div class="dann-face" style="position:absolute; left:27px; top:120px;"><div class="dann-a wht">ON</div><div class="dann-a amb">PRESS</div></div>
+      <div class="dann-face" style="position:absolute; left:93px; top:120px;"><div class="dann-a wht">ON</div><div class="dann-a amb">PRESS</div></div>
+      <div class="dann-face" style="position:absolute; left:159px; top:120px;"><div class="dann-a wht">ON</div><div class="dann-a amb">PRESS</div></div>
+      <div class="dann-face" style="position:absolute; left:225px; top:120px;"><div class="dann-a wht">ON</div><div class="dann-a amb">PRESS</div></div>
+
+    </div>
+
+    <div class="sp" style="left:10px; top:740px; width:285px; height:62px;">
+      <span class="sc tl"></span><span class="sc tr"></span><span class="sc bl"></span><span class="sc br"></span>
+      <div style="display:flex; justify-content:space-evenly; align-items:center; height:100%;">
+        <div>
+          <div class="tiny">STORM<br>OFF</div>
+          <div class="mini-sw"><div class="mini-slot"><div class="mini-lever up"></div></div></div>
+          <div class="tiny">ON</div>
+        </div> 
+        <div>
+          <div class="tiny">CKT BKR<br>OVHD PANEL</div>
+          <div class="lrot"><div class="lrot-face" style="width:26px; height:26px; --ang:-12deg;"></div></div>
+          <div class="tiny">OFF</div>
+        </div>
+        <div>
+          <div class="tiny">GLARESHIELD<br>PANEL/SHIELD</div>
+          <div class="lrot"><div class="lrot-face" style="width:26px; height:26px; --ang:-12deg;"></div></div>
+          <div class="tiny">OFF</div>
+        </div>
+        <div>
+          <div class="tiny">DOME</div>
+          <div class="lrot"><div class="lrot-face" style="width:26px; height:26px; --ang:-12deg;"></div></div>
+          <div class="tiny">OFF</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="sp" style="left:300px; top:8px; width:375px; height:104px;">
+      <span class="sc tl"></span><span class="sc tr"></span><span class="sc bl"></span><span class="sc br"></span>
+      <div style="position:relative; width:100%; height:100%;">
+
+        <!-- FIRE/OVHT TEST + ENG/APU CARGO push-buttons top-left -->
+        <div class="tiny" style="position:absolute; left:8px; top:8px;">FIRE/OVHT<br>TEST<br>ENG</div>
+        <div style="position:absolute; left:17px; top:30px; width:14px; height:14px; border-radius:50%; background:#111; border:1px solid #555;"></div>
+        <div class="tiny" style="position:absolute; left:10px; top:55px;">ENG/APU<br>CARGO</div>
+        <div style="position:absolute; left:17px; top:70px; width:14px; height:14px; border-radius:50%; background:#111; border:1px solid #555;"></div>
+
+        <!-- EMER LIGHTS: vertical 3-choice switch OFF/ARMED/ON -->
+        <div class="tiny" style="position:absolute; left:55px; top:6px; font-size:5.5px; font-weight:800;">EMER LIGHTS</div>
+        <div class="tiny" style="position:absolute; left:55px; top:18px;">OFF</div>
+        <div class="tiny" style="position:absolute; left:46px; top:50px;">ARMED</div>
+        <div class="tiny" style="position:absolute; left:55px; top:72px;">ON</div>
+        <div style="position:absolute; left:66px; top:18px; width:16px; height:58px; background:#0a0a0a; border:1.5px solid #555; border-radius:2px;">
+          <div style="position:absolute; left:4px; top:2px; width:8px; height:12px; background:linear-gradient(90deg,#b0b0b0,#e8e8e8,#888); border-radius:3px;"></div>
+        </div>
+
+        <!-- CAPT AUDIO SYSTEM center -->
+        <div class="tiny" style="position:absolute; left:130px; top:4px; font-size:5.5px; font-weight:800; letter-spacing:.1em;">CAPT AUDIO SYSTEM</div>
+        <div class="tiny" style="position:absolute; left:130px; top:13px;">CAPT</div><div class="tiny" style="position:absolute; left:155px; top:13px;">NORM</div><div class="tiny" style="position:absolute; left:183px; top:13px;">F/O</div>
+        <div style="position:absolute; left:130px; top:21px; width:60px; height:16px; background:#0a0a0a; border:1.5px solid #555; border-radius:2px;"><div style="position:absolute; left:22px; top:2px; width:12px; height:10px; background:linear-gradient(180deg,#b0b0b0,#e8e8e8,#888); border-radius:2px;"></div></div>
+        <div class="tiny" style="position:absolute; left:130px; top:46px;">VHF-L DIRECT</div>
+        <div class="tiny" style="position:absolute; left:130px; top:54px;">OBS AUDIO SYSTEM</div>
+        <div class="tiny" style="position:absolute; left:162px; top:62px;">NORM</div>
+        <div style="position:absolute; left:130px; top:70px; width:60px; height:16px; background:#0a0a0a; border:1.5px solid #555; border-radius:2px;"><div style="position:absolute; left:22px; top:2px; width:12px; height:10px; background:linear-gradient(180deg,#b0b0b0,#e8e8e8,#888); border-radius:2px;"></div></div>
+        <div class="tiny" style="position:absolute; left:140px; top:72px;">CAPT</div>
+        <div class="tiny" style="position:absolute; left:185px; top:72px;">F/O</div>
+
+        <!-- INTERPHONE -->
+        <div class="tiny" style="position:absolute; left:240px; top:6px; font-size:5.5px; font-weight:800;">INTERPHONE</div>
+        <div class="tiny" style="position:absolute; left:240px; top:16px;">SERV</div>
+        <div style="position:absolute; left:244px; top:24px;"><div class="mini-slot"><div class="mini-lever up"></div></div></div>
+        <div class="tiny" style="position:absolute; left:240px; top:46px;">OFF</div>
+        <div class="tiny" style="position:absolute; left:240px; top:54px;">ON</div>
+        <div class="tiny" style="position:absolute; left:270px; top:6px; font-size:5.5px; font-weight:800;">CARGO/<br>CABIN</div>
+        <div style="position:absolute; left:274px; top:24px;"><div class="mini-slot"><div class="mini-lever up"></div></div></div>
+
+        <!-- FUEL XFER -->
+        <div class="tiny" style="position:absolute; right:8px; top:6px; font-size:5px; text-align:center;">FUEL XFER<br>MAIN 1 &amp; 4</div>
+        <div style="position:absolute; right:12px; top:28px;"><div class="dann-face"><div class="dann-a off">OFF</div><div class="dann-a wht">ON</div></div></div>
+
+      </div>
+    </div>
+
+    <div class="sp" style="left:300px; top:158px; width:375px; height:152px;">
+      <span class="sc tl"></span><span class="sc tr"></span><span class="sc bl"></span><span class="sc br"></span>
+      <div style="position:relative; width:100%; height:100%;">
+
+        <!-- top row: 4 fire handles -->
+        <div style="position:absolute; left:14px; top:8px; width:70px; height:72px; background:#0a0a0a; border:2px solid #cc2200; border-radius:3px; display:flex; flex-direction:column; align-items:center; justify-content:center;">
+          <div class="annbar amb" style="position:absolute; top:4px; width:52px;">DISCH</div>
+          <div style="font-size:28px; font-weight:900; color:#cc2200; font-family:'Arial Black',Arial,sans-serif; margin-top:10px;">1</div>
+        </div>
+        <div style="position:absolute; left:96px; top:8px; width:70px; height:72px; background:#0a0a0a; border:2px solid #cc2200; border-radius:3px; display:flex; flex-direction:column; align-items:center; justify-content:center;">
+          <div class="annbar amb" style="position:absolute; top:4px; width:52px;">DISCH</div>
+          <div style="font-size:28px; font-weight:900; color:#cc2200; font-family:'Arial Black',Arial,sans-serif; margin-top:10px;">2</div>
+        </div>
+        <div style="position:absolute; left:178px; top:8px; width:70px; height:72px; background:#0a0a0a; border:2px solid #cc2200; border-radius:3px; display:flex; flex-direction:column; align-items:center; justify-content:center;">
+          <div class="annbar amb" style="position:absolute; top:4px; width:52px;">DISCH</div>
+          <div style="font-size:28px; font-weight:900; color:#cc2200; font-family:'Arial Black',Arial,sans-serif; margin-top:10px;">3</div>
+        </div>
+        <div style="position:absolute; left:260px; top:8px; width:70px; height:72px; background:#0a0a0a; border:2px solid #cc2200; border-radius:3px; display:flex; flex-direction:column; align-items:center; justify-content:center;">
+          <div class="annbar amb" style="position:absolute; top:4px; width:52px;">DISCH</div>
+          <div style="font-size:28px; font-weight:900; color:#cc2200; font-family:'Arial Black',Arial,sans-serif; margin-top:10px;">4</div>
+        </div>
+
+        <!-- BTL A / BTL B annunciators under each handle -->
+        <div style="position:absolute; left:14px; top:84px; display:flex; gap:2px;"><div class="annbar off" style="width:32px;">BTL A<br>DISCH</div><div class="annbar off" style="width:32px;">BTL B<br>DISCH</div></div>
+        <div style="position:absolute; left:96px; top:84px; display:flex; gap:2px;"><div class="annbar off" style="width:32px;">BTL A<br>DISCH</div><div class="annbar off" style="width:32px;">BTL B<br>DISCH</div></div>
+        <div style="position:absolute; left:178px; top:84px; display:flex; gap:2px;"><div class="annbar off" style="width:32px;">BTL A<br>DISCH</div><div class="annbar off" style="width:32px;">BTL B<br>DISCH</div></div>
+        <div style="position:absolute; left:260px; top:84px; display:flex; gap:2px;"><div class="annbar off" style="width:32px;">BTL A<br>DISCH</div><div class="annbar off" style="width:32px;">BTL B<br>DISCH</div></div>
+
+        <!-- bottom-left: APU horizontal fire handle -->
+        <div style="position:absolute; left:8px; top:100px; display:flex; flex-direction:column; align-items:center; gap:2px;">
+          <div style="width:72px; height:32px; background:#0a0a0a; border:2px solid #cc2200; border-radius:3px; display:flex; align-items:center; justify-content:center; position:relative;">
+            <div class="annbar amb" style="position:absolute; left:4px; top:3px; width:28px;">DISCH</div>
+            <div style="font-size:11px; font-weight:900; color:#cc2200; font-family:'Arial Black',Arial,sans-serif; margin-left:20px;">APU</div>
+          </div>
+        </div>
+
+        <!-- bottom-center: round grille -->
+        <div style="position:absolute; left:50%; top:108px; transform:translateX(-50%); width:32px; height:32px; border-radius:50%; border:2px solid #5d4318; background:#111;"></div>
+
+        <!-- bottom-right: MAIN armed + CARGO FIRE DEPRESS -->
+        <div style="position:absolute; right:8px; top:100px; width:110px; height:44px; border:1.5px solid #7b5b2a; border-radius:2px; padding:3px;">
+          <div style="display:flex; gap:4px; align-items:flex-start;">
+            <div style="flex:1;">
+              <div class="tiny" style="text-align:center;">MAIN</div>
+              <div style="display:flex; gap:2px; margin-top:2px;">
+                <div style="display:flex; flex-direction:column; align-items:center; gap:1px;"><div class="annbar off" style="width:22px;">ARMED</div><div class="tiny">FWD</div></div>
+                <div style="display:flex; flex-direction:column; align-items:center; gap:1px;"><div class="annbar off" style="width:22px;">ARMED</div><div class="tiny">AFT</div></div>
+              </div>
+            </div>
+            <div style="width:1px; background:#7b5b2a; align-self:stretch;"></div>
+            <div style="display:flex; flex-direction:column; align-items:center; gap:2px;">
+              <div class="tiny" style="text-align:center; font-size:4px;">CARGO FIRE<br>DEPRESS</div>
+              <div class="annbar amb" style="width:28px;">DISCH</div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <div class="sp" style="left:300px; top:320px; width:375px; height:90px;">
+      <span class="sc tl"></span><span class="sc tr"></span><span class="sc bl"></span><span class="sc br"></span>
+      <div class="pt">ENGINE STARTERS &amp; FUEL JETTISON</div>
+      <div style="display:flex; justify-content:space-between; margin:8px 18px 0;">
+        <div class="col" style="gap:2px;"><div class="tiny">1</div><div class="pb"><div class="pb-face"><span>START</span></div></div></div>
+        <div class="col" style="gap:2px;"><div class="tiny">2</div><div class="pb"><div class="pb-face"><span>START</span></div></div></div>
+        <div class="col" style="gap:2px;"><div class="tiny">3</div><div class="pb"><div class="pb-face"><span>START</span></div></div></div>
+        <div class="col" style="gap:2px;"><div class="tiny">4</div><div class="pb"><div class="pb-face"><span>START</span></div></div></div>
+      </div>
+      <div style="display:grid; grid-template-columns: 1fr 1fr 140px; gap:10px; align-items:flex-start; margin:8px 18px 0;">
+        <div style="display:flex; gap:6px;"><div class="lrot"><div class="lrot-face" style="width:28px; height:28px; --ang:-10deg;"></div><div class="tiny">IGN</div></div><div class="pb"><div class="pb-face"><span>STOP</span></div><div class="pb-lbl">STOP</div></div></div>
+        <div style="display:flex; gap:6px;"><div class="lrot"><div class="lrot-face" style="width:28px; height:28px; --ang:10deg;"></div><div class="tiny">SEL</div></div><div class="pb"><div class="pb-face"><span>ARM</span></div><div class="pb-lbl">JETT</div></div></div>
+        <div style="display:flex; justify-content:flex-end; gap:6px;"><div class="col" style="gap:2px;"><div class="tiny">TO REMAIN</div><div class="lrot"><div class="lrot-face" style="width:26px; height:26px; --ang:0deg;"></div></div></div><div class="col" style="gap:2px;"><div class="tiny">SELECTOR</div><div class="mini-sw"><div class="mini-slot"><div class="mini-lever up"></div></div></div></div><div style="display:flex; gap:4px; align-items:center;"><div class="annbar amb">NOZZLE</div><div class="annbar amb">NOZZLE</div></div></div>
+      </div>
+    </div>
+
+    <div class="sp" style="left:300px; top:420px; width:375px; height:118px;">
+      <span class="sc tl"></span><span class="sc tr"></span><span class="sc bl"></span><span class="sc br"></span>
+      <div class="pt">FUEL PUMP</div>
+      <div style="position:relative; height:92px; margin-top:4px;">
+        <div class="tiny" style="position:absolute; left:34px; top:2px;">RESERVE</div>
+        <div class="tiny" style="position:absolute; left:186px; top:2px;">MAIN FEED</div>
+        <div class="tiny" style="position:absolute; right:36px; top:2px;">CROSSFEED</div>
+        <svg class="pipe-svg" style="position:absolute; left:26px; top:14px; width:410px; height:64px;" viewBox="0 0 410 64" preserveAspectRatio="none">
+          <line x1="10" y1="10" x2="126" y2="10" stroke="#fff" stroke-width="4"></line>
+          <line x1="126" y1="10" x2="240" y2="10" stroke="#fff" stroke-width="4"></line>
+          <line x1="240" y1="10" x2="398" y2="10" stroke="#fff" stroke-width="4"></line>
+          <line x1="60" y1="10" x2="60" y2="40" stroke="#fff" stroke-width="4"></line>
+          <line x1="205" y1="10" x2="205" y2="40" stroke="#fff" stroke-width="4"></line>
+          <line x1="350" y1="10" x2="350" y2="40" stroke="#fff" stroke-width="4"></line>
+          <path d="M60 40 H205 V60" stroke="#fff" stroke-width="4" fill="none"></path>
+          <path d="M205 40 H350" stroke="#fff" stroke-width="4" fill="none"></path>
+          <line x1="10" y1="60" x2="126" y2="60" stroke="#fff" stroke-width="4"></line>
+          <line x1="126" y1="60" x2="240" y2="60" stroke="#fff" stroke-width="4"></line>
+          <line x1="240" y1="60" x2="398" y2="60" stroke="#fff" stroke-width="4"></line>
+        </svg>
+        <div class="mini-sw" style="position:absolute; left:44px; bottom:2px;"><div class="mini-slot"><div class="mini-lever up"></div></div><div class="mini-lbl">PUMP 1</div></div>
+        <div class="mini-sw" style="position:absolute; left:186px; bottom:2px;"><div class="mini-slot"><div class="mini-lever up"></div></div><div class="mini-lbl">PUMP 2</div></div>
+        <div class="mini-sw" style="position:absolute; right:44px; bottom:2px;"><div class="mini-slot"><div class="mini-lever up"></div></div><div class="mini-lbl">PUMP 3</div></div>
+      </div>
+    </div>
+
+    <div class="sp" style="left:300px; top:548px; width:375px; height:78px;">
+      <span class="sc tl"></span><span class="sc tr"></span><span class="sc bl"></span><span class="sc br"></span>
+      <div class="pt">ANTI-ICE / WINDOW HEAT / WIPERS</div>
+      <div style="display:grid; grid-template-columns: 1fr 1fr 1fr; gap:12px; margin:12px 18px 0; align-items:flex-start;">
+        <div class="col" style="gap:4px;"><div class="tiny">ENG ANTI-ICE</div><div class="mini-sw"><div class="mini-slot"><div class="mini-lever up"></div></div></div></div>
+        <div class="col" style="gap:4px;"><div class="tiny">WINDOW HEAT</div><div style="display:flex; gap:4px;"><div class="annbar amb">L</div><div class="annbar amb">R</div></div></div>
+        <div class="col" style="gap:4px;"><div class="tiny">WIPER SELECT</div><div style="display:flex; gap:6px;"><div class="lrot"><div class="lrot-face" style="width:24px; height:24px; --ang:-12deg;"></div></div><div class="lrot"><div class="lrot-face" style="width:24px; height:24px; --ang:12deg;"></div></div></div></div>
+      </div>
+    </div>
+
+    <div class="sp" style="left:300px; top:636px; width:375px; height:72px;">
+      <span class="sc tl"></span><span class="sc tr"></span><span class="sc bl"></span><span class="sc br"></span>
+      <div class="pt">EXTERNAL LIGHTINGS</div>
+      <div style="display:grid; grid-template-columns: 1fr 1fr 1fr; gap:16px; margin:12px 18px 0; align-items:flex-start;">
+        <div class="col" style="gap:4px;"><div class="tiny">LANDING</div><div class="mini-sw"><div class="mini-slot"><div class="mini-lever up"></div></div></div></div>
+        <div class="col" style="gap:4px;"><div class="tiny">TURNOFF</div><div class="mini-sw"><div class="mini-slot"><div class="mini-lever mid"></div></div></div></div>
+        <div class="col" style="gap:4px;"><div class="tiny">TAXI</div><div class="mini-sw"><div class="mini-slot"><div class="mini-lever up"></div></div></div></div>
+      </div>
+    </div>
+
+    <div class="sp" style="left:680px; top:8px; width:285px; height:50px;">
+      <span class="sc tl"></span><span class="sc tr"></span><span class="sc bl"></span><span class="sc br"></span>
+    </div>
+
+    <div class="sp" style="left:680px; top:64px; width:285px; height:50px;">
+      <span class="sc tl"></span><span class="sc tr"></span><span class="sc bl"></span><span class="sc br"></span>
+      <div class="pt">MAIN DECK SIGNALLING</div>
+      <div style="display:flex; justify-content:space-evenly; align-items:center; margin-top:8px;">
+        <div class="annbar amb">CALL</div>
+        <div class="mini-sw"><div class="mini-slot"><div class="mini-lever up"></div></div><div class="mini-lbl">CANCEL</div></div>
+        <div class="annbar amb">ATTN</div>
+      </div>
+    </div>
+
+    <div class="sp" style="left:680px; top:120px; width:285px; height:88px;">
+      <span class="sc tl"></span><span class="sc tr"></span><span class="sc bl"></span><span class="sc br"></span>
+      <div class="pt">OXY / YAW-DAMPER / VOICE-RECORDER</div>
+      <div style="position:relative; height:58px; margin-top:6px;">
+        <div class="tiny" style="position:absolute; left:10px; top:0;">PASS OXY</div>
+        <div class="tiny" style="position:absolute; left:76px; top:0;">YAW DAMPER</div>
+        <div class="tiny" style="position:absolute; right:10px; top:0;">VOICE REC</div>
+        <div class="mini-sw" style="position:absolute; left:16px; top:18px;"><div class="mini-slot"><div class="mini-lever up"></div></div></div>
+        <div class="mini-sw" style="position:absolute; left:88px; top:18px;"><div class="mini-slot"><div class="mini-lever mid"></div></div></div>
+        <div class="pb" style="position:absolute; right:12px; top:18px;"><div class="pb-face"><span>TEST</span></div></div>
+        <div class="annbar amb" style="position:absolute; left:72px; bottom:2px;">ON</div>
+      </div>
+    </div>
+
+    <div class="sp" style="left:680px; top:214px; width:285px; height:118px;">
+      <span class="sc tl"></span><span class="sc tr"></span><span class="sc bl"></span><span class="sc br"></span>
+      <div class="pt">CABIN ALTITUDE CONTROL &amp; MANUAL VALVES</div>
+      <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-top:8px; align-items:start;">
+        <div class="col" style="gap:2px;"><div class="tiny">CAB ALT</div><div class="seg small">08000</div><div class="lrot"><div class="lrot-face" style="width:28px; height:28px; --ang:8deg;"></div></div></div>
+        <div class="col" style="gap:2px;"><div class="tiny">MAN VALVE</div><div class="lrot"><div class="lrot-face" style="width:32px; height:32px; --ang:18deg;"></div></div><div class="annbar amb">OPEN</div></div>
+      </div>
+      <div style="display:flex; justify-content:space-evenly; margin-top:8px;">
+        <div class="mini-sw"><div class="mini-slot"><div class="mini-lever mid"></div></div><div class="mini-lbl">AUTO</div></div>
+        <div class="mini-sw"><div class="mini-slot"><div class="mini-lever up"></div></div><div class="mini-lbl">MAN</div></div>
+      </div>
+    </div>
+
+    <div class="sp" style="left:680px; top:338px; width:285px; height:92px;">
+      <span class="sc tl"></span><span class="sc tr"></span><span class="sc bl"></span><span class="sc br"></span>
+      <div class="pt">AIRCON</div>
+      <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-top:10px; align-items:start;">
+        <div class="col" style="gap:3px;"><div class="tiny">PACK L</div><div class="mini-sw"><div class="mini-slot"><div class="mini-lever up"></div></div></div><div class="annbar off">OFF</div></div>
+        <div class="col" style="gap:3px;"><div class="tiny">PACK R</div><div class="mini-sw"><div class="mini-slot"><div class="mini-lever up"></div></div></div><div class="annbar off">OFF</div></div>
+      </div>
+      <div style="display:flex; justify-content:center; gap:18px; margin-top:6px;">
+        <div class="lrot"><div class="lrot-face" style="width:24px; height:24px; --ang:-10deg;"></div><div class="tiny">TRIM</div></div>
+        <div class="lrot"><div class="lrot-face" style="width:24px; height:24px; --ang:10deg;"></div><div class="tiny">ZONE</div></div>
+      </div>
+    </div>
+
+    <div class="sp" style="left:680px; top:436px; width:285px; height:180px;">
+      <span class="sc tl"></span><span class="sc tr"></span><span class="sc bl"></span><span class="sc br"></span>
+      <div class="pt">BLEED</div>
+      <div style="position:relative; height:152px; margin-top:4px;">
+        <div style="position:absolute; left:18px; top:0; display:flex; gap:18px; width:156px; justify-content:space-between;">
+          <div class="lrot"><div class="lrot-face" style="width:28px; height:28px; --ang:-8deg;"></div></div>
+          <div class="lrot"><div class="lrot-face" style="width:28px; height:28px; --ang:0deg;"></div></div>
+          <div class="lrot"><div class="lrot-face" style="width:28px; height:28px; --ang:8deg;"></div></div>
+        </div>
+        <svg class="pipe-svg" style="position:absolute; left:16px; top:34px; width:162px; height:78px;" viewBox="0 0 162 78" preserveAspectRatio="none">
+          <line x1="8" y1="18" x2="154" y2="18" stroke="#fff" stroke-width="4"></line>
+          <line x1="35" y1="18" x2="35" y2="58" stroke="#fff" stroke-width="4"></line>
+          <line x1="81" y1="18" x2="81" y2="58" stroke="#fff" stroke-width="4"></line>
+          <line x1="127" y1="18" x2="127" y2="58" stroke="#fff" stroke-width="4"></line>
+          <line x1="35" y1="58" x2="81" y2="58" stroke="#fff" stroke-width="4"></line>
+          <line x1="81" y1="58" x2="127" y2="58" stroke="#fff" stroke-width="4"></line>
+        </svg>
+        <div class="annbar blu" style="position:absolute; left:18px; top:118px;">L ISLN</div>
+        <div class="annbar blu" style="position:absolute; left:74px; top:118px;">CTR</div>
+        <div class="annbar blu" style="position:absolute; right:18px; top:118px;">R ISLN</div>
+        <div style="position:absolute; left:18px; bottom:2px; display:flex; gap:10px; width:156px; justify-content:space-between;">
+          <div class="mini-sw"><div class="mini-slot"><div class="mini-lever up"></div></div><div class="mini-lbl">ENG 1</div></div>
+          <div class="mini-sw"><div class="mini-slot"><div class="mini-lever mid"></div></div><div class="mini-lbl">APU</div></div>
+          <div class="mini-sw"><div class="mini-slot"><div class="mini-lever up"></div></div><div class="mini-lbl">ENG 4</div></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="sp" style="left:680px; top:622px; width:285px; height:86px;">
+      <span class="sc tl"></span><span class="sc tr"></span><span class="sc bl"></span><span class="sc br"></span>
+      <div class="pt">EXTERNAL LIGHTS</div>
+      <div style="display:grid; grid-template-columns:repeat(3, 1fr); gap:8px; margin-top:10px; align-items:start;">
+        <div class="col" style="gap:3px;"><div class="tiny">BEACON</div><div class="mini-sw"><div class="mini-slot"><div class="mini-lever up"></div></div></div></div>
+        <div class="col" style="gap:3px;"><div class="tiny">NAV</div><div class="mini-sw"><div class="mini-slot"><div class="mini-lever up"></div></div></div></div>
+        <div class="col" style="gap:3px;"><div class="tiny">STROBE</div><div class="mini-sw"><div class="mini-slot"><div class="mini-lever mid"></div></div></div></div>
+      </div>
+      <div style="display:flex; justify-content:center; gap:18px; margin-top:8px;">
+        <div class="mini-sw"><div class="mini-slot"><div class="mini-lever up"></div></div><div class="mini-lbl">WING</div></div>
+        <div class="mini-sw"><div class="mini-slot"><div class="mini-lever up"></div></div><div class="mini-lbl">LOGO</div></div>
+        <div class="pb"><div class="pb-face"><span>TEST</span></div></div>
+      </div>
+    </div>
+
+  </section>
+</main>
+</body>
+</html>

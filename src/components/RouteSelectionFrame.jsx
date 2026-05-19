@@ -1,6 +1,17 @@
 import React, { useEffect, useState } from 'react';
 import './RouteSelectionFrame.css';
-import { generateSID, generateSTAR, generateGate, generateTaxiway, getLastProcedureWaypoint, getRunways, generateSmartRoute, procedureMatchesWaypoint } from '../utils/routeGenerator';
+import { generateSID, generateSTAR, generateGate, generateTaxiway, getLastProcedureWaypoint, getRunways, generateSmartRouteDetails, procedureMatchesWaypoint } from '../utils/routeGenerator';
+import LocalRouteMap from './LocalRouteMap';
+import { calculateDistance } from '../utils/distanceCalculator';
+
+const calcRouteDistance = (departure, waypoints, arrival) => {
+  const pts = [departure, ...(waypoints || []), arrival].filter(p => p?.latitude != null && p?.longitude != null);
+  let total = 0;
+  for (let i = 0; i < pts.length - 1; i++) {
+    total += calculateDistance(pts[i].latitude, pts[i].longitude, pts[i+1].latitude, pts[i+1].longitude);
+  }
+  return Math.round(total);
+};
 
 const DEFAULT_ROUTE_DATA = {
   departureGate: '',
@@ -11,7 +22,12 @@ const DEFAULT_ROUTE_DATA = {
   star: '',
   landingRunway: '',
   landingTaxiway: '',
-  arrivalGate: ''
+  arrivalGate: '',
+  routeObject: null,
+  routeSource: '',
+  routeFallbackUsed: false,
+  routeDebug: [],
+  routeBilling: null
 };
 
 const RouteSelectionFrame = ({ isOpen, onConfirm, onSkip, onChange, difficulty, departure, arrival, routeData: externalRouteData }) => {
@@ -19,10 +35,14 @@ const RouteSelectionFrame = ({ isOpen, onConfirm, onSkip, onChange, difficulty, 
   const [availableRunwaysDep, setAvailableRunwaysDep] = useState([]);
   const [availableRunwaysArr, setAvailableRunwaysArr] = useState([]);
   const [isGeneratingRoute, setIsGeneratingRoute] = useState(false);
+  const [manualWaypoints, setManualWaypoints] = useState('');
 
   useEffect(() => {
     if (externalRouteData) {
       setRouteData({ ...DEFAULT_ROUTE_DATA, ...externalRouteData });
+      if (externalRouteData.waypoints?.length) {
+        setManualWaypoints(externalRouteData.waypoints.map(w => typeof w === 'string' ? w : w.name).join(' '));
+      }
     }
   }, [externalRouteData]);
 
@@ -39,7 +59,8 @@ const RouteSelectionFrame = ({ isOpen, onConfirm, onSkip, onChange, difficulty, 
 
     const fetchRoute = async () => {
       setIsGeneratingRoute(true);
-      const waypoints = await generateSmartRoute(departure, arrival);
+      const routeObject = await generateSmartRouteDetails(departure, arrival);
+      const waypoints = routeObject.waypoints || [];
       const sid = generateSID((waypoints[0] && waypoints[0].name) || 'ABC');
       const star = generateSTAR(getLastProcedureWaypoint(waypoints) || (waypoints[waypoints.length - 1] && waypoints[waypoints.length - 1].name) || 'ABC');
       const depGate = generateGate();
@@ -62,11 +83,17 @@ const RouteSelectionFrame = ({ isOpen, onConfirm, onSkip, onChange, difficulty, 
         star: isAdvancedOrHigher ? '' : star,
         landingRunway: isAmateurOrHigher ? '' : bestArrRunway,
         landingTaxiway: arrTaxi,
-        arrivalGate: isAmateurOrHigher ? '' : arrGate
+        arrivalGate: isAmateurOrHigher ? '' : arrGate,
+        routeObject,
+        routeSource: routeObject.source,
+        routeFallbackUsed: routeObject.fallbackUsed,
+        routeDebug: routeObject.debug || [],
+        routeBilling: routeObject.billing || null
       };
 
       setRouteData(nextRoute);
       onChange?.(nextRoute);
+      setManualWaypoints(waypoints.map(w => typeof w === 'string' ? w : w.name).join(' '));
       setIsGeneratingRoute(false);
     };
 
@@ -81,16 +108,31 @@ const RouteSelectionFrame = ({ isOpen, onConfirm, onSkip, onChange, difficulty, 
 
   const handleGenerateWaypoints = async () => {
     setIsGeneratingRoute(true);
-    const wps = await generateSmartRoute(departure, arrival);
+    const routeObject = await generateSmartRouteDetails(departure, arrival);
+    const wps = routeObject.waypoints || [];
     const next = {
       ...routeData,
       waypoints: wps,
+      routeObject,
+      routeSource: routeObject.source,
+      routeFallbackUsed: routeObject.fallbackUsed,
+      routeDebug: routeObject.debug || [],
+      routeBilling: routeObject.billing || null,
       sid: routeData.sid || generateSID((wps[0] && wps[0].name) || 'ABC'),
       star: routeData.star || generateSTAR(getLastProcedureWaypoint(wps) || ((wps[wps.length - 1] && wps[wps.length - 1].name) || 'ABC'))
     };
+    setManualWaypoints(wps.map(w => typeof w === 'string' ? w : w.name).join(' '));
     setRouteData(next);
     onChange?.(next);
     setIsGeneratingRoute(false);
+  };
+
+  const handleManualWaypointsChange = (value) => {
+    setManualWaypoints(value);
+    const wps = value.split(/[\s,]+/).filter(Boolean).map(name => ({ name, type: 'WAYPOINT' }));
+    const next = { ...routeData, waypoints: wps };
+    setRouteData(next);
+    onChange?.(next);
   };
 
   const isFormValid = () => {
@@ -149,13 +191,29 @@ const RouteSelectionFrame = ({ isOpen, onConfirm, onSkip, onChange, difficulty, 
             <div className="route-section center-section">
               <h3>Enroute</h3>
               <div className="form-group full-width">
-                <label>Waypoints</label>
-                <div className="waypoints-display">
-                  {Array.isArray(routeData.waypoints) && routeData.waypoints.length > 0 ? routeData.waypoints.map((wp) => typeof wp === 'string' ? wp : (wp.name || 'WPT')).join(' ➝ ') : ''}
-                </div>
+                <label>Waypoints <span style={{fontWeight:'normal',color:'#aaa',fontSize:'11px'}}>(space-separated)</span></label>
+                <input
+                  type="text"
+                  value={manualWaypoints}
+                  onChange={(e) => handleManualWaypointsChange(e.target.value)}
+                  placeholder="e.g. ALPHA BRAVO CHARLIE"
+                />
                 <button className="action-btn" onClick={handleGenerateWaypoints} disabled={isGeneratingRoute}>
-                  {isGeneratingRoute ? 'Generating...' : 'Generate New Route'}
+                  {isGeneratingRoute ? 'Generating...' : 'Auto-Generate'}
                 </button>
+              </div>
+              {routeData.routeSource && (
+                <div className="form-group full-width" style={{marginTop:'4px'}}>
+                  <label>Route Source</label>
+                  <div className="waypoints-display">
+                    {routeData.routeSource}{routeData.routeFallbackUsed ? ' (fallback)' : ''}
+                    {routeData.routeBilling?.chargedTokens ? ` · ${routeData.routeBilling.chargedTokens} token` : ' · 0 tokens'}
+                  </div>
+                </div>
+              )}
+              <div className="form-group full-width" style={{marginTop:'8px'}}>
+                <label>Local Route Preview</label>
+                <LocalRouteMap departure={departure} arrival={arrival} waypoints={routeData.waypoints} routeObject={routeData.routeObject} />
               </div>
             </div>
           )}

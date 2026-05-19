@@ -1,0 +1,115 @@
+{
+  "model": "Airbus A380-800",
+  "type": "Wide-body",
+  "manufacturer": "Airbus",
+  "iata": "388",
+  "icao": "A388",
+  "overheadLayoutId": "airbus_a380_800_overhead",
+  "maxRange": 8200,
+  "cruiseSpeed": 488,
+  "fuelConsumption": 13000,
+  "maxFuelCapacity": 323546,
+  "maxPayload": 152400,
+  "maxPassengers": 853,
+  "typicalFuelBurn": 26.5,
+  "takeoffDistance": 2900,
+  "landingDistance": 2000,
+  "engineType": "Trent 900/GP7200",
+  "engineCount": 4,
+  "hydraulicCount": 2,
+  "category": "Long-haul",
+  "wingArea": 845,
+  "wingSpan": 79.8,
+  "aspectRatio": 7.5,
+  "maxLiftCoefficient": 1.8,
+  "stallSpeed": 130,
+  "maxOperatingMach": 0.89,
+  "emptyWeight": 277000,
+  "maxTakeoffWeight": 575000,
+  "maxThrustPerEngine": 350000,
+  "maxN1": 104,
+  "egtYellow": 750,
+  "egtRed": 850,
+  "fadec": true,
+  "engineReverseCapable": [false, true, true, false],
+  "liftCurveSlope": 6,
+  "zeroLiftDragCoefficient": 0.02,
+  "inducedDragFactor": 0.032,
+  "basicLiftCoefficient": 0.46,
+  "horizontalStabilizerArea": 120,
+  "horizontalStabilizerCL": -0.2,
+  "horizontalStabilizerMomentArm": 28,
+  "aerodynamicCenterPosition": 0.25,
+  "centerOfGravityPosition": 0.15,
+  "dragCenterPosition": 0.75,
+  "controlPower": {
+    "x": 1.2,
+    "y": 1.5,
+    "z": 1
+  },
+  "momentOfInertiaRoll": 420000,
+  "momentOfInertiaPitch": 580000,
+  "momentOfInertiaYaw": 680000,
+  "flapProfile": {
+    "positions": [
+      {
+        "angle": 0,
+        "clIncrement": 0,
+        "cdIncrement": 0,
+        "label": "UP"
+      },
+      {
+        "angle": 10,
+        "clIncrement": 0.1,
+        "cdIncrement": 0.002,
+        "label": "1"
+      },
+      {
+        "angle": 15,
+        "clIncrement": 0.2,
+        "cdIncrement": 0.005,
+        "label": "2"
+      },
+      {
+        "angle": 20,
+        "clIncrement": 0.3,
+        "cdIncrement": 0.01,
+        "label": "3"
+      },
+      {
+        "angle": 30,
+        "clIncrement": 0.4,
+        "cdIncrement": 0.015,
+        "label": "FULL"
+      }
+    ]
+  },
+  "airbrakeProfile": {
+    "positions": [
+      {
+        "label": "RET",
+        "dragIncrement": 0,
+        "liftDecrement": 0
+      },
+      {
+        "label": "1/2",
+        "dragIncrement": 0.04,
+        "liftDecrement": -0.08
+      },
+      {
+        "label": "FULL",
+        "dragIncrement": 0.08,
+        "liftDecrement": -0.16
+      },
+      {
+        "label": "GND",
+        "dragIncrement": 0.22,
+        "liftDecrement": -0.32
+      }
+    ]
+  },
+  "minNoseGearFailedPitch": -0.2,
+  "maxGroundPitch": 0.3,
+  "groundCollisionPitchTorqueFactor": 0.5,
+  "gearHeight": 6.5
+}

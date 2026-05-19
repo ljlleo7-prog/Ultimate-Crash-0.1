@@ -57,19 +57,29 @@ class OverheadLogic {
         // Initialize Ice & Rain
         if (!systems.ice) {
             systems.ice = {
+                windowHeat: false,
                 wingAntiIce: false,
                 eng1AntiIce: false,
                 eng2AntiIce: false,
                 probeHeat: true // Default Auto/On
             };
+        } else {
+            if (systems.ice.windowHeat === undefined) systems.ice.windowHeat = false;
+            if (systems.ice.eng1AntiIce === undefined) systems.ice.eng1AntiIce = systems.ice.engAntiIce ?? false;
+            if (systems.ice.eng2AntiIce === undefined) systems.ice.eng2AntiIce = systems.ice.engAntiIce ?? false;
         }
 
         // Initialize Signs
         if (!systems.signs) {
             systems.signs = {
                 seatBelts: true,
-                noSmoking: true
+                noSmoking: true,
+                attend: false,
+                groundCall: false
             };
+        } else {
+            if (systems.signs.attend === undefined) systems.signs.attend = false;
+            if (systems.signs.groundCall === undefined) systems.signs.groundCall = false;
         }
 
         // Initialize Lighting if missing
@@ -179,9 +189,17 @@ class OverheadLogic {
         const pressurization = systems.pressurization || {};
         const lighting = systems.lighting || {};
 
+        const batterySelector = elec.batterySelector || (elec.battery ? 'AUTO' : 'OFF');
+        const batteryConnected = batterySelector !== 'OFF';
+        elec.batterySelector = batterySelector;
+        elec.battery = batteryConnected;
+        elec.stbyPower = batteryConnected;
+
         let generatorsOn = false;
         let genPowerAvailable = false;
         let activeGens = 0;
+        let bus1Powered = false;
+        let bus2Powered = false;
 
         Object.keys(elec).forEach(key => {
             if (key.match(/^gen\d+$/)) {
@@ -194,24 +212,33 @@ class OverheadLogic {
                     genPowerAvailable = true;
                     activeGens++;
                     elec[`sourceOff${index + 1}`] = false;
+                    if (index === 0) bus1Powered = true;
+                    if (index === 1) bus2Powered = true;
                     generatorsOn = true;
-                } else {
-                    elec[`sourceOff${index + 1}`] = true;
                 }
             }
         });
 
         const apuGenReady = systems.apu.running && systems.apu.n2 > 95;
-        elec.apuGenOn = !!(elec.apuGen && apuGenReady);
-        if (elec.apuGenOn) {
+        const apuGen1Selected = !!(elec.apuGen1 ?? elec.apuGen);
+        const apuGen2Selected = !!(elec.apuGen2 ?? elec.apuGen);
+        const apuGen1On = apuGenReady && apuGen1Selected;
+        const apuGen2On = apuGenReady && apuGen2Selected;
+        elec.apuGen1 = apuGen1Selected;
+        elec.apuGen2 = apuGen2Selected;
+        elec.apuGen = apuGen1Selected || apuGen2Selected;
+        elec.apuGenOn = apuGen1On || apuGen2On;
+        if (apuGen1On || apuGen2On) {
             genPowerAvailable = true;
+            if (apuGen1On) bus1Powered = true;
+            if (apuGen2On) bus2Powered = true;
             elec.apuGenOff = false;
             generatorsOn = true;
         } else {
             elec.apuGenOff = true;
         }
 
-        if (elec.battery) {
+        if (batteryConnected) {
             if (!generatorsOn) {
                 elec.batteryCharge = Math.max(0, (elec.batteryCharge || 100) - (0.05 * dt));
             } else {
@@ -222,11 +249,24 @@ class OverheadLogic {
             elec.dcVolts = 0;
         }
 
+        const grdPwrConnected = batteryConnected && !elec.sourceOff1 && context.onGround;
+        if (grdPwrConnected) {
+            genPowerAvailable = true;
+            bus1Powered = true;
+            bus2Powered = true;
+        }
+
+        if (batteryConnected && elec.busTie) {
+            if (bus1Powered && !bus2Powered) bus2Powered = true;
+            if (bus2Powered && !bus1Powered) bus1Powered = true;
+        }
+
+        elec.sourceOff1 = batteryConnected ? !bus1Powered : true;
+        elec.sourceOff2 = batteryConnected ? !bus2Powered : true;
+
         let mainBusPowered = false;
-        if (genPowerAvailable && elec.busTie) {
-            mainBusPowered = true;
-        } else if (activeGens > 0 || elec.apuGenOn) {
-            mainBusPowered = true;
+        if (batteryConnected) {
+            mainBusPowered = bus1Powered || bus2Powered;
         }
 
         if (mainBusPowered) {
@@ -234,13 +274,14 @@ class OverheadLogic {
             elec.acFreq = 400 + (Math.random() * 4 - 2);
             elec.dcVolts = 28.0 + (Math.random() * 0.5);
             elec.standbyPower = true;
-        } else if (elec.battery && elec.stbyPower) {
+        } else if (batteryConnected) {
             elec.acVolts = 0;
             elec.acFreq = 0;
             elec.standbyPower = true;
         } else {
             elec.acVolts = 0;
             elec.acFreq = 0;
+            elec.dcVolts = 0;
             elec.standbyPower = false;
         }
 
@@ -272,11 +313,13 @@ class OverheadLogic {
         if (apu.state === undefined) apu.state = 'OFF'; // OFF, DOOR_OPEN, CRANK, IGNITION, RUNNING, COOLDOWN
 
         // Inputs
-        const hasBat = systems.electrical.battery;
+        const hasBat = systems.electrical.batterySelector ? systems.electrical.batterySelector !== 'OFF' : systems.electrical.battery;
+        const hasGrdPwr = hasBat && !systems.electrical.sourceOff1 && context.onGround;
+        const hasPower = hasBat || hasGrdPwr;
         const masterSw = apu.master;
         const startSw = apu.start;
 
-        if (!hasBat) {
+        if (!hasPower) {
             apu.state = 'OFF';
             apu.running = false;
             apu.n2 = 0;
@@ -308,16 +351,16 @@ class OverheadLogic {
 
             case 'CRANK':
                 apu.starting = true;
-                apu.n2 += 10 * dt; // Starter motor
-                
+                apu.n2 += 4 * dt; // ~5s to reach 20% N2
+
                 if (!masterSw) apu.state = 'OFF';
                 else if (apu.n2 >= 20) apu.state = 'IGNITION';
                 break;
 
             case 'IGNITION':
-                apu.n2 += 15 * dt; // Combustion assist
-                apu.egt += 120 * dt; // Rapid EGT rise
-                
+                apu.n2 += 3.75 * dt; // ~20s from 20% to 95%
+                apu.egt += 47 * dt;  // rises to ~700°C over ~15s
+
                 if (apu.egt > 700) apu.egt = 700; // Peak
                 if (apu.n2 >= 95) apu.state = 'RUNNING';
                 if (!masterSw) apu.state = 'OFF';
@@ -348,7 +391,7 @@ class OverheadLogic {
                 if (!apu.cooldownTimer) apu.cooldownTimer = 0;
                 apu.cooldownTimer += dt;
                 
-                if (apu.cooldownTimer > this.CONSTANTS.APU_COOLDOWN_TIME || !systems.electrical.battery) {
+                if (apu.cooldownTimer > this.CONSTANTS.APU_COOLDOWN_TIME || (!hasBat && !hasGrdPwr)) {
                     apu.state = 'OFF';
                     apu.cooldownTimer = 0;
                 }
@@ -523,7 +566,7 @@ class OverheadLogic {
             const acAvail = systems.electrical.acVolts > 100;
             const hasFluid = sys.qty > 0;
             const elecPressure = (sys.elecPump && acAvail && hasFluid) ? this.CONSTANTS.HYD_MAX_PRESSURE : 0;
-            const enginePressure = hasFluid ? maxEnginePressure : 0;
+            const enginePressure = (sys.engPump && hasFluid) ? maxEnginePressure : 0;
             const target = Math.max(enginePressure, elecPressure);
 
             if (sys.pressure < target) {
@@ -568,6 +611,14 @@ class OverheadLogic {
 
         // NOTE: Engine fuel burn is now handled in RealisticFlightPhysicsService.js
         // to ensure synchronization with physics fuel flow and mass.
+
+        // Crossfeed balancing: when valve open, equalize left/right tanks quickly
+        if (fuel.crossfeed && fuel.tanks.left !== undefined && fuel.tanks.right !== undefined) {
+            const diff = fuel.tanks.left - fuel.tanks.right;
+            const transfer = diff * Math.min(1, 2.0 * dt); // ~0.5s to equalize
+            fuel.tanks.left -= transfer;
+            fuel.tanks.right += transfer;
+        }
     }
 
     /**
@@ -674,18 +725,9 @@ class OverheadLogic {
 
             if (eng.startSwitch === 'GRD') {
                 // Monitor for Starter Cutout
-                if (eng.n2 > 50) {
+                if (eng.n2 >= 50) {
                     eng.startSwitch = 'OFF';
                 }
-            } else if (eng.startSwitch === 'OFF') {
-                 // Rookie Helper: If fuel control ON and engine stopped, maybe we should auto-start?
-                 // But RealisticFlightPhysicsService needs to know.
-                 // For now, let's trust the user to use the starter.
-                 // Or we can auto-set the switch for rookies?
-                 if (isRookie && eng.fuelControl && eng.n2 < 20 && !eng.running) {
-                     // Auto-engage starter for Rookie if they flip fuel lever
-                     // But this might be annoying. Let's leave it manual for now.
-                 }
             }
             
             // Legacy/Fallback Logic cleanup:

@@ -1,0 +1,114 @@
+{
+  "model": "Airbus A350-900",
+  "type": "Wide-body",
+  "manufacturer": "Airbus",
+  "iata": "359",
+  "icao": "A359",
+  "overheadLayoutId": "airbus_a350_900_overhead",
+  "maxRange": 8100,
+  "cruiseSpeed": 488,
+  "fuelConsumption": 5800,
+  "maxFuelCapacity": 141000,
+  "maxPayload": 53500,
+  "maxPassengers": 325,
+  "typicalFuelBurn": 11.9,
+  "takeoffDistance": 2800,
+  "landingDistance": 1600,
+  "engineType": "Rolls-Royce Trent XWB",
+  "engineCount": 2,
+  "hydraulicCount": 2,
+  "category": "Long-haul",
+  "wingArea": 442,
+  "wingSpan": 64.8,
+  "aspectRatio": 9.5,
+  "maxLiftCoefficient": 1.9,
+  "stallSpeed": 140,
+  "maxOperatingMach": 0.89,
+  "emptyWeight": 115000,
+  "maxTakeoffWeight": 280000,
+  "maxThrustPerEngine": 430000,
+  "maxN1": 104,
+  "egtYellow": 750,
+  "egtRed": 850,
+  "fadec": true,
+  "liftCurveSlope": 6.2,
+  "zeroLiftDragCoefficient": 0.021,
+  "inducedDragFactor": 0.033,
+  "basicLiftCoefficient": 0.43,
+  "horizontalStabilizerArea": 60,
+  "horizontalStabilizerCL": -0.17,
+  "horizontalStabilizerMomentArm": 19,
+  "aerodynamicCenterPosition": 0.25,
+  "centerOfGravityPosition": 0.15,
+  "dragCenterPosition": 0.75,
+  "controlPower": {
+    "x": 1.2,
+    "y": 1.5,
+    "z": 1
+  },
+  "momentOfInertiaRoll": 165000,
+  "momentOfInertiaPitch": 230000,
+  "momentOfInertiaYaw": 295000,
+  "flapProfile": {
+    "positions": [
+      {
+        "angle": 0,
+        "clIncrement": 0,
+        "cdIncrement": 0,
+        "label": "UP"
+      },
+      {
+        "angle": 10,
+        "clIncrement": 0.1,
+        "cdIncrement": 0.002,
+        "label": "1"
+      },
+      {
+        "angle": 15,
+        "clIncrement": 0.2,
+        "cdIncrement": 0.005,
+        "label": "2"
+      },
+      {
+        "angle": 20,
+        "clIncrement": 0.3,
+        "cdIncrement": 0.01,
+        "label": "3"
+      },
+      {
+        "angle": 30,
+        "clIncrement": 0.4,
+        "cdIncrement": 0.015,
+        "label": "FULL"
+      }
+    ]
+  },
+  "airbrakeProfile": {
+    "positions": [
+      {
+        "label": "RET",
+        "dragIncrement": 0,
+        "liftDecrement": 0
+      },
+      {
+        "label": "1/2",
+        "dragIncrement": 0.03,
+        "liftDecrement": -0.05
+      },
+      {
+        "label": "FULL",
+        "dragIncrement": 0.065,
+        "liftDecrement": -0.13
+      },
+      {
+        "label": "GND",
+        "dragIncrement": 0.2,
+        "liftDecrement": -0.28
+      }
+    ]
+  },
+  "minNoseGearFailedPitch": -0.2,
+  "maxGroundPitch": 0.3,
+  "groundCollisionPitchTorqueFactor": 0.5,
+  "gearHeight": 5.8
+}

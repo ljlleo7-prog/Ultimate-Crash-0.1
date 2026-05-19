@@ -100,7 +100,7 @@ export class Quaternion {
 export const EARTH_RADIUS_METERS = 6371000;
 
 export function calculateDistanceMeters(lat1, lon1, lat2, lon2) {
-    const R = EARTH_RADIUS_METERS; 
+    const R = EARTH_RADIUS_METERS;
     const dLat = (lat2 - lat1) * Math.PI / 180;
     const dLon = (lon2 - lon1) * Math.PI / 180;
     const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
@@ -116,4 +116,254 @@ export function calculateBearing(lat1, lon1, lat2, lon2) {
         Math.sin(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.cos((lon2 - lon1) * Math.PI / 180);
     const brng = Math.atan2(y, x) * 180 / Math.PI;
     return (brng + 360) % 360;
+}
+export function normalizeHeadingDegrees(heading) {
+    if (!Number.isFinite(heading)) return 0;
+    return ((heading % 360) + 360) % 360;
+}
+
+export function normalizeSignedHeadingDelta(delta) {
+    if (!Number.isFinite(delta)) return 0;
+    const normalized = ((delta + 540) % 360) - 180;
+    return normalized === -180 ? 180 : normalized;
+}
+
+export function clamp(value, min, max) {
+    return Math.min(max, Math.max(min, value));
+}
+
+export function projectToLocalMeters(referenceLat, referenceLon, latitude, longitude) {
+    const latRad = referenceLat * Math.PI / 180;
+    const metersPerLat = 111132.92;
+    const metersPerLon = 111412.84 * Math.cos(latRad);
+    return {
+        x: (latitude - referenceLat) * metersPerLat,
+        y: (longitude - referenceLon) * metersPerLon
+    };
+}
+
+export function projectFromLocalMeters(referenceLat, referenceLon, x, y) {
+    const latRad = referenceLat * Math.PI / 180;
+    const metersPerLat = 111132.92;
+    const metersPerLon = 111412.84 * Math.cos(latRad);
+    return {
+        latitude: referenceLat + (x / metersPerLat),
+        longitude: referenceLon + (y / metersPerLon)
+    };
+}
+
+function normalizeVector(vector) {
+    const length = Math.hypot(vector.x, vector.y);
+    if (length < 1e-6) return null;
+    return { x: vector.x / length, y: vector.y / length, length };
+}
+
+function rotateLeft(vector) {
+    return { x: -vector.y, y: vector.x };
+}
+
+function rotateRight(vector) {
+    return { x: vector.y, y: -vector.x };
+}
+
+function sampleStraightSegment(start, end, spacingMeters, pointFactory) {
+    const dx = end.x - start.x;
+    const dy = end.y - start.y;
+    const length = Math.hypot(dx, dy);
+    if (length < 1e-6) {
+        return [pointFactory(end.x, end.y)];
+    }
+    const steps = Math.max(1, Math.ceil(length / Math.max(25, spacingMeters)));
+    const points = [];
+    for (let step = 1; step <= steps; step++) {
+        const t = step / steps;
+        points.push(pointFactory(start.x + dx * t, start.y + dy * t));
+    }
+    return points;
+}
+
+function appendSampledPoints(target, sampledPoints) {
+    for (const point of sampledPoints) {
+        const last = target[target.length - 1];
+        if (!last || Math.abs(last.latitude - point.latitude) > 1e-8 || Math.abs(last.longitude - point.longitude) > 1e-8) {
+            target.push(point);
+        }
+    }
+}
+
+export function buildFlyByTurn(previousWaypoint, waypoint, nextWaypoint, options = {}) {
+    if (!previousWaypoint || !waypoint || !nextWaypoint) return null;
+    const coordinates = [previousWaypoint, waypoint, nextWaypoint];
+    if (coordinates.some((point) => !Number.isFinite(point.latitude) || !Number.isFinite(point.longitude))) {
+        return null;
+    }
+
+    const referenceLat = waypoint.latitude;
+    const referenceLon = waypoint.longitude;
+    const previousLocal = projectToLocalMeters(referenceLat, referenceLon, previousWaypoint.latitude, previousWaypoint.longitude);
+    const currentLocal = { x: 0, y: 0 };
+    const nextLocal = projectToLocalMeters(referenceLat, referenceLon, nextWaypoint.latitude, nextWaypoint.longitude);
+
+    const inboundVectorRaw = {
+        x: currentLocal.x - previousLocal.x,
+        y: currentLocal.y - previousLocal.y
+    };
+    const outboundVectorRaw = {
+        x: nextLocal.x - currentLocal.x,
+        y: nextLocal.y - currentLocal.y
+    };
+    const inbound = normalizeVector(inboundVectorRaw);
+    const outbound = normalizeVector(outboundVectorRaw);
+    if (!inbound || !outbound) return null;
+
+    const dot = clamp((inbound.x * outbound.x) + (inbound.y * outbound.y), -1, 1);
+    const turnAngle = Math.acos(dot);
+    const turnAngleDeg = turnAngle * 180 / Math.PI;
+    if (!Number.isFinite(turnAngle) || turnAngle < 1 * Math.PI / 180 || turnAngle > 175 * Math.PI / 180) {
+        return null;
+    }
+
+    const cross = (inbound.x * outbound.y) - (inbound.y * outbound.x);
+    const turnDirection = cross >= 0 ? 'left' : 'right';
+    const radiusMeters = Math.max(150, options.turnRadiusMeters ?? 1852);
+    const inboundLength = inbound.length;
+    const outboundLength = outbound.length;
+    const desiredLead = radiusMeters * Math.tan(turnAngle / 2);
+    const maxLead = Math.max(0, Math.min(inboundLength, outboundLength) - 50);
+    const leadDistance = Math.min(desiredLead, maxLead);
+    if (!Number.isFinite(leadDistance) || leadDistance < 25) {
+        return null;
+    }
+
+    const entry = {
+        x: currentLocal.x - inbound.x * leadDistance,
+        y: currentLocal.y - inbound.y * leadDistance
+    };
+    const exit = {
+        x: currentLocal.x + outbound.x * leadDistance,
+        y: currentLocal.y + outbound.y * leadDistance
+    };
+
+    const inwardNormal = turnDirection === 'left' ? rotateLeft(inbound) : rotateRight(inbound);
+    const outwardNormal = turnDirection === 'left' ? rotateLeft(outbound) : rotateRight(outbound);
+    const center = {
+        x: entry.x + inwardNormal.x * radiusMeters,
+        y: entry.y + inwardNormal.y * radiusMeters
+    };
+    const expectedCenter = {
+        x: exit.x + outwardNormal.x * radiusMeters,
+        y: exit.y + outwardNormal.y * radiusMeters
+    };
+    const centerError = Math.hypot(center.x - expectedCenter.x, center.y - expectedCenter.y);
+    if (!Number.isFinite(centerError) || centerError > Math.max(20, radiusMeters * 0.2)) {
+        return null;
+    }
+
+    const startAngle = Math.atan2(entry.y - center.y, entry.x - center.x);
+    let endAngle = Math.atan2(exit.y - center.y, exit.x - center.x);
+    if (turnDirection === 'left' && endAngle <= startAngle) endAngle += Math.PI * 2;
+    if (turnDirection === 'right' && endAngle >= startAngle) endAngle -= Math.PI * 2;
+    const arcAngle = endAngle - startAngle;
+    const arcLength = Math.abs(arcAngle) * radiusMeters;
+
+    return {
+        referenceLat,
+        referenceLon,
+        radiusMeters,
+        leadDistance,
+        desiredLead,
+        turnAngleDeg,
+        turnDirection,
+        entry: {
+            ...projectFromLocalMeters(referenceLat, referenceLon, entry.x, entry.y),
+            x: entry.x,
+            y: entry.y
+        },
+        exit: {
+            ...projectFromLocalMeters(referenceLat, referenceLon, exit.x, exit.y),
+            x: exit.x,
+            y: exit.y
+        },
+        center: {
+            ...projectFromLocalMeters(referenceLat, referenceLon, center.x, center.y),
+            x: center.x,
+            y: center.y
+        },
+        inboundCourseDeg: calculateBearing(previousWaypoint.latitude, previousWaypoint.longitude, waypoint.latitude, waypoint.longitude),
+        outboundCourseDeg: calculateBearing(waypoint.latitude, waypoint.longitude, nextWaypoint.latitude, nextWaypoint.longitude),
+        startAngle,
+        endAngle,
+        arcAngle,
+        arcLength,
+        waypoint: {
+            latitude: waypoint.latitude,
+            longitude: waypoint.longitude,
+            name: waypoint.label || waypoint.name || 'WPT'
+        }
+    };
+}
+
+export function sampleFlyByRoute(waypoints = [], options = {}) {
+    const validWaypoints = (Array.isArray(waypoints) ? waypoints : []).filter(
+        (point) => Number.isFinite(point?.latitude) && Number.isFinite(point?.longitude)
+    );
+    if (validWaypoints.length === 0) return [];
+
+    const spacingMeters = Math.max(50, options.sampleSpacingMeters ?? 250);
+    const sampledPath = [{
+        latitude: validWaypoints[0].latitude,
+        longitude: validWaypoints[0].longitude,
+        name: validWaypoints[0].label || validWaypoints[0].name || 'WPT'
+    }];
+
+    const turnsByIndex = new Map();
+    for (let i = 1; i < validWaypoints.length - 1; i++) {
+        const turn = buildFlyByTurn(validWaypoints[i - 1], validWaypoints[i], validWaypoints[i + 1], options);
+        if (turn) turnsByIndex.set(i, turn);
+    }
+
+    for (let segmentIndex = 0; segmentIndex < validWaypoints.length - 1; segmentIndex++) {
+        const startWaypoint = validWaypoints[segmentIndex];
+        const endWaypoint = validWaypoints[segmentIndex + 1];
+        const startTurn = turnsByIndex.get(segmentIndex);
+        const endTurn = turnsByIndex.get(segmentIndex + 1);
+
+        const referenceLat = startWaypoint.latitude;
+        const referenceLon = startWaypoint.longitude;
+        const startLocal = startTurn
+            ? projectToLocalMeters(referenceLat, referenceLon, startTurn.exit.latitude, startTurn.exit.longitude)
+            : { x: 0, y: 0 };
+        const endLocal = endTurn
+            ? projectToLocalMeters(referenceLat, referenceLon, endTurn.entry.latitude, endTurn.entry.longitude)
+            : projectToLocalMeters(referenceLat, referenceLon, endWaypoint.latitude, endWaypoint.longitude);
+
+        appendSampledPoints(
+            sampledPath,
+            sampleStraightSegment(startLocal, endLocal, spacingMeters, (x, y) => {
+                const point = projectFromLocalMeters(referenceLat, referenceLon, x, y);
+                return {
+                    ...point,
+                    name: endWaypoint.label || endWaypoint.name || 'WPT'
+                };
+            })
+        );
+
+        if (endTurn) {
+            const arcSteps = Math.max(6, Math.ceil(endTurn.arcLength / spacingMeters));
+            const arcPoints = [];
+            for (let step = 1; step <= arcSteps; step++) {
+                const t = step / arcSteps;
+                const angle = endTurn.startAngle + (endTurn.arcAngle * t);
+                const x = endTurn.center.x + Math.cos(angle) * endTurn.radiusMeters;
+                const y = endTurn.center.y + Math.sin(angle) * endTurn.radiusMeters;
+                arcPoints.push({
+                    ...projectFromLocalMeters(endTurn.referenceLat, endTurn.referenceLon, x, y),
+                    name: endTurn.waypoint.name
+                });
+            }
+            appendSampledPoints(sampledPath, arcPoints);
+        }
+    }
+
+    return sampledPath;
 }

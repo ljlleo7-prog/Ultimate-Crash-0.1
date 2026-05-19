@@ -1,4 +1,4 @@
-import React, { useRef, useState, useEffect, useMemo } from 'react';
+import React, { useRef, useState, useEffect, useMemo, startTransition } from 'react';
 import { useAircraftPhysics } from '../hooks/useAircraftPhysics';
 import { useLanguage } from '../contexts/LanguageContext';
 import { updateWeather } from '../services/weatherService';
@@ -72,6 +72,7 @@ const FlightInProgress = ({
   routeDetails,
   isTutorial = false,
   activeTutorial = null,
+  activeChallenge = null,
   onTutorialClose,
   offlineMode = false
 }) => {
@@ -92,7 +93,11 @@ const FlightInProgress = ({
   const flightPlanFuelWeight = flightPlan && flightPlan.fuel && typeof flightPlan.fuel.totalFuel === 'number'
     ? flightPlan.fuel.totalFuel
     : 0;
-  const tutorialSpawnPreset = activeTutorial?.launchConfig?.spawnPreset || null;
+  const activeScenario = activeChallenge || activeTutorial || null;
+  const scenarioSpawnPreset = activeScenario?.launchConfig?.spawnPreset || null;
+  const scenarioRestrictions = activeScenario?.launchConfig?.restrictions || {};
+  const isScenarioMode = Boolean(activeScenario);
+  const isDirectScenarioMode = isTutorial || Boolean(activeChallenge);
 
   const offsetPointFromReference = React.useCallback((reference, headingDeg, distanceNm) => {
     if (!reference || !Number.isFinite(reference.latitude) || !Number.isFinite(reference.longitude)) {
@@ -115,8 +120,8 @@ const FlightInProgress = ({
   const isEastward = selectedArrival && selectedDeparture ? selectedArrival.longitude > selectedDeparture.longitude : null;
   const baseRunwayHeadingDeg = getRunwayHeading(runwayName, isEastward);
 
-  const tutorialSpawn = useMemo(() => {
-    if (!isTutorial || !tutorialSpawnPreset) {
+  const scenarioSpawn = useMemo(() => {
+    if (!isScenarioMode || !scenarioSpawnPreset) {
       return null;
     }
 
@@ -127,7 +132,7 @@ const FlightInProgress = ({
     const departureGeometry = departureCode ? airportService.getRunwayGeometry(departureCode, departureRunwayName) : null;
     const arrivalGeometry = arrivalCode && arrivalRunwayName ? airportService.getRunwayGeometry(arrivalCode, arrivalRunwayName) : null;
 
-    if (tutorialSpawnPreset.type === 'runway' && departureGeometry?.thresholdStart) {
+    if (scenarioSpawnPreset.type === 'runway' && departureGeometry?.thresholdStart) {
       const runwayPoint = offsetPointFromReference(
         departureGeometry.thresholdStart,
         departureGeometry.heading,
@@ -137,66 +142,65 @@ const FlightInProgress = ({
       return {
         latitude: runwayPoint?.latitude ?? departureGeometry.thresholdStart.latitude,
         longitude: runwayPoint?.longitude ?? departureGeometry.thresholdStart.longitude,
-        heading: departureGeometry.heading,
-        altitude: undefined,
-        speed: undefined
+        heading: scenarioSpawnPreset.heading ?? departureGeometry.heading,
+        altitude: scenarioSpawnPreset.altitude,
+        speed: scenarioSpawnPreset.speed
       };
     }
 
-    if (tutorialSpawnPreset.type === 'departure-airborne' && departureGeometry?.thresholdStart) {
+    if (scenarioSpawnPreset.type === 'departure-airborne' && departureGeometry?.thresholdStart) {
       const airbornePoint = offsetPointFromReference(
         departureGeometry.thresholdStart,
         departureGeometry.heading,
-        tutorialSpawnPreset.distanceNm || 8
+        scenarioSpawnPreset.distanceNm || 8
       );
 
       return {
         latitude: airbornePoint?.latitude ?? departureGeometry.thresholdStart.latitude,
         longitude: airbornePoint?.longitude ?? departureGeometry.thresholdStart.longitude,
-        heading: departureGeometry.heading,
-        altitude: tutorialSpawnPreset.altitude ?? 9000,
-        speed: tutorialSpawnPreset.speed ?? 240
+        heading: scenarioSpawnPreset.heading ?? departureGeometry.heading,
+        altitude: scenarioSpawnPreset.altitude ?? 9000,
+        speed: scenarioSpawnPreset.speed ?? 240
       };
     }
 
-    if (tutorialSpawnPreset.type === 'approach-final' && arrivalGeometry?.thresholdStart) {
+    if (scenarioSpawnPreset.type === 'approach-final' && arrivalGeometry?.thresholdStart) {
       const reciprocalHeading = (arrivalGeometry.heading + 180) % 360;
       const finalPoint = offsetPointFromReference(
         arrivalGeometry.thresholdStart,
         reciprocalHeading,
-        tutorialSpawnPreset.distanceNm || 10
+        scenarioSpawnPreset.distanceNm || 10
       );
 
       return {
         latitude: finalPoint?.latitude ?? arrivalGeometry.thresholdStart.latitude,
         longitude: finalPoint?.longitude ?? arrivalGeometry.thresholdStart.longitude,
-        heading: arrivalGeometry.heading,
-        altitude: tutorialSpawnPreset.altitude ?? 3000,
-        speed: tutorialSpawnPreset.speed ?? 180
+        heading: scenarioSpawnPreset.heading ?? arrivalGeometry.heading,
+        altitude: scenarioSpawnPreset.altitude ?? 3000,
+        speed: scenarioSpawnPreset.speed ?? 180
       };
     }
 
-    if (tutorialSpawnPreset.type === 'enroute-midpoint' && selectedDeparture && selectedArrival) {
+    if (scenarioSpawnPreset.type === 'enroute-midpoint' && selectedDeparture && selectedArrival) {
       const midpoint = {
         latitude: (selectedDeparture.latitude + selectedArrival.latitude) / 2,
         longitude: (selectedDeparture.longitude + selectedArrival.longitude) / 2
       };
-      const heading = departureGeometry?.heading ?? baseRunwayHeadingDeg;
+      const heading = scenarioSpawnPreset.heading ?? departureGeometry?.heading ?? baseRunwayHeadingDeg;
 
       return {
         latitude: midpoint.latitude,
         longitude: midpoint.longitude,
         heading,
-        altitude: tutorialSpawnPreset.altitude ?? 20000,
-        speed: tutorialSpawnPreset.speed ?? 280
+        altitude: scenarioSpawnPreset.altitude ?? 20000,
+        speed: scenarioSpawnPreset.speed ?? 280
       };
     }
 
     return null;
   }, [
-    activeTutorial,
-    isTutorial,
-    tutorialSpawnPreset,
+    isScenarioMode,
+    scenarioSpawnPreset,
     selectedDeparture,
     selectedArrival,
     routeDetails,
@@ -209,11 +213,11 @@ const FlightInProgress = ({
   let runwayHeadingRad = runwayHeadingDeg * Math.PI / 180;
 
   // Calculate Spawn Position (Runway Threshold)
-  let initialLat = tutorialSpawn?.latitude ?? initialDeparture?.latitude ?? 37.6188;
-  let initialLon = tutorialSpawn?.longitude ?? initialDeparture?.longitude ?? -122.3750;
+  let initialLat = scenarioSpawn?.latitude ?? initialDeparture?.latitude ?? 37.6188;
+  let initialLon = scenarioSpawn?.longitude ?? initialDeparture?.longitude ?? -122.3750;
 
-  if (tutorialSpawn) {
-      runwayHeadingDeg = Number.isFinite(tutorialSpawn.heading) ? tutorialSpawn.heading : runwayHeadingDeg;
+  if (scenarioSpawn) {
+      runwayHeadingDeg = Number.isFinite(scenarioSpawn.heading) ? scenarioSpawn.heading : runwayHeadingDeg;
       runwayHeadingRad = runwayHeadingDeg * Math.PI / 180;
   } else if (initialDeparture && runwayName) {
       // Try to get runway geometry to spawn at the threshold
@@ -256,19 +260,22 @@ const FlightInProgress = ({
     windSpeedKts: weatherData && typeof weatherData.windSpeed === 'number'
       ? weatherData.windSpeed
       : 0,
+    windDirection: weatherData?.windDirection ?? 0,
     initialLatitude: initialLat,
     initialLongitude: initialLon,
-    initialHeading: tutorialSpawn?.heading ?? runwayHeadingDeg,
+    initialHeading: scenarioSpawn?.heading ?? runwayHeadingDeg,
     airportElevation: initialDeparture?.elevation || 0,
-    initialAltitude: tutorialSpawn?.altitude,
-    initialSpeed: tutorialSpawn?.speed,
+    initialAltitude: scenarioSpawn?.altitude,
+    initialSpeed: scenarioSpawn?.speed,
     flightPlan: activeRouteWaypoints,
     departure: selectedDeparture,
     arrival: selectedArrival,
     departureRunway: (routeDetails?.departureRunway) || (flightPlan?.departure?.runways?.[0]?.name),
     arrivalRunway: (routeDetails?.landingRunway) || (flightPlan?.arrival?.runways?.[0]?.name),
     difficulty: difficulty,
-    failureType: failureType
+    failureType: failureType,
+    scenarioRestrictions,
+    scenarioMode: isScenarioMode
   }), [
     aircraftModel,
     totalPayloadWeight,
@@ -285,7 +292,9 @@ const FlightInProgress = ({
     selectedDeparture,
     selectedArrival,
     difficulty,
-    failureType
+    failureType,
+    scenarioRestrictions,
+    isScenarioMode
   ]);
   const {
     flightData,
@@ -340,20 +349,20 @@ const FlightInProgress = ({
   }, [flightData, initialLat, initialLon]);
 
   // Control state for UI components
-  const { language } = useLanguage();
+  const { language, t } = useLanguage();
   const [, setThrottleControl] = useState(0); // Initialize at IDLE
   const [commandInput, setCommandInput] = useState('');
   const [radioMessages, setRadioMessages] = useState([]);
   const [npcOrders, setNpcOrders] = useState([]);
   const [currentFreq, setCurrentFreq] = useState(121.500);
-  const [useRealWeather] = useState(!offlineMode);
+  const [useRealWeather] = useState(true);
   const [sceneState, setSceneState] = useState(
-    isTutorial
+    isDirectScenarioMode
       ? {
           scenarioId: null,
-          status: 'tutorial',
+          status: activeChallenge ? 'challenge' : 'tutorial',
           phaseId: null,
-          phaseName: 'Tutorial',
+          phaseName: activeChallenge ? 'Challenge' : 'Tutorial',
           phaseType: null,
           elapsedInPhase: 0,
           totalElapsed: 0,
@@ -482,7 +491,7 @@ const FlightInProgress = ({
   const autoSaveMeta = useAutoCloudSave({
     enabled: !offlineMode && playerSettings.autoSaveEnabled,
     intervalMinutes: playerSettings.autoSaveIntervalMinutes,
-    isInitialized: !offlineMode && isInitialized && playerSettingsLoaded && !isTutorial,
+    isInitialized: !offlineMode && isInitialized && playerSettingsLoaded && !isDirectScenarioMode,
     flightData,
     physicsState,
     physicsService,
@@ -502,18 +511,18 @@ const FlightInProgress = ({
   }, [autoSaveMeta.isSaving, autoSaveMeta.lastSavedAt, autoSaveMeta.saveError]);
 
   useEffect(() => {
-    if (!isTutorial) {
+    if (!isDirectScenarioMode) {
       return;
     }
 
     setNarrative(null);
-    setPhaseName('Tutorial');
+    setPhaseName(activeChallenge ? 'Challenge' : 'Tutorial');
     setActiveFailures([]);
-    const tutorialSceneState = {
-      scenarioId: null,
-      status: 'tutorial',
+    const scenarioSceneState = {
+      scenarioId: activeScenario?.id || null,
+      status: activeChallenge ? 'challenge' : 'tutorial',
       phaseId: null,
-      phaseName: 'Tutorial',
+      phaseName: activeChallenge ? 'Challenge' : 'Tutorial',
       phaseType: null,
       elapsedInPhase: 0,
       totalElapsed: 0,
@@ -524,9 +533,9 @@ const FlightInProgress = ({
       takeoffClearanceReceived: true,
       narrativeHistory: []
     };
-    lastSceneStateRef.current = tutorialSceneState;
-    setSceneState(tutorialSceneState);
-  }, [isTutorial]);
+    lastSceneStateRef.current = scenarioSceneState;
+    setSceneState(scenarioSceneState);
+  }, [isDirectScenarioMode, activeChallenge, activeScenario]);
 
   useEffect(() => {
     initializeATCPhraseologyTemplates();
@@ -536,8 +545,8 @@ const FlightInProgress = ({
     let mounted = true;
 
     const setupMultiplayer = async () => {
-      if (isTutorial || offlineMode) {
-        setMultiplayerStatus({ label: 'Offline', detail: offlineMode ? 'Offline mode enabled.' : 'Tutorial mode active.' });
+      if (isDirectScenarioMode || offlineMode) {
+        setMultiplayerStatus({ label: 'Offline', detail: offlineMode ? 'Offline mode enabled.' : 'Scenario mode active.' });
         return;
       }
 
@@ -621,7 +630,7 @@ const FlightInProgress = ({
       trafficSyncService.disconnect();
       multiplayerSessionService.leaveCurrentSession().catch(() => {});
     };
-  }, [isTutorial, offlineMode, callsign, aircraftModel, difficulty, failureType, selectedDeparture, selectedArrival]);
+  }, [isDirectScenarioMode, offlineMode, callsign, aircraftModel, difficulty, failureType, selectedDeparture, selectedArrival]);
 
   const submitRadioTransmission = (messageDataOrText, type, templateId, params, senderOverride) => {
     // Check if channel is busy
@@ -1020,14 +1029,36 @@ const FlightInProgress = ({
     }
   });
 
-  // Weather update effect
+  useEffect(() => {
+    if (!isInitialized || !physicsState || !setGear || !setFlaps) return;
+
+    const autopilotDebug = physicsState.autopilotDebug || {};
+    const ilsDebug = autopilotDebug.ils || {};
+    const ilsActive = autopilotDebug.mode === 'ILS' && ilsDebug.active;
+    const distAlongFt = Number.isFinite(ilsDebug.distAlong) ? ilsDebug.distAlong : Infinity;
+    const altitudeAglFt = Number.isFinite(physicsState?.derived?.altitude_agl_ft)
+      ? physicsState.derived.altitude_agl_ft
+      : Infinity;
+    const gearDown = physicsState?.gear === true || physicsState?.controls?.gear > 0.5;
+    const flapValue = Number.isFinite(physicsState?.flaps)
+      ? physicsState.flaps
+      : (Number.isFinite(physicsState?.controls?.flaps) ? physicsState.controls.flaps : 0);
+    const landingConfigGate = ilsActive && distAlongFt <= 6076 && altitudeAglFt <= 3000 && altitudeAglFt >= 80;
+    const landingFlapsTarget = 0.83;
+
+    if (!landingConfigGate) return;
+    if (!gearDown) setGear(true);
+    if (flapValue < landingFlapsTarget - 0.05) setFlaps(landingFlapsTarget);
+  }, [isInitialized, physicsState, setGear, setFlaps]);
+
   useEffect(() => {
     let interval;
 
-    if (useRealWeather && !offlineMode) {
+    if (useRealWeather) {
        const fetchRealWeather = async () => {
-         const lat = physicsService?.state?.geo?.lat || initialDeparture?.latitude || 37.6188;
-         const lon = physicsService?.state?.geo?.lon || initialDeparture?.longitude || -122.3750;
+         const svc = physicsServiceRef.current;
+         const lat = svc?.state?.geo?.lat || initialDeparture?.latitude || 37.6188;
+         const lon = svc?.state?.geo?.lon || initialDeparture?.longitude || -122.3750;
          
          try {
              const data = await realWeatherService.getWeather(lat, lon);
@@ -1058,7 +1089,7 @@ const FlightInProgress = ({
     }
 
     return () => clearInterval(interval);
-  }, [useRealWeather, offlineMode, setEnvironment, physicsService]); // Removed weatherData and setWeatherData to prevent loops
+  }, [useRealWeather, offlineMode, setEnvironment]); // physicsServiceRef used inside to always read live position
 
   // Terrain update effect
   useEffect(() => {
@@ -1095,7 +1126,7 @@ const FlightInProgress = ({
 
   // Update scene manager with selected flight parameters
   useEffect(() => {
-    if (isTutorial) {
+    if (isDirectScenarioMode) {
       return;
     }
 
@@ -1122,7 +1153,7 @@ const FlightInProgress = ({
 
       console.log('✅ FlightInProgress: Scene manager updated successfully');
     }
-  }, [callsign, selectedDeparture, selectedArrival, aircraftModel, routeDetails, runwayHeadingDeg, isTutorial]);
+  }, [callsign, selectedDeparture, selectedArrival, aircraftModel, routeDetails, runwayHeadingDeg, isDirectScenarioMode]);
 
   // Trigger Physics ILS update when radio frequency changes
   useEffect(() => {
@@ -1169,7 +1200,7 @@ const FlightInProgress = ({
 
   // Main update loop
   useEffect(() => {
-    if (isTutorial) {
+    if (isDirectScenarioMode) {
       setMotionEnabled?.(true);
     } else {
       sceneManager.start();
@@ -1200,7 +1231,7 @@ const FlightInProgress = ({
         }
       }
 
-      if (!isTutorial) {
+      if (!isDirectScenarioMode) {
         sceneManager.update(steppedDt || frameDt, physicsSnapshot);
         const nextState = sceneManager.getState();
         const previousState = lastSceneStateRef.current;
@@ -1219,7 +1250,9 @@ const FlightInProgress = ({
 
         if (shouldUpdateSceneState) {
           lastSceneStateRef.current = nextState;
-          setSceneState(nextState);
+          startTransition(() => {
+            setSceneState(nextState);
+          });
         }
       }
 
@@ -1231,7 +1264,7 @@ const FlightInProgress = ({
         cancelAnimationFrame(animationId);
       }
     };
-  }, [isTutorial, setMotionEnabled]);
+  }, [isDirectScenarioMode, setMotionEnabled]);
 
   useEffect(() => {
     if (offlineMode) {
@@ -1539,6 +1572,35 @@ const FlightInProgress = ({
     submitNPCCommand(trimmed);
     setCommandInput('');
   };
+  const ilsRunwayOptions = useMemo(() => {
+    const airportCode = selectedArrival?.iata || selectedArrival?.icao;
+    const runways = Array.isArray(selectedArrival?.runways) ? selectedArrival.runways : [];
+    if (!airportCode || runways.length === 0) return [];
+
+    return runways
+      .flatMap((runway) => {
+        const runwayLabel = String(runway.name || '').trim();
+        if (!runwayLabel) return [];
+
+        const geometry = airportService.getRunwayGeometry(airportCode, runwayLabel);
+        if (!geometry) return [];
+
+        const runwayEnds = runwayLabel
+          .split(/[\/-]/)
+          .map((part) => part.trim())
+          .filter(Boolean);
+
+        return runwayEnds.map((runwayEnd) => {
+          const endGeometry = airportService.getRunwayGeometry(airportCode, runwayEnd);
+          return {
+            runwayName: runwayEnd,
+            ilsFrequency: endGeometry?.ilsFrequency,
+          };
+        });
+      })
+      .filter((option) => Number.isFinite(option.ilsFrequency))
+      .filter((option, index, all) => all.findIndex((candidate) => candidate.runwayName === option.runwayName) === index);
+  }, [selectedArrival]);
 
 
 
@@ -1787,7 +1849,8 @@ const FlightInProgress = ({
           <FlightPanelModular
             flightData={{
               ...flightData,
-              trueAirspeed: flightData?.trueAirspeed ?? flightData?.derived?.airspeed,
+              trueAirspeed: flightData?.trueAirspeed,
+              indicatedAirspeed: flightData?.indicatedAirspeed ?? flightData?.derived?.indicatedAirspeed ?? flightData?.airspeed,
               groundSpeed: flightData?.groundSpeed ?? flightData?.derived?.groundSpeed,
               physicsActive: sceneState.physicsActive,
               narrativeHistory: sceneState.narrativeHistory,
@@ -1813,6 +1876,7 @@ const FlightInProgress = ({
             playerSettings={playerSettings}
             playerSettingsError={offlineMode ? null : playerSettingsError}
             autoSaveStatus={offlineMode ? { isSaving: false, lastSavedAt: null, saveError: null } : autoSaveStatus}
+            ilsRunwayOptions={ilsRunwayOptions}
             onUpdatePlayerSettings={handlePlayerSettingsChange}
             onActionRequest={(action, payload, extra) => {
               const payloadStr = typeof payload === 'number' ? payload.toFixed(5) : JSON.stringify(payload);
@@ -1856,6 +1920,10 @@ const FlightInProgress = ({
                   console.log(`📡 FlightPanel Action: ${action} = ${payload}`);
                   break;
                 case 'toggle-autopilot': {
+                  if (scenarioRestrictions.autopilotForbidden) {
+                    console.warn('Autopilot is disabled for this challenge.');
+                    break;
+                  }
                   if (physicsService && typeof physicsService.setAutopilot === 'function') {
                     const status = typeof physicsService.getAutopilotStatus === 'function'
                       ? physicsService.getAutopilotStatus()
@@ -1867,6 +1935,10 @@ const FlightInProgress = ({
                   break;
                 }
                 case 'set-autopilot-mode': {
+                  if (scenarioRestrictions.autopilotForbidden) {
+                    console.warn('Autopilot modes are disabled for this challenge.');
+                    break;
+                  }
                   if (physicsService && typeof physicsService.setAutopilotMode === 'function') {
                     physicsService.setAutopilotMode(payload);
                   }
@@ -1874,6 +1946,10 @@ const FlightInProgress = ({
                   break;
                 }
                 case 'set-autopilot-targets': {
+                  if (scenarioRestrictions.autopilotForbidden) {
+                    console.warn('Autopilot targets are disabled for this challenge.');
+                    break;
+                  }
                   if (physicsService && typeof physicsService.updateAutopilotTargets === 'function' && payload) {
                     // Direct pass-through for RealisticAutopilotService (Imperial Units)
                     // ModernAutopilotModule sends: { ias, vs, altitude }
@@ -1889,8 +1965,21 @@ const FlightInProgress = ({
                   break;
                 }
                 case 'set-nav-frequency': {
+                  if (scenarioRestrictions.autopilotForbidden) {
+                    console.warn('NAV tuning is disabled because autopilot is forbidden for this challenge.');
+                    break;
+                  }
                   if (physicsService && physicsService.autopilot && typeof physicsService.autopilot.setNavFrequency === 'function') {
                     physicsService.autopilot.setNavFrequency(payload);
+
+                    const arrivalAirportCode = selectedArrival?.iata || selectedArrival?.icao;
+                    const matchedIlsRunway = ilsRunwayOptions.find((option) => Math.abs(option.ilsFrequency - payload) < 0.01);
+                    if (arrivalAirportCode && matchedIlsRunway && typeof physicsService.setRunwayGeometry === 'function') {
+                      const geometry = airportService.getRunwayGeometry(arrivalAirportCode, matchedIlsRunway.runwayName);
+                      if (geometry) {
+                        physicsService.setRunwayGeometry({ ...geometry, ilsFrequency: payload });
+                      }
+                    }
                     console.log(`📡 FlightPanel Action: ${action} = ${payload}`);
                   }
                   break;

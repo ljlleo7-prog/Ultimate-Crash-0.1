@@ -1,0 +1,390 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<title>Boeing 737-800 Main Panel</title>
+<style>
+:root{
+  --sky:#1a6aaa;--gnd:#6b3a10;--green:#00e000;--amber:#ffaa00;
+  --cyan:#00d4ff;--mag:#ff44ff;--red:#ff3333;
+  --panel:#1a1d20;--bezel:#2a2e32;--frame:#3a3f44;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{background:#5a5f64;font-family:'Courier New',monospace;display:flex;justify-content:center;padding:12px;}
+
+/* outer wrap */
+.wrap{width:1100px;display:flex;flex-direction:column;background:#2a2e32;border:3px solid #111;border-radius:6px;}
+
+/* MCP */
+.mcp{background:linear-gradient(180deg,#2e3338,#1a1d20);border-bottom:2px solid #111;
+  padding:4px 8px;display:flex;align-items:center;gap:4px;height:60px;border-radius:4px 4px 0 0;}
+.ms{display:flex;flex-direction:column;align-items:center;padding:0 4px;border-right:1px solid #444;}
+.ms:last-child{border:none;}
+.ml{font-size:6px;color:#777;letter-spacing:.05em;margin-bottom:1px;}
+.mv{font-size:12px;color:var(--cyan);background:#000;border:1px solid #333;
+  padding:1px 4px;border-radius:2px;min-width:50px;text-align:center;}
+.mb{background:linear-gradient(180deg,#484e54,#2e3338);border:1px solid #1a1d20;border-radius:2px;
+  color:#bbb;font-size:7px;padding:1px 5px;cursor:pointer;white-space:nowrap;}
+.mb.on{background:linear-gradient(180deg,#1a3a1a,#0e2010);color:var(--green);border-color:#1a4a1a;}
+.mb.cmd{background:linear-gradient(180deg,#1a2a3a,#0e1820);color:var(--cyan);border-color:#1a3a5a;}
+.knob{width:18px;height:18px;border-radius:50%;background:radial-gradient(circle at 35% 35%,#666,#222);
+  border:2px solid #555;position:relative;flex-shrink:0;}
+.knob::after{content:"";position:absolute;width:2px;height:6px;background:#ccc;top:2px;left:7px;}
+
+/* 5-column body: stby | pfd | center(2) | pfd | stby */
+.body{display:grid;grid-template-columns:72px 1fr 1fr 180px;gap:3px;padding:4px;background:#2a2e32;align-items:start;}
+
+/* bezel frame for each display */
+.frame{background:#111;border:3px solid var(--frame);border-radius:3px;position:relative;overflow:hidden;}
+.frame-label{position:absolute;top:2px;left:50%;transform:translateX(-50%);
+  font-size:6px;color:#555;letter-spacing:.1em;z-index:5;}
+
+/* standby column */
+.stby-col{display:flex;flex-direction:column;gap:3px;justify-content:flex-start;}
+.ag{width:64px;height:64px;border-radius:50%;background:#000;border:3px solid #555;position:relative;flex-shrink:0;}
+.ag .face{position:absolute;inset:4px;border-radius:50%;}
+.ag .ndl{position:absolute;width:2px;height:18px;background:#fff;bottom:50%;left:50%;
+  transform-origin:bottom center;margin-left:-1px;}
+.ag .hub{position:absolute;width:5px;height:5px;border-radius:50%;background:#888;
+  top:50%;left:50%;transform:translate(-50%,-50%);}
+.ag .lbl{position:absolute;bottom:4px;left:50%;transform:translateX(-50%);
+  font-size:5px;color:#888;white-space:nowrap;}
+
+/* PFD column */
+.pfd-col{display:flex;flex-direction:column;gap:3px;}
+.pfd{height:290px;}
+.nd{height:290px;}
+
+/* PFD internals */
+.fma{position:absolute;top:0;left:0;right:0;height:24px;background:#000;
+  border-bottom:1px solid #2a2e32;display:flex;z-index:10;}
+.fc{flex:1;border-right:1px solid #2a2e32;display:flex;flex-direction:column;
+  align-items:center;justify-content:center;padding:1px;}
+.fc:last-child{border:none;}
+.fe{font-size:8px;font-weight:bold;color:var(--green);}
+.fe.box{border:1px solid var(--green);padding:0 2px;}
+.fa{font-size:6px;color:#666;}
+
+.spd{position:absolute;left:0;top:24px;bottom:44px;width:60px;
+  background:rgba(0,0,0,.85);border-right:1px solid #333;overflow:hidden;}
+.spd-box{position:absolute;right:0;top:50%;transform:translateY(-50%);
+  background:#000;border:2px solid #fff;width:42px;height:20px;
+  display:flex;align-items:center;justify-content:center;}
+.spd-val{font-size:13px;color:#fff;font-weight:bold;}
+.spd-lbl{position:absolute;top:2px;left:2px;font-size:5px;color:#888;}
+
+.alt{position:absolute;right:0;top:24px;bottom:44px;width:60px;
+  background:rgba(0,0,0,.85);border-left:1px solid #333;overflow:hidden;}
+.alt-box{position:absolute;left:0;top:50%;transform:translateY(-50%);
+  background:#000;border:2px solid #fff;width:60px;height:24px;
+  display:flex;align-items:center;justify-content:center;flex-direction:column;}
+.alt-val{font-size:11px;color:#fff;font-weight:bold;line-height:1;}
+.alt-sub{font-size:8px;color:#fff;line-height:1;}
+.alt-lbl{position:absolute;top:2px;right:2px;font-size:5px;color:#888;}
+.qnh{position:absolute;bottom:2px;right:2px;font-size:6px;color:var(--cyan);}
+
+.vsi{position:absolute;right:60px;top:24px;bottom:44px;width:12px;background:rgba(0,0,0,.4);}
+.vsi-ndl{position:absolute;right:1px;width:3px;background:var(--green);border-radius:2px;}
+
+.adi{position:absolute;left:60px;right:72px;top:24px;bottom:44px;overflow:hidden;}
+.sky-bg{position:absolute;inset:0;background:var(--sky);}
+.gnd-bg{position:absolute;left:0;right:0;bottom:0;background:var(--gnd);}
+.hor{position:absolute;left:0;right:0;height:2px;background:rgba(255,255,255,.7);}
+.pl{position:absolute;left:22%;right:22%;height:1px;background:rgba(255,255,255,.5);}
+.pl.long{left:12%;right:12%;}
+.pl-lbl{position:absolute;font-size:6px;color:#fff;}
+.barc{position:absolute;top:3px;left:50%;transform:translateX(-50%);
+  width:100px;height:50px;border-top:1px solid rgba(255,255,255,.5);border-radius:50px 50px 0 0;}
+.bptr{position:absolute;top:1px;left:50%;
+  width:0;height:0;border-left:4px solid transparent;border-right:4px solid transparent;
+  border-bottom:7px solid #fff;margin-left:-4px;}
+.asym{position:absolute;left:50%;transform:translateX(-50%);}
+.asym-wing{position:absolute;height:3px;background:var(--amber);}
+.asym-nose{position:absolute;left:50%;width:3px;background:var(--amber);margin-left:-1px;}
+
+.ils-h{position:absolute;bottom:44px;left:60px;right:72px;height:9px;
+  display:flex;align-items:center;justify-content:center;}
+.ils-dot{width:5px;height:5px;border-radius:50%;border:1px solid rgba(255,255,255,.3);margin:0 4px;}
+.ils-dot.c{border-color:rgba(255,255,255,.6);}
+.ils-ptr{position:absolute;width:7px;height:7px;border-radius:50%;background:var(--mag);}
+
+.hdg{position:absolute;bottom:0;left:60px;right:72px;height:42px;
+  background:rgba(0,0,0,.9);border-top:1px solid #333;overflow:hidden;}
+.hdg-box{position:absolute;top:0;left:50%;transform:translateX(-50%);
+  background:#000;border:1px solid #fff;width:34px;height:16px;
+  display:flex;align-items:center;justify-content:center;}
+.hdg-val{font-size:11px;color:#fff;font-weight:bold;}
+.hdg-ptr{position:absolute;top:0;left:50%;
+  width:0;height:0;border-left:3px solid transparent;border-right:3px solid transparent;
+  border-top:5px solid #fff;margin-left:-3px;}
+.gs-tas{position:absolute;bottom:2px;left:2px;font-size:6px;color:#ccc;}
+.gs-tas span{color:var(--green);}
+.trk{position:absolute;bottom:2px;right:2px;font-size:6px;color:var(--mag);}
+
+/* center column */
+.ctr-col{display:flex;flex-direction:column;gap:3px;}
+.eicas-upper{height:170px;}
+.eicas-lower{flex:1;}
+.etitle{font-size:6px;color:#555;text-align:center;border-bottom:1px solid #1a1d20;
+  padding-bottom:2px;margin-bottom:2px;letter-spacing:.1em;}
+.eng-row{display:flex;justify-content:space-around;margin-top:3px;}
+.eng-col{display:flex;flex-direction:column;align-items:center;gap:1px;}
+.elbl{font-size:6px;color:#666;}
+.eval{font-size:9px;color:var(--green);}
+
+/* bottom strip */
+.bot{background:linear-gradient(180deg,#1e2226,#141618);border-top:2px solid #111;
+  padding:3px 8px;display:flex;align-items:center;gap:5px;height:30px;border-radius:0 0 4px 4px;}
+.bi{display:flex;flex-direction:column;align-items:center;}
+.bl{font-size:5px;color:#666;}
+.bv{font-size:9px;color:var(--cyan);}
+.bsep{width:1px;height:20px;background:#333;}
+.gear-box{display:flex;gap:2px;}
+.gear{width:12px;height:12px;border-radius:2px;border:1px solid #333;
+  display:flex;align-items:center;justify-content:center;
+  font-size:6px;font-weight:bold;}
+.gear.dn{background:#0a2a0a;color:var(--green);border-color:#1a4a1a;}
+
+/* tape tick helpers */
+.tape-ticks{position:absolute;left:0;right:0;top:0;bottom:0;display:flex;flex-direction:column;
+  justify-content:space-around;padding:28px 0;}
+.tape-ticks span{font-size:6px;color:#aaa;text-align:right;padding-right:3px;}
+.alt .tape-ticks span{text-align:left;padding-left:3px;}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<!-- MCP -->
+<div class="mcp">
+  <div class="ms"><div class="ml">IAS/MACH</div><div class="mv">250</div>
+    <div style="display:flex;gap:2px;margin-top:2px;"><button class="mb">-</button><button class="mb">+</button></div></div>
+  <div class="ms"><div class="ml">HDG/TRK</div><div class="mv">360</div>
+    <div style="display:flex;gap:2px;margin-top:2px;"><button class="mb">-</button><button class="mb">+</button></div></div>
+  <div class="ms" style="flex:1;flex-direction:row;gap:3px;border:none;">
+    <div style="display:flex;flex-direction:column;gap:2px;">
+      <button class="mb cmd">CMD A</button><button class="mb">CWS A</button>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:2px;">
+      <button class="mb on">A/T ARM</button><button class="mb">N1</button><button class="mb">SPEED</button>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:2px;">
+      <button class="mb">LNAV</button><button class="mb">VNAV</button><button class="mb on">HDG SEL</button>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:2px;">
+      <button class="mb">LVL CHG</button><button class="mb on">ALT HOLD</button><button class="mb">V/S</button>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:2px;">
+      <button class="mb">APP</button><button class="mb">VOR/LOC</button><button class="mb">G/S</button>
+    </div>
+    <div class="knob" style="margin:0 4px;"></div>
+    <div style="display:flex;flex-direction:column;gap:2px;">
+      <button class="mb cmd">CMD B</button><button class="mb">CWS B</button>
+    </div>
+  </div>
+  <div class="ms"><div class="ml">ALT</div><div class="mv">10000</div>
+    <div style="display:flex;gap:2px;margin-top:2px;"><button class="mb">-</button><button class="mb">+</button></div></div>
+  <div class="ms" style="border:none;"><div class="ml">V/S</div><div class="mv">+000</div>
+    <div style="display:flex;gap:2px;margin-top:2px;"><button class="mb">-</button><button class="mb">+</button></div></div>
+</div>
+
+<!-- 5-column body -->
+<div class="body">
+
+  <!-- col 1: captain standby -->
+  <div class="stby-col">
+    <div class="ag"><div class="face"></div><div class="ndl" style="transform:rotate(-60deg);"></div><div class="hub"></div><div class="lbl">STBY ASI</div></div>
+    <div class="ag"><div class="face" style="background:linear-gradient(180deg,var(--sky) 50%,var(--gnd) 50%);"></div><div class="hub"></div><div class="lbl">STBY ATT</div></div>
+    <div class="ag"><div class="face"></div><div class="ndl" style="transform:rotate(20deg);"></div><div class="hub"></div><div class="lbl">STBY ALT</div></div>
+  </div>
+
+  <!-- col 2: captain PFD -->
+  <div class="frame pfd">
+      <div class="frame-label">CAPT PFD</div>
+      <div class="fma">
+        <div class="fc"><span class="fe">250</span><span class="fa">MCP SPD</span></div>
+        <div class="fc"><span class="fe box">LNAV</span><span class="fa">ROLL</span></div>
+        <div class="fc"><span class="fe box">VNAV PTH</span><span class="fa">PITCH</span></div>
+        <div class="fc"><span class="fe">1</span><span class="fa">FD</span></div>
+        <div class="fc"><span class="fe" style="color:var(--green)">A/T</span><span class="fa">ARM</span></div>
+      </div>
+      <div class="spd">
+        <div class="spd-lbl">KTS</div>
+        <div class="tape-ticks">
+          <span>280</span><span>270</span><span>260</span><span>250</span><span>240</span><span>230</span><span>220</span>
+        </div>
+        <div class="spd-box"><span class="spd-val">250</span></div>
+      </div>
+      <div class="alt">
+        <div class="alt-lbl">FT</div>
+        <div class="tape-ticks">
+          <span>10500</span><span>10300</span><span>10100</span><span>10000</span><span>9900</span><span>9700</span><span>9500</span>
+        </div>
+        <div class="alt-box"><span class="alt-val">100</span><span class="alt-sub">10</span></div>
+        <div class="qnh">QNH 1013</div>
+      </div>
+      <div class="vsi"><div class="vsi-ndl" style="bottom:50%;height:18%;"></div></div>
+      <div class="adi">
+        <div class="sky-bg"></div>
+        <div class="gnd-bg" style="height:50%;"></div>
+        <div class="hor" style="top:50%;"></div>
+        <div class="pl" style="top:38%;"></div><div class="pl-lbl" style="top:37%;left:23%;">10</div><div class="pl-lbl" style="top:37%;right:23%;">10</div>
+        <div class="pl" style="top:62%;"></div><div class="pl-lbl" style="top:61%;left:23%;">10</div><div class="pl-lbl" style="top:61%;right:23%;">10</div>
+        <div class="pl long" style="top:26%;"></div><div class="pl-lbl" style="top:25%;left:13%;">20</div><div class="pl-lbl" style="top:25%;right:13%;">20</div>
+        <div class="barc"></div><div class="bptr"></div>
+        <div class="asym" style="top:50%;transform:translate(-50%,-50%);">
+          <div class="asym-wing" style="width:36px;left:-18px;top:0;"></div>
+          <div class="asym-nose" style="height:7px;top:-7px;"></div>
+        </div>
+      </div>
+      <div class="ils-h">
+        <div class="ils-dot"></div><div class="ils-dot"></div>
+        <div class="ils-ptr" style="left:calc(50% - 3px);"></div>
+        <div class="ils-dot c"></div><div class="ils-dot"></div><div class="ils-dot"></div>
+      </div>
+      <div class="hdg">
+        <div class="hdg-ptr"></div>
+        <div class="hdg-box"><span class="hdg-val">360</span></div>
+        <div style="position:absolute;top:18px;left:0;right:0;display:flex;justify-content:space-around;padding:0 8px;">
+          <span style="font-size:6px;color:#aaa;">340</span><span style="font-size:6px;color:#aaa;">350</span>
+          <span style="font-size:6px;color:#fff;font-weight:bold;">N</span>
+          <span style="font-size:6px;color:#aaa;">010</span><span style="font-size:6px;color:#aaa;">020</span>
+        </div>
+        <div class="gs-tas">GS <span>248</span> TAS <span>265</span></div>
+        <div class="trk">TRK 358</div>
+      </div>
+    </div>
+
+  <!-- col 3: captain ND -->
+  <div class="frame nd">
+      <div class="frame-label">CAPT ND</div>
+      <canvas id="nd-capt" style="position:absolute;inset:0;width:100%;height:100%;"></canvas>
+      <div style="position:absolute;top:8px;left:6px;font-size:7px;color:var(--cyan);">MAP 20NM</div>
+      <div style="position:absolute;top:8px;right:6px;font-size:7px;color:#fff;">HDG 360</div>
+      <div style="position:absolute;top:8px;left:50%;transform:translateX(-50%);font-size:7px;color:#fff;text-align:center;"><span style="color:var(--cyan);">270</span>/15KT</div>
+      <div style="position:absolute;bottom:6px;left:6px;font-size:7px;color:var(--green);">GS 248</div>
+      <div style="position:absolute;bottom:6px;right:6px;font-size:7px;color:var(--green);">TAS 265</div>
+  </div>
+
+  <!-- col 4: center EICAS stack -->
+  <div class="ctr-col">
+    <div class="frame eicas-upper">
+      <div class="etitle">ENGINE</div>
+      <canvas id="eicas-upper" style="width:100%;height:calc(100% - 14px);display:block;"></canvas>
+    </div>
+    <div class="frame eicas-lower" style="flex:1;padding:4px;">
+      <div class="etitle">SYSTEMS</div>
+      <div class="eng-row"><div class="eng-col"><div class="elbl">HYD A</div><div class="eval">3000</div></div><div class="eng-col"><div class="elbl">HYD B</div><div class="eval">3000</div></div></div>
+      <div class="eng-row"><div class="eng-col"><div class="elbl">FUEL L</div><div class="eval">9000</div></div><div class="eng-col"><div class="elbl">CTR</div><div class="eval">2000</div></div><div class="eng-col"><div class="elbl">FUEL R</div><div class="eval">9000</div></div></div>
+      <div class="eng-row"><div class="eng-col"><div class="elbl">AC</div><div class="eval">115V</div></div><div class="eng-col"><div class="elbl">DC</div><div class="eval">28V</div></div></div>
+      <div class="eng-row"><div class="eng-col"><div class="elbl">CAB ALT</div><div class="eval">0</div></div><div class="eng-col"><div class="elbl">DIFF</div><div class="eval">0.0</div></div></div>
+    </div>
+  </div>
+
+
+</div><!-- /body -->
+
+<!-- bottom strip -->
+<div class="bot">
+  <div class="bi"><div class="bl">FLAPS</div><div class="bv">0</div></div>
+  <div class="bsep"></div>
+  <div class="bi"><div class="bl">GEAR</div><div class="gear-box"><div class="gear dn">N</div><div class="gear dn">L</div><div class="gear dn">R</div></div></div>
+  <div class="bsep"></div>
+  <div class="bi"><div class="bl">STAB TRIM</div><div class="bv">5.0 UP</div></div>
+  <div class="bsep"></div>
+  <div class="bi"><div class="bl">SPOILERS</div><div class="bv">RET</div></div>
+  <div class="bsep"></div>
+  <div class="bi"><div class="bl">AUTOBRK</div><div class="bv">OFF</div></div>
+  <div class="bsep"></div>
+  <div class="bi"><div class="bl">XPDR</div><div class="bv">2000</div></div>
+</div>
+
+</div><!-- /wrap -->
+
+<script>
+function drawND(id, hdg) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  const W = el.offsetWidth || 300, H = el.offsetHeight || 220;
+  el.width = W; el.height = H;
+  const ctx = el.getContext('2d');
+  const cx = W/2, cy = H/2 + 8, R = Math.min(W,H)*0.36;
+  ctx.clearRect(0,0,W,H);
+  ctx.beginPath(); ctx.arc(cx,cy,R,0,Math.PI*2);
+  ctx.fillStyle='rgba(0,20,50,0.85)'; ctx.fill();
+  ctx.strokeStyle='#444'; ctx.lineWidth=1.5; ctx.stroke();
+  ctx.save(); ctx.translate(cx,cy); ctx.rotate(-hdg*Math.PI/180);
+  const cards={0:'N',9:'E',18:'S',27:'W'};
+  for(let i=0;i<36;i++){
+    const a=i*10*Math.PI/180, long=i%3===0;
+    ctx.save(); ctx.rotate(a);
+    ctx.beginPath(); ctx.moveTo(0,-R+1); ctx.lineTo(0,-R+1+(long?10:5));
+    ctx.strokeStyle=long?'#ccc':'#555'; ctx.lineWidth=long?1.5:1; ctx.stroke();
+    if(long){
+      ctx.fillStyle=cards[i]?'#fff':'#999';
+      ctx.font=(cards[i]?'bold ':'')+`${cards[i]?9:7}px Courier New`;
+      ctx.textAlign='center'; ctx.textBaseline='middle';
+      ctx.fillText(cards[i]||(i*10).toString().padStart(3,'0'),0,-R+18);
+    }
+    ctx.restore();
+  }
+  ctx.restore();
+  // heading bug
+  ctx.save(); ctx.translate(cx,cy);
+  ctx.beginPath(); ctx.moveTo(0,-R); ctx.lineTo(-4,-R+9); ctx.lineTo(4,-R+9); ctx.closePath();
+  ctx.fillStyle='#ff44ff'; ctx.fill(); ctx.restore();
+  // aircraft symbol
+  ctx.save(); ctx.translate(cx,cy); ctx.strokeStyle='#ffaa00'; ctx.lineWidth=2;
+  ctx.beginPath(); ctx.moveTo(-16,0); ctx.lineTo(16,0); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(0,0); ctx.lineTo(0,-11); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(-7,6); ctx.lineTo(7,6); ctx.stroke();
+  ctx.restore();
+  // track line
+  ctx.save(); ctx.translate(cx,cy); ctx.strokeStyle='#ff44ff'; ctx.lineWidth=1.5;
+  ctx.setLineDash([4,3]); ctx.beginPath(); ctx.moveTo(0,-11); ctx.lineTo(0,-R+22); ctx.stroke();
+  ctx.restore();
+}
+
+function drawEICAS(id) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  const W = el.offsetWidth || 180, H = el.offsetHeight || 156;
+  el.width = W; el.height = H;
+  const ctx = el.getContext('2d');
+  ctx.clearRect(0,0,W,H);
+  const engs = [{x:W*0.28,n1:85.2,n2:91.4,egt:680,ff:2450},{x:W*0.72,n1:85.0,n2:91.2,egt:675,ff:2440}];
+  engs.forEach(e => {
+    const cx=e.x, cy=52, R=36;
+    const sa=Math.PI*0.75, sweep=Math.PI*1.5;
+    ctx.beginPath(); ctx.arc(cx,cy,R,sa,sa+sweep); ctx.strokeStyle='#333'; ctx.lineWidth=5; ctx.stroke();
+    ctx.beginPath(); ctx.arc(cx,cy,R,sa,sa+e.n1/100*sweep); ctx.strokeStyle='#00e000'; ctx.lineWidth=4; ctx.stroke();
+    for(let t=0;t<=10;t++){
+      const a=sa+t/10*sweep, inner=t%5===0?R-8:R-5;
+      ctx.beginPath(); ctx.moveTo(cx+Math.cos(a)*(R+2),cy+Math.sin(a)*(R+2));
+      ctx.lineTo(cx+Math.cos(a)*inner,cy+Math.sin(a)*inner);
+      ctx.strokeStyle='#777'; ctx.lineWidth=1; ctx.stroke();
+    }
+    const na=sa+e.n1/100*sweep;
+    ctx.beginPath(); ctx.moveTo(cx,cy); ctx.lineTo(cx+Math.cos(na)*(R-3),cy+Math.sin(na)*(R-3));
+    ctx.strokeStyle='#fff'; ctx.lineWidth=1.5; ctx.stroke();
+    ctx.beginPath(); ctx.arc(cx,cy,3,0,Math.PI*2); ctx.fillStyle='#555'; ctx.fill();
+    ctx.fillStyle='#00e000'; ctx.font='bold 11px Courier New'; ctx.textAlign='center';
+    ctx.fillText(e.n1.toFixed(1),cx,cy+13);
+    ctx.fillStyle='#666'; ctx.font='6px Courier New'; ctx.fillText('N1%',cx,cy-R-4);
+    const by=cy+R+8;
+    ctx.fillStyle='#888'; ctx.font='6px Courier New';
+    ctx.fillText('N2',cx-16,by); ctx.fillText('EGT',cx+16,by);
+    ctx.fillStyle='#00e000'; ctx.font='8px Courier New';
+    ctx.fillText(e.n2.toFixed(1),cx-16,by+10); ctx.fillText(e.egt,cx+16,by+10);
+    ctx.fillStyle='#888'; ctx.font='6px Courier New'; ctx.fillText('FF',cx,by+20);
+    ctx.fillStyle='#00e000'; ctx.font='8px Courier New'; ctx.fillText(e.ff,cx,by+30);
+  });
+}
+
+window.addEventListener('load', () => {
+  drawND('nd-capt', 0);
+  drawEICAS('eicas-upper');
+});
+</script>
+</body>
+</html>

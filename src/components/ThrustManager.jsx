@@ -8,7 +8,7 @@ const REVERSE_SYNC_THRESHOLD = -0.05;
 const FORWARD_SYNC_THRESHOLD = 0.02;
 const MANUAL_SYNC_LOCK_MS = 1200;
 
-const ThrustManager = ({ controlThrust, flightState }) => {
+const ThrustManager = ({ controlThrust, flightState, onSystemAction }) => {
   const engineCount =
     Array.isArray(flightState?.engineN1) ? flightState.engineN1.length :
     Array.isArray(flightState?.engineN2) ? flightState.engineN2.length : 2;
@@ -180,20 +180,19 @@ const ThrustManager = ({ controlThrust, flightState }) => {
   };
 
   const lever = (index) => {
-    const n1 = Array.isArray(flightState?.engineN1) ? flightState.engineN1[index] : flightState?.engineN1 || 22;
-    const n2 = Array.isArray(flightState?.engineN2) ? flightState.engineN2[index] : flightState?.engineN2 || 45;
-    const egt = Array.isArray(flightState?.engineEGT) ? flightState.engineEGT[index] : flightState?.engineEGT || 400;
     const pct = displayThrottles[index];
     const isRev = reverse[index];
+    const engineKey = `eng${index + 1}`;
+    const engineRunning = !!flightState?.systems?.engines?.[engineKey]?.fuelControl;
 
     return React.createElement('div', {
       key: index,
       style: {
         background: 'rgba(0, 0, 0, 0.3)',
-        padding: '8px',
+        padding: '6px',
         borderRadius: '8px',
         border: '1px solid #475569',
-        width: '80px'
+        width: '58px'
       }
     },
       React.createElement('div', { style: { textAlign: 'center', marginBottom: '6px', color: '#00ff00', fontFamily: 'monospace', fontSize: '10px' } }, `ENG ${index+1}`),
@@ -201,7 +200,7 @@ const ThrustManager = ({ controlThrust, flightState }) => {
         style: {
           position: 'relative',
           height: '120px',
-          width: '25px',
+          width: '18px',
           background: '#2a2a2a',
           borderRadius: '12px',
           margin: '6px auto',
@@ -219,13 +218,28 @@ const ThrustManager = ({ controlThrust, flightState }) => {
       React.createElement('div', { style: { display: 'flex', justifyContent: 'space-between', gap: '4px', marginTop: '4px' } },
         React.createElement('div', { style: { width: '100%', height: '14px', background: isRev ? '#ef4444' : '#10b981', color: '#fff', borderRadius: '4px', textAlign: 'center', lineHeight: '14px', fontSize: '8px', cursor: 'pointer' }, onClick: () => toggleReverse(index) }, isRev ? 'REV' : 'FWD')
       ),
-      React.createElement('div', { style: { marginTop: '6px', background: '#0a0a0a', borderRadius: '4px', border: '1px solid #333', padding: '4px' } },
-        React.createElement('div', { style: { fontSize: '8px', color: '#888', marginBottom: '2px', textAlign: 'center' } }, 'ENG'),
-        React.createElement('div', { style: { fontSize: '8px', fontFamily: 'monospace', textAlign: 'center' } },
-          React.createElement('div', { style: { color: '#00ff00' } }, `N1: ${(n1 || 0).toFixed(0)}%`),
-          React.createElement('div', { style: { color: '#00ff00' } }, `N2: ${(n2 || 0).toFixed(0)}%`),
-          React.createElement('div', { style: { color: '#ffaa00' } }, `EGT: ${(egt || 0).toFixed(0)}°C`),
-          isRev && React.createElement('div', { style: { color: '#ef4444', fontWeight: 'bold' } }, 'REV')
+      React.createElement('div', {
+        style: { marginTop: '4px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '2px' }
+      },
+        React.createElement('div', { style: { fontSize: '7px', color: '#aaa', textAlign: 'center' } }, engineRunning ? 'RUN' : 'CUT'),
+        React.createElement('div', {
+          style: { width: '28px', height: '28px', position: 'relative', cursor: onSystemAction ? 'pointer' : 'default' },
+          onClick: onSystemAction ? () => onSystemAction('engines', `${engineKey}_run`) : undefined
+        },
+          React.createElement('div', { style: { position: 'absolute', top: '4px', left: '4px', right: '4px', bottom: '4px', background: '#888', borderRadius: '50%', boxShadow: 'inset 0 0 4px #000', border: '1px solid #555' } }),
+          React.createElement('div', { style: {
+            position: 'absolute',
+            top: engineRunning ? '1px' : '10px',
+            left: '8px',
+            width: '12px', height: '18px',
+            background: 'linear-gradient(90deg, #d0d0d0, #f8f8f8, #a0a0a0)',
+            borderRadius: '6px',
+            boxShadow: '0 3px 5px rgba(0,0,0,0.5)',
+            transition: 'top 0.15s cubic-bezier(0.4,0,0.2,1)',
+            zIndex: 2
+          } },
+            React.createElement('div', { style: { width: '100%', height: '3px', background: 'rgba(255,255,255,0.8)', borderRadius: '6px 6px 0 0' } })
+          )
         )
       )
     );

@@ -1,0 +1,137 @@
+{
+  "model": "Airbus A330-300",
+  "type": "Wide-body",
+  "manufacturer": "Airbus",
+  "iata": "333",
+  "icao": "A333",
+  "overheadLayoutId": "airbus_a330_300_overhead",
+  "maxRange": 6350,
+  "cruiseSpeed": 470,
+  "fuelConsumption": 5700,
+  "maxFuelCapacity": 139090,
+  "maxPayload": 45700,
+  "maxPassengers": 440,
+  "typicalFuelBurn": 12.1,
+  "takeoffDistance": 2700,
+  "landingDistance": 1700,
+  "gearHeight": 5.8,
+  "engineType": "Trent 700/CF6-80E1/PW4000",
+  "engineCount": 2,
+  "hydraulicCount": 3,
+  "category": "Long-haul",
+  "wingArea": 363,
+  "wingSpan": 60.3,
+  "aspectRatio": 9.3,
+  "maxLiftCoefficient": 1.7,
+  "stallSpeed": 135,
+  "maxOperatingMach": 0.86,
+  "emptyWeight": 122000,
+  "maxTakeoffWeight": 233000,
+  "maxThrustPerEngine": 320000,
+  "maxN1": 104,
+  "egtYellow": 750,
+  "egtRed": 850,
+  "fadec": true,
+  "liftCurveSlope": 5.9,
+  "zeroLiftDragCoefficient": 0.022,
+  "inducedDragFactor": 0.036,
+  "basicLiftCoefficient": 0.45,
+  "horizontalStabilizerArea": 50,
+  "horizontalStabilizerCL": -0.16,
+  "horizontalStabilizerMomentArm": 17,
+  "aerodynamicCenterPosition": 0.25,
+  "centerOfGravityPosition": 0.15,
+  "dragCenterPosition": 0.75,
+  "controlPower": {
+    "x": 1.2,
+    "y": 1.5,
+    "z": 1
+  },
+  "specificFuelConsumption": 0.000017,
+  "elevatorEffectiveness": 0.00095,
+  "aileronEffectiveness": 0.00047,
+  "rudderEffectiveness": 0.00028,
+  "sideForceCoefficient": 0.00019,
+  "initialCruiseThrottle": 0.53,
+  "pidParameters": {
+    "altitude": {
+      "Kp": 0.00075,
+      "Ki": 0.000095,
+      "Kd": 0.0019,
+      "min": -0.29,
+      "max": 0.29
+    },
+    "speed": {
+      "Kp": 0.47,
+      "Ki": 0.047,
+      "Kd": 0.095,
+      "min": -0.47,
+      "max": 0.47
+    },
+    "heading": {
+      "Kp": 0.77,
+      "Ki": 0.095,
+      "Kd": 0.28,
+      "min": -0.47,
+      "max": 0.47
+    }
+  },
+  "momentOfInertiaRoll": 150000,
+  "momentOfInertiaPitch": 210000,
+  "momentOfInertiaYaw": 280000,
+  "flapProfile": {
+    "positions": [
+      {
+        "angle": 0,
+        "clIncrement": 0,
+        "cdIncrement": 0,
+        "label": "UP"
+      },
+      {
+        "angle": 10,
+        "clIncrement": 0.1,
+        "cdIncrement": 0.002,
+        "label": "1"
+      },
+      {
+        "angle": 15,
+        "clIncrement": 0.2,
+        "cdIncrement": 0.005,
+        "label": "2"
+      },
+      {
+        "angle": 25,
+        "clIncrement": 0.35,
+        "cdIncrement": 0.012,
+        "label": "FULL"
+      }
+    ]
+  },
+  "airbrakeProfile": {
+    "positions": [
+      {
+        "label": "RET",
+        "dragIncrement": 0,
+        "liftDecrement": 0
+      },
+      {
+        "label": "1/2",
+        "dragIncrement": 0.03,
+        "liftDecrement": -0.06
+      },
+      {
+        "label": "FULL",
+        "dragIncrement": 0.07,
+        "liftDecrement": -0.15
+      },
+      {
+        "label": "GND",
+        "dragIncrement": 0.22,
+        "liftDecrement": -0.32
+      }
+    ]
+  },
+  "minNoseGearFailedPitch": -0.2,
+  "maxGroundPitch": 0.3,
+  "groundCollisionPitchTorqueFactor": 0.5
+}

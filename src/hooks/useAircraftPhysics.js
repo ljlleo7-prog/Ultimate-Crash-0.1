@@ -76,15 +76,31 @@ export function useAircraftPhysics(config = {}, autoStart = true) {
             failureType: config.failureType
           });
 
-          const airport = config.departure?.iata || config.departure?.icao || config.arrival?.iata || config.arrival?.icao;
-          const runway = config.departureRunway || config.arrivalRunway;
-          if (airport) {
+          const departureAirport = config.departure?.iata || config.departure?.icao;
+          const arrivalAirport = config.arrival?.iata || config.arrival?.icao;
+          const airport = config.arrivalRunway && arrivalAirport
+            ? arrivalAirport
+            : departureAirport || arrivalAirport;
+          const runway = config.arrivalRunway || config.departureRunway;
+          if (airport && runway) {
             const geometry = airportService.getRunwayGeometry(airport, runway);
             if (geometry) service.setRunwayGeometry(geometry);
           }
         }
 
+        if (config.scenarioRestrictions?.autopilotForbidden && typeof service.setAutopilot === 'function') {
+          service.setAutopilot(false);
+        }
+
         if (cancelled || physicsServiceRef.current) return;
+
+        // Apply initial wind so TAS ≠ GS from frame 0
+        if (config.windSpeedKts != null || config.windDirection != null) {
+          service.setEnvironment({
+            windSpeed: config.windSpeedKts ?? 0,
+            windDirection: config.windDirection ?? 0,
+          });
+        }
 
         physicsServiceRef.current = service;
         coordinatorRef.current = new PhysicsCoordinator(service);

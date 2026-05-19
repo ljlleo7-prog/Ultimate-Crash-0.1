@@ -29,7 +29,7 @@ const normalizeTargetValue = (type, value) => {
   }
 };
 
-const ModernAutopilotModule = ({ flightState, setAutopilotTargets, toggleAutopilot, setAutopilotMode, setAltimeter, frequencyContext }) => {
+const ModernAutopilotModule = ({ flightState, setAutopilotTargets, toggleAutopilot, setAutopilotMode, setAltimeter, frequencyContext, efisFontFamily }) => {
   const initialTargets = flightState?.autopilotTargets
     ? {
         ias: Number(flightState.autopilotTargets.ias) || Number(flightState.indicatedAirspeed) || 0,
@@ -57,17 +57,14 @@ const ModernAutopilotModule = ({ flightState, setAutopilotTargets, toggleAutopil
     if (flightState?.autopilotTargets) {
       setTargets(prev => {
         const newIas = Number(flightState.autopilotTargets.ias);
-        const newVs = Number(flightState.autopilotTargets.vs);
         const newAlt = Number(flightState.autopilotTargets.altitude);
         const newHdg = Number(flightState.autopilotTargets.heading);
-        
-        // In HDG mode, do NOT update heading from props unless local heading is invalid (0).
-        // This prevents the "sync with flight direction" issue if the backend echos current heading.
+
         const shouldUpdateHeading = !isNaN(newHdg) && (currentMode === 'LNAV' || prev.heading === 0);
 
         return {
            ias: (!isNaN(newIas) && newIas > 0) ? newIas : prev.ias,
-           vs: !isNaN(newVs) ? newVs : prev.vs,
+           vs: prev.vs,
            altitude: (!isNaN(newAlt) && newAlt > 0) ? newAlt : prev.altitude,
            heading: shouldUpdateHeading ? newHdg : prev.heading
          };
@@ -246,7 +243,7 @@ const ModernAutopilotModule = ({ flightState, setAutopilotTargets, toggleAutopil
               textAlign: 'center', 
               fontSize: '13px', 
               color: '#f8fafc', 
-              fontFamily: 'monospace',
+              fontFamily: efisFontFamily || 'monospace',
               fontWeight: 'bold'
             } 
           }, `${targets.ias.toFixed(0)}`),
@@ -282,7 +279,7 @@ const ModernAutopilotModule = ({ flightState, setAutopilotTargets, toggleAutopil
               textAlign: 'center', 
               fontSize: '13px', 
               color: currentMode === 'LNAV' ? '#64748b' : '#f8fafc', 
-              fontFamily: 'monospace',
+              fontFamily: efisFontFamily || 'monospace',
               fontWeight: 'bold'
             } 
           }, `${targets.heading.toFixed(0)}`),
@@ -297,31 +294,53 @@ const ModernAutopilotModule = ({ flightState, setAutopilotTargets, toggleAutopil
       // VS Group
       React.createElement('div', { style: { display: 'flex', flexDirection: 'column', gap: '2px', width: '85px' } },
         React.createElement('label', { style: { fontSize: '9px', color: '#94a3b8', fontWeight: 'bold' } }, 'V/S (FPM)'),
-        React.createElement('div', { 
-          style: { 
-            display: 'flex', 
-            alignItems: 'center', 
+        React.createElement('div', {
+          style: {
+            display: 'flex',
+            alignItems: 'center',
             background: '#0f172a',
             borderRadius: '4px',
             padding: '2px',
             border: '1px solid #1e293b'
-          } 
+          }
         },
           React.createElement('button', {
             style: { background: 'none', border: 'none', color: '#64748b', cursor: 'pointer', padding: '0 4px', fontSize: '14px' },
             onClick: () => updateTarget('vs', Math.max(-4000, targets.vs - 100)),
             disabled: flightState.hasCrashed
           }, '-'),
-          React.createElement('span', { 
-            style: { 
-              flex: 1, 
-              textAlign: 'center', 
-              fontSize: '13px', 
-              color: '#f8fafc', 
-              fontFamily: 'monospace',
-              fontWeight: 'bold'
-            } 
-          }, `${targets.vs >= 0 ? '+' : ''}${targets.vs.toFixed(0)}`),
+          (() => {
+            const apMode = flightState.autopilot?.altitudeMode;
+            const apActiveVS = flightState.autopilotTargets?.vs;
+            const userVS = flightState.autopilot?.userVsTarget ?? targets.vs;
+            const isOverriding = flightState.autopilot?.engaged
+              && (apMode === 'capture' || apMode === 'hold')
+              && Number.isFinite(apActiveVS)
+              && Math.abs(apActiveVS - userVS) > 50;
+            return React.createElement('div', {
+              style: { flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '1px' }
+            },
+              React.createElement('span', {
+                style: {
+                  textAlign: 'center',
+                  fontSize: '13px',
+                  color: isOverriding ? '#94a3b8' : '#f8fafc',
+                  fontFamily: efisFontFamily || 'monospace',
+                  fontWeight: 'bold',
+                  textDecoration: isOverriding ? 'line-through' : 'none'
+                }
+              }, `${targets.vs >= 0 ? '+' : ''}${targets.vs.toFixed(0)}`),
+              isOverriding && React.createElement('span', {
+                style: {
+                  textAlign: 'center',
+                  fontSize: '10px',
+                  color: '#f59e0b',
+                  fontFamily: efisFontFamily || 'monospace',
+                  fontWeight: 'bold'
+                }
+              }, `${apActiveVS >= 0 ? '+' : ''}${apActiveVS.toFixed(0)}`)
+            );
+          })(),
           React.createElement('button', {
             style: { background: 'none', border: 'none', color: '#64748b', cursor: 'pointer', padding: '0 4px', fontSize: '14px' },
             onClick: () => updateTarget('vs', Math.min(4000, targets.vs + 100)),
@@ -354,7 +373,7 @@ const ModernAutopilotModule = ({ flightState, setAutopilotTargets, toggleAutopil
               textAlign: 'center', 
               fontSize: '13px', 
               color: '#f8fafc', 
-              fontFamily: 'monospace',
+              fontFamily: efisFontFamily || 'monospace',
               fontWeight: 'bold'
             } 
           }, `${targets.altitude.toFixed(0)}`),
@@ -390,7 +409,7 @@ const ModernAutopilotModule = ({ flightState, setAutopilotTargets, toggleAutopil
               textAlign: 'center', 
               fontSize: '13px', 
               color: '#38bdf8', 
-              fontFamily: 'monospace',
+              fontFamily: efisFontFamily || 'monospace',
               fontWeight: 'bold'
             } 
           }, `${(flightState.altimeter || 29.92).toFixed(2)}`),

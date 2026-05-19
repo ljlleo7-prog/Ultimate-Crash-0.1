@@ -12,6 +12,7 @@
  */
 
 import EnginePhysicsService from './EnginePhysicsService.js';
+import FADECService from './FADECService.js';
 import RealisticAutopilotService from './RealisticAutopilotService.js';
 import FailureHandler from './failures/FailureHandler.js';
 import WarningSystem from './WarningSystem.js';
@@ -81,9 +82,12 @@ class RealisticFlightPhysicsService {
         };
 
         // Failure Simulation State
-        this.controlLag = { aileron: 1.0, elevator: 1.0, rudder: 1.0, gear: 1.0, flaps: 1.0 }; // 1.0 = normal, >1.0 = slower
-        this.controlEffectiveness = { aileron: 1.0, elevator: 1.0, rudder: 1.0, gear: 1.0, flaps: 1.0 }; // 0.0 to 1.0
-        this.vibrationLevel = 0; // Global vibration level
+        this.controlLag = { aileron: 1.0, elevator: 1.0, rudder: 1.0, gear: 1.0, flaps: 1.0 };
+        this.controlEffectiveness = { aileron: 1.0, elevator: 1.0, rudder: 1.0, gear: 1.0, flaps: 1.0, spoilers: 1.0 };
+        this.vibrationLevel = 0;
+        this.navigationPath = [];
+        this._prevDistToWaypoint = Infinity;
+        this._lastWaypointIndex = null;
 
         // Failure Parameters (Generic)
         this.failureParams = {
@@ -98,17 +102,27 @@ class RealisticFlightPhysicsService {
         };
 
         // Engine State
-        this.engines = Array(this.aircraft.engineCount).fill(0).map(() => {
-            // Introduce ~5% uncertainty in engine responsiveness
-            // Range: 0.95 to 1.05
+        const reverseCapableList = this.aircraft.engineReverseCapable; // per-engine array or undefined
+        this.engines = Array(this.aircraft.engineCount).fill(0).map((_, i) => {
             const uncertainty = 0.95 + Math.random() * 0.10;
-            
+            const reverseCapable = Array.isArray(reverseCapableList)
+                ? (reverseCapableList[i] !== false)
+                : true;
             return new EnginePhysicsService({
                 maxThrust: this.aircraft.maxThrust,
                 specificFuelConsumption: this.aircraft.specificFuelConsumption,
-                responsiveness: uncertainty
+                responsiveness: uncertainty,
+                maxN1: this.aircraft.maxN1 || 102,
+                operationalMaxN1: this.aircraft.operationalMaxN1 || 98.4,
+                emergencyMaxN1: this.aircraft.emergencyMaxN1 || this.aircraft.maxN1 || 102,
+                egtYellow: this.aircraft.egtYellow || 750,
+                egtRed: this.aircraft.egtRed || 850,
+                reverseCapable,
             });
         });
+
+        // FADEC — Airbus only (fadec: true in static.json)
+        this.fadec = this.aircraft.fadec ? new FADECService(this.aircraft.family || this.aircraft.icao) : null;
 
         // Simulation Metadata
         this.crashed = false;
@@ -374,12 +388,13 @@ class RealisticFlightPhysicsService {
         const beta = (Math.abs(vx) > 1) ? Math.atan2(vy, vx) : 0;
 
         const altitudeAGL = (this.currentGroundZ - this.state.pos.z) * 3.28084;
+        const altitudeIndicated = (-this.state.pos.z + (this.airportElevation || 0)) * 3.28084;
         const apState = {
             airspeed: currentAirspeed,
             verticalSpeed: currentVS,
             pitch: euler.theta,
             roll: euler.phi,
-            altitude: -this.state.pos.z * 3.28084,
+            altitude: altitudeIndicated,
             altitudeAGL,
             heading: currentHeading,
             track: track,
@@ -393,105 +408,59 @@ class RealisticFlightPhysicsService {
 
         // --- Waypoint Sequencing & LNAV ---
         if (this.flightPlan && this.flightPlan.length > 0) {
-            // Ensure index is valid. If flight plan has multiple points (e.g. Origin -> WP1), start at 1 to avoid targeting origin.
-            if (this.currentWaypointIndex === undefined) {
-                this.currentWaypointIndex = (this.flightPlan.length > 1) ? 1 : 0;
-            }
-            
-            if (this.currentWaypointIndex < this.flightPlan.length) {
-                const nextWaypoint = this.flightPlan[this.currentWaypointIndex];
-                const dist = calculateDistanceMeters(this.state.geo.lat, this.state.geo.lon, nextWaypoint.latitude, nextWaypoint.longitude);
-                
-                // Track distance history for "moving away" detection
+            const navUpdate = this.navigationService.update(apState, {
+                flightPlan: this.flightPlan,
+                currentWaypointIndex: this.currentWaypointIndex,
+                previousDistanceToWaypoint: this._prevDistToWaypoint,
+                turnRadiusMeters: 1852,
+                sampleSpacingMeters: 250
+            });
+
+            this.currentWaypointIndex = navUpdate.currentWaypointIndex;
+            this.navigationPath = navUpdate.navigationPath;
+
+            if (navUpdate.activeWaypoint) {
+                const activeWaypoint = navUpdate.activeWaypoint;
+                const dist = Number.isFinite(navUpdate.distanceToWaypoint)
+                    ? navUpdate.distanceToWaypoint
+                    : calculateDistanceMeters(this.state.geo.lat, this.state.geo.lon, activeWaypoint.latitude, activeWaypoint.longitude);
+
                 if (this._lastWaypointIndex !== this.currentWaypointIndex) {
                     this._prevDistToWaypoint = dist;
                     this._lastWaypointIndex = this.currentWaypointIndex;
-                }
-                
-                const isMovingAway = (dist > (this._prevDistToWaypoint || dist) + 50); // 50m buffer
-                const wasClose = dist < 4000; // 4km proximity
-                
-                this._prevDistToWaypoint = dist;
-
-                // Switch to next waypoint if:
-                // 1. Within 2km (Fly-over)
-                // 2. Moving away and was close (Fly-by / Passed)
-                // 3. User requested "Auto-delete" -> We simulate this by advancing index and never looking back
-                if ((dist < 2000 || (isMovingAway && wasClose)) && !nextWaypoint.isHold) {
-                    this.currentWaypointIndex++;
-                    this._prevDistToWaypoint = Infinity; 
-                    console.log(`📍 Reached/Passed waypoint ${nextWaypoint.label || this.currentWaypointIndex - 1}. Sequencing to index ${this.currentWaypointIndex}`);
+                    console.log(`📍 Sequencing to waypoint ${activeWaypoint.label || activeWaypoint.name || this.currentWaypointIndex}`);
+                } else {
+                    this._prevDistToWaypoint = dist;
                 }
 
-                // If LNAV is engaged, update target heading to waypoint bearing
-                if (this.autopilot.mode === 'LNAV' && this.currentWaypointIndex < this.flightPlan.length) {
-                    const targetWP = this.flightPlan[this.currentWaypointIndex];
-                    const bearing = calculateBearing(this.state.geo.lat, this.state.geo.lon, targetWP.latitude, targetWP.longitude);
-                    
-                    if (targetWP.isHold) {
-                        // --- HOLD PATTERN LOGIC (Right Turn Orbit) ---
-                        // Target a circular orbit around the waypoint
-                        const HOLD_RADIUS = 3000; // 3km radius (~1.6nm)
-                        const CONVERGENCE_GAIN = 0.001; // Sensitivity of convergence
-                        
-                        // Calculate heading relative to bearing
-                        // If on radius: Bearing + 90
-                        // If outside: Turn In (Bearing + 90 - correction)
-                        // If inside: Turn Out (Bearing + 90 + correction) (Wait, inside means we are closer, we want to widen turn?)
-                        // Let's visualize: Center North. Tangent East. 
-                        // If we are South (Bearing 0), we fly East (90).
-                        // If we are South but Far (Outside), we want to fly North-East (45). (90 - 45).
-                        // If we are South but Close (Inside), we want to fly South-East (135). (90 + 45).
-                        
-                        // Correction should be positive if Inside (Dist < Radius) -> 90 + pos
-                        // Correction should be negative if Outside (Dist > Radius) -> 90 - pos
-                        
-                        // dist - radius > 0 (Outside). We want negative correction.
-                        // So: -1 * (dist - radius) * gain
-                        
-                        const distError = dist - HOLD_RADIUS;
-                        const correction = Math.atan(distError * CONVERGENCE_GAIN); // radians, range -PI/2 to PI/2
-                        
-                        // Target Heading = Bearing + 90 - Correction
-                        // But wait, if we are outside (dist > radius), distError > 0. Correction > 0.
-                        // We want Bearing + 90 - Correction.
-                        // Example: Outside. Bearing 0. Target 90 - 45 = 45. Correct.
-                        // Example: Inside. Bearing 0. DistError < 0. Correction < 0.
-                        // Target 90 - (-45) = 135. Correct.
-                        
-                        let targetHeading = bearing + 90 - (correction * 180 / Math.PI);
-                        
-                        // Normalize to 0-360
-                        targetHeading = (targetHeading + 360) % 360;
-                        
-                        this.autopilot.setTargets({ heading: targetHeading });
-                        // console.log(`🔄 Holding at ${targetWP.label}: Dist ${Math.round(dist)}m, Hdg ${Math.round(targetHeading)}`);
-                    } else {
-                        // Standard Direct-To
-                        this.autopilot.setTargets({ heading: bearing });
-                    }
+                if (this.autopilot.mode === 'LNAV' && Number.isFinite(navUpdate.targetHeading)) {
+                    this.autopilot.setTargets({ heading: navUpdate.targetHeading });
                 }
 
-                // Update Runway Geometry if target is an airport with a selected runway
-                // Do not auto-switch away from the departure runway while still on the ground.
-                if (!this.onGround && this.currentWaypointIndex < this.flightPlan.length) {
-                    const targetWP = this.flightPlan[this.currentWaypointIndex];
-                    if ((targetWP.type === 'airport' || targetWP.type === 'runway') && targetWP.selectedRunway && targetWP.details) {
-                        const airportCode = targetWP.details.iata || targetWP.details.icao || targetWP.label;
-                        // Check if we need to update (simple check to avoid spamming)
-                        if (!this.runwayGeometry || (this.runwayGeometry.runwayName !== targetWP.selectedRunway && this.runwayGeometry.airportCode !== airportCode)) {
-                             const geom = airportService.getRunwayGeometry(airportCode, targetWP.selectedRunway);
-                             if (geom) {
-                                 this.setRunwayGeometry(geom);
-                                 console.log(`📍 Physics: Auto-selected runway ${targetWP.selectedRunway} at ${airportCode}`);
-                             }
+                if (!this.onGround && (activeWaypoint.type === 'airport' || activeWaypoint.type === 'runway') && activeWaypoint.selectedRunway && activeWaypoint.details) {
+                    const airportCode = activeWaypoint.details.iata || activeWaypoint.details.icao || activeWaypoint.label;
+                    if (!this.runwayGeometry || (this.runwayGeometry.runwayName !== activeWaypoint.selectedRunway && this.runwayGeometry.airportCode !== airportCode)) {
+                        const geom = airportService.getRunwayGeometry(airportCode, activeWaypoint.selectedRunway);
+                        if (geom) {
+                            this.setRunwayGeometry(geom);
+                            console.log(`📍 Physics: Auto-selected runway ${activeWaypoint.selectedRunway} at ${airportCode}`);
                         }
                     }
                 }
+            } else {
+                this.navigationPath = this.navigationService.lastPath || [];
             }
         }
 
-        const apOutputs = this.autopilot.update(apState, this.controls, dt);
+        const autopilotControlReference = {
+            throttle: Number.isFinite(input?.throttle) ? input.throttle : this.controls.throttle,
+            elevator: Number.isFinite(input?.pitch) ? input.pitch : this.controls.elevator,
+            aileron: Number.isFinite(input?.roll) ? input.roll : this.controls.aileron,
+            rudder: Number.isFinite(input?.yaw) ? input.yaw : this.controls.rudder,
+            trim: Number.isFinite(input?.trim) ? input.trim : this.controls.trim
+        };
+
+        const apOutputs = this.autopilot.update(apState, autopilotControlReference, dt);
 
         let finalInput = input;
         if (apOutputs) {
@@ -589,16 +558,18 @@ class RealisticFlightPhysicsService {
         // Smooth inputs to simulate actuator dynamics
         const responseRate = Math.min(1, 5.0 * dt);
         const autopilotActive = input.autopilotActive === true;
-        const throttleInput = Number.isFinite(input.throttle) ? input.throttle : this.controls.throttle;
+        let throttleInput = Number.isFinite(input.throttle) ? input.throttle : this.controls.throttle;
         const pitchInput = Number.isFinite(input.pitch) ? input.pitch : this.controls.elevator;
         const rollInput = Number.isFinite(input.roll) ? input.roll : this.controls.aileron;
         const yawInput = Number.isFinite(input.yaw) ? input.yaw : this.controls.rudder;
+
+        const throttleResponse = autopilotActive ? Math.min(1, 18.0 * dt) : responseRate;
         const elevatorResponse = autopilotActive ? responseRate : Math.min(1, responseRate * 2);
-        const aileronResponse = autopilotActive ? Math.min(1, responseRate * 1.5) : Math.min(1, responseRate * 3);
+        const aileronResponse = autopilotActive ? Math.min(1, responseRate * 1.15) : Math.min(1, responseRate * 3);
         const rudderResponse = autopilotActive ? responseRate : Math.min(1, responseRate * 2);
 
         // Throttle (Master)
-        this.controls.throttle += (throttleInput - this.controls.throttle) * responseRate;
+        this.controls.throttle += (throttleInput - this.controls.throttle) * throttleResponse;
 
         // Individual Throttles
         if (input.throttles && Array.isArray(input.throttles)) {
@@ -606,7 +577,7 @@ class RealisticFlightPhysicsService {
             for (let i = 0; i < this.controls.engineThrottles.length; i++) {
                 const rawTarget = input.throttles[i];
                 const target = Number.isFinite(rawTarget) ? rawTarget : throttleInput;
-                this.controls.engineThrottles[i] += (target - this.controls.engineThrottles[i]) * responseRate;
+                this.controls.engineThrottles[i] += (target - this.controls.engineThrottles[i]) * throttleResponse;
             }
         } else {
             // Sync to master if no individual inputs
@@ -656,12 +627,19 @@ class RealisticFlightPhysicsService {
      * Simulates redundancy and degradation.
      */
     updateControlEffectiveness(dt) {
-        const effectiveness = this.systemsService.updateControlEffectiveness(this.systems);
+        if (!this.controlEffectiveness) {
+            this.controlEffectiveness = { aileron: 1.0, elevator: 1.0, rudder: 1.0, gear: 1.0, flaps: 1.0, spoilers: 1.0 };
+        }
+        if (!this.controlLag) {
+            this.controlLag = { aileron: 1.0, elevator: 1.0, rudder: 1.0, gear: 1.0, flaps: 1.0 };
+        }
+
+        const effectiveness = this.systemsService?.updateControlEffectiveness?.(this.systems) || {};
         this.controlEffectiveness.elevator = effectiveness.elevator ?? this.controlEffectiveness.elevator;
         this.controlEffectiveness.aileron = effectiveness.aileron ?? this.controlEffectiveness.aileron;
         this.controlEffectiveness.rudder = effectiveness.rudder ?? this.controlEffectiveness.rudder;
         this.controlEffectiveness.gear = effectiveness.gear ?? this.controlEffectiveness.gear;
-        this.controlEffectiveness.spoilers = effectiveness.spoilers ?? this.controlEffectiveness.spoilers;
+        this.controlEffectiveness.spoilers = effectiveness.spoilers ?? this.controlEffectiveness.spoilers ?? 1.0;
 
         const hydraulicSystems = Object.values(this.systems?.hydraulics || {});
         const totalSystems = hydraulicSystems.length;
@@ -793,13 +771,31 @@ class RealisticFlightPhysicsService {
 
         this.engines.forEach((engine, index) => {
              // 1. Get Control Inputs
-             const engineThrottle = Number.isFinite(this.controls.engineThrottles[index])
+             let engineThrottle = Number.isFinite(this.controls.engineThrottles[index])
                  ? this.controls.engineThrottles[index]
                  : (Number.isFinite(this.controls.throttle) ? this.controls.throttle : 0);
+
+             // OEI emergency thrust authorization: allow only if another engine is failed/not running.
+             const otherEngineOut = this.engines.some((otherEngine, otherIndex) =>
+                 otherIndex !== index && (otherEngine.state.failed || !otherEngine.state.running)
+             );
+             engine.setEmergencyBoostAllowed(otherEngineOut);
+
+             // FADEC: for Airbus, lever position drives a computed N1 target.
+             // We pass a synthetic throttle (0–1) that maps to the FADEC N1 fraction.
+             if (this.fadec && engineThrottle >= 0) {
+                 const altitudeFt = -this.state.pos.z * 3.28084;
+                 const fadecN1 = this.fadec.targetN1(engineThrottle, this.aircraft.maxN1 || 102, altitudeFt);
+                 // Convert back to 0–1 throttle so EnginePhysicsService can use it normally
+                 const maxN1 = this.aircraft.maxN1 || 102;
+                 const idleN1 = 20;
+                 engineThrottle = Math.max(0, Math.min(1, (fadecN1 - idleN1) / (maxN1 - idleN1)));
+             }
              
              // 2. Feed System State to Engine Physics
              const sysEng = this.systems.engines[`eng${index + 1}`];
              const pneu = this.systems.pressurization;
+             let fuelSourceAvailable = false;
              
              if (sysEng) {
                  // Determine Pneumatic Pressure Availability
@@ -818,15 +814,12 @@ class RealisticFlightPhysicsService {
                  
                  // Let's calculate fuel availability first
                  const fuel = this.systems.fuel;
-                 let fuelSourceAvailable = false;
+                 fuelSourceAvailable = false;
                  
                  const currentAltFt = Math.max(0, (-this.state.pos.z || 0) * 3.28084);
-                // Suction feed available at low altitude, but limited by fuel flow demand (N2)
-                // If thrust is high (>65% N2) without pumps, suction is insufficient (cavitation)
-                // User Request: Reverted to allow suction feed on ground/low altitude (realism),
-                // but ensures engines can be cut in the air (Cruise > 20,000ft).
-                const highThrust = engine.state.n2 > 65;
-                const suctionAvailable = (this.onGround || currentAltFt < 20000) && !highThrust;
+                // Suction feed is available at low altitude as a fallback when tanks contain fuel.
+                // Pumps/pressure are still required at cruise altitude.
+                const suctionAvailable = this.onGround || currentAltFt < 20000;
                 
                 if (fuel.pressC > 10 && fuel.tanks.center > 0) fuelSourceAvailable = true;
                  else if (isLeft) {
@@ -838,11 +831,14 @@ class RealisticFlightPhysicsService {
                  }
                  
                  // Update Engine Physics State
+                const hasIgnitionPower = (this.systems.electrical?.dcVolts || 0) > 20;
+                const ignitionCommanded = hasIgnitionPower && (sysEng.startSwitch === 'GRD' || sysEng.startSwitch === 'FLT');
+
                 engine.setStartupState(
                     sysEng.startSwitch === 'GRD', // Starter Valve Open
                     ductPress,                   // Air Pressure (PSI)
                     sysEng.fuelControl && fuelSourceAvailable, // Fuel Valve & Supply
-                    true // Ignition (Assume Auto/On for now)
+                    ignitionCommanded
                 );
                  
                  // Sync External Fuel Burn
@@ -885,9 +881,9 @@ class RealisticFlightPhysicsService {
                  sysEng.egt = engine.state.egt;
                  sysEng.ff = engine.state.fuelFlow;
 
-                 const engineSelfSustaining = engine.state.running || engine.state.n2 >= 55;
+                 const engineSelfSustaining = engine.state.running || engine.state.n2 >= engine._lightoffN2Threshold || sysEng.n2 >= 50;
                  if (sysEng.startSwitch === 'GRD' && engineSelfSustaining) {
-                     sysEng.startSwitch = 'CONT';
+                     sysEng.startSwitch = 'OFF';
                  }
              }
              
@@ -1032,6 +1028,16 @@ class RealisticFlightPhysicsService {
             const dCl_yaw = (CL * r * b) / (8 * V_airspeed);
             
             Cl += dCl_yaw;
+        }
+
+        // Fuel imbalance roll torque: heavier wing rolls toward it
+        const fuelTanks = this.systems?.fuel?.tanks;
+        if (fuelTanks && fuelTanks.left !== undefined && fuelTanks.right !== undefined && q > 1) {
+            const imbalanceKg = (fuelTanks.left - fuelTanks.right) * 0.8; // ~0.8 kg/L
+            const S = this.aircraft.wingArea || 125;
+            const b_span = this.aircraft.wingspan || 34;
+            const rollMoment = imbalanceKg * 9.81 * (b_span * 0.25);
+            Cl += rollMoment / (q * S * b_span);
         }
 
         return { CL, CD, CY, Cm, Cl, Cn };
@@ -1587,8 +1593,32 @@ class RealisticFlightPhysicsService {
             const groundStatus = this.groundStatus?.status;
             const speed = typeof this.state.vel?.magnitude === 'function' ? this.state.vel.magnitude() : 0;
             const groundedTaxiLike = this.onGround && speed < 80;
+            let validApproachCorridor = false;
 
-            if (groundStatus === 'OBJECTS' && !groundedTaxiLike) {
+            if (this.runwayGeometry?.thresholdStart && Number.isFinite(this.state.geo?.lat) && Number.isFinite(this.state.geo?.lon)) {
+                const { thresholdStart, heading, length, width } = this.runwayGeometry;
+                const latRad = thresholdStart.latitude * Math.PI / 180;
+                const metersPerLat = 111132.92;
+                const metersPerLon = 111412.84 * Math.cos(latRad);
+                const dx = (this.state.geo.lat - thresholdStart.latitude) * metersPerLat;
+                const dy = (this.state.geo.lon - thresholdStart.longitude) * metersPerLon;
+                const headingRad = heading * Math.PI / 180;
+                const along = dx * Math.cos(headingRad) + dy * Math.sin(headingRad);
+                const cross = -dx * Math.sin(headingRad) + dy * Math.cos(headingRad);
+                const euler = this.state.quat?.toEuler?.() || { psi: 0 };
+                const headingDeg = (euler.psi * 180 / Math.PI + 360) % 360;
+                let headingError = Math.abs(((headingDeg - heading + 540) % 360) - 180);
+                if (headingError > 180) headingError = 360 - headingError;
+                const descending = (this.state.vel?.z || 0) > -1.5;
+                validApproachCorridor = !this.onGround
+                    && along >= -1200
+                    && along <= length + 300
+                    && Math.abs(cross) <= Math.max(width * 1.5, 90)
+                    && headingError <= 20
+                    && descending;
+            }
+
+            if (groundStatus === 'OBJECTS' && !groundedTaxiLike && !validApproachCorridor) {
                 this.objectCollisionTimer += 0.016;
                 if (this.objectCollisionTimer >= 0.5) {
                     this.crashed = true;
@@ -1640,7 +1670,15 @@ class RealisticFlightPhysicsService {
                 egt: this.engines.map((engine) => engine.state.egt),
                 fuelFlow: this.engines.map((engine) => engine.state.fuelFlow),
                 oilPressure: this.engines.map((engine) => engine.state.oilPressure),
-                vibration: this.engines.map((engine) => engine.state.vibration)
+                vibration: this.engines.map((engine) => engine.state.vibration),
+                epr: this.engines.map((engine) => 1.0 + Math.pow(Math.max(0, engine.state.n1) / 100, 2) * 0.5),
+                fadecMode: this.getFADECMode(),
+                maxN1: this.aircraft.maxN1 || 102,
+                egtYellow: this.aircraft.egtYellow || 750,
+                egtRed: this.aircraft.egtRed || 850,
+                startValveOpen:  Object.values(this.systems?.engines || {}).map(e => e.startSwitch === 'GRD'),
+                oilFilterBypass: this.engines.map(e => e.state.running && e.state.oilPressure < 13 && e.state.oilPressure > 0),
+                lowOilPressure:  this.engines.map(e => e.state.running && e.state.oilPressure < 13),
             },
             autopilot: {
                 engaged: autopilotStatus.engaged,
@@ -1652,6 +1690,7 @@ class RealisticFlightPhysicsService {
             fuel: this.state.fuel,
             runwayGeometry: this.runwayGeometry,
             groundStatus: this.groundStatus,
+            navigationPath: this.navigationPath,
             currentWaypointIndex: this.currentWaypointIndex || 0
         };
     }
@@ -1718,20 +1757,25 @@ class RealisticFlightPhysicsService {
             verticalSpeed: applyNoise(vs * 196.85), // m/s -> ft/min
             hasCrashed: this.crashed,
             crashWarning: this.crashReason,
+            trueAirspeed: airspeeds.trueAirspeed,
+            indicatedAirspeed: airspeeds.indicatedAirspeed,
+            groundSpeed: airspeeds.groundSpeed,
             autopilot: autopilotStatus,
             autopilotTargets: autopilotStatus.targets,
             autopilotDebug: this.autopilot.debugState,
             engineParams: {
                 n1: this.engines.map(e => applyNoise(e.state.n1)),
-                n2: this.engines.map(e => applyNoise(e.state.n2)), 
+                n2: this.engines.map(e => applyNoise(e.state.n2)),
                 egt: this.engines.map(e => applyNoise(e.state.egt)),
                 fuelFlow: this.engines.map(e => applyNoise(e.state.fuelFlow)),
                 oilPressure: this.engines.map(e => applyNoise(e.state.oilPressure)),
-                vibration: this.engines.map(e => applyNoise(e.state.vibration))
+                vibration: this.engines.map(e => applyNoise(e.state.vibration)),
+                epr: this.engines.map(e => applyNoise(1.0 + Math.pow(Math.max(0, e.state.n1) / 100, 2) * 0.5)),
             },
             systems: this.systems,
             fuel: this.state.fuel,
             currentWaypointIndex: this.currentWaypointIndex || 0,
+            navigationPath: this.navigationPath,
             environment: {
                 windSpeed: this.environment?.windSpeed || 0,
                 windDirection: this.environment?.windDirection || 0,
@@ -1748,10 +1792,12 @@ class RealisticFlightPhysicsService {
             drag: Number.isFinite(this.aeroForces?.x) ? Math.abs(this.aeroForces.x) : 0,
             derived: {
                 altitude_ft: altitudeAMSL * 3.28084, // Display AMSL
+                altitude: altitudeAMSL * 3.28084,
                 altitude_agl_ft: altitudeAGL * 3.28084,
                 terrain_elevation_ft: (this.terrainElevation || 0) * 3.28084,
                 airport_elevation_ft: (this.airportElevation || 0) * 3.28084,
                 airspeed: airspeeds.trueAirspeed,
+                indicatedAirspeed: airspeeds.indicatedAirspeed,
                 groundSpeed: airspeeds.groundSpeed,
                 heading: (euler.psi * 180 / Math.PI + 360) % 360
             },
@@ -1804,6 +1850,11 @@ class RealisticFlightPhysicsService {
     setWheelBrakes(val) { this.controls.wheelBrakes = Math.max(0, Math.min(1, Number.isFinite(val) ? val : 0)); }
     setTrim(val) { this.controls.trim = val; }
     setAutopilot(engaged, targets) {
+        if (this.aircraft?.scenarioRestrictions?.autopilotForbidden && engaged) {
+            console.warn('Autopilot engagement blocked by active challenge restrictions.');
+            this.autopilot?.setEngaged?.(false, this.state);
+            return false;
+        }
         const explicitTargets = targets ? { ...targets } : null;
         if (targets) {
             this.autopilot.setTargets(targets);
@@ -1817,7 +1868,7 @@ class RealisticFlightPhysicsService {
                 verticalSpeed: -v_earth.z * 196.85,
                 pitch: euler.theta,
                 roll: euler.phi,
-                altitude: -this.state.pos.z * 3.28084,
+                altitude: this.getOutputState().derived?.altitude ?? ((-this.state.pos.z + (this.airportElevation || 0)) * 3.28084),
                 heading: (euler.psi * 180 / Math.PI + 360) % 360,
                 beta: this.debugData?.beta || 0,
                 throttle: this.controls.throttle,
@@ -1843,6 +1894,14 @@ class RealisticFlightPhysicsService {
             if (typeof current === 'boolean') return !current;
             return current; // No change if not boolean and no value
         };
+
+        // Canonicalize 737-specific action aliases before dispatch
+        if (system === 'ice' && action === 'engAntiIce') {
+            const next = toggle(this.systems.ice.eng1AntiIce);
+            this.systems.ice.eng1AntiIce = next;
+            this.systems.ice.eng2AntiIce = next;
+            return;
+        }
 
         // Special System Handling
         if (system === 'hydraulics') {
@@ -1874,23 +1933,55 @@ class RealisticFlightPhysicsService {
             }
         }
         else if (system === 'engines') {
-             // Engine Start Switches (Multi-state: OFF -> GRD -> CONT -> FLT -> OFF)
-             const cycleStartSwitch = (current) => {
-                 const states = ['OFF', 'GRD', 'CONT', 'FLT'];
-                 const idx = states.indexOf(current);
-                 return states[(idx + 1) % states.length];
+             const setStartSwitch = (engineKey) => {
+                 const engine = this.systems.engines?.[engineKey];
+                 if (!engine) return;
+                 const states = ['OFF', 'GRD', 'FLT'];
+                 const current = states.includes(engine.startSwitch) ? engine.startSwitch : 'OFF';
+                 engine.startSwitch = value !== undefined ? value : states[(states.indexOf(current) + 1) % states.length];
              };
 
-             if (action === 'eng1_start_toggle') this.systems.engines.eng1.startSwitch = cycleStartSwitch(this.systems.engines.eng1.startSwitch);
-             else if (action === 'eng2_start_toggle') this.systems.engines.eng2.startSwitch = cycleStartSwitch(this.systems.engines.eng2.startSwitch);
-             else if (action === 'eng3_start_toggle' && this.systems.engines.eng3) this.systems.engines.eng3.startSwitch = cycleStartSwitch(this.systems.engines.eng3.startSwitch);
-             else if (action === 'eng4_start_toggle' && this.systems.engines.eng4) this.systems.engines.eng4.startSwitch = cycleStartSwitch(this.systems.engines.eng4.startSwitch);
-             
-             // Fuel Control
-             else if (action === 'eng1_fuel') this.systems.engines.eng1.fuelControl = toggle(this.systems.engines.eng1.fuelControl);
-             else if (action === 'eng2_fuel') this.systems.engines.eng2.fuelControl = toggle(this.systems.engines.eng2.fuelControl);
-             else if (action === 'eng3_fuel' && this.systems.engines.eng3) this.systems.engines.eng3.fuelControl = toggle(this.systems.engines.eng3.fuelControl);
-             else if (action === 'eng4_fuel' && this.systems.engines.eng4) this.systems.engines.eng4.fuelControl = toggle(this.systems.engines.eng4.fuelControl);
+             const setFuelControl = (engineKey) => {
+                 const engine = this.systems.engines?.[engineKey];
+                 if (!engine) return;
+                 engine.fuelControl = value !== undefined ? !!value : !engine.fuelControl;
+             };
+
+             if (action === 'eng1_start_toggle') setStartSwitch('eng1');
+             else if (action === 'eng2_start_toggle') setStartSwitch('eng2');
+             else if (action === 'eng3_start_toggle') setStartSwitch('eng3');
+             else if (action === 'eng4_start_toggle') setStartSwitch('eng4');
+             else if (action === 'eng1_start') setStartSwitch('eng1');
+             else if (action === 'eng2_start') setStartSwitch('eng2');
+             else if (action === 'eng3_start') setStartSwitch('eng3');
+             else if (action === 'eng4_start') setStartSwitch('eng4');
+             else if (action === 'eng1_fuel' || action === 'eng1_run') setFuelControl('eng1');
+             else if (action === 'eng2_fuel' || action === 'eng2_run') setFuelControl('eng2');
+             else if (action === 'eng3_fuel' || action === 'eng3_run') setFuelControl('eng3');
+             else if (action === 'eng4_fuel' || action === 'eng4_run') setFuelControl('eng4');
+        }
+        else if (system === 'electrical') {
+            if (action === 'batterySelector') {
+                const states = ['BAT', 'OFF', 'AUTO'];
+                const current = this.systems.electrical.batterySelector || (this.systems.electrical.battery ? 'AUTO' : 'OFF');
+                const nextState = value !== undefined ? value : states[(states.indexOf(current) + 1 + states.length) % states.length];
+                this.systems.electrical.batterySelector = nextState;
+                this.systems.electrical.battery = nextState !== 'OFF';
+                this.systems.electrical.stbyPower = nextState !== 'OFF';
+            } else if (action === 'apuGen1') {
+                this.systems.electrical.apuGen1 = toggle(this.systems.electrical.apuGen1);
+            } else if (action === 'apuGen2') {
+                this.systems.electrical.apuGen2 = toggle(this.systems.electrical.apuGen2);
+            } else if (action === 'apuGen') {
+                const nextValue = value !== undefined ? !!value : !(this.systems.electrical.apuGen1 || this.systems.electrical.apuGen2);
+                this.systems.electrical.apuGen1 = nextValue;
+                this.systems.electrical.apuGen2 = nextValue;
+                this.systems.electrical.apuGen = nextValue;
+            } else if (this.systems.electrical[action] !== undefined) {
+                this.systems.electrical[action] = toggle(this.systems.electrical[action]);
+            } else {
+                console.warn(`Electrical action ${action} not found`);
+            }
         }
         else if (system === 'fire') {
             const normalizedAction = String(action)
@@ -2088,12 +2179,6 @@ class RealisticFlightPhysicsService {
         this.runwayGeometry = geometry;
         if (this.autopilot && typeof this.autopilot.setRunwayGeometry === 'function') {
             this.autopilot.setRunwayGeometry(geometry);
-            
-            // Auto-tune NAV1 Frequency if available
-            if (geometry.ilsFrequency && typeof this.autopilot.setNavFrequency === 'function') {
-                this.autopilot.setNavFrequency(geometry.ilsFrequency);
-                console.log(`📻 Physics Service: Auto-tuned NAV1 to ${geometry.ilsFrequency} MHz for ${geometry.runwayName}`);
-            }
         }
         console.log("Physics Service: Runway Geometry Set", geometry);
     }
@@ -2134,11 +2219,14 @@ class RealisticFlightPhysicsService {
         // Electrical
         this.systems.electrical = {
             ...this.systems.electrical,
+            batterySelector: 'OFF',
             battery: false,
             stbyPower: false,
             gen1: false,
             gen2: false,
             apuGen: false,
+            apuGen1: false,
+            apuGen2: false,
             busTie: true,
             dcVolts: 0,
             acVolts: 0,
@@ -2272,8 +2360,9 @@ class RealisticFlightPhysicsService {
             this.difficulty = 'rookie'; // Default
         }
 
-        // Apply Cold Start if Professional or higher
-        if (['pro', 'professional', 'survival', 'devil'].includes(this.difficulty)) {
+        // Apply Cold Start if Professional or higher, unless a scenario explicitly launches hot
+        const forceHotStart = this.aircraft?.scenarioMode && this.aircraft?.scenarioRestrictions?.hotStart !== false;
+        if (!forceHotStart && ['pro', 'professional', 'survival', 'devil'].includes(this.difficulty)) {
             this.setColdStart();
         } else if (conditions.coldStart) {
             // Explicit override
@@ -2735,7 +2824,9 @@ class RealisticFlightPhysicsService {
             engaged: this.autopilot.engaged,
             mode: this.autopilot.mode,
             targets: this.autopilot.targets,
-            fma: this.autopilot.fmaStatus || null
+            fma: this.autopilot.fmaStatus || null,
+            altitudeMode: this.autopilot.altitudeMode,
+            userVsTarget: this.autopilot.userVsTarget
         };
     }
 
@@ -2748,6 +2839,17 @@ class RealisticFlightPhysicsService {
             }
         }
     }
+
+    /** Set FLEX temperature for derated Airbus takeoff (°C). No-op on Boeing. */
+    setFlexTemp(temp) {
+        if (this.fadec) this.fadec.setFlexTemp(temp);
+    }
+
+    /** Returns current FADEC mode string (IDLE/CLB/FLEX/MCT/TOGA) or null for Boeing. */
+    getFADECMode() {
+        return this.fadec ? this.fadec.getMode() : null;
+    }
+
     reset() {
         const gearHeight = this.aircraft.gearHeight || 2;
         // Z is relative to Airport Elevation (Origin), so we just want to be gearHeight above 0

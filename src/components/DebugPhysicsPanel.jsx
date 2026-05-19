@@ -152,7 +152,13 @@ const DebugPhysicsPanel = ({ debugPhysicsData, thrust, drag, waypoints = [], fli
       <div>Steering Moment: {formatFixed(safeDebugPhysicsData.steeringMoment_n, 0, ' N·m')}</div>
 
       <div style={{ fontWeight: 'bold', marginTop: '8px', marginBottom: '5px', borderBottom: '1px solid #444', paddingBottom: '3px' }}>KINEMATICS</div>
+      <div>TAS: {formatFixed(flightData?.derived?.trueAirspeed ?? flightData?.derived?.airspeed, 1, ' kts')}</div>
+      <div>IAS: {formatFixed(flightData?.derived?.indicatedAirspeed, 1, ' kts')}</div>
       <div>GS: {formatFixed(derivedGroundSpeed, 1, ' kts')}</div>
+      <div style={{ fontWeight: 'bold', marginTop: '8px', marginBottom: '5px', borderBottom: '1px solid #444', paddingBottom: '3px' }}>WIND</div>
+      <div>Speed: {formatFixed(flightData?.environment?.windSpeed, 1, ' kts')}</div>
+      <div>Dir: {formatFixed(flightData?.environment?.windDirection, 0, '°')}</div>
+      <div>Gust: {formatFixed(flightData?.environment?.windGust, 1, ' kts')}</div>
       <div>Body Vel U: {formatFixed(velocity?.u, 2, ' m/s')}</div>
       <div>Body Vel V: {formatFixed(velocity?.v, 2, ' m/s')}</div>
       <div>Body Vel W: {formatFixed(velocity?.w, 2, ' m/s')}</div>

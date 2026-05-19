@@ -88,7 +88,7 @@ class RealisticAutopilotService {
         // --- PID Configurations ---
         
         // Auto-Throttle
-        this.speedPID = new PIDController(0.06, 0.012, 0.025, 0.0, 1.0, 0.45); // Smooth but authoritative speed hold
+        this.speedPID = new PIDController(0.06, 0.0135, 0.025, 0.0, 1.0, 0.45); // Smooth but authoritative speed hold
 
         // Vertical Speed (VS -> Pitch)
         // Softer outer-loop pitch target prevents step changes from becoming elevator snaps.
@@ -96,7 +96,7 @@ class RealisticAutopilotService {
 
         // Altitude Hold (Altitude -> Target VS)
         // Used when not in ILS GS mode but Altitude Target is set.
-        this.altitudePID = new PIDController(1.0, 0.004, 0.0, -2200, 2200, 0.5);
+        this.altitudePID = new PIDController(2.0, 0.01, 0.0, -8000, 8000, 0.5);
 
         // Pitch Attitude (Target Pitch -> Elevator)
         // Inner loop remains responsive, but derivative smoothing and lower gains avoid jerky reversals.
@@ -125,7 +125,8 @@ class RealisticAutopilotService {
         this.runwayGeometry = null;
         this.nav1Frequency = 0; // Currently tuned NAV1 Frequency
         this.prevTargetRoll = 0;
-        this.maxRollRate = 12.0 * Math.PI / 180;
+        this.maxRollRate = 10.0 * Math.PI / 180;
+        this.normalBankLimit = 25.0 * Math.PI / 180;
 
         this.targets = {
             speed: 0, // Knots
@@ -133,6 +134,8 @@ class RealisticAutopilotService {
             altitude: 0, // ft (Optional)
             heading: 0 // degrees
         };
+        this.userVsTarget = 0; // User's commanded VS — never overwritten by AP internal logic
+        this.lnavVS = null; // LNAV VNAV computed VS
         
         this.debugState = {
             headingError: 0,
@@ -161,14 +164,14 @@ class RealisticAutopilotService {
             prevAirspeed: null,
             prevThrottle: null
         };
-        this.inputFilterTau = 0.8;
+        this.inputFilterTau = 0.45;
         this.outputRateLimits = {
             throttle: 0.35,
             elevator: 0.55,
             aileron: 0.42,
             rudder: 0.55
         };
-        this.engagementBlendDuration = 0.6;
+        this.engagementBlendDuration = 0.3;
         this.engagementBlendRemaining = 0;
         this.fmaService = new FMAService();
         this.fmaStatus = this.fmaService.buildStatus({
@@ -204,12 +207,14 @@ class RealisticAutopilotService {
 
     snapValue(value, step) {
         if (!Number.isFinite(value) || !Number.isFinite(step) || step <= 0) return value;
-        return Math.round(value / step) * step;
+        const snapped = Math.round(value / step) * step;
+        return Object.is(snapped, -0) ? 0 : snapped;
     }
 
     normalizeHeading(value, fallback = 0) {
         if (!Number.isFinite(value)) return fallback;
-        const normalized = ((value % 360) + 360) % 360;
+        const snapped = this.snapValue(value, 5);
+        const normalized = ((snapped % 360) + 360) % 360;
         return normalized === 0 ? 360 : normalized;
     }
 
@@ -239,6 +244,7 @@ class RealisticAutopilotService {
 
         if (rawTargets.vs !== undefined) {
             normalized.vs = this.normalizeVerticalSpeedTarget(rawTargets.vs, this.targets.vs || 0);
+            this.userVsTarget = normalized.vs;
         }
 
         if (rawTargets.altitude !== undefined) {
@@ -268,16 +274,6 @@ class RealisticAutopilotService {
         const preserveExisting = options.preserveExisting === true;
 
         if (normalizedTargets.mode) {
-            // Auto-tune Logic: If ILS mode is requested and we have a runway geometry, tune the frequency
-            if (normalizedTargets.mode === 'ILS' && this.runwayGeometry && this.runwayGeometry.ilsFrequency) {
-                // Only auto-tune if we aren't already tuned (or force it? Force is safer for user experience)
-                if (this.nav1Frequency !== this.runwayGeometry.ilsFrequency) {
-                    this.setNavFrequency(this.runwayGeometry.ilsFrequency);
-                    // Update debug message to inform user
-                    this.debugState.ilsMessage = `Auto-tuned ILS ${this.runwayGeometry.ilsFrequency.toFixed(2)}`;
-                }
-            }
-
             this.mode = normalizedTargets.mode;
         }
 
@@ -341,7 +337,7 @@ class RealisticAutopilotService {
                 if (explicitTargets.heading === undefined) {
                     captureTargets.heading = this.normalizeHeading(currentState.heading, 360);
                 }
-                this.setTargets(captureTargets, { preserveExisting: true });
+                this.setTargets(captureTargets);
 
                 const targetSpeed = Number.isFinite(this.targets.speed) ? this.targets.speed : captureTargets.speed ?? 150;
                 const targetVS = Number.isFinite(this.targets.vs) ? this.targets.vs : captureTargets.vs ?? 0;
@@ -356,9 +352,19 @@ class RealisticAutopilotService {
                 this.rollPID.initialize(currentState.aileron, currentState.roll, currentState.roll);
                 this.rudderPID.initialize(currentState.rudder ?? 0, currentState.beta || 0, 0);
 
-                this.prevTargetRoll = Number.isFinite(currentState.roll) ? currentState.roll : 0;
+                this.prevTargetRoll = Number.isFinite(currentState.roll)
+                    ? this.clamp(currentState.roll, -8 * Math.PI / 180, 8 * Math.PI / 180)
+                    : 0;
+                // Seed outputState.throttle from base throttle at current speed so the rate limiter
+                // starts from a realistic value rather than controls.throttle (which may be 0 at init).
+                const seedSpeed = Number.isFinite(currentState.airspeed) ? currentState.airspeed : 150;
+                const seedTargetSpeed = Number.isFinite(this.targets.speed) ? this.targets.speed : seedSpeed;
+                const seedThrottle = this.clamp(
+                    0.5 + ((seedTargetSpeed - 220) * 0.0035),
+                    0.35, 0.9
+                );
                 this.outputState = {
-                    throttle: Number.isFinite(currentState.throttle) ? currentState.throttle : 0,
+                    throttle: seedThrottle,
                     elevator: Number.isFinite(currentState.elevator) ? currentState.elevator : 0,
                     aileron: Number.isFinite(currentState.aileron) ? currentState.aileron : 0,
                     rudder: Number.isFinite(currentState.rudder) ? currentState.rudder : 0
@@ -402,12 +408,30 @@ class RealisticAutopilotService {
         return prev + delta;
     }
 
+    applyRollEnvelope(targetRoll, headingErrorDeg, isShortFinal) {
+        const errorMagnitude = Math.abs(Number.isFinite(headingErrorDeg) ? headingErrorDeg : 0);
+        const authorityScale = this.clamp(0.65 + (errorMagnitude / 60), 0.65, 1.0);
+        let limitedRoll = targetRoll * authorityScale;
+        const normalLimit = this.normalBankLimit;
+
+        if (limitedRoll > normalLimit) limitedRoll = normalLimit;
+        if (limitedRoll < -normalLimit) limitedRoll = -normalLimit;
+
+        if (isShortFinal) {
+            const shortFinalLimit = 8.0 * Math.PI / 180;
+            if (limitedRoll > shortFinalLimit) limitedRoll = shortFinalLimit;
+            if (limitedRoll < -shortFinalLimit) limitedRoll = -shortFinalLimit;
+        }
+
+        return limitedRoll;
+    }
+
     computePredictiveThrottle(targetSpeed, currentSpeed, targetVS, dt) {
         const prevState = this.speedControlState;
         const speedTrend = Number.isFinite(prevState.prevAirspeed) && dt > 0
             ? (currentSpeed - prevState.prevAirspeed) / dt
             : 0;
-        const targetDeltaLimit = 6 * dt;
+        const targetDeltaLimit = 7;
         const shapedTarget = prevState.shapedTarget === null
             ? targetSpeed
             : this.rateLimit(prevState.shapedTarget, targetSpeed, targetDeltaLimit, dt);
@@ -416,13 +440,13 @@ class RealisticAutopilotService {
         const baseThrottle = this.clamp(
             0.5
             + ((shapedTarget - 220) * 0.0035)
-            + (this.clamp(verticalDemand, -2000, 2500) / 12000),
-            0.18,
+            + (this.clamp(verticalDemand, -1800, 1800) / 15000),
+            0.35,
             0.9
         );
         const correction = this.speedPID.update(shapedTarget, currentSpeed, dt);
         const predictiveDamping = this.clamp(speedTrend * 0.04, -0.18, 0.18);
-        const throttleCmd = this.clamp(baseThrottle + (correction * 0.55) - predictiveDamping, 0.0, 1.0);
+        const throttleCmd = this.clamp(baseThrottle + (correction * 0.95) - predictiveDamping, 0.0, 1.0);
 
         this.speedControlState = {
             shapedTarget,
@@ -440,23 +464,34 @@ class RealisticAutopilotService {
         };
     }
 
-    applyThrottleEnvelope(rawThrottle, targetSpeed, currentSpeed, targetVS) {
+    applyThrottleEnvelope(rawThrottle, targetSpeed, currentSpeed, targetVS, altitudeMode, altError) {
         const speedError = targetSpeed - currentSpeed;
-        const climbBias = this.clamp((Number.isFinite(targetVS) ? targetVS : 0) / 6000, 0, 0.12);
-        let minThrottle = 0.5;
+        const verticalDemand = Number.isFinite(targetVS) ? targetVS : 0;
+        const climbBias = this.clamp(verticalDemand / 8000, 0, 0.1);
+        let minThrottle = verticalDemand > 500 ? 0.5 : (verticalDemand > 100 ? 0.42 : 0.32);
         let maxThrottle = 0.8 + climbBias;
 
         if (speedError < -10) {
-            const overspeedFactor = this.clamp((-speedError - 10) / 60, 0, 1);
-            minThrottle = this.clamp(0.5 - overspeedFactor * 0.45, 0.05, 0.5);
-            maxThrottle = this.clamp(0.8 - overspeedFactor * 0.72, 0.08, 0.8);
+            const overspeedFactor = this.clamp((-speedError - 10) / 50, 0, 1);
+            minThrottle = this.clamp(0.5 - overspeedFactor * 0.5, 0.0, 0.5);
+            maxThrottle = this.clamp(0.8 - overspeedFactor * 0.8, 0.0, 0.8);
         } else if (speedError > 25) {
             const lowEnergyFactor = this.clamp((speedError - 25) / 55, 0, 1);
             maxThrottle = this.clamp(maxThrottle + lowEnergyFactor * 0.2, 0.8, 1.0);
         }
 
+        // When altitude hold/capture is active and aircraft is below target or sinking,
+        // enforce a recovery floor so the speed controller cannot cut thrust during descent recovery.
+        const altRecoveryActive = (altitudeMode === 'hold' || altitudeMode === 'capture')
+            && Number.isFinite(altError) && altError > 120
+            && verticalDemand > 100;
+        if (altRecoveryActive) {
+            minThrottle = Math.max(minThrottle, 0.42);
+        }
+
         return {
             throttleCmd: this.clamp(rawThrottle, minThrottle, maxThrottle),
+            rawThrottle: speedError < -10 ? Math.min(rawThrottle, minThrottle - 0.02) : rawThrottle,
             minThrottle,
             maxThrottle,
             speedError
@@ -490,6 +525,205 @@ class RealisticAutopilotService {
         return next;
     }
 
+    updateIlsTelemetry(state) {
+        const { airspeed, groundSpeed, verticalSpeed, heading, track, latitude, longitude, altitude, altitudeAGL, onGround } = state;
+        const beta = state.beta || 0;
+
+        let ilsDebug = {
+            active: false,
+            distAlong: 0,
+            distCross: 0,
+            altError: 0,
+            targetAltitude: 0,
+            message: ''
+        };
+
+        let isShortFinal = false;
+
+        if (this.runwayGeometry && typeof latitude === 'number' && typeof longitude === 'number') {
+            const requiredFreq = this.runwayGeometry.ilsFrequency;
+            let freqMatch = true;
+            if (requiredFreq && Math.abs(this.nav1Frequency - requiredFreq) > 0.05) {
+                freqMatch = false;
+            }
+
+            if (!freqMatch) {
+                ilsDebug.message = `Wrong Freq: ${this.nav1Frequency} vs ${requiredFreq}`;
+            } else {
+                const { thresholdStart, heading: runwayHeading } = this.runwayGeometry;
+                const latRad = thresholdStart.latitude * Math.PI / 180;
+                const metersPerLat = 111132.92;
+                const metersPerLon = 111412.84 * Math.cos(latRad);
+
+                const dx = (latitude - thresholdStart.latitude) * metersPerLat;
+                const dy = (longitude - thresholdStart.longitude) * metersPerLon;
+
+                const rH = runwayHeading * Math.PI / 180;
+                const ux = Math.cos(rH);
+                const uy = Math.sin(rH);
+
+                const distAlong = dx * ux + dy * uy;
+                const distCross = -dx * uy + dy * ux;
+                const distToThresholdFt = -distAlong * 3.28084;
+
+                let targetAltitude = altitude;
+                const runwayElev = thresholdStart.elevation || 0;
+                const heightAglFt = Number.isFinite(altitudeAGL) ? altitudeAGL : Math.max(0, altitude - runwayElev);
+                const sinkRateFpm = Number.isFinite(verticalSpeed) ? verticalSpeed : 0;
+                const inFlareWindow = distToThresholdFt <= 900 && distToThresholdFt > -1800;
+                const inRollout = onGround || (distToThresholdFt <= 1800 && heightAglFt <= 6);
+                let ilsPhase = 'approach';
+                if (inRollout) ilsPhase = 'rollout';
+                else if (inFlareWindow || heightAglFt <= 80) ilsPhase = 'flare';
+
+                const thresholdCrossingHeightFt = 92;
+                const touchdownZoneFt = 1200;
+                const shortFinalFloorFt = 66;
+                const flareStartAglFt = 35;
+
+                if (distToThresholdFt > 1500 && distToThresholdFt < 300000) {
+                    targetAltitude = runwayElev + thresholdCrossingHeightFt + (distToThresholdFt * Math.tan(3 * Math.PI / 180));
+                } else if (distToThresholdFt > 0) {
+                    const shortFinalStartFt = 1500;
+                    const decayWindowFt = 220;
+                    const protectedDistanceFt = Math.max(0, distToThresholdFt - (shortFinalStartFt - decayWindowFt));
+                    const thresholdBlend = Math.min(1, Math.max(0, protectedDistanceFt / decayWindowFt));
+                    const thresholdReferenceAltitude = shortFinalFloorFt + ((thresholdCrossingHeightFt - shortFinalFloorFt) * thresholdBlend);
+                    targetAltitude = runwayElev + thresholdReferenceAltitude;
+                } else if (distToThresholdFt > -touchdownZoneFt) {
+                    const touchDownWindowFt = Math.max(700, touchdownZoneFt - 150);
+                    const touchdownBlend = Math.min(1, Math.max(0, (-distToThresholdFt) / touchDownWindowFt));
+                    const touchdownReferenceAltitude = Math.max(0, shortFinalFloorFt * (1 - touchdownBlend));
+                    targetAltitude = runwayElev + touchdownReferenceAltitude;
+                }
+                if (distToThresholdFt <= -touchdownZoneFt) {
+                    targetAltitude = runwayElev;
+                }
+
+                const altError = targetAltitude - altitude;
+                let ilsVS = 0;
+                let glideActive = false;
+                let driftAngle = 0;
+                let headingCorrection = 0;
+                let deviationDeg = 0;
+                const referenceGroundSpeedKts = Number.isFinite(groundSpeed) && groundSpeed > 30
+                    ? groundSpeed
+                    : (Number.isFinite(airspeed) ? airspeed : 0);
+                const nominalGlideslopeVs = -referenceGroundSpeedKts * 5.2;
+                const shortFinalDescentVs = Math.min(nominalGlideslopeVs, -420);
+
+                if (altError > 60 && distToThresholdFt > 1200) {
+                    ilsVS = nominalGlideslopeVs;
+                } else {
+                    const vsCorrection = this.glideslopePID.update(altError, 0, 0.016);
+                    let baseDescentRate = distToThresholdFt > 1200 ? nominalGlideslopeVs : shortFinalDescentVs;
+                    if (distToThresholdFt <= -touchdownZoneFt || onGround) {
+                        baseDescentRate = 0;
+                    }
+                    ilsVS = baseDescentRate + vsCorrection;
+                }
+
+                if (ilsPhase === 'flare') {
+                    if (distToThresholdFt > 0) {
+                        ilsVS = Math.max(-520, Math.min(-180, ilsVS * 0.22));
+                    } else {
+                        ilsVS = Math.max(-620, Math.min(-160, ilsVS * 0.5));
+                    }
+                }
+                if (ilsPhase === 'flare' && heightAglFt <= flareStartAglFt) {
+                    ilsVS = Math.max(ilsVS, -560);
+                }
+                ilsVS = Math.max(-4500, Math.min(1000, ilsVS));
+
+                if (distAlong > 3700) {
+                    const reciprocal = (runwayHeading + 180) % 360;
+                    ilsDebug.message = `ILS: Behind threshold (${(distAlong / 1852).toFixed(1)}nm past) — turning to ${reciprocal.toFixed(0)}°`;
+                    ilsDebug.distAlong = distAlong * 3.28084;
+                    ilsDebug.distCross = distCross * 3.28084;
+                } else {
+                    const distToThresholdMeters = -distAlong;
+                    const effectiveDist = Math.max(distToThresholdMeters, 500);
+                    const distNm = effectiveDist / 1852;
+                    const dynamicKp = 6.0 + (distNm * 1.5);
+                    this.localizerPID.kp = Math.min(dynamicKp, 30.0);
+
+                    deviationDeg = Math.atan2(distCross, effectiveDist) * 180 / Math.PI;
+
+                    if (typeof track === 'number') {
+                        let rawDrift = track - heading;
+                        if (rawDrift > 180) rawDrift -= 360;
+                        if (rawDrift < -180) rawDrift += 360;
+                        driftAngle = rawDrift - (beta * 180 / Math.PI);
+                    }
+
+                    const distNM = distToThresholdFt / 6076.12;
+                    const maxIntercept = 28;
+                    let desiredInterceptAngle = 0;
+                    if (Math.abs(deviationDeg) > 1.5) {
+                        let correction = -deviationDeg * 4.5;
+                        if (correction > maxIntercept) correction = maxIntercept;
+                        if (correction < -maxIntercept) correction = -maxIntercept;
+                        desiredInterceptAngle = correction;
+                    } else {
+                        let correction = this.localizerPID.update(0, deviationDeg, 0.016);
+                        if (correction > maxIntercept) correction = maxIntercept;
+                        if (correction < -maxIntercept) correction = -maxIntercept;
+                        desiredInterceptAngle = correction;
+                    }
+
+                    headingCorrection = desiredInterceptAngle - driftAngle;
+                    if (headingCorrection > 60) headingCorrection = 60;
+                    if (headingCorrection < -60) headingCorrection = -60;
+
+                    glideActive = (distNM <= 50.0) && (Math.abs(deviationDeg) < 70.0);
+                    if (distNM < 1.0) {
+                        isShortFinal = true;
+                        const limit = ilsPhase === 'flare' ? 3.0 : 5.0;
+                        if (headingCorrection > limit) headingCorrection = limit;
+                        if (headingCorrection < -limit) headingCorrection = -limit;
+                    }
+
+                    ilsDebug.message = `ILS Tracking (Dev: ${deviationDeg.toFixed(2)}°)`;
+                    ilsDebug = {
+                        active: true,
+                        runway: this.runwayGeometry.runwayName,
+                        distAlong: distAlong * 3.28084,
+                        distCross: distCross * 3.28084,
+                        altError,
+                        targetAltitude,
+                        driftAngle,
+                        message: ilsDebug.message,
+                        locCaptured: Math.abs(deviationDeg) <= 2.0,
+                        gsCaptured: glideActive,
+                        locDeviationDeg: deviationDeg,
+                        gsDeviationDeg: glideActive ? 0 : (altError / (distToThresholdFt || 1)) * 57.29,
+                        phase: ilsPhase,
+                        runwayEntryHeightFt: Math.abs(distToThresholdFt) <= 600 ? heightAglFt : null,
+                        sinkRateFpm,
+                        thresholdCrossingHeightFt,
+                        touchdownZoneFt,
+                        shortFinalFloorFt,
+                        flareStartAglFt,
+                        headingTarget: (runwayHeading + headingCorrection + 360) % 360,
+                        vsTarget: glideActive ? ilsVS : 0,
+                    };
+
+                    if (distToThresholdMeters > 0) {
+                        const currentAngleRad = Math.atan2(altitude - this.runwayGeometry.thresholdStart.elevation, distToThresholdMeters);
+                        const currentAngleDeg = currentAngleRad * 180 / Math.PI;
+                        ilsDebug.gsDeviationDeg = currentAngleDeg - 3.0;
+                    } else {
+                        ilsDebug.gsDeviationDeg = 0;
+                    }
+                }
+            }
+        }
+
+        this.debugState.ils = ilsDebug;
+        if (ilsDebug.message) this.debugState.ilsMessage = ilsDebug.message;
+        return { ilsDebug, isShortFinal };
+    }
+
     /**
      * Calculate Control Outputs
      * @param {Object} state - Current aircraft state { airspeed (kts), verticalSpeed (ft/min), pitch (rad), roll (rad), altitude (ft), heading (deg), latitude, longitude }
@@ -498,7 +732,18 @@ class RealisticAutopilotService {
      * @returns {Object} New control inputs { throttle, elevator, trim, aileron } or null if not engaged
      */
     update(state, currentControls, dt) {
-        if (!this.engaged) return null;
+        const { ilsDebug: passiveIlsDebug } = this.updateIlsTelemetry(state);
+        if (!this.engaged) {
+            this.debugState = {
+                ...this.debugState,
+                mode: this.mode,
+                engaged: this.engaged,
+                ils: passiveIlsDebug,
+                lnav: this.debugState.lnav,
+                lnavMessage: this.debugState.lnavMessage || ''
+            };
+            return null;
+        }
 
         const { airspeed, verticalSpeed, pitch, roll, heading, track, latitude, longitude, altitude } = state;
         const altitudeAGL = state.altitudeAGL;
@@ -522,6 +767,7 @@ class RealisticAutopilotService {
         }
         if (this.targets.vs === 0 && Math.abs(fVerticalSpeed) > 100 && this.altitudeMode !== 'hold') {
              this.targets.vs = this.normalizeVerticalSpeedTarget(fVerticalSpeed, 0);
+             this.userVsTarget = this.targets.vs;
         }
         if (this.targets.heading === 0) {
             this.targets.heading = this.normalizeHeading(fHeading, 360);
@@ -628,16 +874,12 @@ class RealisticAutopilotService {
             // Set Altitude Target from Fix if available
             if (fix.altitude && typeof fix.altitude === 'number') {
                 this.targets.altitude = fix.altitude;
-                
-                // Active VNAV for LNAV fixes: Drive VS to target automatically
-                // This ensures the plane climbs/descends to the pre-turn altitude
-                let pidVS = this.altitudePID.update(fix.altitude, altitude, dt);
-                this.targets.vs = pidVS;
+                this.lnavVS = this.altitudePID.update(fix.altitude, altitude, dt);
             }
         }
         
         // --- ILS Logic ---
-        let ilsDebug = {
+        let ilsDebug = this.debugState.ils || {
             active: false,
             distAlong: 0,
             distCross: 0,
@@ -646,263 +888,12 @@ class RealisticAutopilotService {
             message: ''
         };
 
-        let isShortFinal = false;
+        let isShortFinal = Boolean(ilsDebug?.active && Math.abs(ilsDebug?.distAlong || 0) < 6076);
 
-        if (this.mode === 'ILS' && this.runwayGeometry && typeof latitude === 'number' && typeof longitude === 'number') {
-             // Frequency Check
-             const requiredFreq = this.runwayGeometry.ilsFrequency;
-             // Allow slight tolerance for float comparison, though exact match usually fine for entered numbers
-             // If requiredFreq is missing (older data), assume always valid or fail? 
-             // Logic: If ILS freq is defined, we MUST match it.
-             let freqMatch = true;
-             if (requiredFreq) {
-                 if (Math.abs(this.nav1Frequency - requiredFreq) > 0.05) {
-                     freqMatch = false;
-                 }
-             }
-
-             if (!freqMatch) {
-                 ilsDebug.message = `Wrong Freq: ${this.nav1Frequency} vs ${requiredFreq}`;
-                 // Fallback to maintain current heading/altitude or do nothing (let other PIDs handle last targets)
-                 // If we return here, we need to make sure we don't zero out throttle etc.
-                 // Ideally, we should just not run the ILS path calculations and let the "HDG/ALT" hold logic take over 
-                 // BUT current logic applies PIDs at the end. 
-                 // If mode is ILS but freq is wrong, we should probably act like "HDG" mode using current heading target.
-             } else {
-                 const { thresholdStart, heading: runwayHeading } = this.runwayGeometry;
-                 
-                 // Convert Geo to Meters relative to Threshold
-                 const latRad = thresholdStart.latitude * Math.PI / 180;
-                 const metersPerLat = 111132.92;
-                 const metersPerLon = 111412.84 * Math.cos(latRad);
-                 
-                 const dx = (latitude - thresholdStart.latitude) * metersPerLat;
-                 const dy = (longitude - thresholdStart.longitude) * metersPerLon;
-                 
-                 const rH = runwayHeading * Math.PI / 180;
-                 const ux = Math.cos(rH);
-                 const uy = Math.sin(rH);
-                 
-                 // Distance ALONG the runway (positive = past threshold, negative = approaching)
-                 const distAlong = dx * ux + dy * uy;
-                 
-                 // Cross Track Error (positive = right of centerline)
-                 const distCross = -dx * uy + dy * ux;
-                 
-                 // 1. Glideslope (VNAV)
-                 // Target Altitude Calculation: 3 degree slope aiming at 50ft above threshold
-                 // Alt = 50 + distance * tan(3deg). Distance is -distAlong (positive distance to go)
-                 const distToThresholdFt = -distAlong * 3.28084;
-                 
-                 // Safety: If we are passed the threshold (distToThresholdFt < 0) or too far behind (> 20nm),
-                 // Do not engage Glideslope dive. Maintain current altitude or safe minimum.
-                 let targetAltitude = altitude; // Default to hold current
-                 
-                 const runwayElev = thresholdStart.elevation || 0;
-                const heightAglFt = Number.isFinite(altitudeAGL) ? altitudeAGL : Math.max(0, altitude - runwayElev);
-                const sinkRateFpm = Number.isFinite(verticalSpeed) ? verticalSpeed : 0;
-                const inFlareWindow = distToThresholdFt <= 1200 && distToThresholdFt > -1500;
-                const inRollout = onGround || (distToThresholdFt <= -150 && heightAglFt <= 5);
-                let ilsPhase = 'approach';
-                if (inRollout) ilsPhase = 'rollout';
-                else if (inFlareWindow || heightAglFt <= 80) ilsPhase = 'flare';
-                 
-                 // Active Zone: Approaching (dist > 0) and within reasonable range (< 50nm)
-                 // and not "behind" the runway (distAlong < 0)
-                 if (distToThresholdFt > 1200 && distToThresholdFt < 300000) {
-                    targetAltitude = runwayElev + 50 + (distToThresholdFt * Math.tan(3 * Math.PI / 180));
-                 } else if (distToThresholdFt > -1500) {
-                     const flareBlend = Math.min(1, Math.max(0, (1200 - distToThresholdFt) / 2700));
-                     const flareReferenceAltitude = runwayElev + Math.max(5, 50 * (1 - flareBlend));
-                    targetAltitude = flareReferenceAltitude;
-                 }
-                 
-                 if (distToThresholdFt <= -1500) {
-                    targetAltitude = runwayElev;
-                }
-
-                const altError = targetAltitude - altitude;
-                 
-                 // Glideslope Capture Logic (Capture from Below)
-                 // If we are significantly below the glidepath (altError > 50ft), 
-                 // we should MAINTAIN ALTITUDE (VS=0) until we intercept.
-                 // We should NOT climb to the glideslope.
-                 
-                 let vsCorrection = 0;
-                 let baseDescentRate = 0;
-                 
-                 if (altError > 50) {
-                     // Below Glidepath: Fly Level
-                     vsCorrection = 0;
-                     baseDescentRate = 0;
-                     this.glideslopePID.reset(); // Prevent integral windup while waiting
-                 } else {
-                     // On or Above Glidepath: Track it
-                     
-                     // Update VS Target via Glideslope PID
-                     // Error < 0 (Too High) -> Negative VS (Descent)
-                     vsCorrection = this.glideslopePID.update(altError, 0, dt);
-                     
-                     // Feed Forward: Base Descent Rate for 3 degree slope
-                     const groundSpeedKts = fAirspeed; // Using IAS as proxy for GS
-                     baseDescentRate = -groundSpeedKts * 5.2; 
-                     
-                     // If not in active approach zone, disable base descent
-                     if (distToThresholdFt <= -1500 || distToThresholdFt > 120000) {
-                         baseDescentRate = 0;
-                         vsCorrection = vsCorrection * 0.1;
-                     }
-                 }
-                 
-                 this.targets.vs = baseDescentRate + vsCorrection;
-
-                if (ilsPhase === 'flare') {
-                    this.targets.vs = Math.max(-900, Math.min(-150, this.targets.vs * 0.45));
-                }
-                if (ilsPhase === 'rollout') {
-                    this.targets.vs = 0;
-                    this.glideslopePID.reset();
-                }
-                
-                // Clamp VS for safety
-                // Increased max descent to 4500 fpm to allow capture from high altitude
-                if (this.targets.vs < -4500) this.targets.vs = -4500; 
-                if (this.targets.vs > 1000) this.targets.vs = 1000; // Reduced max climb in GS mode
-
-                // 2. Localizer (LNAV)
-                 // REDESIGNED: Use Angular Deviation (Degrees) instead of Linear Distance.
-                 // This mimics real ILS receiver behavior (sensitivity increases as you get closer)
-                 // and provides smoother intercepts from far out.
-                 
-                 // Calculate Angular Deviation (Localizer Error in Degrees)
-                 // distAlong is negative on approach. We want positive distance to threshold.
-                 const distToThresholdMeters = -distAlong; 
-                 
-                 // Avoid division by zero or singular behavior near threshold
-                 // Effective distance minimum 500m to cap sensitivity on short final
-                 const effectiveDist = Math.max(distToThresholdMeters, 500);
-                 
-                 // Dynamic Gain Scheduling
-                 // Far out (15nm): High Gain to capture.
-                 // Close in (2nm): Lower Gain to prevent oscillation.
-                 // Kp = 6.0 + (distNm * 1.5)
-                 // Increased base to 6.0 and scaling to 1.5 for stronger response
-                 const distNm = effectiveDist / 1852;
-                 const dynamicKp = 6.0 + (distNm * 1.5);
-                 this.localizerPID.kp = Math.min(dynamicKp, 30.0); // Clamp to max 30.0 for far intercepts
-
-                 const deviationRad = Math.atan2(distCross, effectiveDist);
-                 const deviationDeg = deviationRad * 180 / Math.PI;
-                 
-                 // Calculate Drift Angle (Track - Heading)
-                 let driftAngle = 0;
-                if (typeof fTrack === 'number') {
-                    let rawDrift = fTrack - fHeading;
-                     if (rawDrift > 180) rawDrift -= 360;
-                     if (rawDrift < -180) rawDrift += 360;
-                     driftAngle = rawDrift - (beta * 180 / Math.PI);
-                 }
-
-                 const distNM = distToThresholdFt / 6076.12;
-                 let headingCorrection = 0;
-                 
-                 // Determine Intercept vs Track Mode
-                 // Standard ILS Capture: 
-                 // If deviation is large, use Proportional control capped at 60 degrees.
-                 
-                 // PID Controller for Localizer (Angular)
-                  // Input: Deviation (deg). Output: Heading Correction (deg).
-                  // Limit to +/- 28 deg to avoid snap-roll style intercepts
-
-                  const maxIntercept = 28;
-                  let desiredInterceptAngle = 0;
-
-                  // Smooth transition: Use PID update but clamp output
-
-                  if (Math.abs(deviationDeg) > 1.5) {
-                      // Pure proportional intercept, but intentionally gentle.
-                      let correction = -deviationDeg * 4.5;
-                      if (correction > maxIntercept) correction = maxIntercept;
-                      if (correction < -maxIntercept) correction = -maxIntercept;
-                      desiredInterceptAngle = correction;
-                      
-                      // Reset PID integral to prevent windup during intercept
-                      this.localizerPID.reset();
-                  } else {
-                     // Fine tracking with PID
-                     let correction = this.localizerPID.update(0, deviationDeg, dt);
-                     // Clamp PID output
-                     if (correction > maxIntercept) correction = maxIntercept;
-                     if (correction < -maxIntercept) correction = -maxIntercept;
-                     desiredInterceptAngle = correction;
-                 }
-
-                 // Feed-Forward Drift Compensation
-                 // If we have a drift angle (wind), we need to offset our heading to maintain the desired track.
-                 // PID calculates desired correction relative to the line.
-                 // To make the Track follow that correction, we must subtract drift from Heading.
-                 headingCorrection = desiredInterceptAngle - driftAngle;
-
-                 // Final Clamp for Safety (allow up to 60 deg for strong crosswind intercept)
-                 if (headingCorrection > 60) headingCorrection = 60;
-                 if (headingCorrection < -60) headingCorrection = -60;
-
-                 // Glideslope Gating: Only descend when reasonably aligned and within capture range
-                // Extended capture range to 50nm to handle far intercepts
-                // Relaxed lateral deviation check to 70 deg to allow GS capture during aggressive intercepts
-                const glideActive = (distNM <= 50.0) && (Math.abs(deviationDeg) < 70.0);
-                if (!glideActive) {
-                    this.targets.vs = 0;
-                     this.glideslopePID.reset(); // Reset if not active
-                 }
-                 
-                 // Bank Limit Logic on Short Final
-                 if (distNM < 1.0) {
-                     isShortFinal = true;
-                     const limit = ilsPhase === 'flare' ? 3.0 : 5.0;
-                     if (headingCorrection > limit) headingCorrection = limit;
-                     if (headingCorrection < -limit) headingCorrection = -limit;
-                 }
-
-                 ilsDebug.message = `ILS Tracking (Dev: ${deviationDeg.toFixed(2)}°)`;
-                 
-                 // Target Heading = Runway Heading + Correction
-                 let targetH = runwayHeading + headingCorrection;
-                 
-                 // Normalize
-                 this.targets.heading = (targetH + 360) % 360;
-
-                 ilsDebug = {
-                     active: true,
-                     runway: this.runwayGeometry.runwayName,
-                     distAlong: distAlong * 3.28084, // ft
-                     distCross: distCross * 3.28084, // ft
-                     altError: altError,
-                     targetAltitude: targetAltitude,
-                     driftAngle: driftAngle,
-                     message: ilsDebug.message,
-                     locCaptured: Math.abs(deviationDeg) <= 2.0,
-                     gsCaptured: glideActive,
-                     locDeviationDeg: deviationDeg, // Export for PFD
-                     gsDeviationDeg: glideActive ? 0 : (altError / (distToThresholdFt || 1)) * 57.29 // Approx angle deg if needed, or just use altError
-                 };
-
-                 // Refined GS Deviation (Angular) for PFD
-                 // Standard GS is 3 degrees. 
-                 // Angle = atan(Alt / Dist)
-                 // Deviation = Angle - 3.0
-                 if (distToThresholdMeters > 0) {
-                     const currentAngleRad = Math.atan2(altitude - this.runwayGeometry.thresholdStart.elevation, distToThresholdMeters);
-                     const currentAngleDeg = currentAngleRad * 180 / Math.PI;
-                     ilsDebug.gsDeviationDeg = currentAngleDeg - 3.0;
-                 } else {
-                     ilsDebug.gsDeviationDeg = 0;
-                 }
-
-                 ilsDebug.phase = ilsPhase;
-                 ilsDebug.runwayEntryHeightFt = Math.abs(distToThresholdFt) <= 600 ? heightAglFt : null;
-                 ilsDebug.sinkRateFpm = sinkRateFpm;
-             }
+        if (this.mode === 'ILS' && ilsDebug.active) {
+            this.targets.vs = Number.isFinite(ilsDebug.vsTarget) ? ilsDebug.vsTarget : 0;
+            this.targets.heading = Number.isFinite(ilsDebug.headingTarget) ? ilsDebug.headingTarget : this.targets.heading;
+            isShortFinal = ilsDebug.phase === 'flare' || ilsDebug.phase === 'rollout' || isShortFinal;
         }
         
         // Expose debug info
@@ -913,52 +904,122 @@ class RealisticAutopilotService {
         const lnavHandlingVS = (this.mode === 'LNAV' && this.navPlan && this.navPlan.fix && typeof this.navPlan.fix.altitude === 'number');
         const altitudeControlActive = !ilsDebug.gsCaptured && !lnavHandlingVS && this.targets.altitude > 0;
 
+        // ILS/LNAV already computed their VS; pick up the right source
+        let effectiveVS = ilsDebug.active
+            ? this.targets.vs
+            : (lnavHandlingVS && this.lnavVS !== null ? this.lnavVS : this.userVsTarget);
+
         if (!altitudeControlActive) {
             this.resetAltitudeCapture();
             this.altitudePID.reset();
+            if (!ilsDebug.active) this.targets.vs = this.userVsTarget;
         } else {
             const altError = this.targets.altitude - altitude;
             const previousAltError = this.lastAltitudeError;
-            const captureBand = 80;
-            const holdBand = 40;
+            const captureBand = 250;
+            const holdBand = 55;
             const verticalTrend = Number.isFinite(fVerticalSpeed) ? fVerticalSpeed : 0;
             const movingTowardTarget = Math.abs(verticalTrend) > 100 && Math.sign(verticalTrend) === Math.sign(altError);
+            const divergingFromTarget = Math.abs(altError) > holdBand && Math.abs(verticalTrend) > 150 && Math.sign(verticalTrend) !== Math.sign(altError);
             const passedTarget = previousAltError !== null && Math.sign(previousAltError) !== Math.sign(altError) && Math.abs(previousAltError) > holdBand;
             const nearTarget = Math.abs(altError) <= captureBand;
+            const farFromTarget = Math.abs(altError) > 1200;
 
             if (this.altitudeMode === 'idle') {
                 this.armAltitudeCapture();
             }
 
-            if (this.altitudeMode !== 'hold' && (passedTarget || nearTarget || (Math.abs(altError) <= 200 && movingTowardTarget))) {
-                this.altitudeMode = nearTarget ? 'capture' : 'hold';
+            // If already within hold band and not diverging fast, go straight to hold
+            if (this.altitudeMode !== 'hold' && Math.abs(altError) <= holdBand && Math.abs(verticalTrend) < 300) {
+                this.altitudeMode = 'hold';
             }
 
-            if (this.altitudeMode === 'capture' || this.altitudeMode === 'hold') {
-                const pidVS = this.altitudePID.update(this.targets.altitude, altitude, dt);
-                const leveledVS = this.clamp(pidVS, -800, 800);
-                this.targets.vs = Math.abs(altError) <= holdBand ? 0 : leveledVS;
-                if (Math.abs(altError) <= holdBand || passedTarget) {
-                    this.altitudeMode = 'hold';
-                    this.targets.vs = 0;
+            if (farFromTarget || divergingFromTarget) {
+                this.altitudeMode = 'armed';
+            } else if (this.altitudeMode !== 'hold' && (passedTarget || (nearTarget && movingTowardTarget) || (Math.abs(altError) <= 350 && movingTowardTarget))) {
+                this.altitudeMode = 'capture';
+            }
+
+            const pidVS = this.altitudePID.update(this.targets.altitude, altitude, dt);
+            const needsRecoveryBias = altError > 0 && verticalTrend < -150;
+            const recoveryBias = needsRecoveryBias
+                ? this.clamp((Math.abs(verticalTrend) * 0.6) + (Math.abs(altError) * 0.35), 0, 1400)
+                : 0;
+            const commandedVS = pidVS + recoveryBias;
+
+            // Estimate seconds to target altitude
+            const absVS = Math.abs(verticalTrend);
+            const secsToTarget = absVS > 50 ? Math.abs(altError) / absVS * 60 : Infinity;
+            const convergingWindow = secsToTarget < 5 || Math.abs(altError) <= captureBand;
+
+            if (this.altitudeMode === 'armed') {
+                // User VS takes priority when non-zero; otherwise use altitude PID to correct drift
+                if (this.userVsTarget !== 0) {
+                    effectiveVS = this.userVsTarget;
+                } else {
+                    effectiveVS = this.clamp(commandedVS, -2500, 2500);
                 }
-            } else {
-                this.altitudePID.reset();
+                this.targets.vs = this.userVsTarget;
+
+                const userVsSignMatches = this.userVsTarget !== 0 && Math.sign(this.userVsTarget) === Math.sign(altError);
+                const derateWindow = userVsSignMatches && (secsToTarget < 8 || Math.abs(altError) <= 320);
+                if (derateWindow) {
+                    const approachScale = this.clamp(secsToTarget / 8, 0.18, 1.0);
+                    effectiveVS = this.clamp((this.userVsTarget * approachScale) + (commandedVS * (1 - approachScale)), -2200, 2200);
+                    this.targets.vs = Math.round(effectiveVS / 100) * 100;
+                }
+            } else if (this.altitudeMode === 'capture' || this.altitudeMode === 'hold') {
+                const captureScale = this.clamp(Math.abs(altError) / (captureBand * 1.45), 0.22, 1.0);
+                const belowTargetBias = altError > 0 ? this.clamp(Math.abs(altError) / 160, 0, 220) : 0;
+                const leveledVS = this.clamp((commandedVS * captureScale) + belowTargetBias, -450, 600);
+                // In hold: use small PID correction rather than hard 0, so pitch fights drift
+                effectiveVS = Math.abs(altError) <= holdBand
+                    ? this.clamp(commandedVS * 0.3, -200, 200)
+                    : leveledVS;
+                this.targets.vs = convergingWindow ? Math.round(effectiveVS / 100) * 100 : this.userVsTarget;
+                if (Math.abs(altError) <= holdBand || (passedTarget && Math.abs(verticalTrend) <= 300)) {
+                    this.altitudeMode = 'hold';
+                    if (Math.abs(verticalTrend) < 150) {
+                        effectiveVS = this.clamp(commandedVS * 0.3, -200, 200);
+                        this.targets.vs = 0;
+                    } else {
+                        effectiveVS = this.clamp(commandedVS, -500, 500);
+                    }
+                }
             }
 
             this.lastAltitudeError = altError;
         }
 
-        const { speed: targetSpeed, vs: targetVS, heading: targetHeading } = this.targets;
+        const { speed: targetSpeed, heading: targetHeading } = this.targets;
+        let targetVS = effectiveVS;
+        let targetPitchBias = 0;
+
+        if (this.mode === 'ILS' && ilsDebug.active) {
+            const heightAglFt = Number.isFinite(state.altitudeAGL) ? state.altitudeAGL : Infinity;
+            if (ilsDebug.phase === 'flare' && heightAglFt <= 30) {
+                const flareBlend = this.clamp((30 - heightAglFt) / 30, 0, 1);
+                targetPitchBias = flareBlend * (1.2 * Math.PI / 180);
+            }
+        }
 
         // 1. Auto-Throttle (Predictive Speed Control)
         const speedControl = this.computePredictiveThrottle(targetSpeed, fAirspeed, targetVS, dt);
         const rawThrottleCmd = speedControl.throttleCmd;
-        const throttleEnvelope = this.applyThrottleEnvelope(rawThrottleCmd, targetSpeed, fAirspeed, targetVS);
+        const throttleEnvelope = this.applyThrottleEnvelope(rawThrottleCmd, targetSpeed, fAirspeed, targetVS, this.altitudeMode, altitudeControlActive ? (this.targets.altitude - altitude) : null);
         const throttleCmd = throttleEnvelope.throttleCmd;
 
         // 2. Vertical Speed Control (VS -> Pitch -> Trim)
-        const targetPitch = this.vsPID.update(targetVS, fVerticalSpeed, dt);
+        const targetPitchRaw = this.vsPID.update(targetVS, fVerticalSpeed, dt);
+        const postEngagementPitchLimitDeg = this.altitudeMode === 'capture' ? 20 : 18;
+        const engagementPitchLimitDeg = this.engagementBlendRemaining > 0
+            ? 7.5
+            : postEngagementPitchLimitDeg;
+        const targetPitch = this.clamp(
+            targetPitchRaw + targetPitchBias,
+            -(engagementPitchLimitDeg * Math.PI / 180),
+            engagementPitchLimitDeg * Math.PI / 180
+        );
         const pitchCmd = this.pitchPID.update(targetPitch, fPitch, dt);
         
         // Trim Logic:
@@ -989,19 +1050,39 @@ class RealisticAutopilotService {
             if (headingError < -180) headingError += 360;
             
             // Convert to Radians for PID (Output is Target Roll in Radians)
-            // Kp=1.0 implies 1 Rad error -> 1 Rad bank.
             const headingErrorRad = headingError * Math.PI / 180;
-            
-            // Safety: Ensure headingErrorRad is finite
             const safeErrorRad = isFinite(headingErrorRad) ? headingErrorRad : 0;
 
-            targetRoll = this.headingPID.update(safeErrorRad, 0, dt); // Target heading vs current heading
-            
+            const isILS = this.mode === 'ILS';
+            const maxBank = isILS ? 18 : 25;
+            // Nonlinear schedule: stays near max bank until error is small,
+            // then tapers only inside the last ~8 degrees to avoid early leveling.
+            const absErr = Math.abs(headingError);
+            const linearPart = absErr * (isILS ? 0.38 : 0.62);
+            const scheduledRollMag = absErr > 8
+                ? this.clamp(linearPart, 0, maxBank)
+                : this.clamp(Math.pow(absErr / 8, 0.55) * maxBank * 0.88, 0, maxBank);
+            const scheduledRollDeg = scheduledRollMag * Math.sign(headingError || 0);
+            const scheduledRollRad = scheduledRollDeg * Math.PI / 180;
+            const pidRollRad = this.headingPID.update(safeErrorRad, 0, dt);
+            const engagementLimitDeg = this.engagementBlendRemaining > 0
+                ? 8 + (17 * this.clamp(1 - (this.engagementBlendRemaining / this.engagementBlendDuration), 0, 1))
+                : 25;
+            const engagementLimitRad = engagementLimitDeg * Math.PI / 180;
+
+            targetRoll = this.clamp(
+                scheduledRollRad * 0.88 + pidRollRad * 0.12,
+                -engagementLimitRad,
+                engagementLimitRad
+            );
+
             // Safety check for NaN/Inf
             if (!isFinite(targetRoll)) targetRoll = 0;
+            targetRoll = this.applyRollEnvelope(targetRoll, headingError, isShortFinal);
 
             const maxDelta = this.maxRollRate * dt;
             const delta = targetRoll - this.prevTargetRoll;
+            // Rate-limit in both directions to prevent bank-angle overflow
             if (delta > maxDelta) targetRoll = this.prevTargetRoll + maxDelta;
             if (delta < -maxDelta) targetRoll = this.prevTargetRoll - maxDelta;
             this.prevTargetRoll = targetRoll;
@@ -1015,7 +1096,11 @@ class RealisticAutopilotService {
             }
         }
 
-        const aileronCmd = this.rollPID.update(targetRoll, fRoll, dt);
+        const aileronRaw = this.rollPID.update(targetRoll, fRoll, dt);
+        // Roll-rate damping: resist fast bank changes to prevent overshoot → violent counter-action
+        const rollRate = dt > 0 ? (fRoll - (this._prevRoll ?? fRoll)) / dt : 0;
+        this._prevRoll = fRoll;
+        const aileronCmd = aileronRaw - 0.18 * rollRate;
 
         // 5. Beta -> Rudder (Turn Coordination)
         // We want Beta to be 0.
@@ -1048,10 +1133,11 @@ class RealisticAutopilotService {
 
         const currentTrimCommand = Number.isFinite(currentControls.trim) ? currentControls.trim : 0;
         const blendedThrottle = currentControls.throttle + ((limitedThrottle - currentControls.throttle) * blendAlpha);
-        const blendedElevator = currentControls.elevator + ((limitedElevator - currentControls.elevator) * blendAlpha);
+        // Elevator and trim get full authority immediately — pitch blend causes altitude loss during engagement
+        const blendedElevator = limitedElevator;
         const blendedAileron = currentControls.aileron + ((limitedAileron - currentControls.aileron) * blendAlpha);
         const blendedRudder = currentControls.rudder + ((limitedRudder - currentControls.rudder) * blendAlpha);
-        const blendedTrim = currentTrimCommand + ((newTrim - currentTrimCommand) * blendAlpha);
+        const blendedTrim = newTrim;
 
         // Update Debug State
         this.debugState = {
@@ -1061,7 +1147,7 @@ class RealisticAutopilotService {
             targetPitch: targetPitch * 180 / Math.PI,
             speedError: targetSpeed - fAirspeed,
             throttleCmd: blendedThrottle,
-            throttleRawCommand: throttleCmd,
+            throttleRawCommand: throttleEnvelope.rawThrottle,
             throttleEnvelopeMin: throttleEnvelope.minThrottle,
             throttleEnvelopeMax: throttleEnvelope.maxThrottle,
             shapedSpeedTarget: speedControl.shapedTarget,

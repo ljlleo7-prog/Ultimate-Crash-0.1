@@ -4,6 +4,7 @@ import PropTypes from 'prop-types';
 const FMCLegs = ({ flightPlan, onUpdateFlightPlan, flightState, fmcService, planView }) => {
   const activeLegs = planView?.model?.fms?.activePlan?.legs || [];
   const temporaryLegs = planView?.model?.fms?.temporaryPlan?.legs || [];
+  const isPreflightMode = typeof flightState === 'undefined' || flightState === null;
   const waypoints = temporaryLegs.length > 0 ? temporaryLegs : (Array.isArray(flightPlan) ? flightPlan : (flightPlan?.waypoints || []));
   const [editIdx, setEditIdx] = useState(null);
   const [altConstraint, setAltConstraint] = useState('');
@@ -13,6 +14,19 @@ const FMCLegs = ({ flightPlan, onUpdateFlightPlan, flightState, fmcService, plan
   const isTempPlan = Boolean(planView?.validation?.execPending);
 
   const handleSaveConstraint = (idx) => {
+    if (isPreflightMode) {
+      const nextWaypoints = waypoints.map((wp, waypointIdx) => (waypointIdx === idx ? {
+        ...wp,
+        altConstraint: altConstraint ? Number(altConstraint) : null,
+        spdConstraint: spdConstraint ? Number(spdConstraint) : null
+      } : wp));
+      onUpdateFlightPlan?.({ waypoints: nextWaypoints });
+      setEditIdx(null);
+      setAltConstraint('');
+      setSpdConstraint('');
+      return;
+    }
+
     const nextPlan = fmcService.updateLegConstraints(flightPlan, idx, {
       altConstraint: altConstraint ? Number(altConstraint) : null,
       spdConstraint: spdConstraint ? Number(spdConstraint) : null
@@ -24,10 +38,35 @@ const FMCLegs = ({ flightPlan, onUpdateFlightPlan, flightState, fmcService, plan
   };
 
   const handleDelete = (idx) => {
+    if (isPreflightMode) {
+      const nextWaypoints = waypoints.filter((_, waypointIdx) => waypointIdx !== idx);
+      onUpdateFlightPlan?.({ waypoints: nextWaypoints });
+      return;
+    }
     onUpdateFlightPlan?.(fmcService.removeLeg(flightPlan, idx));
   };
 
   const handleInsertDiscontinuity = (idx) => {
+    if (isPreflightMode) {
+      const discontinuity = {
+        id: `DISCO-${Date.now()}-${idx + 1}`,
+        ident: 'DISCONTINUITY',
+        label: 'DISCONTINUITY',
+        name: 'DISCONTINUITY',
+        type: 'discontinuity',
+        source: 'manual',
+        sequencingMode: 'manual',
+        latitude: null,
+        longitude: null,
+        altConstraint: null,
+        spdConstraint: null,
+        isDiscontinuity: true
+      };
+      const nextWaypoints = [...waypoints];
+      nextWaypoints.splice(idx + 1, 0, discontinuity);
+      onUpdateFlightPlan?.({ waypoints: nextWaypoints });
+      return;
+    }
     onUpdateFlightPlan?.(fmcService.insertDiscontinuity(flightPlan, idx + 1));
   };
 

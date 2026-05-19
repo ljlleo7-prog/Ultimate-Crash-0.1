@@ -48,7 +48,7 @@ class TerrainRadarService {
 
     // Main update loop called by the component
     // Populates the queue based on current position and range
-    update(lat, lon, rangeNm) {
+    update(lat, lon, rangeNm, heading = 0) {
         this.lastPlayerPos = { lat, lon };
 
         // 1. Calculate visible grid bounds
@@ -66,6 +66,9 @@ class TerrainRadarService {
         const seenKeys = new Set();
 
         // 2. Identify needed tiles
+        const headingRad = heading * Math.PI / 180;
+        const forwardX = Math.sin(headingRad);
+        const forwardY = Math.cos(headingRad);
         for (let i = startIdx.latIdx; i <= endIdx.latIdx; i++) {
             for (let j = startIdx.lonIdx; j <= endIdx.lonIdx; j++) {
                 const key = this.getKey(i, j);
@@ -73,28 +76,38 @@ class TerrainRadarService {
                     // Calculate center of tile
                     const tileLat = (i + 0.5) * this.GRID_SIZE;
                     const tileLon = (j + 0.5) * this.GRID_SIZE;
-                    
+
                     // Approximate distance check
-                    const distSq = (tileLat - lat) ** 2 + (tileLon - lon) ** 2; // Squared deg distance
-                    
+                    const dLat = tileLat - lat;
+                    const dLon = tileLon - lon;
+                    const distSq = dLat ** 2 + dLon ** 2;
+
+                    // Priority: closest first, front-180° before back-180°.
+                    // Apply a small multiplier penalty to back-hemisphere tiles so
+                    // distance remains the dominant sort key.
+                    const dot = (dLon * forwardX) + (dLat * forwardY);
+                    const hemispherePenalty = dot >= 0 ? 1.0 : 2.0;
+                    const priority = distSq * hemispherePenalty;
+
                     newQueue.push({
                         key,
                         latIdx: i,
                         lonIdx: j,
                         lat: tileLat,
                         lon: tileLon,
-                        distSq
+                        distSq,
+                        priority
                     });
                 }
                 seenKeys.add(key);
             }
         }
 
-        // 3. Update Queue: Sort by distance (closest first)
+        // 3. Update Queue: Sort by distance with forward bias
         // We only replace the queue if we have new targets, merging with existing priority
         // For simplicity, we just use the new queue but might lose in-progress stuff if not careful.
         // Better: Filter out what is already in cache (done above) and replace queue.
-        newQueue.sort((a, b) => a.distSq - b.distSq);
+        newQueue.sort((a, b) => (a.priority ?? a.distSq) - (b.priority ?? b.distSq));
         this.fetchQueue = newQueue;
 
         // 4. Cleanup old cache

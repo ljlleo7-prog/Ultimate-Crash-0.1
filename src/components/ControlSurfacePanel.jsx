@@ -1,12 +1,14 @@
 import React, { useState, useEffect } from 'react';
+import PropTypes from 'prop-types';
 import aircraftService from '../services/aircraftService';
 
-const ControlSurfacePanel = ({ controlFlaps, controlGear, controlAirBrakes, controlWheelBrakes, controlTrim, flightState, aircraftModel }) => {
+const ControlSurfacePanel = ({ controlFlaps, controlGear, controlAirBrakes, controlWheelBrakes, controlTrim, controlNavFrequency, flightState, aircraftModel, ilsRunwayOptions = [] }) => {
   const [flapProfile, setFlapProfile] = useState(null);
   const [airbrakeProfile, setAirbrakeProfile] = useState(null);
   const [loading, setLoading] = useState(true);
 
   const trimValue = typeof flightState?.trimValue === 'number' ? flightState.trimValue : 0;
+  const nav1Frequency = typeof flightState?.autopilotDebug?.nav1Frequency === 'number' ? flightState.autopilotDebug.nav1Frequency : 0;
   const wheelBrakesValue = typeof flightState?.wheelBrakesValue === 'number'
     ? flightState.wheelBrakesValue
     : (flightState?.systems?.brakes?.parkingBrake ? 1 : 0);
@@ -428,31 +430,106 @@ const ControlSurfacePanel = ({ controlFlaps, controlGear, controlAirBrakes, cont
     ),
     
     // Right side: Status Info (Vertical)
-    React.createElement('div', { 
-      style: { 
+    React.createElement('div', {
+      style: {
         display: 'flex',
         flexDirection: 'column',
         gap: '8px',
         paddingLeft: '12px',
         borderLeft: '1px solid rgba(75, 85, 99, 0.5)',
-        minWidth: '110px'
-      } 
+        minWidth: '150px'
+      }
     },
       React.createElement('div', { style: { fontSize: '11px', fontWeight: 'bold', color: '#3b82f6', marginBottom: '2px' } }, 'SYSTEMS'),
-      
+
       React.createElement('div', { style: { fontSize: '9px', display: 'flex', justifyContent: 'space-between' } },
         React.createElement('span', { style: { color: '#94a3b8' } }, 'HYD:'),
         React.createElement('span', { style: { color: flightState.hydraulicPressure > 2000 ? '#10b981' : '#ef4444', fontWeight: 'bold' } }, `${flightState.hydraulicPressure}`)
       ),
-      
+
       React.createElement('div', { style: { fontSize: '9px', display: 'flex', justifyContent: 'space-between' } },
         React.createElement('span', { style: { color: '#94a3b8' } }, 'STATUS:'),
         React.createElement('span', { style: { color: flightState.hydraulicPressure > 1000 ? '#10b981' : '#ef4444', fontWeight: 'bold' } }, flightState.hydraulicPressure > 1000 ? 'OK' : 'FAIL')
       ),
 
-      React.createElement('div', { style: { fontSize: '9px', marginTop: '4px', color: '#60a5fa', fontStyle: 'italic', maxWidth: '100px' } }, aircraftModel?.substring(0, 15) || 'B737-800')
+      React.createElement('div', {
+        style: {
+          marginTop: '6px',
+          paddingTop: '6px',
+          borderTop: '1px solid rgba(75, 85, 99, 0.5)',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '6px'
+        }
+      },
+        React.createElement('div', { style: { fontSize: '10px', fontWeight: 'bold', color: '#93c5fd' } }, 'NAV1 / ILS'),
+        React.createElement('div', {
+          style: {
+            display: 'flex',
+            alignItems: 'center',
+            gap: '6px'
+          }
+        },
+          React.createElement('button', {
+            onClick: () => controlNavFrequency && controlNavFrequency(Math.max(108.1, Number((nav1Frequency - 0.05).toFixed(2)))),
+            style: { background: '#0f172a', border: '1px solid #475569', color: '#cbd5e1', borderRadius: '4px', padding: '2px 6px', cursor: 'pointer' },
+            disabled: !controlNavFrequency
+          }, '−'),
+          React.createElement('div', {
+            style: {
+              flex: 1,
+              textAlign: 'center',
+              background: 'rgba(15, 23, 42, 0.85)',
+              border: '1px solid #334155',
+              borderRadius: '4px',
+              padding: '4px 6px',
+              color: '#f8fafc',
+              fontSize: '12px',
+              fontWeight: 'bold'
+            }
+          }, nav1Frequency > 0 ? nav1Frequency.toFixed(2) : '---.--'),
+          React.createElement('button', {
+            onClick: () => controlNavFrequency && controlNavFrequency(Math.min(117.95, Number((nav1Frequency + 0.05).toFixed(2)))),
+            style: { background: '#0f172a', border: '1px solid #475569', color: '#cbd5e1', borderRadius: '4px', padding: '2px 6px', cursor: 'pointer' },
+            disabled: !controlNavFrequency
+          }, '+')
+        ),
+        ilsRunwayOptions.length > 0 && React.createElement('div', {
+          style: {
+            display: 'flex',
+            flexWrap: 'wrap',
+            gap: '4px'
+          }
+        }, ilsRunwayOptions.slice(0, 4).map((option) => React.createElement('button', {
+          key: `${option.runwayName}-${option.ilsFrequency}`,
+          onClick: () => controlNavFrequency && controlNavFrequency(option.ilsFrequency),
+          style: {
+            background: Math.abs(nav1Frequency - option.ilsFrequency) < 0.01 ? '#f59e0b' : 'rgba(30, 41, 59, 0.95)',
+            color: Math.abs(nav1Frequency - option.ilsFrequency) < 0.01 ? '#0f172a' : '#cbd5e1',
+            border: '1px solid #475569',
+            borderRadius: '999px',
+            padding: '2px 8px',
+            fontSize: '9px',
+            cursor: 'pointer'
+          }
+        }, `${option.runwayName} ${option.ilsFrequency.toFixed(2)}`)))
+      ),
+
+      React.createElement('div', { style: { fontSize: '9px', marginTop: '4px', color: '#60a5fa', fontStyle: 'italic', maxWidth: '130px' } }, aircraftModel?.substring(0, 15) || 'B737-800')
     )
   );
 };
 
 export default ControlSurfacePanel;
+
+ControlSurfacePanel.propTypes = {
+  controlFlaps: PropTypes.func,
+  controlGear: PropTypes.func,
+  controlAirBrakes: PropTypes.func,
+  controlWheelBrakes: PropTypes.func,
+  controlTrim: PropTypes.func,
+  controlNavFrequency: PropTypes.func,
+  flightState: PropTypes.object,
+  aircraftModel: PropTypes.string,
+  ilsRunwayOptions: PropTypes.array
+};

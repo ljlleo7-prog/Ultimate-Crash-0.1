@@ -1,0 +1,143 @@
+{
+  "model": "Boeing 777-300ER",
+  "type": "Wide-body",
+  "manufacturer": "Boeing",
+  "iata": "77W",
+  "icao": "B77W",
+  "overheadLayoutId": "boeing_777_300er_overhead",
+  "maxRange": 7930,
+  "cruiseSpeed": 485,
+  "fuelConsumption": 7500,
+  "maxFuelCapacity": 181280,
+  "maxPayload": 69850,
+  "maxPassengers": 396,
+  "typicalFuelBurn": 15.5,
+  "takeoffDistance": 3200,
+  "landingDistance": 1800,
+  "engineType": "GE90-115B",
+  "engineCount": 2,
+  "hydraulicCount": 3,
+  "category": "Long-haul",
+  "wingArea": 428,
+  "wingSpan": 64.8,
+  "aspectRatio": 9,
+  "maxLiftCoefficient": 1.8,
+  "stallSpeed": 145,
+  "maxOperatingMach": 0.89,
+  "emptyWeight": 167800,
+  "maxTakeoffWeight": 351500,
+  "maxThrustPerEngine": 510000,
+  "maxN1": 106,
+  "egtYellow": 750,
+  "egtRed": 850,
+  "fadec": false,
+  "liftCurveSlope": 6,
+  "zeroLiftDragCoefficient": 0.022,
+  "inducedDragFactor": 0.035,
+  "basicLiftCoefficient": 0.45,
+  "horizontalStabilizerArea": 65,
+  "horizontalStabilizerCL": -0.18,
+  "horizontalStabilizerMomentArm": 20,
+  "aerodynamicCenterPosition": 0.25,
+  "centerOfGravityPosition": 0.15,
+  "dragCenterPosition": 0.75,
+  "controlPower": {
+    "x": 1.2,
+    "y": 1.5,
+    "z": 1
+  },
+  "specificFuelConsumption": 0.00001,
+  "elevatorEffectiveness": 0.00088,
+  "aileronEffectiveness": 0.00044,
+  "rudderEffectiveness": 0.00026,
+  "sideForceCoefficient": 0.00017,
+  "initialCruiseThrottle": 0.51,
+  "pidParameters": {
+    "altitude": {
+      "Kp": 0.00068,
+      "Ki": 0.000088,
+      "Kd": 0.0017,
+      "min": -0.27,
+      "max": 0.27
+    },
+    "speed": {
+      "Kp": 0.44,
+      "Ki": 0.044,
+      "Kd": 0.088,
+      "min": -0.44,
+      "max": 0.44
+    },
+    "heading": {
+      "Kp": 0.74,
+      "Ki": 0.088,
+      "Kd": 0.26,
+      "min": -0.44,
+      "max": 0.44
+    }
+  },
+  "momentOfInertiaRoll": 180000,
+  "momentOfInertiaPitch": 250000,
+  "momentOfInertiaYaw": 320000,
+  "flapProfile": {
+    "positions": [
+      {
+        "angle": 0,
+        "clIncrement": 0,
+        "cdIncrement": 0,
+        "label": "UP"
+      },
+      {
+        "angle": 10,
+        "clIncrement": 0.1,
+        "cdIncrement": 0.002,
+        "label": "TO1"
+      },
+      {
+        "angle": 15,
+        "clIncrement": 0.18,
+        "cdIncrement": 0.004,
+        "label": "TO2"
+      },
+      {
+        "angle": 20,
+        "clIncrement": 0.25,
+        "cdIncrement": 0.008,
+        "label": "LDG"
+      },
+      {
+        "angle": 30,
+        "clIncrement": 0.35,
+        "cdIncrement": 0.015,
+        "label": "FULL"
+      }
+    ]
+  },
+  "airbrakeProfile": {
+    "positions": [
+      {
+        "label": "DN",
+        "dragIncrement": 0,
+        "liftDecrement": 0
+      },
+      {
+        "label": "ARM",
+        "dragIncrement": 0.01,
+        "liftDecrement": -0.02
+      },
+      {
+        "label": "FLT",
+        "dragIncrement": 0.07,
+        "liftDecrement": -0.15
+      },
+      {
+        "label": "UP",
+        "dragIncrement": 0.22,
+        "liftDecrement": -0.3
+      }
+    ]
+  },
+  "minNoseGearFailedPitch": -0.2,
+  "maxGroundPitch": 0.3,
+  "groundCollisionPitchTorqueFactor": 0.5,
+  "gearHeight": 5.5
+}

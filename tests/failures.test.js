@@ -157,7 +157,7 @@ test('intermediate mode still allows uncontained engine catastrophic cascades', 
   });
 });
 
-test('engine start switch auto returns from GRD to CONT after self-sustaining start', () => {
+test('engine start switch stays in GRD without electrical power for ignition', () => {
   withFixedRandom(0.5, () => {
     const service = new RealisticFlightPhysicsService(aircraft, 0, 0, 'pro');
     service.setAutopilot(false);
@@ -177,8 +177,8 @@ test('engine start switch auto returns from GRD to CONT after self-sustaining st
       service.update({}, 0.25);
     }
 
-    assert.equal(service.systems.engines.eng2.startSwitch, 'CONT');
-    assert.equal(service.systems.engines.eng2.n2 >= 55 || service.engines[1].state.running, true);
+    assert.equal(service.systems.engines.eng2.startSwitch, 'GRD');
+    assert.equal(service.engines[1].state.running, false);
   });
 });
 

@@ -1,7 +1,7 @@
 import React from 'react';
 
 // Flight Pose Panel Component - Vertically compressed 3-column layout
-const FlightPosePanel = ({ flightState }) => {
+const FlightPosePanel = ({ flightState, efisFontFamily }) => {
   const indicatedAirspeed = Number.isFinite(flightState?.indicatedAirspeed) ? flightState.indicatedAirspeed : 0;
   // Use derived AMSL altitude if available (from physics engine), otherwise fallback
   const trueAltitude = Number.isFinite(flightState?.derived?.altitude_ft)
@@ -14,6 +14,12 @@ const FlightPosePanel = ({ flightState }) => {
   const trueAirspeed = Number.isFinite(flightState?.trueAirspeed) ? flightState.trueAirspeed : 0;
   const pitch = Number.isFinite(flightState?.pitch) ? flightState.pitch : 0;
   const roll = Number.isFinite(flightState?.roll) ? flightState.roll : 0;
+  const rawMode = flightState?.fadecMode;
+  const engineThrottles = Array.isArray(flightState?.engineThrottles) ? flightState.engineThrottles : [flightState?.throttle ?? 0, flightState?.throttle ?? 0];
+  const commandedThrottle = engineThrottles.length
+    ? engineThrottles.reduce((sum, value) => sum + (Number.isFinite(value) ? value : 0), 0) / engineThrottles.length
+    : 0;
+  const thrustMode = rawMode || (commandedThrottle < -0.05 ? 'REV' : commandedThrottle <= 0.08 ? 'IDLE' : commandedThrottle >= 0.9 ? 'TOGA' : commandedThrottle >= 0.45 ? 'CLB' : 'THR');
   
   // Altimeter Logic
   const altimeterSetting = flightState.altimeter || 29.92;
@@ -101,7 +107,21 @@ const FlightPosePanel = ({ flightState }) => {
       
       // Center: Artificial Horizon with Pitch/Roll (compressed)
       React.createElement('div', { className: 'artificial-horizon compressed' },
-        React.createElement('div', { 
+        React.createElement('div', {
+          style: {
+            position: 'absolute',
+            top: '0px',
+            left: '50%',
+            transform: 'translateX(-50%)',
+            zIndex: 30,
+            color: '#ffb700ff',
+            padding: '1px 8px',
+            fontSize: '11px',
+            fontWeight: 'bold',
+            letterSpacing: '0.5px'
+          }
+        }, thrustMode),
+        React.createElement('div', {
           className: 'horizon-container',
           style: { transform: `rotate(${-roll}deg)` } // Reverse roll direction for correct horizon reference
         },

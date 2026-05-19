@@ -1,0 +1,148 @@
+{
+  "model": "Airbus A320-200",
+  "type": "Narrow-body",
+  "manufacturer": "Airbus",
+  "iata": "320",
+  "icao": "A320",
+  "overheadLayoutId": "airbus_a320_200_overhead",
+  "maxRange": 3300,
+  "cruiseSpeed": 447,
+  "fuelConsumption": 2400,
+  "maxFuelCapacity": 23800,
+  "maxPayload": 16500,
+  "maxPassengers": 180,
+  "typicalFuelBurn": 5.3,
+  "takeoffDistance": 2300,
+  "landingDistance": 1500,
+  "engineType": "CFM56-5A/5B",
+  "engineCount": 2,
+  "hydraulicCount": 3,
+  "category": "Medium-haul",
+  "wingArea": 122,
+  "wingSpan": 34.1,
+  "aspectRatio": 9.5,
+  "maxLiftCoefficient": 1.7,
+  "stallSpeed": 120,
+  "maxOperatingMach": 0.82,
+  "emptyWeight": 42500,
+  "maxTakeoffWeight": 77000,
+  "maxThrustPerEngine": 115000,
+  "maxN1": 104,
+  "egtYellow": 750,
+  "egtRed": 850,
+  "fadec": true,
+  "liftCurveSlope": 5.8,
+  "zeroLiftDragCoefficient": 0.024,
+  "inducedDragFactor": 0.038,
+  "basicLiftCoefficient": 0.42,
+  "horizontalStabilizerArea": 24,
+  "horizontalStabilizerCL": -0.14,
+  "horizontalStabilizerMomentArm": 12,
+  "aerodynamicCenterPosition": 0.25,
+  "centerOfGravityPosition": 0.15,
+  "dragCenterPosition": 0.75,
+  "controlPower": {
+    "x": 1.2,
+    "y": 1.5,
+    "z": 1
+  },
+  "specificFuelConsumption": 0.000014,
+  "elevatorEffectiveness": 0.00102,
+  "aileronEffectiveness": 0.00051,
+  "rudderEffectiveness": 0.0003,
+  "sideForceCoefficient": 0.0002,
+  "initialCruiseThrottle": 0.55,
+  "pidParameters": {
+    "altitude": {
+      "Kp": 0.00081,
+      "Ki": 0.000102,
+      "Kd": 0.002,
+      "min": -0.3,
+      "max": 0.3
+    },
+    "speed": {
+      "Kp": 0.51,
+      "Ki": 0.051,
+      "Kd": 0.102,
+      "min": -0.51,
+      "max": 0.51
+    },
+    "heading": {
+      "Kp": 0.81,
+      "Ki": 0.102,
+      "Kd": 0.3,
+      "min": -0.51,
+      "max": 0.51
+    }
+  },
+  "momentOfInertiaRoll": 32000,
+  "momentOfInertiaPitch": 52000,
+  "momentOfInertiaYaw": 85000,
+  "flapProfile": {
+    "positions": [
+      {
+        "angle": 0,
+        "clIncrement": 0,
+        "cdIncrement": 0,
+        "label": "UP"
+      },
+      {
+        "angle": 10,
+        "clIncrement": 0.5,
+        "cdIncrement": 0.005,
+        "label": "1"
+      },
+      {
+        "angle": 15,
+        "clIncrement": 1,
+        "cdIncrement": 0.01,
+        "label": "2"
+      },
+      {
+        "angle": 20,
+        "clIncrement": 1.6,
+        "cdIncrement": 0.03,
+        "label": "3"
+      },
+      {
+        "angle": 35,
+        "clIncrement": 2.2,
+        "cdIncrement": 0.06,
+        "label": "FULL"
+      }
+    ]
+  },
+  "airbrakeProfile": {
+    "positions": [
+      {
+        "label": "RET",
+        "dragIncrement": 0,
+        "liftDecrement": 0
+      },
+      {
+        "label": "ARM",
+        "dragIncrement": 0.01,
+        "liftDecrement": -0.02
+      },
+      {
+        "label": "1/2",
+        "dragIncrement": 0.03,
+        "liftDecrement": -0.06
+      },
+      {
+        "label": "FULL",
+        "dragIncrement": 0.1,
+        "liftDecrement": -0.12
+      },
+      {
+        "label": "GND",
+        "dragIncrement": 0.25,
+        "liftDecrement": -0.25
+      }
+    ]
+  },
+  "minNoseGearFailedPitch": -0.2,
+  "maxGroundPitch": 0.3,
+  "groundCollisionPitchTorqueFactor": 0.5,
+  "gearHeight": 3.8
+}

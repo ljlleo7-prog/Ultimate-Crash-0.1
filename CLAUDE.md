@@ -4,6 +4,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 For any testing, you MUST add an auto-terminate command at the end of each test file and each test bash after each test is finished to avoid the test bash to run on forever even if test is already finished within a few seconds.
 
+Entering plan mode REQUIRES PERMISSION.
+
 ## Commands
 
 - Install dependencies: `npm install`

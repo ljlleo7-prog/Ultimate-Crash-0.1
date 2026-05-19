@@ -2,353 +2,1225 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Boeing 737 Overhead Static Preview</title>
   <style>
     :root {
-      --base: #6f787e;
-      --panel: #5f686e;
-      --panel-dark: #50595f;
-      --white-panel: #e7e4dc;
-      --ink: #101416;
-      --label: #e9edf0;
-      --amber: #d99a2b;
-      --blue: #2d71c7;
-      --green: #73c86e;
-      --red: #c71f1f;
-      --black: #111416;
-      --line: #252d31;
+      --panel: #2c353b;
+      --panel-border: #333;
+      --title: #ccc;
+      --label: #eee;
+      --amber: #ffaa00;
+      --blue: #00ccff;
     }
-
     * { box-sizing: border-box; }
-
-    body {
-      margin: 0;
-      min-height: 100vh;
-      display: grid;
-      place-items: center;
-      background: #f2f2f0;
-      font-family: "Arial Narrow", "Helvetica Neue", Arial, sans-serif;
-      letter-spacing: .045em;
+    body { margin:0; min-height:100vh; display:grid; place-items:center; background:#c8c8c5; font-family:Arial,sans-serif; }
+    .preview-wrap { padding:18px; }
+    .overhead-shell {
+      position:relative; width:890px; height:800px;
+      background:#4c555b; border:2px solid #23282c;
+      clip-path:polygon(1% 0,99% 0,99% 93%,96% 99%,4% 99%,1% 93%);
+      box-shadow:0 20px 48px rgba(0,0,0,.4); overflow:hidden;
+    }
+    .overhead-shell::before {
+      content:""; position:absolute; inset:0; pointer-events:none;
+      background:repeating-linear-gradient(0deg,rgba(255,255,255,.015) 0 1px,transparent 1px 6px);
     }
 
-    .preview-wrap { padding: 22px; }
+    .layout-col { position:absolute; top:14px; bottom:96px; display:flex; flex-direction:column; gap:8px; }
+    .col-1 { left:60px;  width:164px; }
+    .col-2 { left:232px; width:164px; }
+    .col-3 { left:404px; width:80px; }
+    .col-4 { left:492px; width:164px; }
+    .col-5 { left:664px; width:164px; }
 
-    .overhead {
-      position: relative;
-      width: 960px;
-      height: 980px;
-      background: var(--base);
-      clip-path: polygon(1% 0, 99% 0, 99% 92%, 96% 99%, 4% 99%, 1% 92%);
-      border: 2px solid #31393d;
-      box-shadow: 0 18px 45px rgba(0,0,0,.28);
-      overflow: hidden;
+    .sp {
+      position:relative; width:100%; flex-shrink:0;
+      background:var(--panel); border:2px solid var(--panel-border);
+      border-radius:5px; padding:5px; color:var(--label); overflow:hidden;
     }
+    .sp.h54{height:54px}.sp.h74{height:74px}.sp.h80{height:80px}.sp.h86{height:86px}.sp.h90{height:90px}.sp.h92{height:92px}.sp.h96{height:96px}.sp.h98{height:98px}.sp.h104{height:104px}.sp.h106{height:106px}.sp.h110{height:110px}.sp.h116{height:116px}.sp.h120{height:120px}.sp.h122{height:122px}.sp.h128{height:128px}.sp.h130{height:130px}.sp.h134{height:134px}.sp.h140{height:140px}.sp.h144{height:144px}.sp.h146{height:146px}.sp.h148{height:148px}.sp.h152{height:152px}.sp.h160{height:160px}.sp.h168{height:168px}.sp.h176{height:176px}.sp.h184{height:184px}.sp.h192{height:192px}.sp.h200{height:200px}.sp.h220{height:220px}.sp.h240{height:240px}.sp.h260{height:260px}
+    .pt {
+      margin:0 0 4px; font-size:9px; font-weight:700; letter-spacing:.06em;
+      text-align:center; color:var(--title); border-bottom:1px solid #3a3a3a; padding-bottom:2px;
+    }
+    .sc { position:absolute; width:6px; height:6px; border-radius:50%; background:#1a1e20; border:1px solid #5a6268; }
+    .sc.tl{top:3px;left:3px} .sc.tr{top:3px;right:3px} .sc.bl{bottom:3px;left:3px} .sc.br{bottom:3px;right:3px}
 
-    .overhead::before {
-      content: "";
-      position: absolute;
-      inset: 0;
-      background:
-        linear-gradient(90deg, transparent 0 19.8%, rgba(35,43,47,.72) 19.9% 20.1%, transparent 20.2% 39.8%, rgba(35,43,47,.58) 39.9% 40.1%, transparent 40.2% 59.8%, rgba(35,43,47,.58) 59.9% 60.1%, transparent 60.2% 79.8%, rgba(35,43,47,.72) 79.9% 80.1%, transparent 80.2%),
-        linear-gradient(0deg, transparent 0 24.8%, rgba(35,43,47,.45) 24.9% 25.1%, transparent 25.2% 49.8%, rgba(35,43,47,.45) 49.9% 50.1%, transparent 50.2% 74.8%, rgba(35,43,47,.45) 74.9% 75.1%, transparent 75.2%);
-      pointer-events: none;
-      opacity: .55;
-    }
-
-    .panel {
-      position: absolute;
-      background: var(--panel);
-      border: 1px solid #263035;
-      box-shadow: inset 0 1px rgba(255,255,255,.12), inset 0 -1px rgba(0,0,0,.18);
-      color: var(--label);
-      padding: 14px 8px 8px;
-    }
-
-    .panel.white {
-      background: var(--white-panel);
-      color: #222;
-      border-color: #777870;
-    }
-
-    .title {
-      position: absolute;
-      top: 3px;
-      left: 0;
-      right: 0;
-      text-align: center;
-      color: #161c1f;
-      font-size: 9px;
-      font-weight: 800;
-      letter-spacing: .14em;
-    }
-
-    .white .title { color: #2a2b28; }
-
-    .screw {
-      position: absolute;
-      width: 8px;
-      height: 8px;
-      border-radius: 50%;
-      background: #2c3438;
-      border: 1px solid #8a9296;
-    }
-    .tl { top: 6px; left: 6px; } .tr { top: 6px; right: 6px; }
-    .bl { bottom: 6px; left: 6px; } .br { bottom: 6px; right: 6px; }
-
-    .label {
-      font-size: 7px;
-      line-height: .98;
-      text-align: center;
-      color: inherit;
-      white-space: pre-line;
-    }
-
-    .row { display: flex; align-items: flex-start; justify-content: center; gap: 7px; }
-    .col { display: flex; flex-direction: column; align-items: center; gap: 5px; }
-    .tight { gap: 3px; }
-
-    .ann {
-      min-width: 38px;
-      height: 17px;
-      display: grid;
-      place-items: center;
-      border: 1px solid #050607;
-      background: #0c0e0f;
-      color: #2c3032;
-      font-size: 6px;
-      line-height: .92;
-      font-weight: 800;
-      text-align: center;
-      padding: 1px 3px;
-    }
-    .ann.amber.on { background: var(--amber); color: #211407; }
-    .ann.blue.on { background: var(--blue); color: #dcecff; }
-    .ann.green.on { background: var(--green); color: #061306; }
-    .ann.white.on { background: #e8eee9; color: #111; }
-
-    /* Flat switch adapted from the JSX overhead switch proportions: round base + simple lever, no toy-like 3D blob. */
-    .toggle {
-      width: 32px;
-      height: 36px;
-      position: relative;
-    }
-    .toggle::before {
-      content: "";
-      position: absolute;
-      left: 6px;
-      top: 9px;
-      width: 20px;
-      height: 20px;
-      border-radius: 50%;
-      background: #7b8388;
-      border: 1px solid #2a3033;
-    }
-    .toggle::after {
-      content: "";
-      position: absolute;
-      left: 14px;
-      top: 2px;
-      width: 4px;
-      height: 28px;
-      border-radius: 2px;
-      background: #d6d8d4;
-      border-left: 1px solid #737b80;
-      border-right: 1px solid #343a3d;
-      transform: rotate(var(--r, 0deg));
-      transform-origin: 50% 24px;
-    }
-    .toggle.down::after { top: 9px; transform: rotate(180deg); }
-    .toggle.left::after { --r: -24deg; }
-    .toggle.right::after { --r: 24deg; }
-
-    .knob {
-      width: 42px;
-      height: 42px;
-      border-radius: 50%;
-      background: #c6c9c7;
-      border: 2px solid #333a3e;
-      position: relative;
-    }
-    .knob::after {
-      content: "";
-      position: absolute;
-      left: 18px;
-      top: 4px;
-      width: 4px;
-      height: 15px;
-      background: #111;
-      transform: rotate(var(--r, 0deg));
-      transform-origin: 50% 17px;
-    }
-
+    .ann { background:#1a1a1a; color:#3a3a3a; font-size:7px; font-weight:bold; padding:1px 3px; border:1px solid #111; text-align:center; min-width:30px; line-height:1.1; border-radius:1px; }
+    .ann.amb { background:#000; color:#fa0; }
+    .ann.blu { background:#0cf; color:#000; }
     .guard {
-      width: 18px;
-      height: 58px;
-      background: var(--red);
-      border: 2px solid #7e1111;
-      box-shadow: inset 3px 0 rgba(255,255,255,.22);
+      position:relative; display:inline-flex; align-items:flex-end; justify-content:center;
+      background:linear-gradient(180deg,#c00 0%,#800 100%);
+      border:1px solid #600; border-radius:2px 2px 0 0;
+      padding:2px 3px 1px; cursor:pointer;
+    }
+    .guard::before {
+      content:""; position:absolute; top:-5px; left:50%; transform:translateX(-50%);
+      width:60%; height:6px;
+      background:linear-gradient(180deg,#a00,#c00);
+      border:1px solid #600; border-radius:2px 2px 0 0;
     }
 
-    .gauge {
-      width: 66px;
-      height: 66px;
-      border-radius: 50%;
-      background: #0b0c0d;
-      border: 4px solid #2d3438;
-      position: relative;
-    }
-    .gauge::before {
-      content: "";
-      position: absolute;
-      inset: 10px;
-      border-radius: 50%;
-      background: repeating-conic-gradient(from -55deg, #dce2e1 0 3deg, transparent 3deg 18deg);
-    }
-    .gauge::after {
-      content: "";
-      position: absolute;
-      left: 31px;
-      top: 15px;
-      width: 2px;
-      height: 25px;
-      background: #e9eeee;
-      transform: rotate(var(--r, -35deg));
-      transform-origin: bottom center;
-    }
+    .sw { display:flex; flex-direction:column; align-items:center; margin:1px; }
+    .sw-face { width:22px; height:22px; position:relative; }
+    .sw-plate { position:absolute; top:2px; left:2px; right:2px; bottom:2px; background:#777; border-radius:2px; border:1px solid #444; box-shadow:inset 0 0 4px #000; }
+    .sw-lever { position:absolute; left:7px; width:8px; height:14px; background:linear-gradient(90deg,#c8c8c8,#f0f0f0,#989898); border-radius:5px; box-shadow:0 3px 5px rgba(0,0,0,.5); z-index:2; }
+    .sw-lever.up{top:1px}.sw-lever.mid{top:4px}.sw-lever.dn{top:8px}
+    .sw-lever::after { content:""; display:block; width:100%; height:2px; background:rgba(255,255,255,.7); border-radius:5px 5px 0 0; }
+    .sw-lbl { font-size:7px; margin-top:1px; color:#ddd; text-align:center; font-weight:bold; line-height:1.05; }
+    .sw-sub { font-size:6px; color:#aaa; text-align:center; line-height:1; }
 
-    .display {
-      background: #071007;
-      color: #a8ff57;
-      border: 2px solid #101416;
-      font-family: "Courier New", monospace;
-      font-size: 17px;
-      line-height: 1.15;
-      padding: 4px 8px;
-      min-width: 88px;
-      text-align: center;
-      letter-spacing: .08em;
+    .rot { display:flex; flex-direction:column; align-items:center; margin:1px; }
+    .rot-body { width:28px; height:28px; border-radius:50%; background:radial-gradient(circle at 35% 35%,#555,#222); border:2px solid #666; position:relative; }
+    .rot-body::after { content:""; position:absolute; width:2px; height:10px; background:#ddd; top:3px; left:12px; transform:rotate(var(--r,0deg)); transform-origin:bottom center; }
+
+    .row { display:flex; justify-content:center; gap:4px; align-items:flex-start; margin-top:3px; }
+    .row.tight { gap:2px; }
+    .pipe-svg { position:absolute; inset:0; width:100%; height:100%; pointer-events:none; }
+    .fqty { display:grid; grid-template-columns:1fr 1fr 1fr; gap:2px; margin-bottom:5px; background:#000; padding:2px; border:1px solid #444; }
+    .fqty span { font-family:monospace; color:#fa0; font-size:11px; text-align:right; padding:1px 3px; background:#111; border:1px solid #333; }
+    .radio-box { background:#000; border:1px solid #444; padding:3px; margin-bottom:3px; }
+    .radio-box .rlbl { font-size:7px; color:#666; font-weight:bold; margin-bottom:1px; }
+    .radio-box .rfreq { display:flex; justify-content:space-between; align-items:baseline; }
+    .radio-box .ract { font-size:12px; font-family:monospace; color:#fa0; font-weight:bold; }
+    .radio-box .rstby { font-size:9px; font-family:monospace; color:#a06000; }
+
+    /* White circular analog gauge */
+    .dial { display:flex; flex-direction:column; align-items:center; margin:0 2px; }
+    .dial-face {
+      width:46px; height:46px; border-radius:50%; position:relative;
+      background:radial-gradient(circle at 35% 35%, #1f1f1f, #0c0c0c 70%, #000 100%);
+      border:2px solid #666; box-shadow:inset 0 0 0 2px #222, inset 0 0 0 4px #111;
     }
-
-    .duct {
-      position: absolute;
-      height: 8px;
-      background: #ece8dd;
-      border: 1px solid #77756e;
+    .dial-face::before {
+      content:""; position:absolute; inset:7px; border-radius:50%;
+      border:1px solid rgba(255,255,255,.16);
     }
-    .duct.v { width: 8px; height: 62px; }
-    .duct.dark { background: #374046; border-color: #1b2226; }
+    .dial-dig {
+      position:absolute; bottom:6px; left:50%; transform:translateX(-50%);
+      font-family:'Courier New',monospace; font-size:6px; color:#9ffd5c;
+      background:#000; border:1px solid #333; border-radius:1px;
+      padding:0 2px; white-space:nowrap; line-height:1.3;
+    }
+    .dial-pointer {
+      position:absolute; left:21px; top:8px; width:2px; height:15px; background:#fff;
+      transform:rotate(var(--ang,0deg)); transform-origin:bottom center;
+      box-shadow:0 0 0 1px rgba(0,0,0,.6);
+    }
+    .dial-pointer::after {
+      content:""; position:absolute; left:-2px; bottom:-2px; width:6px; height:6px;
+      border-radius:50%; background:#111; border:1px solid #999;
+    }
+    .dial-lbl { font-size:6px; color:#f0f0f0; margin-top:2px; text-align:center; font-weight:bold; line-height:1.05; }
+    .seven-seg { font-family:'Courier New',monospace; background:#000; color:rgb(159, 253, 92); border:1px solid #333; border-radius:2px; letter-spacing:2px; font-weight:bold; display:inline-block; }
 
-    .tiny-switches { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; }
-    .mini { width: 18px; height: 18px; border-radius: 50%; background: #d7d8d3; border: 1px solid #333; position: relative; }
-    .mini::after { content: ""; position: absolute; left: 8px; top: 2px; width: 2px; height: 11px; background: #111; }
+    .bottom-row { position:absolute; left:60px; right:60px; bottom:14px; height:72px; display:grid; grid-template-columns:180px 120px 120px 120px 120px 1fr; gap:8px; }
+    .bottom-row .sp { height:80px; }
 
-    .elec { left: 205px; top: 18px; width: 220px; height: 250px; }
-    .irs { left: 18px; top: 18px; width: 140px; height: 245px; }
-    .flight-control { left: 18px; top: 280px; width: 178px; height: 176px; }
-    .nav-displays { left: 18px; top: 468px; width: 178px; height: 150px; }
-    .fuel { left: 205px; top: 285px; width: 220px; height: 230px; }
-    .hyd { left: 205px; top: 530px; width: 220px; height: 145px; }
-    .air-cond { left: 438px; top: 18px; width: 135px; height: 360px; }
-    .lights-center { left: 438px; top: 392px; width: 135px; height: 170px; }
-    .cargo-fire { left: 438px; top: 575px; width: 135px; height: 155px; }
-    .window-heat { left: 588px; top: 18px; width: 245px; height: 150px; }
-    .anti-ice { left: 588px; top: 182px; width: 245px; height: 125px; }
-    .bleed { left: 588px; top: 320px; width: 245px; height: 170px; }
-    .press { left: 645px; top: 505px; width: 250px; height: 210px; }
-    .wipers { left: 660px; top: 730px; width: 235px; height: 120px; }
-    .engine-start { left: 275px; top: 770px; width: 335px; height: 125px; }
-    .lights-bottom { left: 20px; top: 750px; width: 235px; height: 145px; }
+    .fire-handle { display:flex; flex-direction:column; align-items:center; margin:0 2px; }
+    .fire-t { width:24px; height:34px; background:#2a0000; border:2px solid #555; border-radius:2px; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:1px; }
+    .fire-t .ft-lbl { font-size:5px; color:#ccc; font-weight:bold; }
+    .fire-t .ft-btn { width:14px; height:14px; border-radius:50%; background:#3a0000; border:2px solid #666; }
+    .fire-t .ft-st { font-size:4px; color:#888; }
   </style>
 </head>
 <body>
-  <main class="preview-wrap">
-    <section class="overhead" aria-label="Static photocopy-style Boeing 737 overhead panel preview">
-      <div class="duct dark" style="left:430px; top:0; width:8px; height:925px;"></div>
-      <div class="duct dark" style="left:580px; top:0; width:8px; height:925px;"></div>
-      <div class="duct" style="left:18px; top:690px; width:600px;"></div>
-      <div class="duct" style="left:610px; top:690px; width:260px;"></div>
-      <div class="duct v" style="left:118px; top:618px;"></div>
-      <div class="duct v" style="left:540px; top:700px;"></div>
+<main class="preview-wrap">
+<section class="overhead-shell">
 
-      <section class="panel irs"><div class="title">IRS / FLT ALT</div><span class="screw tl"></span><span class="screw tr"></span><span class="screw bl"></span><span class="screw br"></span>
-        <div class="row" style="margin-top:20px"><div class="col"><div class="ann amber on">ALIGN</div><div class="toggle"></div><div class="label">IRS L</div></div><div class="col"><div class="ann">DC FAIL</div><div class="toggle down"></div><div class="label">IRS R</div></div></div>
-        <div class="row" style="margin-top:18px"><div class="guard"></div><div class="col"><div class="ann amber">ON DC</div><div class="ann amber">FAULT</div><div class="ann amber">GPS</div></div></div>
-      </section>
+<!-- COL 1 -->
+<div class="layout-col col-1">
+  <div class="sp h240">
+    <span class="sc tl"></span><span class="sc tr"></span><span class="sc bl"></span><span class="sc br"></span>
+    <!-- FLT CONTROL sub-zone -->
+    <div class="pt">FLT CONTROL</div>
+    <div style="display:flex;gap:3px;justify-content:center;margin-bottom:3px;">
+      <div class="ann amb" style="font-size:6px;padding:1px 2px;min-width:44px">FEEL DIFF PRESS</div>
+      <div class="ann amb" style="font-size:6px;padding:1px 2px;min-width:44px">SPEED TRIM FAIL</div>
+    </div>
+    <div style="display:flex;gap:3px;justify-content:center;margin-bottom:3px;">
+      <div class="ann amb" style="font-size:6px;padding:1px 2px;min-width:44px">MACH TRIM FAIL</div>
+      <div class="ann amb" style="font-size:6px;padding:1px 2px;min-width:44px">AUTO SLAT FAIL</div>
+    </div>
+    <div class="row tight" style="margin-bottom:2px;">
+      <div class="sw"><div class="ann">LOW PRESS</div><div class="sw-face"><div class="sw-plate"></div><div class="sw-lever dn"></div></div><div class="sw-lbl">SPOILER A</div></div>
+      <div class="sw"><div class="ann">LOW PRESS</div><div class="sw-face"><div class="sw-plate"></div><div class="sw-lever dn"></div></div><div class="sw-lbl">SPOILER B</div></div>
+      <div class="sw"><div class="ann amb">ON</div><div class="sw-face"><div class="sw-plate"></div><div class="sw-lever up"></div></div><div class="sw-lbl">YAW DMPR</div></div>
+    </div>
+    <!-- seam between FLT CTRL and STBY HYD -->
+    <div style="border-top:1px solid #3a3a3a;margin:3px 0;"></div>
+    <!-- STBY HYD sub-zone -->
+    <div class="pt" style="margin-bottom:3px;">STBY HYD</div>
+    <div class="row tight" style="margin-bottom:2px;">
+      <div class="sw"><div class="ann">LOW PRESS</div><div class="sw-face"><div class="sw-plate"></div><div class="sw-lever dn"></div></div><div class="sw-lbl">STBY RUD</div></div>
+      <div class="sw"><div class="ann">LOW PRESS</div><div class="sw-face"><div class="sw-plate"></div><div class="sw-lever dn"></div></div><div class="sw-lbl">STBY HYD</div></div>
+    </div>
+    <!-- seam -->
+    <div style="border-top:1px solid #3a3a3a;margin:3px 0;"></div>
+    <!-- ALT FLAPS sub-zone -->
+    <div class="row tight">
+      <div class="sw"><div class="sw-face"><div class="sw-plate"></div><div class="sw-lever dn"></div></div><div class="sw-lbl">ALT FLAPS</div><div class="sw-sub">ARM</div></div>
+      <div class="sw"><div class="guard" style="width:28px;height:28px;"><div style="font-size:5px;color:#f44;text-align:center;font-weight:bold;">DISCON</div></div></div>
+    </div>
+  </div>
 
-      <section class="panel elec"><div class="title">ELECTRICAL</div><span class="screw tl"></span><span class="screw tr"></span><span class="screw bl"></span><span class="screw br"></span>
-        <div class="row"><div class="ann amber on">BAT<br>DISCHARGE</div><div class="ann">TR UNIT</div><div class="ann">ELEC</div></div>
-        <div class="row" style="margin-top:9px"><div class="knob" style="--r:-38deg"></div><div class="knob" style="--r:28deg"></div></div>
-        <div class="row" style="margin-top:8px"><div class="display">23&nbsp;&nbsp;456<br>78901234</div></div>
-        <div class="row" style="margin-top:8px"><div class="col"><div class="ann amber">DRIVE</div><div class="toggle"></div><div class="label">GEN 1</div></div><div class="col"><div class="ann amber">DRIVE</div><div class="toggle down"></div><div class="label">GEN 2</div></div><div class="col"><div class="ann green on">STBY<br>PWR</div><div class="toggle right"></div><div class="label">STANDBY</div></div></div>
-      </section>
+  <div class="sp h126">
+    <span class="sc tl"></span><span class="sc tr"></span><span class="sc bl"></span><span class="sc br"></span>
+    <div class="pt">NAVIGATION / DISPLAY</div>
+    <div class="row">
+      <div class="rot"><div class="rot-body" style="--r:-18deg"></div><div class="sw-lbl">VHF NAV</div><div class="sw-sub">NORM</div></div>
+      <div class="rot"><div class="rot-body" style="--r:0deg"></div><div class="sw-lbl">IRS</div><div class="sw-sub">BOTH</div></div>
+      <div class="rot"><div class="rot-body" style="--r:18deg"></div><div class="sw-lbl">FMC</div><div class="sw-sub">AUTO</div></div>
+    </div>
+    <div class="row">
+      <div class="rot"><div class="rot-body" style="--r:-18deg"></div><div class="sw-lbl">SOURCE</div><div class="sw-sub">AUTO</div></div>
+      <div class="rot"><div class="rot-body" style="--r:18deg"></div><div class="sw-lbl">CTRL PNL</div><div class="sw-sub">NORM</div></div>
+    </div>
+    <div class="row"><div class="radio-box" style="width:120px;margin:4px 0 0"><div class="rlbl">DISPLAY SOURCE</div><div class="rfreq"><span class="ract">AUTO</span><span class="rstby">NORM</span></div></div></div>
+  </div>
 
-      <section class="panel flight-control"><div class="title">FLIGHT CONTROL</div><span class="screw tl"></span><span class="screw tr"></span><span class="screw bl"></span><span class="screw br"></span>
-        <div class="row"><div class="col"><div class="ann amber on">LOW<br>PRESS</div><div class="toggle"></div><div class="label">FLT<br>CTRL A</div></div><div class="col"><div class="ann amber on">LOW<br>PRESS</div><div class="toggle"></div><div class="label">FLT<br>CTRL B</div></div><div class="gauge" style="--r:-28deg"></div></div>
-        <div class="row" style="margin-top:10px"><div class="col"><div class="ann">STBY<br>RUD</div><div class="toggle down"></div></div><div class="col"><div class="ann blue on">LOW<br>QTY</div><div class="toggle"></div></div><div class="col"><div class="ann">STBY<br>RUD</div><div class="toggle down"></div></div></div>
-      </section>
+  <div class="sp h260">
+    <span class="sc tl"></span><span class="sc tr"></span><span class="sc bl"></span><span class="sc br"></span>
+    <div class="pt">FUEL PUMPS</div>
+    <!-- top row: dial left, XFEED right, corner annunciators -->
+    <div style="display:grid;grid-template-columns:36px 1fr 36px;align-items:start;gap:2px;margin-bottom:2px;">
+      <div style="display:flex;flex-direction:column;gap:1px;">
+        <div class="ann blu" style="font-size:5px;min-width:0">ENG VLV<br>CLOSED</div>
+        <div class="ann blu" style="font-size:5px;min-width:0">FILTER<br>BYPASS</div>
+      </div>
+      <div style="display:flex;justify-content:center;align-items:flex-start;">
+        <div class="dial">
+          <div class="dial-face"><div class="dial-pointer" style="--ang:-32deg"></div><div class="dial-dig">-12</div></div>
+          <div class="dial-lbl">FUEL TEMP</div>
+        </div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:1px;align-items:flex-end;">
+        <div class="ann blu" style="font-size:5px;min-width:0">ENG VLV<br>CLOSED</div>
+        <div class="ann blu" style="font-size:5px;min-width:0">FILTER<br>BYPASS</div>
+      </div>
+    </div>
+    <!-- FQTY display -->
+    <div style="background:#000;border:2px solid #333;border-radius:3px;padding:3px 4px;margin:2px 0;box-shadow:inset 0 0 6px #000;">
+      <div style="display:flex;justify-content:center;">
+        <div class="seven-seg" style="font-size:9px;letter-spacing:1px;padding:2px 4px;">2450 &nbsp; 830 &nbsp; 2470</div>
+      </div>
+      <div style="display:flex;justify-content:space-between;padding:0 14px;margin-top:1px;">
+        <span style="font-size:5px;color:#666">L</span>
+        <span style="font-size:5px;color:#666">CTR</span>
+        <span style="font-size:5px;color:#666">R</span>
+      </div>
+    </div>
+    <!-- pipeline + switches -->
+    <div style="position:relative;top:8px;height:110px;">
+      <svg style="position:absolute;top:0;left:0;width:100%;height:100%;" viewBox="0 0 154 110" preserveAspectRatio="none">
+        <!-- horizontal manifold at y=55 -->
+        <line x1="8" y1="65" x2="50" y2="65" stroke="#fff" stroke-width="3"/>
+        <line x1="8" y1="65" x2="50" y2="65" stroke="#888" stroke-width="1.5"/>
+        <line x1="104" y1="65" x2="147" y2="65" stroke="#fff" stroke-width="3"/>
+        <line x1="104" y1="65" x2="147" y2="65" stroke="#888" stroke-width="1.5"/>
+        <line x1="8" y1="5" x2="147" y2="5" stroke="#fff" stroke-width="3"/>
+        <line x1="8" y1="5" x2="147" y2="5" stroke="#888" stroke-width="1.5"/>
+        <!-- CTR L up at x=8 -->
+        <line x1="8" y1="5" x2="8" y2="65" stroke="#fff" stroke-width="3"/>
+        <line x1="8" y1="5" x2="8" y2="65" stroke="#888" stroke-width="1.5"/>
+        <line x1="51" y1="5" x2="51" y2="25" stroke="#fff" stroke-width="3"/>
+        <line x1="51" y1="5" x2="51" y2="25" stroke="#888" stroke-width="1.5"/>
+        <!-- CTR R up at x=146 -->
+        <line x1="146" y1="5" x2="146" y2="65" stroke="#fff" stroke-width="3"/>
+        <line x1="146" y1="5" x2="146" y2="65" stroke="#888" stroke-width="1.5"/>
+        <line x1="102" y1="5" x2="102" y2="25" stroke="#fff" stroke-width="3"/>
+        <line x1="102" y1="5" x2="102" y2="25" stroke="#888" stroke-width="1.5"/>
+        <!-- L AFT down at x=8 -->
+        <line x1="8" y1="65" x2="8" y2="85" stroke="#fff" stroke-width="3"/>
+        <line x1="8" y1="65" x2="8" y2="85" stroke="#888" stroke-width="1.5"/>
+        <!-- L FWD down at x=49 -->
+        <line x1="49" y1="65" x2="49" y2="85" stroke="#fff" stroke-width="3"/>
+        <line x1="49" y1="65" x2="49" y2="85" stroke="#888" stroke-width="1.5"/>
+        <!-- R FWD down at x=105 -->
+        <line x1="105" y1="65" x2="105" y2="85" stroke="#fff" stroke-width="3"/>
+        <line x1="105" y1="65" x2="105" y2="85" stroke="#888" stroke-width="1.5"/>
+        <!-- R AFT down at x=146 -->
+        <line x1="146" y1="65" x2="146" y2="85" stroke="#fff" stroke-width="3"/>
+        <line x1="146" y1="65" x2="146" y2="85" stroke="#888" stroke-width="1.5"/>
+      </svg>
+      <!-- XFEED at x=75, y=5 on the top pipeline -->
+      <div style="position:absolute;left:60px;top:-15px;display:flex;flex-direction:column;align-items:center;">
+        <div class="ann blu" style="font-size:5px;padding:0 2px;">OPEN</div>
+        <div style="position:relative;width:26px;height:26px;">
+          <svg width="26" height="26" style="position:absolute;top:0;left:0;">
+            <circle cx="13" cy="13" r="12" fill="url(#xfeed-grad)" stroke="#777" stroke-width="1.5"/>
+            <!-- compound line through full diameter -->
+            <line x1="2" y1="13" x2="24" y2="13" stroke="#fff" stroke-width="3"/>
+            <line x1="2" y1="13" x2="24" y2="13" stroke="#444" stroke-width="1.5"/>
+            <defs><radialGradient id="xfeed-grad" cx="35%" cy="35%"><stop offset="0%" stop-color="#666"/><stop offset="100%" stop-color="#1a1a1a"/></radialGradient></defs>
+          </svg>
+        </div>
+      </div>
+      <!-- CTR L switch -->
+      <div class="sw" style="position:absolute;left:30px;top:14px;align-items:center;">
+        <div class="ann amb" style="font-size:5px">LOW<br>PRESSURE</div>
+        <div class="sw-face"><div class="sw-plate"></div><div class="sw-lever up"></div></div>
+        <div class="sw-lbl">CTR L</div>
+      </div>
+      <!-- CTR R switch -->
+      <div class="sw" style="position:absolute;left:80px;top:14px;align-items:center;">
+        <div class="ann amb" style="font-size:5px">LOW<br>PRESSURE</div>
+        <div class="sw-face"><div class="sw-plate"></div><div class="sw-lever up"></div></div>
+        <div class="sw-lbl">CTR R</div>
+      </div>
+      <!-- L AFT -->
+      <div class="sw" style="position:absolute;left:-8px;top:70px;align-items:center;">
+        <div class="ann amb" style="font-size:5px">LOW<br>PRESSURE</div>
+        <div class="sw-face"><div class="sw-plate"></div><div class="sw-lever up"></div></div>
+        <div class="sw-lbl" style="font-size:5px">L AFT</div>
+      </div>
+      <!-- L FWD -->
+      <div class="sw" style="position:absolute;left:30px;top:70px;align-items:center;">
+        <div class="ann amb" style="font-size:5px">LOW<br>PRESSURE</div>
+        <div class="sw-face"><div class="sw-plate"></div><div class="sw-lever up"></div></div>
+        <div class="sw-lbl" style="font-size:5px">L FWD</div>
+      </div>
+      <!-- R FWD -->
+      <div class="sw" style="position:absolute;left:83px;top:70px;align-items:center;">
+        <div class="ann amb" style="font-size:5px">LOW<br>PRESSURE</div>
+        <div class="sw-face"><div class="sw-plate"></div><div class="sw-lever up"></div></div>
+        <div class="sw-lbl" style="font-size:5px">R FWD</div>
+      </div>
+      <!-- R AFT -->
+      <div class="sw" style="position:absolute;left:123px;top:70px;align-items:center;">
+        <div class="ann amb" style="font-size:5px">LOW<br>PRESSURE</div>
+        <div class="sw-face"><div class="sw-plate"></div><div class="sw-lever up"></div></div>
+        <div class="sw-lbl" style="font-size:5px">R AFT</div>
+      </div>
+    </div>
+  </div>
+</div>
 
-      <section class="panel nav-displays"><div class="title">NAVIGATION / DISPLAYS</div><span class="screw tl"></span><span class="screw tr"></span><span class="screw bl"></span><span class="screw br"></span>
-        <div class="row"><div class="ann blue on">GPS</div><div class="gauge" style="--r:35deg"></div><div class="ann blue on">IRS</div></div>
-        <div class="row" style="margin-top:8px"><div class="toggle"></div><div class="toggle down"></div><div class="toggle"></div></div>
-      </section>
+<!-- COL 2 -->
+<div class="layout-col col-2">
+  <div class="sp h110">
+    <span class="sc tl"></span><span class="sc tr"></span><span class="sc bl"></span><span class="sc br"></span>
+    <div class="pt">IRS L / R</div>
+    <div class="row" style="gap:12px;align-items:flex-start;">
+      <!-- IRS L -->
+      <div style="display:flex;flex-direction:column;align-items:center;gap:1px;">
+        <div class="row">
+          <div class="ann" style="font-size:5px;color:#fff;border-color:#555;">ALIGN</div>
+          <div class="ann amb" style="font-size:5px;">ON DC</div>
+        </div>
+        <div class="row">
+          <div class="ann" style="font-size:5px;">FAULT</div>
+          <div class="ann amb" style="font-size:5px;">DC FAIL</div>
+        </div>
+        <div class="rot" style="margin-top:2px;">
+          <div class="rot-body" style="--r:18deg"></div>
+          <div class="sw-lbl">IRS L</div>
+          <div class="sw-sub">OFF·ALIGN·NAV</div>
+        </div>
+      </div>
+      <!-- IRS R -->
+      <div style="display:flex;flex-direction:column;align-items:center;gap:1px;">
+        <div class="row">
+          <div class="ann" style="font-size:5px;color:#fff;border-color:#555;">ALIGN</div>
+          <div class="ann amb" style="font-size:5px;">ON DC</div>
+        </div>
+        <div class="row">
+          <div class="ann" style="font-size:5px;">FAULT</div>
+          <div class="ann amb" style="font-size:5px;">DC FAIL</div>
+        </div>
+        <div class="rot" style="margin-top:2px;">
+          <div class="rot-body" style="--r:18deg"></div>
+          <div class="sw-lbl">IRS R</div>
+          <div class="sw-sub">OFF·ALIGN·NAV</div>
+        </div>
+      </div>
+    </div>
+  </div>
 
-      <section class="panel white fuel"><div class="title">FUEL</div><span class="screw tl"></span><span class="screw tr"></span><span class="screw bl"></span><span class="screw br"></span>
-        <div class="row"><div class="col"><div class="ann amber on">LOW<br>PRESS</div><div class="toggle"></div><div class="label">L FWD<br>PUMP</div></div><div class="col"><div class="ann amber">LOW<br>PRESS</div><div class="toggle down"></div><div class="label">L AFT<br>PUMP</div></div><div class="col"><div class="ann amber">LOW<br>PRESS</div><div class="toggle"></div><div class="label">R FWD<br>PUMP</div></div><div class="col"><div class="ann amber">LOW<br>PRESS</div><div class="toggle down"></div><div class="label">R AFT<br>PUMP</div></div></div>
-        <div class="duct" style="left:18px; top:112px; width:180px;"></div>
-        <div class="row" style="margin-top:18px"><div class="col"><div class="ann blue on">VALVE<br>OPEN</div><div class="toggle right"></div><div class="label">CROSSFEED</div></div><div class="col"><div class="ann amber">FILTER<br>BYPASS</div><div class="toggle"></div><div class="label">CTR L</div></div><div class="col"><div class="ann amber">FILTER<br>BYPASS</div><div class="toggle"></div><div class="label">CTR R</div></div></div>
-      </section>
+  <div class="sp h150">
+    <span class="sc tl"></span><span class="sc tr"></span><span class="sc bl"></span><span class="sc br"></span>
+    <div class="pt">ELECTRICAL</div>
+    <!-- 5 electrical displays in black screen bezel -->
+    <div style="background:#000;border:2px solid #333;border-radius:3px;padding:4px 3px;margin-bottom:3px;box-shadow:inset 0 0 6px #000;">
+      <div style="display:flex;justify-content:space-between;margin-bottom:3px;">
+        <div style="display:flex;flex-direction:column;align-items:center;">
+          <div style="font-size:5px;color:#666;letter-spacing:.05em;">DC AMPS</div>
+          <div class="seven-seg" style="font-size:10px;padding:1px 3px;">23</div>
+        </div>
+        <div style="display:flex;flex-direction:column;align-items:center;">
+          <div style="font-size:5px;color:#666;letter-spacing:.05em;">CPS FREQ</div>
+          <div class="seven-seg" style="font-size:10px;padding:1px 3px;">456</div>
+        </div>
+      </div>
+      <div style="display:flex;justify-content:space-between;">
+        <div style="display:flex;flex-direction:column;align-items:center;">
+          <div style="font-size:5px;color:#666;">DC VOLTS</div>
+          <div class="seven-seg" style="font-size:10px;padding:1px 3px;">78</div>
+        </div>
+        <div style="display:flex;flex-direction:column;align-items:center;">
+          <div style="font-size:5px;color:#666;">AC AMPS</div>
+          <div class="seven-seg" style="font-size:10px;padding:1px 3px;">901</div>
+        </div>
+        <div style="display:flex;flex-direction:column;align-items:center;">
+          <div style="font-size:5px;color:#666;">AC VOLTS</div>
+          <div class="seven-seg" style="font-size:10px;padding:1px 3px;">234</div>
+        </div>
+      </div>
+    </div>
+    <!-- amber annunciators row -->
+    <div style="display:flex;justify-content:space-around;margin-bottom:3px;">
+      <div class="ann amb" style="font-size:5px;">BAT<br>DISCHARGE</div>
+      <div class="ann amb" style="font-size:5px;">TR<br>UNIT</div>
+      <div class="ann amb" style="font-size:5px;">ELEC</div>
+    </div>
+    <!-- 2 rotary knobs -->
+    <div class="row" style="justify-content:space-around;margin-top:2px;">
+      <div class="rot"><div class="rot-body" style="--r:-22deg"></div><div class="sw-lbl">DC/AC</div><div class="sw-sub">SELECT</div></div>
+      <div class="rot"><div class="rot-body" style="--r:10deg"></div><div class="sw-lbl">METER</div><div class="sw-sub">SELECT</div></div>
+    </div>
+  </div>
 
-      <section class="panel hyd"><div class="title">HYDRAULIC</div><span class="screw tl"></span><span class="screw tr"></span><span class="screw bl"></span><span class="screw br"></span>
-        <div class="row"><div class="col"><div class="ann amber">LOW<br>PRESS</div><div class="toggle"></div><div class="label">ENG 1</div></div><div class="col"><div class="ann amber on">OVER<br>HEAT</div><div class="toggle down"></div><div class="label">ELEC 2</div></div><div class="col"><div class="ann amber">LOW<br>PRESS</div><div class="toggle"></div><div class="label">ELEC 1</div></div><div class="col"><div class="ann amber">LOW<br>PRESS</div><div class="toggle"></div><div class="label">ENG 2</div></div></div>
-      </section>
+  <div class="sp h100">
+    <span class="sc tl"></span><span class="sc tr"></span><span class="sc bl"></span><span class="sc br"></span>
+    <div class="pt">STANDBY POWER</div>
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:3px;">
+      <div style="font-size:8px;color:#aaa;text-align:center;">1</div>
+      <div class="ann amb" style="font-size:5px;">STANDBY<br>PWR OFF</div>
+      <div style="font-size:8px;color:#aaa;text-align:center;">2</div>
+    </div>
+    <div style="display:flex;justify-content:space-around;margin-bottom:3px;">
+      <div class="ann amb" style="font-size:5px;">DRIVE</div>
+      <div class="ann amb" style="font-size:5px;">DRIVE</div>
+    </div>
+    <div style="display:flex;justify-content:center;margin-top:2px;">
+      <div style="display:flex;flex-direction:column;align-items:center;">
+        <div style="display:flex;align-items:center;gap:2px;background:#333;border:1px solid #555;border-radius:3px;padding:2px 4px;">
+          <div style="width:18px;height:10px;background:#666;border-radius:2px;border:1px solid #888;display:flex;align-items:center;justify-content:center;">
+            <div style="width:6px;height:8px;background:linear-gradient(90deg,#c8c8c8,#f0f0f0,#989898);border-radius:2px;"></div>
+          </div>
+        </div>
+        <div style="display:flex;gap:8px;margin-top:1px;">
+          <span style="font-size:5px;color:#aaa;">BAT</span>
+          <span style="font-size:5px;color:#aaa;">OFF</span>
+          <span style="font-size:5px;color:#aaa;">AUTO</span>
+        </div>
+      </div>
+    </div>
+    <div style="display:flex;justify-content:space-around;margin-top:2px;">
+      <div class="guard" style="width:28px;height:18px;"><div style="font-size:5px;color:#f44;text-align:center;font-weight:bold;">DISCON</div></div>
+      <div class="guard" style="width:28px;height:18px;"><div style="font-size:5px;color:#f44;text-align:center;font-weight:bold;">DISCON</div></div>
+    </div>
+  </div>
 
-      <section class="panel air-cond"><div class="title">AIR CONDITIONING</div><span class="screw tl"></span><span class="screw tr"></span><span class="screw bl"></span><span class="screw br"></span>
-        <div class="col" style="margin-top:14px"><div class="knob" style="--r:-20deg"></div><div class="label">TEMP<br>SELECT</div><div class="knob" style="--r:16deg"></div><div class="label">TRIM AIR</div><div class="ann amber">ZONE<br>TEMP</div><div class="toggle"></div><div class="label">PACK L</div><div class="toggle down"></div><div class="label">PACK R</div><div class="ann blue on">AUTO</div></div>
-      </section>
+  <div class="sp h165">
+    <span class="sc tl"></span><span class="sc tr"></span><span class="sc bl"></span><span class="sc br"></span>
+    <div class="pt">GEN SYSTEM</div>
+    <div style="position:relative;height:160px;top:-10px;">
+      <!-- pipeline SVG -->
+      <svg style="position:absolute;top:0;left:0;width:100%;height:100%;" viewBox="0 0 154 160" preserveAspectRatio="none">
+        
+        <!-- horizontal bus bar -->
+        <line x1="20" y1="90" x2="70" y2="90" stroke="#fff" stroke-width="3"/>
+        <line x1="20" y1="90" x2="70" y2="90" stroke="#888" stroke-width="1.5"/>
+        <line x1="84" y1="90" x2="134" y2="90" stroke="#fff" stroke-width="3"/>
+        <line x1="84" y1="90" x2="134" y2="90" stroke="#888" stroke-width="1.5"/>
+        <!-- GEN 1 drop -->
+        <line x1="20" y1="90" x2="20" y2="130" stroke="#fff" stroke-width="3"/><line x1="20" y1="90" x2="20" y2="130" stroke="#888" stroke-width="1.5"/>
+        <!-- APU 1 drop -->
+        <line x1="70" y1="90" x2="70" y2="130" stroke="#fff" stroke-width="3"/><line x1="70" y1="90" x2="70" y2="130" stroke="#888" stroke-width="1.5"/>
+        <line x1="70" y1="130" x2="60" y2="130" stroke="#fff" stroke-width="3"/><line x1="70" y1="130" x2="60" y2="130" stroke="#888" stroke-width="1.5"/>
+        <!-- APU 2 drop -->
+        <line x1="84" y1="90" x2="84" y2="130" stroke="#fff" stroke-width="3"/><line x1="84" y1="90" x2="84" y2="130" stroke="#888" stroke-width="1.5"/>
+        <line x1="84" y1="130" x2="94" y2="130" stroke="#fff" stroke-width="3"/><line x1="84" y1="130" x2="94" y2="130" stroke="#888" stroke-width="1.5"/>
+        <!-- GEN 2 drop -->
+        <line x1="134" y1="90" x2="134" y2="130" stroke="#fff" stroke-width="3"/><line x1="134" y1="90" x2="134" y2="130" stroke="#888" stroke-width="1.5"/>
+      </svg>
+      <!-- BUS TRANS horizontal switch -->
+      <div style="position:absolute;left:43px;top:65px;display:flex;flex-direction:column;align-items:center;">
+        <div style="display:flex;align-items:center;gap:2px;background:#333;border:1px solid #555;border-radius:3px;padding:2px 6px;">
+          <div style="width:28px;height:10px;background:#666;border-radius:2px;border:1px solid #888;display:flex;align-items:center;justify-content:center;">
+            <div style="width:6px;height:8px;background:linear-gradient(90deg,#c8c8c8,#f0f0f0,#989898);border-radius:2px;"></div>
+          </div>
+        </div>
+        <div style="display:flex;gap:6px;margin-top:1px;">
+          <span style="font-size:5px;color:#aaa;">OFF</span>
+          <span style="font-size:5px;color:#ddd;font-weight:bold;">BUS TRANS</span>
+          <span style="font-size:5px;color:#aaa;">AUTO</span>
+        </div>
+      </div>
+      <!-- GRD PWR switch -->
+      <div class="sw" style="position:absolute;left:55px;top:10px;">
+        <div class="ann blu" style="font-size:5px">GRD PWR<br>AVAILABLE</div>
+        <div class="sw-face"><div class="sw-plate"></div><div class="sw-lever up"></div></div>
+        <div class="sw-lbl">GRD PWR</div>
+      </div>
+      <!-- GEN 1 switch -->
+      <div class="sw" style="position:absolute;left:1px;top:65px;">
+        <div class="ann amb" style="font-size:5px">TRANSFER<br>BUS OFF</div>
+        <div class="ann amb" style="font-size:5px">SOURCE<br>OFF</div>
+        <div class="ann blu" style="font-size:5px">GEN OFF<br>BUS</div>
+        <div class="sw" style="position:relative;left:0px;top:10px;">
+          <div class="sw-face"><div class="sw-plate"></div><div class="sw-lever up"></div></div>
+          <div class="sw-lbl" style="font-size:8px">GEN 1</div>
+        </div>
+      </div>
+      <!-- APU 1 switch -->
+      <div class="sw" style="position:absolute;left:40px;top:122px;">
+        <div class="sw-face"><div class="sw-plate"></div><div class="sw-lever up"></div></div>
+      </div>
+      <div class="sw" style="position:absolute;left:59px;top:95px;">
+        <div class="ann blu" style="font-size:5px">APU GEN<br>OFF BUS</div>
+      </div>
+      <!-- APU 2 switch -->
+      <div class="sw" style="position:absolute;left:85px;top:122px;">
+        <div class="sw-face"><div class="sw-plate"></div><div class="sw-lever up"></div></div>
+      </div>
+      <!-- GEN 2 switch -->
+      <div class="sw" style="position:absolute;left:112px;top:65px;">
+        <div class="ann amb" style="font-size:5px">TRANSFER<br>BUS OFF</div>
+        <div class="ann amb" style="font-size:5px">SOURCE<br>OFF</div>
+        <div class="ann blu" style="font-size:5px">GEN OFF<br>BUS</div>
+        <div class="sw" style="position:relative;left:0px;top:10px;">
+          <div class="sw-face"><div class="sw-plate"></div><div class="sw-lever up"></div></div>
+          <div class="sw-lbl" style="font-size:8px">GEN 2</div>
+        </div>
+      </div>
+      <!-- bottom annunciators -->
+      <div class="ann blu" style="position:absolute;left:0px;top:162px;font-size:4px;">MAINT</div>
+      <div class="ann amb" style="position:absolute;left:40px;top:162px;font-size:4px;">LOW OIL<br>PRESSURE</div>
+      <div class="ann amb" style="position:absolute;left:80px;top:162px;font-size:4px;">FAULT</div>
+      <div class="ann amb" style="position:absolute;left:120px;top:162px;font-size:4px;">OVER<br>SPEED</div>
+    </div>
+  </div>
 
-      <section class="panel lights-center"><div class="title">CENTER LIGHTS</div><span class="screw tl"></span><span class="screw tr"></span><span class="screw bl"></span><span class="screw br"></span>
-        <div class="row"><div class="col"><div class="ann amber">DOOR</div><div class="toggle"></div></div><div class="col"><div class="ann blue on">DOME</div><div class="toggle down"></div></div></div>
-        <div class="row"><div class="ann">EQUIP<br>COOL</div><div class="ann blue on">AIR</div></div>
-      </section>
+  <div class="sp h90">
+    <span class="sc tl"></span><span class="sc tr"></span><span class="sc bl"></span><span class="sc br"></span>
+    <div class="pt">APU EGT / L WIPER</div>
+    <div class="row">
+      <div class="dial">
+        <div class="dial-face"><div class="dial-pointer" style="--ang:-80deg"></div><div class="dial-dig">820</div></div>
+        <div class="dial-lbl">APU EGT</div>
+      </div>
+      <div class="rot"><div class="rot-body" style="--r:-28deg"></div><div class="sw-lbl">L WIPER</div><div class="sw-sub">OFF</div></div>
+    </div>
+  </div>
+</div>
 
-      <section class="panel cargo-fire"><div class="title">CARGO FIRE</div><span class="screw tl"></span><span class="screw tr"></span><span class="screw bl"></span><span class="screw br"></span>
-        <div class="row"><div class="ann amber on">FWD</div><div class="ann amber">AFT</div></div>
-        <div class="row" style="margin-top:12px"><div class="guard"></div><div class="guard"></div></div>
-        <div class="row"><div class="mini"></div><div class="mini"></div><div class="mini"></div></div>
-      </section>
+<!-- MID COL -->
+<div class="layout-col col-3">
+  <div class="sp h124">
+    <span class="sc tl"></span><span class="sc tr"></span><span class="sc bl"></span><span class="sc br"></span>
+    <div class="pt">PANEL BRIGHTNESS</div>
+    <div class="row">
+      <div class="rot">
+        <div class="rot-body" style="--r:0deg"></div>
+        <div class="sw-lbl">PANEL</div>
+        <div class="sw-sub">BRT</div>
+      </div>
+    </div>
+    <div class="row">
+      <div class="rot">
+        <div class="rot-body" style="--r:10deg"></div>
+        <div class="sw-lbl">FLOOD</div>
+        <div class="sw-sub">DIM</div>
+      </div>
+    </div>
+  </div>
 
-      <section class="panel window-heat"><div class="title">WINDOW HEAT</div><span class="screw tl"></span><span class="screw tr"></span><span class="screw bl"></span><span class="screw br"></span>
-        <div class="row"><div class="col"><div class="ann green on">ON</div><div class="toggle"></div><div class="label">L SIDE</div></div><div class="col"><div class="ann">OVER<br>HEAT</div><div class="toggle"></div><div class="label">L FWD</div></div><div class="col"><div class="ann">OVER<br>HEAT</div><div class="toggle"></div><div class="label">R FWD</div></div><div class="col"><div class="ann green on">ON</div><div class="toggle"></div><div class="label">R SIDE</div></div></div>
-      </section>
+  <div class="sp h54">
+    <span class="sc tl"></span><span class="sc tr"></span><span class="sc bl"></span><span class="sc br"></span>
+    <div class="pt">LAVATORY WARNING</div>
+    <div class="row">
+      <div class="ann amb">SMOKE</div>
+      <div class="ann amb">CALL</div>
+    </div>
+  </div>
 
-      <section class="panel anti-ice"><div class="title">ANTI-ICE</div><span class="screw tl"></span><span class="screw tr"></span><span class="screw bl"></span><span class="screw br"></span>
-        <div class="row"><div class="col"><div class="ann blue">COWL<br>VALVE</div><div class="toggle"></div><div class="label">ENG 1</div></div><div class="col"><div class="ann blue on">VALVE<br>OPEN</div><div class="toggle right"></div><div class="label">WING</div></div><div class="col"><div class="ann blue">COWL<br>VALVE</div><div class="toggle"></div><div class="label">ENG 2</div></div></div>
-      </section>
+  <div class="sp h106">
+    <span class="sc tl"></span><span class="sc tr"></span><span class="sc bl"></span><span class="sc br"></span>
+    <div class="pt">EQUIP COOLING</div>
+    <div class="row">
+      <div class="sw">
+        <div class="sw-face"><div class="sw-plate"></div><div class="sw-lever up"></div></div>
+        <div class="sw-lbl">SUPPLY</div>
+        <div class="sw-sub">NORM</div>
+        <div class="ann amb" style="font-size:5px;">OFF</div>
+      </div>
+      <div class="sw">
+        <div class="sw-face"><div class="sw-plate"></div><div class="sw-lever up"></div></div>
+        <div class="sw-lbl">EXHAUST</div>
+        <div class="sw-sub">NORM</div>
+        <div class="ann amb" style="font-size:5px;">OFF</div>
+      </div>
+    </div>
+  </div>
 
-      <section class="panel bleed"><div class="title">PNEUMATICS / BLEED</div><span class="screw tl"></span><span class="screw tr"></span><span class="screw bl"></span><span class="screw br"></span>
-        <div class="row"><div class="gauge" style="--r:-18deg"></div><div class="col"><div class="ann amber on">BLEED<br>TRIP</div><div class="toggle"></div><div class="label">ENG 1</div></div><div class="col"><div class="ann blue on">VALVE<br>OPEN</div><div class="toggle right"></div><div class="label">APU</div></div><div class="col"><div class="ann amber">BLEED<br>TRIP</div><div class="toggle"></div><div class="label">ENG 2</div></div></div>
-        <div class="duct" style="left:88px; top:108px; width:130px;"></div><div class="duct v" style="left:150px; top:82px; height:56px;"></div>
-      </section>
+  <div class="sp h96">
+    <span class="sc tl"></span><span class="sc tr"></span><span class="sc bl"></span><span class="sc br"></span>
+    <div class="pt">EMER EXIT LIGHTS</div>
+    <div class="row">
+      <div class="sw">
+        <div class="ann amb">NOT ARMED</div>
+        <div class="sw-face"><div class="sw-plate"></div><div class="sw-lever up"></div></div>
+        <div class="sw-lbl">EMER EXIT</div>
+        <div class="sw-sub">ARM</div>
+      </div>
+    </div>
+  </div>
 
-      <section class="panel white press"><div class="title">PRESSURIZATION</div><span class="screw tl"></span><span class="screw tr"></span><span class="screw bl"></span><span class="screw br"></span>
-        <div class="row"><div class="gauge" style="--r:40deg"></div><div class="col"><div class="display">7234</div><div class="display">1234</div><div class="label">FLT ALT<br>LAND ALT</div></div><div class="knob" style="--r:18deg"></div></div>
-        <div class="row" style="margin-top:12px"><div class="ann">AUTO<br>FAIL</div><div class="ann green on">MAN</div><div class="toggle down"></div></div>
-      </section>
+  <div class="sp h168">
+    <span class="sc tl"></span><span class="sc tr"></span><span class="sc bl"></span><span class="sc br"></span>
+    <div class="pt">NO SMOKING / BELTS / ATTEND / GRD CALL</div>
+    <div class="row tight">
+      <div class="sw">
+        <div class="sw-face"><div class="sw-plate"></div><div class="sw-lever up"></div></div>
+        <div class="sw-lbl">NO SMOKE</div>
+      </div>
+      <div class="sw">
+        <div class="sw-face"><div class="sw-plate"></div><div class="sw-lever up"></div></div>
+        <div class="sw-lbl">SEAT BELTS</div>
+      </div>
+    </div>
+    <div class="row tight">
+      <div class="sw">
+        <div class="sw-face"><div class="sw-plate"></div><div class="sw-lever dn"></div></div>
+        <div class="sw-lbl">ATTEND</div>
+      </div>
+      <div class="sw">
+        <div class="sw-face"><div class="sw-plate"></div><div class="sw-lever dn"></div></div>
+        <div class="sw-lbl">GRD CALL</div>
+      </div>
+    </div>
+    <div class="row">
+      <div class="ann blu" style="font-size:5px;">CALL</div>
+    </div>
+  </div>
 
-      <section class="panel wipers"><div class="title">WIPERS</div><span class="screw tl"></span><span class="screw tr"></span><span class="screw bl"></span><span class="screw br"></span>
-        <div class="row"><div class="col"><div class="knob" style="--r:-55deg"></div><div class="label">L WIPER</div></div><div class="col"><div class="knob" style="--r:55deg"></div><div class="label">R WIPER</div></div><div class="col"><div class="ann">PARK</div><div class="toggle down"></div></div></div>
-      </section>
+  <div class="sp h80">
+    <span class="sc tl"></span><span class="sc tr"></span><span class="sc bl"></span><span class="sc br"></span>
+    <div class="pt">R WIPER</div>
+    <div class="row">
+      <div class="rot">
+        <div class="rot-body" style="--r:-28deg"></div>
+        <div class="sw-lbl">R WIPER</div>
+        <div class="sw-sub">OFF</div>
+      </div>
+    </div>
+  </div>
 
-      <section class="panel engine-start"><div class="title">ENGINE START</div><span class="screw tl"></span><span class="screw tr"></span><span class="screw bl"></span><span class="screw br"></span>
-        <div class="row"><div class="col"><div class="knob" style="--r:-50deg"></div><div class="label">ENG 1<br>START</div></div><div class="col"><div class="ann amber">START<br>VALVE</div><div class="toggle"></div></div><div class="col"><div class="ann amber">START<br>VALVE</div><div class="toggle down"></div></div><div class="col"><div class="knob" style="--r:50deg"></div><div class="label">ENG 2<br>START</div></div></div>
-      </section>
+</div>
 
-      <section class="panel lights-bottom"><div class="title">EXTERIOR LIGHTS</div><span class="screw tl"></span><span class="screw tr"></span><span class="screw bl"></span><span class="screw br"></span>
-        <div class="row"><div class="col"><div class="ann blue on">LOGO</div><div class="toggle"></div></div><div class="col"><div class="ann">BEACON</div><div class="toggle"></div></div><div class="col"><div class="ann blue on">WING</div><div class="toggle down"></div></div></div>
-        <div class="row"><div class="toggle"></div><div class="toggle down"></div><div class="toggle"></div><div class="toggle"></div></div>
-      </section>
-    </section>
-  </main>
+<!-- COL 4 -->
+<div class="layout-col col-4">
+  <div class="sp h186">
+    <span class="sc tl"></span><span class="sc tr"></span><span class="sc bl"></span><span class="sc br"></span>
+    <div class="pt">WINDOW HEAT / PROBE</div>
+    <!-- 4 window heat switches: L SIDE, L FWD, R FWD, R SIDE -->
+    <div class="row tight" style="margin-bottom:2px;">
+      <div class="sw">
+        <div class="ann amb" style="font-size:5px;">OVHT</div>
+        <div class="ann amb" style="font-size:5px;">ON</div>
+        <div class="sw-face"><div class="sw-plate"></div><div class="sw-lever up"></div></div>
+        <div class="sw-lbl">L SIDE</div>
+        <div class="sw-sub">ON</div>
+      </div>
+      <div class="sw">
+        <div class="ann amb" style="font-size:5px;">OVHT</div>
+        <div class="ann amb" style="font-size:5px;">ON</div>
+        <div class="sw-face"><div class="sw-plate"></div><div class="sw-lever up"></div></div>
+        <div class="sw-lbl">L FWD</div>
+        <div class="sw-sub">ON</div>
+      </div>
+      <div class="sw">
+        <div class="ann amb" style="font-size:5px;">OVHT</div>
+        <div class="ann amb" style="font-size:5px;">ON</div>
+        <div class="sw-face"><div class="sw-plate"></div><div class="sw-lever up"></div></div>
+        <div class="sw-lbl">R FWD</div>
+        <div class="sw-sub">ON</div>
+      </div>
+      <div class="sw">
+        <div class="ann amb" style="font-size:5px;">OVHT</div>
+        <div class="ann amb" style="font-size:5px;">ON</div>
+        <div class="sw-face"><div class="sw-plate"></div><div class="sw-lever up"></div></div>
+        <div class="sw-lbl">R SIDE</div>
+        <div class="sw-sub">ON</div>
+      </div>
+    </div>
+    <!-- seam -->
+    <div style="border-top:1px solid #3a3a3a;margin:2px 0;"></div>
+    <!-- PROBE HEAT: 3 columns: 4 anns | 3 switches | 4 anns -->
+    <div style="display:grid;grid-template-columns:36px 72px 36px;gap:3px;align-items:start;">
+      <!-- Left col: 4 anns -->
+      <div style="display:flex;flex-direction:column;gap:2px;">
+        <div class="ann amb" style="font-size:4px;min-width:0;padding:1px 2px;text-align:center;">CAPT<br>PITOT</div>
+        <div class="ann amb" style="font-size:4px;min-width:0;padding:1px 2px;text-align:center;">L ELEV<br>PITOT</div>
+        <div class="ann amb" style="font-size:4px;min-width:0;padding:1px 2px;text-align:center;">L ALPHA<br>VANE</div>
+        <div class="ann amb" style="font-size:4px;min-width:0;padding:1px 2px;text-align:center;">TEMP<br>PROBE</div>
+      </div>
+      <!-- Center col: 2+1 switches -->
+      <div style="display:flex;flex-direction:column;align-items:center;gap:2px;">
+        <div style="display:flex;gap:2px;">
+          <div class="sw"><div class="sw-face"><div class="sw-plate"></div><div class="sw-lever up"></div></div><div class="sw-lbl">CAPT</div><div class="sw-sub">ON</div></div>
+          <div class="sw"><div class="sw-face"><div class="sw-plate"></div><div class="sw-lever up"></div></div><div class="sw-lbl">F/O</div><div class="sw-sub">ON</div></div>
+        </div>
+        <div style="display:flex;flex-direction:column;align-items:center;">
+          <div style="font-size:5px;color:#aaa;">PWR TEST</div>
+          <div class="sw"><div class="sw-face"><div class="sw-plate"></div><div class="sw-lever dn"></div></div><div class="sw-lbl">PROBE</div></div>
+          <div style="font-size:5px;color:#aaa;">ON HEAT</div>
+        </div>
+      </div>
+      <!-- Right col: 4 anns -->
+      <div style="display:flex;flex-direction:column;gap:2px;">
+        <div class="ann amb" style="font-size:4px;min-width:0;padding:1px 2px;text-align:center;">F/O<br>PITOT</div>
+        <div class="ann amb" style="font-size:4px;min-width:0;padding:1px 2px;text-align:center;">R ELEV<br>PITOT</div>
+        <div class="ann amb" style="font-size:4px;min-width:0;padding:1px 2px;text-align:center;">R ALPHA<br>VANE</div>
+        <div class="ann amb" style="font-size:4px;min-width:0;padding:1px 2px;text-align:center;">AUX<br>PITOT</div>
+      </div>
+    </div>
+    <div style="font-size:5px;color:#888;text-align:center;margin-top:2px;letter-spacing:.05em;">TAT TEST</div>
+  </div>
+  <div class="sp h110">
+    <span class="sc tl"></span><span class="sc tr"></span><span class="sc bl"></span><span class="sc br"></span>
+    <div class="pt">ANTI-ICE</div>
+    <div class="row tight">
+      <div class="sw" style="margin-top:20px;">
+        <div class="row">
+          <div class="ann blu" style="font-size:5px;">L VALVE<br>OPEN</div>
+          <div class="ann blu" style="font-size:5px;">R VALVE<br>OPEN</div>
+        </div>
+        <div class="sw-face"><div class="sw-plate"></div><div class="sw-lever up"></div></div>
+        <div class="sw-lbl">WING</div>
+        <div class="sw-sub">ANTI-ICE</div>
+      </div>
+      <div class="sw">
+        <div class="row">
+          <div class="ann amb" style="font-size:5px;">COWL<br>ANTI-ICE</div>
+          <div class="ann amb" style="font-size:5px;">COWL<br>ANTI-ICE</div>
+        </div>
+        <div class="row">
+          <div class="ann blu" style="font-size:5px;">COWL<br>VLV OPEN</div>
+          <div class="ann blu" style="font-size:5px;">COWL<br>VLV OPEN</div>
+        </div>
+        <div class="row">
+        <div>
+          <div class="sw-face"><div class="sw-plate"></div><div class="sw-lever up"></div></div>
+          <div class="sw-lbl">ENG 1</div>
+          <div class="sw-sub">COWL</div>
+        </div>
+        <div>
+          <div class="sw-face"><div class="sw-plate"></div><div class="sw-lever up"></div></div>
+          <div class="sw-lbl">ENG 2</div>
+          <div class="sw-sub">COWL</div>
+        </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="sp h200">
+    <span class="sc tl"></span><span class="sc tr"></span><span class="sc bl"></span><span class="sc br"></span>
+    <div class="pt">HYDRAULIC PUMPS</div>
+    <!-- SYS A / SYS B labels -->
+    <div style="display:flex;justify-content:space-around;margin-bottom:1px;">
+      <span style="font-size:6px;color:#aaa;letter-spacing:.05em;">SYS A</span>
+      <span style="font-size:6px;color:#aaa;letter-spacing:.05em;">SYS B</span>
+    </div>
+    <div class="row tight">
+      <div class="sw">
+        <div class="ann amb" style="font-size:5px;">LOW<br>PRESS</div>
+        <div class="ann amb" style="font-size:5px;">OVHT</div>
+        <div class="sw-face"><div class="sw-plate"></div><div class="sw-lever dn"></div></div>
+        <div class="sw-lbl">ENG 1</div>
+      </div>
+      <div class="sw">
+        <div class="ann amb" style="font-size:5px;">LOW<br>PRESS</div>
+        <div class="ann amb" style="font-size:5px;">OVHT</div>
+        <div class="sw-face"><div class="sw-plate"></div><div class="sw-lever up"></div></div>
+        <div class="sw-lbl">ELEC 1</div>
+      </div>
+      <div class="sw">
+        <div class="ann amb" style="font-size:5px;">LOW<br>PRESS</div>
+        <div class="ann amb" style="font-size:5px;">OVHT</div>
+        <div class="sw-face"><div class="sw-plate"></div><div class="sw-lever up"></div></div>
+        <div class="sw-lbl">ELEC 2</div>
+      </div>
+      <div class="sw">
+        <div class="ann amb" style="font-size:5px;">LOW<br>PRESS</div>
+        <div class="ann amb" style="font-size:5px;">OVHT</div>
+        <div class="sw-face"><div class="sw-plate"></div><div class="sw-lever dn"></div></div>
+        <div class="sw-lbl">ENG 2</div>
+      </div>
+    </div>
+    <div class="row" style="margin-top:3px;">
+      <div class="ann amb" style="font-size:5px;">FLT<br>CONTROL</div>
+      <div class="ann amb" style="font-size:5px;">LOW<br>QTY</div>
+      <div class="ann" style="font-size:5px;">FILTER<br>BYPASS</div>
+    </div>
+    <!-- door annunciators from reference -->
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:2px;margin-top:3px;">
+      <div class="ann amb" style="font-size:4px;padding:1px 2px;text-align:center;width:100%;">FWD<br>ENTRY</div>
+      <div class="ann amb" style="font-size:4px;padding:1px 2px;text-align:center;width:100%;">FWD<br>SERVICE</div>
+      <div class="ann amb" style="font-size:4px;padding:1px 2px;text-align:center;width:100%;">FWD<br>CARGO</div>
+      <div class="ann amb" style="font-size:4px;padding:1px 2px;text-align:center;width:100%;">L AFT<br>OVERWING</div>
+      <div class="ann amb" style="font-size:4px;padding:1px 2px;text-align:center;width:100%;">R AFT<br>OVERWING</div>
+      <div class="ann amb" style="font-size:4px;padding:1px 2px;text-align:center;width:100%;">AFT<br>CARGO</div>
+      <div class="ann amb" style="font-size:4px;padding:1px 2px;text-align:center;width:100%;">AFT<br>ENTRY</div>
+      <div class="ann amb" style="font-size:4px;padding:1px 2px;text-align:center;width:100%;">AFT<br>SERVICE</div>
+      <div class="ann amb" style="font-size:4px;padding:1px 2px;text-align:center;width:100%;">EQUIP</div>
+    </div>
+  </div>
+  <div class="sp h160"><span class="sc tl"></span><span class="sc tr"></span><span class="sc bl"></span><span class="sc br"></span><div class="pt">CABIN ALT / CABIN CLIMB</div><div class="row"><div class="dial"><div class="dial-face" style="width:64px;height:64px;"><div class="dial-pointer" style="--ang:-88deg;left:30px;height:22px;top:10px;"></div><div class="dial-dig" style="font-size:8px;">1000</div></div><div class="dial-lbl">CAB ALT</div></div><div class="dial"><div class="dial-face" style="width:64px;height:64px;"><div class="dial-pointer" style="--ang:-20deg;left:30px;height:22px;top:10px;"></div><div class="dial-dig" style="font-size:8px;">-50</div></div><div class="dial-lbl">CAB CLB</div></div></div></div>
+</div>
+
+<!-- COL 5 -->
+<div class="layout-col col-5">
+  <div class="sp h200">
+    <span class="sc tl"></span><span class="sc tr"></span><span class="sc bl"></span><span class="sc br"></span>
+    <div class="pt">AIR CONDITIONING</div>
+    <!-- top: AIR TEMP dial + SUPPLY DUCT knob -->
+    <div style="display:flex;gap:8px;align-items:flex-end;margin-bottom:3px;">
+      <div class="dial">
+        <div class="dial-face" style="width:54px;height:54px;">
+          <div class="dial-pointer" style="--ang:-30deg;left:25px;height:18px;top:8px;"></div>
+          <div class="dial-dig" style="font-size:7px;">22°C</div>
+        </div>
+        <div class="dial-lbl">AIR TEMP</div>
+      </div>
+      <div class="rot">
+        <div class="rot-body" style="--r:0deg"></div>
+        <div class="sw-lbl">SUPPLY</div>
+        <div class="sw-sub">DUCT</div>
+      </div>
+    </div>
+    <!-- TRIM-AIR switch -->
+    <div style="display:flex;align-items:center;gap:4px;margin-bottom:3px;">
+      <div style="font-size:5px;color:#aaa;">TRIM-AIR</div>
+      <div class="sw">
+        <div class="sw-face"><div class="sw-plate"></div><div class="sw-lever up"></div></div>
+      </div>
+      <div style="font-size:5px;color:#aaa;">ON</div>
+    </div>
+    <!-- 3 zone temp knobs -->
+    <div style="display:flex;justify-content:space-around;">
+      <div style="display:flex;flex-direction:column;align-items:center;gap:1px;">
+        <div class="ann amb" style="font-size:4px;">ZONE<br>TEMP</div>
+        <div class="rot"><div class="rot-body" style="--r:-10deg"></div></div>
+        <div class="sw-lbl">CONT CAB</div>
+        <div style="display:flex;gap:4px;">
+          <span style="font-size:4px;color:#aaa;">C</span>
+          <span style="font-size:4px;color:#aaa;">AUTO</span>
+          <span style="font-size:4px;color:#aaa;">W</span>
+        </div>
+        <div style="font-size:4px;color:#aaa;">OFF</div>
+      </div>
+      <div style="display:flex;flex-direction:column;align-items:center;gap:1px;">
+        <div class="ann amb" style="font-size:4px;">ZONE<br>TEMP</div>
+        <div class="rot"><div class="rot-body" style="--r:-10deg"></div></div>
+        <div class="sw-lbl">FWD CAB</div>
+        <div style="display:flex;gap:4px;">
+          <span style="font-size:4px;color:#aaa;">C</span>
+          <span style="font-size:4px;color:#aaa;">AUTO</span>
+          <span style="font-size:4px;color:#aaa;">W</span>
+        </div>
+        <div style="font-size:4px;color:#aaa;">OFF</div>
+      </div>
+      <div style="display:flex;flex-direction:column;align-items:center;gap:1px;">
+        <div class="ann amb" style="font-size:4px;">ZONE<br>TEMP</div>
+        <div class="rot"><div class="rot-body" style="--r:-10deg"></div></div>
+        <div class="sw-lbl">AFT CAB</div>
+        <div style="display:flex;gap:4px;">
+          <span style="font-size:4px;color:#aaa;">C</span>
+          <span style="font-size:4px;color:#aaa;">AUTO</span>
+          <span style="font-size:4px;color:#aaa;">W</span>
+        </div>
+        <div style="font-size:4px;color:#aaa;">OFF</div>
+      </div>
+    </div>
+  </div>
+  <!-- BLEED / DUCT PRESS panel -->
+  <div class="sp" style="height:260px;position:relative;">
+    <span class="sc tl"></span><span class="sc tr"></span>
+    <span class="sc bl"></span><span class="sc br"></span>
+    <div class="pt">BLEED / DUCT PRESS</div>
+
+    <!-- top anns -->
+    <div style="position:absolute;top:18px;left:4px;" class="ann blu" style="font-size:4px;">DUAL<br>BLEED</div>
+    <div style="position:absolute;top:18px;left:36px;" class="ann blu" style="font-size:4px;">RAM DOOR<br>FULL OPEN</div>
+    <div style="position:absolute;top:18px;right:4px;" class="ann blu" style="font-size:4px;">RAM DOOR<br>FULL OPEN</div>
+
+    <!-- L RECIRC FAN -->
+    <div style="position:absolute;top:44px;left:4px;display:flex;flex-direction:column;align-items:center;gap:1px;">
+      <div style="font-size:4px;color:#aaa;text-align:center;">L RECIRC<br>FAN</div>
+      <div class="sw">
+        <div class="sw-face"><div class="sw-plate"></div><div class="sw-lever up"></div></div>
+        <div class="sw-lbl">AUTO</div>
+      </div>
+    </div>
+
+    <!-- R RECIRC FAN -->
+    <div style="position:absolute;top:44px;right:4px;display:flex;flex-direction:column;align-items:center;gap:1px;">
+      <div style="font-size:4px;color:#aaa;text-align:center;">R RECIRC<br>FAN</div>
+      <div class="sw">
+        <div class="sw-face"><div class="sw-plate"></div><div class="sw-lever up"></div></div>
+        <div class="sw-lbl">AUTO</div>
+      </div>
+    </div>
+
+    <!-- DUCT PRESS dial -->
+    <div style="position:absolute;top:38px;left:50%;transform:translateX(-50%);">
+      <div class="dial">
+        <div class="dial-face" style="width:60px;height:60px;">
+          <div class="dial-pointer" style="--ang:18deg;height:22px;top:8px;left:28px;"></div>
+          <div class="dial-dig">42</div>
+        </div>
+        <div class="dial-lbl">DUCT PRESS</div>
+      </div>
+    </div>
+
+    <!-- SVG pipelines: horizontal duct + vertical APU feed -->
+    <svg style="position:absolute;top:110px;left:0;width:100%;height:60px;overflow:visible;" viewBox="0 0 120 60" preserveAspectRatio="none">
+      <!-- horizontal main duct: ENG1 side → isolation valve → ENG2 side -->
+      <line x1="13"  y1="20" x2="107" y2="20" stroke="#fff" stroke-width="4"/>
+      <line x1="13"  y1="20" x2="107" y2="20" stroke="#666" stroke-width="2"/>
+      <line x1="13"  y1="80" x2="50" y2="80" stroke="#fff" stroke-width="4"/>
+      <line x1="13"  y1="80" x2="50" y2="80" stroke="#666" stroke-width="2"/>
+      <!-- L pack branch down -->
+      <line x1="13" y1="10" x2="13" y2="90" stroke="#fff" stroke-width="4"/>
+      <line x1="13" y1="10" x2="13" y2="90" stroke="#666" stroke-width="2"/>
+      <!-- R pack branch down -->
+      <line x1="107" y1="10" x2="107" y2="90" stroke="#fff" stroke-width="4"/>
+      <line x1="107" y1="10" x2="107" y2="90" stroke="#666" stroke-width="2"/>
+      <!-- APU feed from bottom center -->
+      <line x1="50" y1="90" x2="50" y2="80" stroke="#fff" stroke-width="4"/>
+      <line x1="50" y1="90" x2="50" y2="80" stroke="#666" stroke-width="2"/>
+    </svg>
+
+    <!-- ISOLATION VALVE switch -->
+    <div style="position:absolute;top:108px;left:50%;transform:translateX(-50%);display:flex;flex-direction:column;align-items:center;gap:1px;">
+      <div style="font-size:4px;color:#aaa;">AUTO</div>
+      <div class="sw">
+        <div class="ann blu" style="font-size:4px;">OPEN</div>
+        <div class="sw-face"><div class="sw-plate"></div><div class="sw-lever up"></div></div>
+        <div class="sw-lbl">ISOLATION</div>
+        <div class="sw-sub">VALVE</div>
+      </div>
+      <div style="font-size:4px;color:#aaa;">CLOSE</div>
+    </div>
+
+    <!-- L PACK label + switch -->
+    <div style="position:absolute;top:92px;left:8px;display:flex;flex-direction:column;align-items:center;gap:1px;">
+      <div style="font-size:5px;color:#ccc;font-weight:bold;">L PACK</div>
+      <div style="font-size:4px;color:#aaa;">OFF</div>
+      <div class="sw">
+        <div class="sw-face"><div class="sw-plate"></div><div class="sw-lever mid"></div></div>
+      </div>
+      <div style="font-size:4px;color:#aaa;">AUTO</div>
+      <div style="font-size:4px;color:#aaa;">HIGH</div>
+    </div>
+
+    <!-- R PACK label + switch -->
+    <div style="position:absolute;top:92px;right:8px;display:flex;flex-direction:column;align-items:center;gap:1px;">
+      <div style="font-size:5px;color:#ccc;font-weight:bold;">R PACK</div>
+      <div style="font-size:4px;color:#aaa;">OFF</div>
+      <div class="sw">
+        <div class="sw-face"><div class="sw-plate"></div><div class="sw-lever mid"></div></div>
+      </div>
+      <div style="font-size:4px;color:#aaa;">AUTO</div>
+      <div style="font-size:4px;color:#aaa;">HIGH</div>
+    </div>
+
+    <!-- WING ANTI ICE L + PACK L anns -->
+    <div style="position:absolute;top:142px;left:27px;display:flex;gap:2px;">
+      <div style="display:flex;flex-direction:column;gap:1px;">
+        <div class="ann amb" style="font-size:4px;font-weight:bold;text-align:center;">PACK</div>
+        <div class="ann amb" style="font-size:4px;">WING BODY<br>OVERHEAT</div>
+        <div class="ann amb" style="font-size:4px;">BLEED<br>TRIP OFF</div>
+      </div>
+    </div>
+
+    <!-- WING ANTI ICE R + PACK R anns -->
+    <div style="position:absolute;top:142px;right:27px;display:flex;gap:2px;flex-direction:row-reverse;">
+      <div style="display:flex;flex-direction:column;gap:1px;">
+        <div class="ann amb" style="font-size:4px;font-weight:bold;text-align:center;">PACK</div>
+        <div class="ann amb" style="font-size:4px;">WING BODY<br>OVERHEAT</div>
+        <div class="ann amb" style="font-size:4px;">BLEED<br>TRIP OFF</div>
+      </div>
+    </div>
+
+    <!-- ENG 1 BLEED switch -->
+    <div style="position:absolute;top:190px;left:5px;display:flex;flex-direction:column;align-items:center;gap:1px;">
+      <div style="font-size:4px;color:#aaa;">OFF</div>
+      <div class="sw">
+        <div class="sw-face"><div class="sw-plate"></div><div class="sw-lever mid"></div></div>
+        <div class="sw-lbl">ENG 1</div>
+        <div class="sw-sub">BLEED</div>
+      </div>
+      <div style="font-size:4px;color:#aaa;">ON</div>
+    </div>
+
+    <!-- APU BLEED switch -->
+    <div style="position:absolute;top:190px;left:67px;transform:translateX(-50%);display:flex;flex-direction:column;align-items:center;gap:1px;">
+      <div style="font-size:4px;color:#aaa;">OFF</div>
+      <div class="sw">
+        <div class="sw-face"><div class="sw-plate"></div><div class="sw-lever dn"></div></div>
+        <div class="sw-lbl">APU</div>
+        <div class="sw-sub">BLEED</div>
+      </div>
+      <div style="font-size:4px;color:#aaa;">ON</div>
+    </div>
+
+    <!-- ENG 2 BLEED switch -->
+    <div style="position:absolute;top:190px;right:5px;display:flex;flex-direction:column;align-items:center;gap:1px;">
+      <div style="font-size:4px;color:#aaa;">OFF</div>
+      <div class="sw">
+        <div class="sw-face"><div class="sw-plate"></div><div class="sw-lever mid"></div></div>
+        <div class="sw-lbl">ENG 2</div>
+        <div class="sw-sub">BLEED</div>
+      </div>
+      <div style="font-size:4px;color:#aaa;">ON</div>
+    </div>
+  </div>
+  <!-- PRESSURIZATION panel -->
+  <div class="sp" style="height:200px;position:relative;">
+    <span class="sc tl"></span><span class="sc tr"></span>
+    <span class="sc bl"></span><span class="sc br"></span>
+    <div class="pt">PRESSURIZATION</div>
+
+    <!-- Top anns row -->
+    <div style="position:absolute;top:18px;left:2px;right:2px;display:flex;gap:2px;">
+      <div class="ann amb" style="font-size:4px;">AUTO<br>FAIL</div>
+      <div class="ann amb" style="font-size:4px;">OFF SCHED<br>DESCENT</div>
+      <div class="ann" style="font-size:4px;">AL TN</div>
+      <div class="ann" style="font-size:4px;">MANUAL</div>
+    </div>
+
+    <!-- Left: AUTO label -->
+    <div style="position:absolute;top:42px;left:26px;font-size:8px;color:#ccc;">AUTO</div>
+
+    <!-- Right: MANUAL label -->
+    <div style="position:absolute;top:42px;right:26px;font-size:8px;color:#ccc;">MANUAL</div>
+
+    <!-- FLT ALT display + knob -->
+    <div style="position:absolute;top:50px;left:14px;display:flex;flex-direction:column;align-items:center;gap:1px;">
+      <div style="background:#000;border:1px solid #333;border-radius:2px;padding:1px 3px;">
+        <div class="seven-seg" style="font-size:8px;">12345</div>
+      </div>
+      <div class="rot"><div class="rot-body" style="--r:20deg"></div></div>
+      <div class="sw-lbl">FLT ALT</div>
+    </div>
+
+    <!-- LAND ALT display + knob -->
+    <div style="position:absolute;top:115px;left:14px;display:flex;flex-direction:column;align-items:center;gap:1px;">
+      <div style="background:#000;border:1px solid #333;border-radius:2px;padding:1px 3px;">
+        <div class="seven-seg" style="font-size:8px;">12345</div>
+      </div>
+      <div class="rot"><div class="rot-body" style="--r:-10deg"></div></div>
+      <div class="sw-lbl">LAND ALT</div>
+    </div>
+
+    <!-- OUTFLOW VALVE arc gauge -->
+    <div style="position:absolute;top:46px;right:4px;display:flex;flex-direction:column;align-items:center;gap:1px;">
+      <div style="font-size:4px;color:#aaa;writing-mode:vertical-rl;letter-spacing:1px;">VALVE</div>
+      <div class="dial">
+        <div class="dial-face" style="width:36px;height:36px;">
+          <div class="dial-pointer" style="--ang:30deg;height:12px;top:5px;left:16px;"></div>
+        </div>
+      </div>
+      <div style="display:flex;align-items:center;gap:2px;">
+        <div style="font-size:4px;color:#aaa;">CLOSE</div>
+        <div class="sw">
+          <div class="sw-face"><div class="sw-plate"></div><div class="sw-lever up"></div></div>
+        </div>
+        <div style="font-size:4px;color:#aaa;">OPEN</div>
+      </div>
+    </div>
+
+    <!-- ALTN/AUTO/MAN knob -->
+    <div style="position:absolute;top:130px;right:12px;display:flex;flex-direction:column;align-items:center;gap:1px;">
+      <div class="rot"><div class="rot-body" style="--r:10deg"></div></div>
+      <div style="display:flex;gap:2px;">
+        <div style="font-size:4px;color:#aaa;">ALTN</div>
+        <div style="font-size:4px;color:#aaa;">AUTO</div>
+        <div style="font-size:4px;color:#aaa;">MAN</div>
+      </div>
+    </div>
+
+    <!-- Bottom CAB ALT / FLT ALT strip -->
+    <div style="position:absolute;bottom:2px;left:2px;right:2px;background:#111;border:1px solid #333;border-radius:2px;padding:2px;display:flex;gap:4px;align-items:center;">
+      <div style="font-size:4px;color:#aaa;">CAB ALT</div>
+      <div style="font-size:4px;color:#aaa;">LAND ALT 2000</div>
+      <div style="font-size:4px;color:#aaa;">4000</div>
+      <div style="font-size:4px;color:#aaa;">6000</div>
+      <div style="font-size:4px;color:#aaa;">8000</div>
+    </div>
+    <div style="position:absolute;bottom:2px;left:2px;right:2px;margin-top:8px;">
+      <div style="font-size:4px;color:#aaa;padding-left:2px;">FLT ALT &lt;FL160 &lt;FL220 &lt;FL260 &lt;FL320 &lt;FL360</div>
+    </div>
+  </div>
+</div>
+
+<!-- BOTTOM ROW -->
+<div style="position:absolute;left:100px;right:100px;bottom:24px;height:72px;">
+  <div class="sp" style="height:72px;width:100%;display:flex;align-items:center;gap:0;">
+    <span class="sc tl"></span><span class="sc tr"></span><span class="sc bl"></span><span class="sc br"></span>
+
+    <!-- LANDING -->
+    <div style="display:flex;flex-direction:column;align-items:center;padding:0 6px;border-right:1px solid #3a3a3a;">
+      <div class="pt" style="border:none;margin-bottom:2px;">LANDING</div>
+      <div style="display:flex;gap:3px;">
+        <div style="display:flex;flex-direction:column;align-items:center;gap:1px;">
+          <div style="font-size:4px;color:#aaa;">OFF</div>
+          <div class="sw"><div class="sw-face"><div class="sw-plate"></div><div class="sw-lever dn"></div></div></div>
+          <div style="font-size:4px;color:#aaa;">ON</div>
+          <div class="sw-lbl">L</div>
+        </div>
+        <div style="display:flex;flex-direction:column;align-items:center;gap:1px;">
+          <div style="font-size:4px;color:#aaa;">OFF</div>
+          <div class="sw"><div class="sw-face"><div class="sw-plate"></div><div class="sw-lever dn"></div></div></div>
+          <div style="font-size:4px;color:#aaa;">ON</div>
+          <div class="sw-lbl">R</div>
+        </div>
+        <div style="display:flex;flex-direction:column;align-items:center;gap:1px;">
+          <div style="font-size:4px;color:#aaa;">OFF</div>
+          <div class="sw"><div class="sw-face"><div class="sw-plate"></div><div class="sw-lever dn"></div></div></div>
+          <div style="font-size:4px;color:#aaa;">ON</div>
+          <div class="sw-lbl">L</div>
+        </div>
+        <div style="display:flex;flex-direction:column;align-items:center;gap:1px;">
+          <div style="font-size:4px;color:#aaa;">OFF</div>
+          <div class="sw"><div class="sw-face"><div class="sw-plate"></div><div class="sw-lever dn"></div></div></div>
+          <div style="font-size:4px;color:#aaa;">ON</div>
+          <div class="sw-lbl">R</div>
+        </div>
+      </div>
+      <div style="display:flex;gap:4px;margin-top:1px;">
+        <div style="font-size:4px;color:#aaa;flex:2;text-align:center;">RETRACTABLE</div>
+        <div style="font-size:4px;color:#aaa;flex:2;text-align:center;">FIXED</div>
+      </div>
+    </div>
+
+    <!-- RUNWAY TURNOFF -->
+    <div style="display:flex;flex-direction:column;align-items:center;padding:0 10px;border-right:1px solid #3a3a3a;">
+      <div class="pt" style="border:none;margin-bottom:2px;">RUNWAY<br>TURNOFF</div>
+      <div style="display:flex;gap:3px;">
+        <div style="display:flex;flex-direction:column;align-items:center;gap:1px;">
+          <div style="font-size:4px;color:#aaa;">OFF</div>
+          <div class="sw"><div class="sw-face"><div class="sw-plate"></div><div class="sw-lever up"></div></div></div>
+          <div style="font-size:4px;color:#aaa;">ON</div>
+          <div class="sw-lbl">L</div>
+        </div>
+        <div style="display:flex;flex-direction:column;align-items:center;gap:1px;">
+          <div style="font-size:4px;color:#aaa;">OFF</div>
+          <div class="sw"><div class="sw-face"><div class="sw-plate"></div><div class="sw-lever up"></div></div></div>
+          <div style="font-size:4px;color:#aaa;">ON</div>
+          <div class="sw-lbl">R</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- TAXI -->
+    <div style="display:flex;flex-direction:column;align-items:center;padding:0 10px;border-right:1px solid #3a3a3a;">
+      <div class="pt" style="border:none;margin-bottom:2px;">TAXI</div>
+      <div style="display:flex;flex-direction:column;align-items:center;gap:1px;">
+        <div style="font-size:4px;color:#aaa;">OFF</div>
+        <div class="sw"><div class="sw-face"><div class="sw-plate"></div><div class="sw-lever up"></div></div></div>
+        <div style="font-size:4px;color:#aaa;">ON</div>
+      </div>
+    </div>
+
+    <!-- APU -->
+    <div style="display:flex;flex-direction:column;align-items:center;padding:0 10px;border-right:1px solid #3a3a3a;">
+      <div class="pt" style="border:none;margin-bottom:2px;">APU</div>
+      <div style="display:flex;flex-direction:column;align-items:center;gap:1px;">
+        <div style="font-size:4px;color:#aaa;">START</div>
+        <div style="font-size:4px;color:#aaa;">ON</div>
+        <div style="width:14px;height:44px;background:#555;border:1px solid #777;border-radius:3px;position:relative;display:flex;align-items:flex-end;justify-content:center;padding-bottom:3px;">
+          <div style="width:8px;height:14px;background:linear-gradient(90deg,#c8c8c8,#f0f0f0,#989898);border-radius:4px;box-shadow:0 2px 4px rgba(0,0,0,.5);"></div>
+        </div>
+        <div style="font-size:4px;color:#aaa;">OFF</div>
+      </div>
+    </div>
+
+    <!-- ENGINE START -->
+    <div style="display:flex;flex-direction:column;align-items:center;padding:0 6px;border-right:1px solid #3a3a3a;flex:1;">
+      <div class="pt" style="border:none;margin-bottom:2px;">ENGINE START</div>
+      <div style="display:flex;gap:4px;align-items:flex-start;">
+        <!-- ENG 1 rotary -->
+        <div style="display:flex;flex-direction:column;align-items:center;gap:1px;">
+          <div style="font-size:4px;color:#aaa;">GRD</div>
+          <div class="rot"><div class="rot-body" style="--r:-45deg"></div></div>
+          <div style="display:flex;gap:3px;">
+            <div style="font-size:4px;color:#aaa;">OFF</div>
+            <div style="font-size:4px;color:#aaa;">CONT</div>
+          </div>
+          <div style="font-size:4px;color:#aaa;">FLT</div>
+          <div class="sw-lbl">1</div>
+        </div>
+        <!-- BOTH 3-position switch -->
+        <div style="display:flex;flex-direction:column;align-items:center;gap:1px;margin-left:10px;margin-right:10px;">
+          <div style="font-size:4px;color:#aaa;">BOTH</div>
+          <div class="sw">
+            <div class="sw-face"><div class="sw-plate"></div><div class="sw-lever mid"></div></div>
+          </div>
+          <div style="font-size:4px;color:#aaa;">GRD</div>
+          <div style="font-size:4px;color:#aaa;">OFF</div>
+          <div class="sw-lbl">BOTH</div>
+        </div>
+        <!-- ENG 2 rotary -->
+        <div style="display:flex;flex-direction:column;align-items:center;gap:1px;">
+          <div style="font-size:4px;color:#aaa;">GRD</div>
+          <div class="rot"><div class="rot-body" style="--r:45deg"></div></div>
+          <div style="display:flex;gap:3px;">
+            <div style="font-size:4px;color:#aaa;">OFF</div>
+            <div style="font-size:4px;color:#aaa;">CONT</div>
+          </div>
+          <div style="font-size:4px;color:#aaa;">FLT</div>
+          <div class="sw-lbl">2</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- LIGHTS right section -->
+    <div style="display:flex;flex-direction:column;align-items:center;padding:0 6px;">
+      <div class="pt" style="border:none;margin-bottom:2px;">LIGHTS</div>
+      <div style="display:flex;gap:3px;">
+        <div style="display:flex;flex-direction:column;align-items:center;gap:1px;">
+          <div style="font-size:4px;color:#aaa;">OFF</div>
+          <div class="sw"><div class="sw-face"><div class="sw-plate"></div><div class="sw-lever up"></div></div></div>
+          <div style="font-size:4px;color:#aaa;">ON</div>
+          <div class="sw-lbl">LOGO</div>
+        </div>
+        <div style="display:flex;flex-direction:column;align-items:center;gap:1px;">
+          <div style="font-size:4px;color:#aaa;">OFF</div>
+          <div class="sw"><div class="sw-face"><div class="sw-plate"></div><div class="sw-lever up"></div></div></div>
+          <div style="font-size:4px;color:#aaa;">STEADY</div>
+          <div class="sw-lbl">POS</div>
+        </div>
+        <div style="display:flex;flex-direction:column;align-items:center;gap:1px;">
+          <div style="font-size:4px;color:#aaa;">OFF</div>
+          <div class="sw"><div class="sw-face"><div class="sw-plate"></div><div class="sw-lever up"></div></div></div>
+          <div style="font-size:4px;color:#aaa;">ON</div>
+          <div class="sw-lbl">ANTI<br>COLL</div>
+        </div>
+        <div style="display:flex;flex-direction:column;align-items:center;gap:1px;">
+          <div style="font-size:4px;color:#aaa;">OFF</div>
+          <div class="sw"><div class="sw-face"><div class="sw-plate"></div><div class="sw-lever up"></div></div></div>
+          <div style="font-size:4px;color:#aaa;">ON</div>
+          <div class="sw-lbl">WING</div>
+        </div>
+        <div style="display:flex;flex-direction:column;align-items:center;gap:1px;">
+          <div style="font-size:4px;color:#aaa;">OFF</div>
+          <div class="sw"><div class="sw-face"><div class="sw-plate"></div><div class="sw-lever up"></div></div></div>
+          <div style="font-size:4px;color:#aaa;">ON</div>
+          <div class="sw-lbl">WHEEL<br>WELL</div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+</section>
+</main>
 </body>
 </html>

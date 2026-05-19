@@ -1,0 +1,149 @@
+{
+  "model": "Boeing 757-200",
+  "type": "Narrow-body",
+  "manufacturer": "Boeing",
+  "iata": "752",
+  "icao": "B752",
+  "overheadLayoutId": "boeing_757_200_overhead",
+  "maxRange": 3900,
+  "cruiseSpeed": 460,
+  "fuelConsumption": 3400,
+  "maxFuelCapacity": 34000,
+  "maxPayload": 22000,
+  "maxPassengers": 239,
+  "typicalFuelBurn": 7.4,
+  "takeoffDistance": 2300,
+  "landingDistance": 1500,
+  "engineType": "RB211-535E4/PW2037/PW2040",
+  "engineCount": 2,
+  "hydraulicCount": 3,
+  "category": "Medium-haul",
+  "wingArea": 181,
+  "wingSpan": 38,
+  "aspectRatio": 8,
+  "maxLiftCoefficient": 1.6,
+  "stallSpeed": 125,
+  "maxOperatingMach": 0.86,
+  "emptyWeight": 58000,
+  "maxTakeoffWeight": 115700,
+  "maxThrustPerEngine": 195000,
+  "maxN1": 104,
+  "egtYellow": 750,
+  "egtRed": 850,
+  "fadec": false,
+  "liftCurveSlope": 5.6,
+  "zeroLiftDragCoefficient": 0.026,
+  "inducedDragFactor": 0.041,
+  "basicLiftCoefficient": 0.42,
+  "flapProfile": {
+    "positions": [
+      {
+        "angle": 0,
+        "clIncrement": 0,
+        "cdIncrement": 0,
+        "label": "UP"
+      },
+      {
+        "angle": 1,
+        "clIncrement": 0.05,
+        "cdIncrement": 0.001,
+        "label": "1"
+      },
+      {
+        "angle": 5,
+        "clIncrement": 0.1,
+        "cdIncrement": 0.002,
+        "label": "5"
+      },
+      {
+        "angle": 15,
+        "clIncrement": 0.2,
+        "cdIncrement": 0.005,
+        "label": "15"
+      },
+      {
+        "angle": 25,
+        "clIncrement": 0.3,
+        "cdIncrement": 0.01,
+        "label": "25"
+      },
+      {
+        "angle": 30,
+        "clIncrement": 0.4,
+        "cdIncrement": 0.015,
+        "label": "30"
+      }
+    ]
+  },
+  "airbrakeProfile": {
+    "positions": [
+      {
+        "label": "RET",
+        "dragIncrement": 0,
+        "liftDecrement": 0
+      },
+      {
+        "label": "1/2",
+        "dragIncrement": 0.03,
+        "liftDecrement": -0.06
+      },
+      {
+        "label": "FULL",
+        "dragIncrement": 0.07,
+        "liftDecrement": -0.14
+      },
+      {
+        "label": "GND",
+        "dragIncrement": 0.22,
+        "liftDecrement": -0.32
+      }
+    ]
+  },
+  "horizontalStabilizerArea": 35,
+  "horizontalStabilizerCL": -0.1,
+  "horizontalStabilizerMomentArm": 14,
+  "aerodynamicCenterPosition": 0.25,
+  "centerOfGravityPosition": 0.15,
+  "dragCenterPosition": 0.75,
+  "controlPower": {
+    "x": 1.2,
+    "y": 1.5,
+    "z": 1
+  },
+  "specificFuelConsumption": 0.000016,
+  "elevatorEffectiveness": 0.001,
+  "aileronEffectiveness": 0.0005,
+  "rudderEffectiveness": 0.0003,
+  "sideForceCoefficient": 0.0002,
+  "initialCruiseThrottle": 0.55,
+  "pidParameters": {
+    "altitude": {
+      "Kp": 0.0008,
+      "Ki": 0.0001,
+      "Kd": 0.002,
+      "min": -0.3,
+      "max": 0.3
+    },
+    "speed": {
+      "Kp": 0.5,
+      "Ki": 0.05,
+      "Kd": 0.1,
+      "min": -0.5,
+      "max": 0.5
+    },
+    "heading": {
+      "Kp": 0.8,
+      "Ki": 0.1,
+      "Kd": 0.3,
+      "min": -0.5,
+      "max": 0.5
+    }
+  },
+  "momentOfInertiaRoll": 42000,
+  "momentOfInertiaPitch": 65000,
+  "momentOfInertiaYaw": 95000,
+  "minNoseGearFailedPitch": -0.2,
+  "maxGroundPitch": 0.3,
+  "groundCollisionPitchTorqueFactor": 0.5,
+  "gearHeight": 4.5
+}

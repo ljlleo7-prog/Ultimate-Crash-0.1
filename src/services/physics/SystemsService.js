@@ -2,7 +2,8 @@ import OverheadLogic from '../OverheadLogic.js';
 
 export default class SystemsService {
     initializeSystems(aircraft, difficulty, stateFuel, engines) {
-        const isColdDark = ['pro', 'devil', 'professional', 'survival'].includes(difficulty);
+        const forceHotStart = aircraft?.scenarioMode && aircraft?.scenarioRestrictions?.hotStart !== false;
+        const isColdDark = !forceHotStart && ['pro', 'devil', 'professional', 'survival'].includes(difficulty);
         const engineCount = aircraft.engineCount || 2;
 
         const enginesState = {};
@@ -33,11 +34,15 @@ export default class SystemsService {
             });
         }
 
+        const batterySelector = isColdDark ? 'OFF' : 'AUTO';
         const elecState = {
-            battery: !isColdDark,
+            batterySelector,
+            battery: batterySelector !== 'OFF',
             batteryCharge: 100,
-            stbyPower: !isColdDark,
+            stbyPower: batterySelector !== 'OFF',
             apuGen: false,
+            apuGen1: false,
+            apuGen2: false,
             busTie: true,
             dcVolts: isColdDark ? 0 : 28.0,
             acVolts: isColdDark ? 0 : 115,
@@ -106,15 +111,15 @@ export default class SystemsService {
             transponder: { code: 2000, mode: 'STBY', ident: false },
             pressurization: pneuState,
             oxygen: { masks: false, crewPressure: 1800, paxPressure: 1500 },
-            lighting: { landing: false, taxi: false, nav: !isColdDark, beacon: !isColdDark, strobe: !isColdDark, logo: false, wing: false, powered: !isColdDark },
+            lighting: { landing: false, taxi: false, nav: false, beacon: false, strobe: false, logo: false, wing: false, powered: !isColdDark },
             nav: { irsL: !isColdDark, irsR: !isColdDark },
             engines: enginesState,
             fire: fireState,
-            signs: { seatBelts: !isColdDark, noSmoking: !isColdDark },
+            signs: { seatBelts: false, noSmoking: false, attend: false, groundCall: false },
             wipers: { left: false, right: false },
             brakes: { parkingBrake: true, autobrake: 'OFF', temp: [20, 20, 20, 20] },
             adirs: { ir1: 'OFF', ir2: 'OFF', ir3: 'OFF', alignState: 0, aligned: false, onBat: false },
-            ice: { windowHeat: !isColdDark, probeHeat: !isColdDark, wingAntiIce: false, engAntiIce: false, icingLevel: 0, deicingRequired: false }
+            ice: { windowHeat: !isColdDark, probeHeat: !isColdDark, wingAntiIce: false, eng1AntiIce: false, eng2AntiIce: false, icingLevel: 0, deicingRequired: false }
         };
     }
 

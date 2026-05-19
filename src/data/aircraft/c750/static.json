@@ -1,0 +1,91 @@
+{
+  "model": "Cessna Citation X",
+  "type": "Business",
+  "manufacturer": "Cessna",
+  "iata": "CEX",
+  "icao": "C750",
+  "maxRange": 3430,
+  "cruiseSpeed": 528,
+  "fuelConsumption": 1000,
+  "maxFuelCapacity": 6800,
+  "maxPayload": 1200,
+  "maxPassengers": 12,
+  "typicalFuelBurn": 1.9,
+  "takeoffDistance": 1600,
+  "landingDistance": 900,
+  "engineType": "Rolls-Royce AE3007C",
+  "engineCount": 2,
+  "hydraulicCount": 2,
+  "category": "Business",
+  "wingArea": 32.5,
+  "wingSpan": 19.3,
+  "aspectRatio": 7.2,
+  "maxLiftCoefficient": 1.4,
+  "stallSpeed": 95,
+  "maxOperatingMach": 0.92,
+  "emptyWeight": 10500,
+  "maxTakeoffWeight": 16500,
+  "maxThrustPerEngine": 9700,
+  "maxN1": 100,
+  "egtYellow": 700,
+  "egtRed": 800,
+  "fadec": false,
+  "liftCurveSlope": 5.2,
+  "zeroLiftDragCoefficient": 0.03,
+  "inducedDragFactor": 0.05,
+  "basicLiftCoefficient": 0.4,
+  "horizontalStabilizerArea": 8,
+  "horizontalStabilizerCL": -0.12,
+  "horizontalStabilizerMomentArm": 4,
+  "aerodynamicCenterPosition": 0.25,
+  "centerOfGravityPosition": 0.15,
+  "dragCenterPosition": 0.75,
+  "controlPower": {
+    "x": 1.2,
+    "y": 1.5,
+    "z": 1
+  },
+  "momentOfInertiaRoll": 2500,
+  "momentOfInertiaPitch": 3500,
+  "momentOfInertiaYaw": 5500,
+  "flapProfile": {
+    "positions": [
+      {
+        "angle": 0,
+        "clIncrement": 0,
+        "cdIncrement": 0,
+        "label": "UP"
+      },
+      {
+        "angle": 15,
+        "clIncrement": 0.1,
+        "cdIncrement": 0.003,
+        "label": "1"
+      },
+      {
+        "angle": 35,
+        "clIncrement": 0.25,
+        "cdIncrement": 0.008,
+        "label": "FULL"
+      }
+    ]
+  },
+  "airbrakeProfile": {
+    "positions": [
+      {
+        "label": "RET",
+        "dragIncrement": 0,
+        "liftDecrement": 0
+      },
+      {
+        "label": "EXT",
+        "dragIncrement": 0.05,
+        "liftDecrement": -0.05
+      }
+    ]
+  },
+  "minNoseGearFailedPitch": -0.2,
+  "maxGroundPitch": 0.3,
+  "gearHeight": 2.8,
+  "groundCollisionPitchTorqueFactor": 0.5
+}

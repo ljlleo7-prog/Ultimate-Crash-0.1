@@ -1,0 +1,126 @@
+{
+  "model": "Boeing 747-400",
+  "type": "Wide-body",
+  "manufacturer": "Boeing",
+  "iata": "744",
+  "icao": "B744",
+  "overheadLayoutId": "boeing_747_400_overhead",
+  "maxRange": 7260,
+  "cruiseSpeed": 475,
+  "fuelConsumption": 11000,
+  "maxFuelCapacity": 216840,
+  "maxPayload": 112760,
+  "maxPassengers": 416,
+  "typicalFuelBurn": 22.5,
+  "takeoffDistance": 3300,
+  "landingDistance": 2100,
+  "gearHeight": 9.5,
+  "engineType": "PW4000/CF6-80C2/RB211-524",
+  "engineCount": 4,
+  "hydraulicCount": 4,
+  "category": "Long-haul",
+  "wingArea": 525,
+  "wingSpan": 64.4,
+  "aspectRatio": 7.9,
+  "maxLiftCoefficient": 1.7,
+  "stallSpeed": 155,
+  "maxOperatingMach": 0.92,
+  "emptyWeight": 178800,
+  "maxTakeoffWeight": 396900,
+  "maxThrustPerEngine": 280000,
+  "maxN1": 104,
+  "egtYellow": 750,
+  "egtRed": 850,
+  "fadec": false,
+  "liftCurveSlope": 5.8,
+  "zeroLiftDragCoefficient": 0.023,
+  "inducedDragFactor": 0.037,
+  "basicLiftCoefficient": 0.44,
+  "horizontalStabilizerArea": 65,
+  "horizontalStabilizerCL": -0.17,
+  "horizontalStabilizerMomentArm": 18,
+  "aerodynamicCenterPosition": 0.25,
+  "centerOfGravityPosition": 0.15,
+  "dragCenterPosition": 0.75,
+  "controlPower": {
+    "x": 1.2,
+    "y": 1.5,
+    "z": 1
+  },
+  "momentOfInertiaRoll": 250000,
+  "momentOfInertiaPitch": 380000,
+  "momentOfInertiaYaw": 450000,
+  "flapProfile": {
+    "positions": [
+      {
+        "angle": 0,
+        "clIncrement": 0,
+        "cdIncrement": 0,
+        "label": "UP"
+      },
+      {
+        "angle": 5,
+        "clIncrement": 0.05,
+        "cdIncrement": 0.001,
+        "label": "1"
+      },
+      {
+        "angle": 10,
+        "clIncrement": 0.1,
+        "cdIncrement": 0.002,
+        "label": "5"
+      },
+      {
+        "angle": 15,
+        "clIncrement": 0.18,
+        "cdIncrement": 0.004,
+        "label": "10"
+      },
+      {
+        "angle": 20,
+        "clIncrement": 0.25,
+        "cdIncrement": 0.007,
+        "label": "20"
+      },
+      {
+        "angle": 25,
+        "clIncrement": 0.35,
+        "cdIncrement": 0.012,
+        "label": "25"
+      },
+      {
+        "angle": 30,
+        "clIncrement": 0.45,
+        "cdIncrement": 0.018,
+        "label": "30"
+      }
+    ]
+  },
+  "airbrakeProfile": {
+    "positions": [
+      {
+        "label": "DN",
+        "dragIncrement": 0,
+        "liftDecrement": 0
+      },
+      {
+        "label": "ARM",
+        "dragIncrement": 0.01,
+        "liftDecrement": -0.02
+      },
+      {
+        "label": "FLT",
+        "dragIncrement": 0.08,
+        "liftDecrement": -0.15
+      },
+      {
+        "label": "UP",
+        "dragIncrement": 0.25,
+        "liftDecrement": -0.35
+      }
+    ]
+  },
+  "minNoseGearFailedPitch": -0.2,
+  "maxGroundPitch": 0.3,
+  "groundCollisionPitchTorqueFactor": 0.5
+}
