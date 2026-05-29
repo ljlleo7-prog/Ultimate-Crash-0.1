@@ -27,6 +27,8 @@ export const normalizeWaypoint = (waypoint, index = 0, source = ROUTE_SOURCES.BU
     latitude,
     longitude,
     type: waypoint.type || 'WAYPOINT',
+    segment: waypoint.segment || waypoint.segmentType || waypoint.procedureSegment || 'enroute',
+    procedureName: waypoint.procedureName || null,
     source: waypoint.source || source
   };
 };
@@ -53,7 +55,9 @@ export const waypointsToLegs = (departure, waypoints = [], arrival, source = ROU
       latitude: to.latitude,
       longitude: to.longitude,
       airway: to.airway || '',
-      sequence: index + 1
+      sequence: index + 1,
+      segment: to.segment || 'enroute',
+      procedureName: to.procedureName || null
     }));
   }
   return legs;
@@ -69,7 +73,9 @@ export const normalizeRoute = ({
   fallbackUsed = false,
   debug = [],
   billing = null,
-  metadata = {}
+  metadata = {},
+  procedures = null,
+  procedureSegments = []
 } = {}) => {
   const normalizedWaypoints = waypoints
     .map((waypoint, index) => normalizeWaypoint(waypoint, index, source))
@@ -88,7 +94,9 @@ export const normalizeRoute = ({
     fallbackUsed,
     debug,
     billing,
-    metadata
+    metadata,
+    procedures,
+    procedureSegments
   };
 };
 

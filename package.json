@@ -18,6 +18,8 @@
     "process:failure-graph": "node scripts/process_failure_graph.js",
     "build:failure-pipeline": "npm run fetch:authoritative-sources && npm run process:failure-graph",
     "build:atc-phraseology": "NODE_TLS_REJECT_UNAUTHORIZED=0 node scripts/build_atc_phraseology_pipeline.js",
+    "export:aip-supabase-csv": "node scripts/export_aip_supabase_csv.js",
+    "test:aip-route-search": "node scripts/test_aip_route_search_smoke.js",
     "predeploy": "npm run build",
     "deploy": "gh-pages -d dist"
   },

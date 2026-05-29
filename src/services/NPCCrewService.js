@@ -1,7 +1,7 @@
 
 import { supabase } from './skylinetragedy/SupabaseClient.js';
 import eventBus from './eventBus.js';
-import fallbackResponses from '../data/npc_fallback_responses.json' with { type: "json" };
+import fallbackResponses from '../data/npc_fallback_responses.json';
 
 class NPCCrewService {
     constructor() {

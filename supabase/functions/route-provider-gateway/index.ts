@@ -20,7 +20,13 @@ type ProviderResult = {
   metadata?: Record<string, unknown>;
 };
 
-type FlightPlanDbPlan = Record<string, unknown> & { id?: number | string };
+type RouteReservationResult = {
+  status: string;
+  charged_tokens: number;
+  window_start: string | null;
+  call_count: number | null;
+  token_balance: number | null;
+};
 
 type FlightPlanDbNode = Record<string, unknown> & {
   ident?: string;
@@ -49,6 +55,14 @@ const getProviderKey = (provider: string) => {
       return Deno.env.get('FLIGHTPLANDATABASE_API_KEY') || Deno.env.get('VITE_FLIGHTPLANDATABASE_API_KEY') || '';
     case 'OpenAIP':
       return Deno.env.get('OPENAIP_CLIENT_KEY') || Deno.env.get('VITE_OPENAIP_CLIENT_KEY') || '';
+    case 'ProcedureData':
+      return Deno.env.get('PROCEDURE_DATA_API_KEY') || Deno.env.get('VITE_PROCEDURE_DATA_API_KEY') || '';
+    case 'AirportReference':
+      return Deno.env.get('AIRPORT_REFERENCE_API_KEY') || Deno.env.get('OPENAIP_CLIENT_KEY') || Deno.env.get('VITE_AIRPORT_REFERENCE_API_KEY') || Deno.env.get('VITE_OPENAIP_CLIENT_KEY') || '';
+    case 'OurAirports':
+      return Deno.env.get('OURAIRPORTS_DATA_URL') || Deno.env.get('VITE_OURAIRPORTS_DATA_URL') || 'https://davidmegginson.github.io/ourairports-data/airports.csv';
+    case 'FAACIFP':
+      return Deno.env.get('FAA_CIFP_API_KEY') || Deno.env.get('VITE_FAA_CIFP_API_KEY') || Deno.env.get('FAA_CIFP_DATA_URL') || Deno.env.get('VITE_FAA_CIFP_DATA_URL') || '';
     default:
       return '';
   }
@@ -56,6 +70,34 @@ const getProviderKey = (provider: string) => {
 
 const toText = (value: unknown) => String(value || '').trim();
 const toUpper = (value: unknown) => toText(value).toUpperCase();
+
+const parseCsvLine = (line: string) => {
+  const values: string[] = [];
+  let current = '';
+  let inQuotes = false;
+
+  for (const char of line) {
+    if (char === '"') inQuotes = !inQuotes;
+    else if (char === ',' && !inQuotes) {
+      values.push(current);
+      current = '';
+    } else {
+      current += char;
+    }
+  }
+
+  values.push(current);
+  return values;
+};
+
+const parseCsv = (text: string) => {
+  const [headerLine, ...lines] = text.split(/\r?\n/).filter(Boolean);
+  const headers = parseCsvLine(headerLine || '');
+  return lines.map((line) => {
+    const values = parseCsvLine(line);
+    return headers.reduce((record, header, index) => ({ ...record, [header]: values[index] || '' }), {} as Record<string, unknown>);
+  });
+};
 
 const buildFlightPlanDbAuthHeader = (key: string) => `Basic ${btoa(`${key}:`)}`;
 
@@ -70,74 +112,28 @@ const safeJson = async (response: Response): Promise<unknown> => {
   }
 };
 
-async function enforceRateLimit(supabase: ReturnType<typeof createClient>, userId: string) {
-  const now = new Date();
-  now.setSeconds(0, 0);
-  const windowStart = now.toISOString();
+async function reserveRouteApiCall(
+  supabase: ReturnType<typeof createClient>,
+  userId: string,
+  provider: string,
+  payload: GatewayPayload
+): Promise<RouteReservationResult | null> {
+  const { data, error } = await supabase.rpc('reserve_route_api_call', {
+    p_user_id: userId,
+    p_limit_per_minute: RATE_LIMIT_PER_MINUTE,
+    p_token_cost: ROUTE_TOKEN_COST,
+    p_provider: provider,
+    p_origin: payload.origin || null,
+    p_destination: payload.destination || null
+  });
 
-  const { data } = await supabase
-    .from('route_api_call_limits')
-    .select('call_count')
-    .eq('user_id', userId)
-    .eq('window_start', windowStart)
-    .maybeSingle();
-
-  const callCount = Number(data?.call_count || 0);
-  if (callCount >= RATE_LIMIT_PER_MINUTE) {
-    return false;
+  if (error || !data || !Array.isArray(data) || data.length === 0) {
+    return null;
   }
 
-  await supabase
-    .from('route_api_call_limits')
-    .upsert({ user_id: userId, window_start: windowStart, call_count: callCount + 1 }, { onConflict: 'user_id,window_start' });
-
-  return true;
+  return data[0] as RouteReservationResult;
 }
 
-async function chargeToken(supabase: ReturnType<typeof createClient>, userId: string, provider: string, payload: GatewayPayload) {
-  const { data: wallet, error } = await supabase
-    .from('wallets')
-    .select('id, token_balance')
-    .eq('user_id', userId)
-    .single();
-
-  if (error || Number(wallet?.token_balance || 0) < ROUTE_TOKEN_COST) {
-    return false;
-  }
-
-  const nextBalance = Number(wallet.token_balance) - ROUTE_TOKEN_COST;
-  const { data: updatedWallet, error: updateError } = await supabase
-    .from('wallets')
-    .update({ token_balance: nextBalance })
-    .eq('id', wallet.id)
-    .eq('token_balance', wallet.token_balance)
-    .select('id')
-    .maybeSingle();
-
-  if (updateError || !updatedWallet) {
-    return false;
-  }
-
-  const { error: ledgerError } = await supabase
-    .from('ledger_entries')
-    .insert({
-      user_id: userId,
-      amount: -ROUTE_TOKEN_COST,
-      currency: 'TOKEN',
-      operation_type: 'ROUTE_API_CALL',
-      description: `${provider} route lookup ${payload.origin || payload.query || ''}-${payload.destination || ''}`
-    });
-
-  if (ledgerError) {
-    await supabase
-      .from('wallets')
-      .update({ token_balance: wallet.token_balance })
-      .eq('id', wallet.id);
-    return false;
-  }
-
-  return true;
-}
 
 const normalizeFlightPlanDbNode = (node: Record<string, unknown>) => ({
   name: toUpper(node.ident || node.name || node.code || 'WPT'),
@@ -276,6 +272,202 @@ async function fetchOpenAipReferences(payload: GatewayPayload, key: string): Pro
   };
 }
 
+const normalizeAirportReference = (item: Record<string, unknown>) => {
+  const geometry = item.geometry as Record<string, unknown> | undefined;
+  const coordinates = Array.isArray(geometry?.coordinates) ? geometry?.coordinates as number[] : [];
+  const longitude = Number(coordinates[0] ?? item.longitude ?? item.lon);
+  const latitude = Number(coordinates[1] ?? item.latitude ?? item.lat);
+
+  return {
+    id: item._id || item.id || item.identifier || item.icaoCode || item.iataCode || item.name || null,
+    type: toText(item.type || 'airport').toLowerCase(),
+    name: toText(item.name || item.identifier || item.icaoCode || item.iataCode || 'REF'),
+    identifier: toText(item.identifier || item.icaoCode || item.iataCode || item.altIdentifier || ''),
+    icao: toText(item.icaoCode || item.icao || ''),
+    iata: toText(item.iataCode || item.iata || ''),
+    icaoCode: toText(item.icaoCode || item.icao || ''),
+    iataCode: toText(item.iataCode || item.iata || ''),
+    city: toText(item.city || item.municipality || ''),
+    country: item.country || item.countryCode || null,
+    elevation: item.elevation || item.elevationFt || null,
+    latitude,
+    longitude,
+    runways: Array.isArray(item.runways) ? item.runways : [],
+    frequencies: Array.isArray(item.frequencies) ? item.frequencies : [],
+    source: 'AirportReference'
+  };
+};
+
+async function fetchAirportReferences(payload: GatewayPayload, key: string): Promise<ProviderResult> {
+  const requestType = toText(payload.requestType || 'airport_search');
+  const type = requestType === 'navaid_search' ? 'navaid' : 'airport';
+  const endpoint = type === 'airport' ? 'airports' : 'navaids';
+  const url = new URL(`https://api.core.openaip.net/${endpoint}`);
+  url.searchParams.set('limit', requestType === 'navaid_search' ? '25' : '15');
+
+  if (requestType === 'nearby_airports') {
+    const latitude = Number(payload.latitude);
+    const longitude = Number(payload.longitude);
+    if (Number.isFinite(latitude) && Number.isFinite(longitude)) {
+      url.searchParams.set('lat', String(latitude));
+      url.searchParams.set('lon', String(longitude));
+      url.searchParams.set('dist', String(Math.round(Number(payload.radiusNm || 120) * 1852)));
+    }
+  } else if (requestType === 'navaid_search') {
+    const query = toText(payload.origin || payload.destination || payload.query);
+    if (query) url.searchParams.set('search', query);
+  } else {
+    const query = toText(payload.query || payload.code);
+    if (query) url.searchParams.set('search', query);
+  }
+
+  const response = await fetch(url, {
+    headers: {
+      'x-openaip-api-key': key,
+      Accept: 'application/json'
+    }
+  });
+  const body = await safeJson(response) as Record<string, unknown> | null;
+
+  if (!response.ok || !body) {
+    return { status: 'provider_failed', message: `Airport reference lookup failed (${response.status}).`, data: body };
+  }
+
+  const items = Array.isArray(body.items) ? body.items : [];
+  const normalized = items.map((item) => normalizeAirportReference(item as Record<string, unknown>)).filter((item) => Number.isFinite(Number(item.latitude)) && Number.isFinite(Number(item.longitude)));
+
+  if (type === 'navaid') {
+    return { status: 'ok', navaids: normalized };
+  }
+
+  return { status: 'ok', airports: normalized, references: normalized };
+}
+
+async function fetchOurAirportsReferences(payload: GatewayPayload, dataUrl: string): Promise<ProviderResult> {
+  const requestType = toText(payload.requestType || 'airport_search');
+  const query = toUpper(payload.query || payload.code || payload.origin || payload.destination);
+  const sourceUrl = requestType === 'navaid_search'
+    ? (Deno.env.get('OURAIRPORTS_NAVAIDS_DATA_URL') || Deno.env.get('VITE_OURAIRPORTS_NAVAIDS_DATA_URL') || dataUrl.replace(/airports\.csv$/, 'navaids.csv'))
+    : dataUrl;
+  const response = await fetch(sourceUrl, { headers: { Accept: 'text/csv,*/*' } });
+  const text = await response.text();
+
+  if (!response.ok || !text) {
+    return { status: 'provider_failed', message: `OurAirports lookup failed (${response.status}).` };
+  }
+
+  const records = parseCsv(text);
+  const latitude = Number(payload.latitude);
+  const longitude = Number(payload.longitude);
+  const radiusNm = Number(payload.radiusNm || 120);
+  const distanceNm = (airport: Record<string, unknown>) => {
+    const lat = Number(airport.latitude_deg ?? airport.latitude);
+    const lon = Number(airport.longitude_deg ?? airport.longitude);
+    if (!Number.isFinite(latitude) || !Number.isFinite(longitude) || !Number.isFinite(lat) || !Number.isFinite(lon)) return Infinity;
+    const dLat = (lat - latitude) * 60;
+    const dLon = (lon - longitude) * 60 * Math.cos(latitude * Math.PI / 180);
+    return Math.hypot(dLat, dLon);
+  };
+
+  const normalized = filtered
+    .map((record) => requestType === 'navaid_search'
+      ? normalizeAirportReference({
+          id: record.id,
+          type: record.type || 'navaid',
+          name: record.name || record.ident,
+          identifier: record.ident,
+          latitude: record.latitude_deg,
+          longitude: record.longitude_deg,
+          source: 'OurAirports'
+        })
+      : normalizeAirportReference({
+          id: record.id,
+          type: record.type,
+          name: record.name,
+          identifier: record.ident || record.gps_code || record.iata_code || record.local_code,
+          icao: record.gps_code || record.ident,
+          iata: record.iata_code,
+          city: record.municipality,
+          country: record.iso_country,
+          elevation: record.elevation_ft,
+          latitude: record.latitude_deg,
+          longitude: record.longitude_deg,
+          source: 'OurAirports'
+        }))
+    .filter((item) => Number.isFinite(Number(item.latitude)) && Number.isFinite(Number(item.longitude)));
+
+  if (requestType === 'navaid_search') {
+    return { status: 'ok', navaids: normalized };
+  }
+
+  return { status: 'ok', airports: normalized, references: normalized };
+}
+
+async function fetchFaaCifpProcedures(payload: GatewayPayload, key: string): Promise<ProviderResult> {
+  const endpoint = Deno.env.get('FAA_CIFP_DATA_URL') || Deno.env.get('VITE_FAA_CIFP_DATA_URL') || '';
+  if (!endpoint) {
+    return { status: 'unavailable', message: 'FAA CIFP procedure source is not configured for this deployment.' };
+  }
+
+  const url = new URL(endpoint);
+  url.searchParams.set('origin', toUpper(payload.origin));
+  url.searchParams.set('destination', toUpper(payload.destination));
+  if (payload.departureRunway) url.searchParams.set('departureRunway', toText(payload.departureRunway));
+  if (payload.arrivalRunway) url.searchParams.set('arrivalRunway', toText(payload.arrivalRunway));
+  if (payload.aircraftType) url.searchParams.set('aircraftType', toText(payload.aircraftType));
+  if (Deno.env.get('FAA_CIFP_CYCLE')) url.searchParams.set('cycle', Deno.env.get('FAA_CIFP_CYCLE') || '');
+
+  const response = await fetch(url, {
+    headers: {
+      ...(key && !key.startsWith('http') ? { Authorization: `Bearer ${key}` } : {}),
+      Accept: 'application/json'
+    }
+  });
+  const body = await safeJson(response) as Record<string, unknown> | null;
+
+  if (!response.ok || !body) {
+    return { status: 'provider_failed', message: `FAA CIFP lookup failed (${response.status}).`, data: body };
+  }
+
+  return { status: 'ok', data: body, metadata: { cycle: body.cycle || Deno.env.get('FAA_CIFP_CYCLE') || null } };
+}
+
+async function fetchProcedureData(payload: GatewayPayload, key: string): Promise<ProviderResult> {
+  const endpoint = Deno.env.get('PROCEDURE_DATA_API_URL') || Deno.env.get('VITE_PROCEDURE_DATA_API_URL') || '';
+  if (!endpoint || !key) {
+    return {
+      status: 'unavailable',
+      message: 'Published SID/STAR procedure provider is not configured for this deployment.',
+      data: {
+        origin: toUpper(payload.origin),
+        destination: toUpper(payload.destination),
+        requestType: 'procedures'
+      }
+    };
+  }
+
+  const url = new URL(endpoint);
+  url.searchParams.set('origin', toUpper(payload.origin));
+  url.searchParams.set('destination', toUpper(payload.destination));
+  if (payload.departureRunway) url.searchParams.set('departureRunway', toText(payload.departureRunway));
+  if (payload.arrivalRunway) url.searchParams.set('arrivalRunway', toText(payload.arrivalRunway));
+  if (payload.aircraftType) url.searchParams.set('aircraftType', toText(payload.aircraftType));
+
+  const response = await fetch(url, {
+    headers: {
+      Authorization: `Bearer ${key}`,
+      Accept: 'application/json'
+    }
+  });
+  const body = await safeJson(response) as Record<string, unknown> | null;
+
+  if (!response.ok || !body) {
+    return { status: 'provider_failed', message: `Published procedure lookup failed (${response.status}).`, data: body };
+  }
+
+  return { status: 'ok', data: body };
+}
+
 async function fetchProvider(provider: string, payload: GatewayPayload, key: string): Promise<ProviderResult> {
   if (!key) {
     return { status: 'provider_failed', message: `${provider} API key is not configured.` };
@@ -294,6 +486,22 @@ async function fetchProvider(provider: string, payload: GatewayPayload, key: str
 
   if (provider === 'OpenAIP') {
     return fetchOpenAipReferences(payload, key);
+  }
+
+  if (provider === 'ProcedureData') {
+    return fetchProcedureData(payload, key);
+  }
+
+  if (provider === 'AirportReference') {
+    return fetchAirportReferences(payload, key);
+  }
+
+  if (provider === 'OurAirports') {
+    return fetchOurAirportsReferences(payload, key);
+  }
+
+  if (provider === 'FAACIFP') {
+    return fetchFaaCifpProcedures(payload, key);
   }
 
   return { status: 'provider_failed', message: `Unknown route provider: ${provider}` };
@@ -325,24 +533,37 @@ serve(async (req) => {
   const provider = String(body.provider || '');
   const payload = body.payload || {};
 
-  const withinLimit = await enforceRateLimit(adminClient, user.id);
-  if (!withinLimit) {
+  if (provider === 'ProcedureData' && (!getProviderKey(provider) || !(Deno.env.get('PROCEDURE_DATA_API_URL') || Deno.env.get('VITE_PROCEDURE_DATA_API_URL')))) {
+    await adminClient.from('route_api_call_logs').insert({ user_id: user.id, provider, origin: payload.origin, destination: payload.destination, status: 'unavailable', charged_tokens: 0 });
+    return json({
+      status: 'unavailable',
+      message: 'Published SID/STAR procedure provider is not configured for this deployment.',
+      billing: { chargedTokens: 0 }
+    });
+  }
+
+  const reservation = await reserveRouteApiCall(adminClient, user.id, provider, payload);
+  if (!reservation) {
+    await adminClient.from('route_api_call_logs').insert({ user_id: user.id, provider, origin: payload.origin, destination: payload.destination, status: 'provider_failed' });
+    return json({ status: 'provider_failed', message: 'Could not reserve route API quota for this request.' }, 500);
+  }
+
+  if (reservation.status === 'rate_limited') {
     await adminClient.from('route_api_call_logs').insert({ user_id: user.id, provider, origin: payload.origin, destination: payload.destination, status: 'rate_limited' });
     return json({ status: 'rate_limited', message: 'Route API rate limit exceeded. Falling back to local routing.' });
   }
 
-  const providerResult = await fetchProvider(provider, payload, getProviderKey(provider));
-  if (providerResult.status !== 'ok') {
-    await adminClient.from('route_api_call_logs').insert({ user_id: user.id, provider, origin: payload.origin, destination: payload.destination, status: providerResult.status });
-    return json(providerResult);
-  }
-
-  const charged = await chargeToken(adminClient, user.id, provider, payload);
-  if (!charged) {
+  if (reservation.status === 'insufficient_tokens') {
     await adminClient.from('route_api_call_logs').insert({ user_id: user.id, provider, origin: payload.origin, destination: payload.destination, status: 'insufficient_tokens' });
     return json({ status: 'insufficient_tokens', message: 'Not enough tokens for external route API call.' });
   }
 
-  await adminClient.from('route_api_call_logs').insert({ user_id: user.id, provider, origin: payload.origin, destination: payload.destination, status: 'ok', charged_tokens: ROUTE_TOKEN_COST });
-  return json({ ...providerResult, billing: { chargedTokens: ROUTE_TOKEN_COST } });
+  const providerResult = await fetchProvider(provider, payload, getProviderKey(provider));
+  if (providerResult.status !== 'ok') {
+    await adminClient.from('route_api_call_logs').insert({ user_id: user.id, provider, origin: payload.origin, destination: payload.destination, status: providerResult.status, charged_tokens: reservation.charged_tokens || 0 });
+    return json({ ...providerResult, billing: { chargedTokens: reservation.charged_tokens || 0 } });
+  }
+
+  await adminClient.from('route_api_call_logs').insert({ user_id: user.id, provider, origin: payload.origin, destination: payload.destination, status: 'ok', charged_tokens: reservation.charged_tokens || ROUTE_TOKEN_COST });
+  return json({ ...providerResult, billing: { chargedTokens: reservation.charged_tokens || ROUTE_TOKEN_COST } });
 });

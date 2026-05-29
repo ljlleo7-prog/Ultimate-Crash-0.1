@@ -1,5 +1,9 @@
-import airportDatabase from '../data/airportDatabase.json' with { type: "json" };
+import airportDatabase from '../data/airportDatabase.json';
+import { getAirportReferenceByCode, getNearbyAirportReferences, searchAirportReferences } from './routes/adapters/airportReferenceAdapter.js';
+import { getNearbyOurAirports, getOurAirportByCode, searchOurAirports } from './routes/adapters/ourAirportsAdapter.js';
 import { fetchOpenAipReferences } from './routes/adapters/openAipAdapter.js';
+import { buildReferenceCacheKey, getCachedReferenceData, setCachedReferenceData } from './routes/routeCacheService.js';
+import { REFERENCE_DATA_TTL_MS } from './routes/routeTypes.js';
 
 class AirportService {
   constructor(apiKey = '') {
@@ -47,6 +51,55 @@ class AirportService {
 
   searchNormalAirports(query) {
     return this.searchAirports(query, { type: 'normal' });
+  }
+
+  mergeAirportResults(...resultSets) {
+    const seen = new Set();
+    return resultSets.flat().filter((airport) => {
+      const key = String(airport?.icao || airport?.icaoCode || airport?.iata || airport?.iataCode || airport?.id || airport?.name || '').toUpperCase();
+      if (!key || seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+  }
+
+  async searchAirportsRemote(query, options = {}) {
+    const localResults = this.searchAirports(query, options);
+    const [ourAirportsResponse, referenceResponse] = await Promise.all([
+      searchOurAirports({ query }),
+      searchAirportReferences({ query })
+    ]);
+    return this.mergeAirportResults(
+      localResults,
+      ourAirportsResponse?.status === 'ok' && Array.isArray(ourAirportsResponse.airports) ? ourAirportsResponse.airports : [],
+      referenceResponse?.status === 'ok' && Array.isArray(referenceResponse.airports) ? referenceResponse.airports : []
+    );
+  }
+
+  async getAirportByCodeRemote(code) {
+    const localAirport = this.getAirportByCode(code);
+    const [ourAirportResponse, referenceResponse] = await Promise.all([
+      getOurAirportByCode({ code }),
+      getAirportReferenceByCode({ code })
+    ]);
+    const remoteAirports = [
+      ...(ourAirportResponse?.status === 'ok' && Array.isArray(ourAirportResponse.airports) ? ourAirportResponse.airports : []),
+      ...(referenceResponse?.status === 'ok' && Array.isArray(referenceResponse.airports) ? referenceResponse.airports : [])
+    ];
+    return remoteAirports.reduce((merged, airport) => ({ ...(merged || {}), ...airport }), localAirport || null);
+  }
+
+  async getAirportsWithinRadiusRemote(latitude, longitude, radiusNm, options = {}) {
+    const localResults = this.getAirportsWithinRadius(latitude, longitude, radiusNm, options);
+    const [ourAirportsResponse, referenceResponse] = await Promise.all([
+      getNearbyOurAirports({ latitude, longitude, radiusNm }),
+      getNearbyAirportReferences({ latitude, longitude, radiusNm })
+    ]);
+    return this.mergeAirportResults(
+      localResults,
+      ourAirportsResponse?.status === 'ok' && Array.isArray(ourAirportsResponse.airports) ? ourAirportsResponse.airports : [],
+      referenceResponse?.status === 'ok' && Array.isArray(referenceResponse.airports) ? referenceResponse.airports : []
+    );
   }
 
   searchEmergencyAirports(query) {
@@ -369,19 +422,27 @@ class AirportService {
     const airport = this.getAirportByCode(airportCode);
     if (!airport) return null;
 
+    const cacheKey = buildReferenceCacheKey({ type: 'airport', airport, query: airportCode });
+    const cached = getCachedReferenceData(cacheKey, REFERENCE_DATA_TTL_MS);
+    if (cached) {
+      return cached;
+    }
+
     const response = await fetchOpenAipReferences({
       query: airport.icao || airport.iata || airport.name,
       type: 'airport'
     });
 
     if (response?.status !== 'ok' || !Array.isArray(response.references) || !response.references.length) {
-      return {
+      const localReferenceData = {
         airport,
         references: [],
         source: 'local',
         billing: response?.billing || { chargedTokens: 0 },
         status: response?.status || 'ok'
       };
+      setCachedReferenceData(cacheKey, localReferenceData);
+      return localReferenceData;
     }
 
     const matchedReference = response.references.find((reference) =>
@@ -391,7 +452,7 @@ class AirportService {
       reference.identifier === String(airport.iata || '').toUpperCase()
     ) || response.references[0];
 
-    return {
+    const referenceData = {
       airport: {
         ...airport,
         latitude: matchedReference.latitude ?? airport.latitude,
@@ -403,6 +464,9 @@ class AirportService {
       billing: response.billing || { chargedTokens: 1 },
       status: response.status
     };
+
+    setCachedReferenceData(cacheKey, referenceData);
+    return referenceData;
   }
 
 }

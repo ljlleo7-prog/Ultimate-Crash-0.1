@@ -1,14 +1,58 @@
 import React from 'react';
 import { useLanguage } from '../contexts/LanguageContext';
+import { useAuth } from '../contexts/AuthContext.jsx';
 
 const Header = ({ devMode, setDevMode, handleDevStart }) => {
   const { t } = useLanguage();
+  const { user, authAvailable, signOut, signInWithSSO } = useAuth();
+
+  const handleLogin = () => {
+    if (typeof window !== 'undefined') {
+      window.location.assign('/login?redirect_to=/');
+    }
+  };
+
+  const handleQuickSso = async () => {
+    const { error } = await signInWithSSO({ redirectTo: '/login?redirect_to=/' });
+    if (error) {
+      console.warn('SSO sign-in failed.', error);
+    }
+  };
+
+  const handleLogout = async () => {
+    await signOut();
+    if (typeof window !== 'undefined') {
+      window.location.assign('/');
+    }
+  };
 
   return (
     <header className="app-header">
       <h1>{t('initialization.title')}</h1>
       <p>{t('initialization.subtitle')}</p>
-      
+
+      <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', justifyContent: 'center', marginTop: '10px' }}>
+        {user ? (
+          <>
+            <span style={{ color: '#cbd5e1', alignSelf: 'center' }}>{user.email}</span>
+            <button onClick={handleLogout} style={{ backgroundColor: '#334155', color: 'white', border: 'none', padding: '8px 16px', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }}>
+              Sign Out
+            </button>
+          </>
+        ) : (
+          <>
+            <button onClick={handleLogin} style={{ backgroundColor: '#2563eb', color: 'white', border: 'none', padding: '8px 16px', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }}>
+              Login
+            </button>
+            {authAvailable && (
+              <button onClick={handleQuickSso} style={{ backgroundColor: '#1f2937', color: 'white', border: '1px solid #475569', padding: '8px 16px', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }}>
+                SSO Sign in
+              </button>
+            )}
+          </>
+        )}
+      </div>
+
       {/* Development mode toggle */}
       <div className="dev-mode-toggle" style={{ marginTop: '10px' }}>
         <button
@@ -26,7 +70,7 @@ const Header = ({ devMode, setDevMode, handleDevStart }) => {
           {devMode ? '🔧 Dev Mode: ON' : '🔧 Dev Mode: OFF'}
         </button>
       </div>
-      
+
       {/* Development mode quick start button */}
       {devMode && (
         <div className="dev-start" style={{ marginTop: '10px' }}>

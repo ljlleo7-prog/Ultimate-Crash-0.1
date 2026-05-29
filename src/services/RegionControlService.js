@@ -1,9 +1,12 @@
 
-import americanAirports from '../data/americanAirports.json' with { type: "json" };
-import asianAirports from '../data/asianAirports.json' with { type: "json" };
-import europeanAirports from '../data/europeanAirports.json' with { type: "json" };
-import americanEmergency from '../data/americanEmergencyAirports.json' with { type: "json" };
-import otherEmergency from '../data/otherEmergencyAirports.json' with { type: "json" };
+import americanAirports from '../data/americanAirports.json';
+import asianAirports from '../data/asianAirports.json';
+import europeanAirports from '../data/europeanAirports.json';
+import otherAirports from '../data/otherAirports.json';
+import americanEmergency from '../data/americanEmergencyAirports.json';
+import asianEmergency from '../data/asianEmergencyAirports.json';
+import europeanEmergency from '../data/europeanEmergencyAirports.json';
+import otherEmergency from '../data/otherEmergencyAirports.json';
 
 class RegionControlService {
     constructor() {
@@ -26,7 +29,10 @@ class RegionControlService {
         process(americanAirports, 'american');
         process(asianAirports, 'asian');
         process(europeanAirports, 'european');
+        process(otherAirports, 'other');
         process(americanEmergency, 'amer_emerg');
+        process(asianEmergency, 'asian_emerg');
+        process(europeanEmergency, 'european_emerg');
         process(otherEmergency, 'other_emerg');
         
         console.log(`RegionControlService: Loaded ${this.airports.length} airports.`);

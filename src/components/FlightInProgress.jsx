@@ -118,7 +118,13 @@ const FlightInProgress = ({
   // Calculate initial heading from runway
   const runwayName = (routeDetails?.departureRunway) || (flightPlan?.departure?.runways?.[0]?.name) || '36L';
   const isEastward = selectedArrival && selectedDeparture ? selectedArrival.longitude > selectedDeparture.longitude : null;
-  const baseRunwayHeadingDeg = getRunwayHeading(runwayName, isEastward);
+  const departureRunwayGeometry = React.useMemo(() => {
+    const airportCode = initialDeparture?.iata || initialDeparture?.icao;
+    if (!airportCode || !runwayName) return null;
+    return airportService.getRunwayGeometry(airportCode, runwayName);
+  }, [initialDeparture, runwayName]);
+
+  const baseRunwayHeadingDeg = departureRunwayGeometry?.heading ?? getRunwayHeading(runwayName, isEastward);
 
   const scenarioSpawn = useMemo(() => {
     if (!isScenarioMode || !scenarioSpawnPreset) {
@@ -129,7 +135,9 @@ const FlightInProgress = ({
     const arrivalCode = selectedArrival?.iata || selectedArrival?.icao;
     const departureRunwayName = (routeDetails?.departureRunway) || (flightPlan?.departure?.runways?.[0]?.name) || '36L';
     const arrivalRunwayName = (routeDetails?.landingRunway) || (flightPlan?.arrival?.runways?.[0]?.name);
-    const departureGeometry = departureCode ? airportService.getRunwayGeometry(departureCode, departureRunwayName) : null;
+    const departureGeometry = departureCode && departureRunwayName === runwayName && departureRunwayGeometry
+      ? departureRunwayGeometry
+      : (departureCode ? airportService.getRunwayGeometry(departureCode, departureRunwayName) : null);
     const arrivalGeometry = arrivalCode && arrivalRunwayName ? airportService.getRunwayGeometry(arrivalCode, arrivalRunwayName) : null;
 
     if (scenarioSpawnPreset.type === 'runway' && departureGeometry?.thresholdStart) {
@@ -205,6 +213,8 @@ const FlightInProgress = ({
     selectedArrival,
     routeDetails,
     flightPlan,
+    departureRunwayGeometry,
+    runwayName,
     baseRunwayHeadingDeg,
     offsetPointFromReference
   ]);
@@ -224,7 +234,7 @@ const FlightInProgress = ({
       // Pass the airport code (IATA or ICAO)
       const airportCode = initialDeparture.iata || initialDeparture.icao;
       if (airportCode) {
-          const geom = airportService.getRunwayGeometry(airportCode, runwayName);
+          const geom = departureRunwayGeometry || airportService.getRunwayGeometry(airportCode, runwayName);
           if (geom && geom.thresholdStart) {
               console.log(`Spawn Point Adjusted to Runway ${runwayName} Threshold:`, geom.thresholdStart);
               initialLat = geom.thresholdStart.latitude;

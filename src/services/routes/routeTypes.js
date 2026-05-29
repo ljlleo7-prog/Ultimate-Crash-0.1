@@ -2,7 +2,11 @@ export const ROUTE_SOURCES = Object.freeze({
   SIMBRIEF: 'SimBrief',
   FLIGHT_PLAN_DB: 'FlightPlanDB',
   OPEN_AIP: 'OpenAIP',
+  PROCEDURE_DATA: 'ProcedureData',
+  AIRPORT_REFERENCE: 'AirportReference',
   OUR_AIRPORTS: 'OurAirports',
+  FAA_CIFP: 'FAACIFP',
+  LOCAL_AIP: 'LocalAIP',
   BUILT_IN: 'Built-in'
 });
 

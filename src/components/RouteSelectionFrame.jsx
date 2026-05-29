@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import './RouteSelectionFrame.css';
 import { generateSID, generateSTAR, generateGate, generateTaxiway, getLastProcedureWaypoint, getRunways, generateSmartRouteDetails, procedureMatchesWaypoint } from '../utils/routeGenerator';
 import LocalRouteMap from './LocalRouteMap';
+import ProcedureMiniMap from './ProcedureMiniMap.jsx';
 import { calculateDistance } from '../utils/distanceCalculator';
 
 const calcRouteDistance = (departure, waypoints, arrival) => {
@@ -27,10 +28,12 @@ const DEFAULT_ROUTE_DATA = {
   routeSource: '',
   routeFallbackUsed: false,
   routeDebug: [],
-  routeBilling: null
+  routeBilling: null,
+  procedures: null,
+  procedureSegments: []
 };
 
-const RouteSelectionFrame = ({ isOpen, onConfirm, onSkip, onChange, difficulty, departure, arrival, routeData: externalRouteData }) => {
+const RouteSelectionFrame = ({ isOpen, onConfirm, onSkip, onChange, difficulty, departure, arrival, routeData: externalRouteData, routeAuthState = 'guest' }) => {
   const [routeData, setRouteData] = useState(DEFAULT_ROUTE_DATA);
   const [availableRunwaysDep, setAvailableRunwaysDep] = useState([]);
   const [availableRunwaysArr, setAvailableRunwaysArr] = useState([]);
@@ -59,7 +62,7 @@ const RouteSelectionFrame = ({ isOpen, onConfirm, onSkip, onChange, difficulty, 
 
     const fetchRoute = async () => {
       setIsGeneratingRoute(true);
-      const routeObject = await generateSmartRouteDetails(departure, arrival);
+      const routeObject = await generateSmartRouteDetails(departure, arrival, { authState: routeAuthState });
       const waypoints = routeObject.waypoints || [];
       const sid = generateSID((waypoints[0] && waypoints[0].name) || 'ABC');
       const star = generateSTAR(getLastProcedureWaypoint(waypoints) || (waypoints[waypoints.length - 1] && waypoints[waypoints.length - 1].name) || 'ABC');
@@ -88,7 +91,9 @@ const RouteSelectionFrame = ({ isOpen, onConfirm, onSkip, onChange, difficulty, 
         routeSource: routeObject.source,
         routeFallbackUsed: routeObject.fallbackUsed,
         routeDebug: routeObject.debug || [],
-        routeBilling: routeObject.billing || null
+        routeBilling: routeObject.billing || null,
+        procedures: routeObject.procedures || null,
+        procedureSegments: routeObject.procedureSegments || []
       };
 
       setRouteData(nextRoute);
@@ -98,7 +103,7 @@ const RouteSelectionFrame = ({ isOpen, onConfirm, onSkip, onChange, difficulty, 
     };
 
     fetchRoute();
-  }, [isOpen, departure, arrival, difficulty, externalRouteData, onChange]);
+  }, [isOpen, departure, arrival, difficulty, externalRouteData, onChange, routeAuthState]);
 
   const handleChange = (field, value) => {
     const next = { ...routeData, [field]: value };
@@ -108,7 +113,7 @@ const RouteSelectionFrame = ({ isOpen, onConfirm, onSkip, onChange, difficulty, 
 
   const handleGenerateWaypoints = async () => {
     setIsGeneratingRoute(true);
-    const routeObject = await generateSmartRouteDetails(departure, arrival);
+    const routeObject = await generateSmartRouteDetails(departure, arrival, { authState: routeAuthState });
     const wps = routeObject.waypoints || [];
     const next = {
       ...routeData,
@@ -118,8 +123,10 @@ const RouteSelectionFrame = ({ isOpen, onConfirm, onSkip, onChange, difficulty, 
       routeFallbackUsed: routeObject.fallbackUsed,
       routeDebug: routeObject.debug || [],
       routeBilling: routeObject.billing || null,
-      sid: routeData.sid || generateSID((wps[0] && wps[0].name) || 'ABC'),
-      star: routeData.star || generateSTAR(getLastProcedureWaypoint(wps) || ((wps[wps.length - 1] && wps[wps.length - 1].name) || 'ABC'))
+      procedures: routeObject.procedures || null,
+      procedureSegments: routeObject.procedureSegments || [],
+      sid: routeObject.sid || routeData.sid || generateSID((wps[0] && wps[0].name) || 'ABC'),
+      star: routeObject.star || routeData.star || generateSTAR(getLastProcedureWaypoint(wps) || ((wps[wps.length - 1] && wps[wps.length - 1].name) || 'ABC'))
     };
     setManualWaypoints(wps.map(w => typeof w === 'string' ? w : w.name).join(' '));
     setRouteData(next);
@@ -153,6 +160,8 @@ const RouteSelectionFrame = ({ isOpen, onConfirm, onSkip, onChange, difficulty, 
   const showWaypoints = ['intermediate', 'advanced', 'pro', 'devil', 'rookie'].includes(difficulty);
   const showSidStarFields = ['advanced', 'pro', 'devil', 'rookie'].includes(difficulty);
 
+  const hasPublishedProcedures = Boolean(routeData.procedureSegments?.length || routeData.procedures?.sid || routeData.procedures?.star);
+
   return (
     <div className="route-selection-overlay">
       <div className="route-selection-frame">
@@ -180,11 +189,15 @@ const RouteSelectionFrame = ({ isOpen, onConfirm, onSkip, onChange, difficulty, 
             </div>
             {showSidStarFields && (
               <div className="form-group">
-                <label>SID</label>
+                <label>SID <span style={{fontWeight:'normal',color:'#aaa',fontSize:'11px'}}>({hasPublishedProcedures ? 'published' : 'synthetic'})</span></label>
                 <input type="text" value={routeData.sid} onChange={(e) => handleChange('sid', e.target.value)} placeholder="e.g. OMA12D" />
                 <button className="generate-btn" onClick={() => handleChange('sid', generateSID((routeData.waypoints[0] && routeData.waypoints[0].name) || 'ABC'))}>🎲</button>
               </div>
             )}
+            <div className="form-group full-width procedure-preview-group">
+              <label>Departure Procedure Preview</label>
+              <ProcedureMiniMap airport={departure} runwayName={routeData.departureRunway} procedureName={routeData.sid} procedureSegments={routeData.procedureSegments || []} waypoints={routeData.waypoints || []} side="departure" />
+            </div>
           </div>
 
           {showWaypoints && (
@@ -208,12 +221,13 @@ const RouteSelectionFrame = ({ isOpen, onConfirm, onSkip, onChange, difficulty, 
                   <div className="waypoints-display">
                     {routeData.routeSource}{routeData.routeFallbackUsed ? ' (fallback)' : ''}
                     {routeData.routeBilling?.chargedTokens ? ` · ${routeData.routeBilling.chargedTokens} token` : ' · 0 tokens'}
+                    {hasPublishedProcedures ? ' · published SID/STAR' : ' · synthetic procedures'}
                   </div>
                 </div>
               )}
               <div className="form-group full-width" style={{marginTop:'8px'}}>
-                <label>Local Route Preview</label>
-                <LocalRouteMap departure={departure} arrival={arrival} waypoints={routeData.waypoints} routeObject={routeData.routeObject} />
+                <label>Local Route Preview <span style={{fontWeight:'normal',color:'#aaa',fontSize:'11px'}}>({hasPublishedProcedures ? 'published procedure layers' : 'synthetic procedure preview'})</span></label>
+                <LocalRouteMap departure={departure} arrival={arrival} waypoints={routeData.waypoints} routeObject={{ ...(routeData.routeObject || {}), procedureSegments: routeData.procedureSegments || [], waypoints: routeData.routeObject?.waypoints || routeData.waypoints }} />
               </div>
             </div>
           )}
@@ -222,11 +236,15 @@ const RouteSelectionFrame = ({ isOpen, onConfirm, onSkip, onChange, difficulty, 
             <h3>Arrival ({arrival?.iata})</h3>
             {showSidStarFields && (
               <div className="form-group">
-                <label>STAR</label>
+                <label>STAR <span style={{fontWeight:'normal',color:'#aaa',fontSize:'11px'}}>({hasPublishedProcedures ? 'published' : 'synthetic'})</span></label>
                 <input type="text" value={routeData.star} onChange={(e) => handleChange('star', e.target.value)} placeholder="e.g. DXB45A" />
                 <button className="generate-btn" onClick={() => handleChange('star', generateSTAR((getLastProcedureWaypoint(routeData.waypoints) || ((routeData.waypoints[routeData.waypoints.length - 1] && routeData.waypoints[routeData.waypoints.length - 1].name) || 'ABC'))))}>🎲</button>
               </div>
             )}
+            <div className="form-group full-width procedure-preview-group">
+              <label>Arrival Procedure Preview</label>
+              <ProcedureMiniMap airport={arrival} runwayName={routeData.landingRunway} procedureName={routeData.star} procedureSegments={routeData.procedureSegments || []} waypoints={routeData.waypoints || []} side="arrival" />
+            </div>
             <div className="form-group">
               <label>Runway</label>
               <select value={routeData.landingRunway} onChange={(e) => handleChange('landingRunway', e.target.value)}>

@@ -946,12 +946,21 @@ class RealisticFlightPhysicsService {
         const CD_flaps = CD_flaps_base; 
         const CD_gear = this.controls.gear * 0.015; 
         const CD_elevator = Math.abs(effElevator) * 0.02; // Parasitic drag from elevator deflection
-        
+        const rollRateIntensity = V_airspeed > 12
+            ? Math.min(1.5, Math.abs(rates.x) * this.aircraft.wingSpan / (2 * Math.max(V_airspeed, 12)))
+            : 0;
+        const rollCompressionDrag = Math.min(0.08, 0.045 * rollRateIntensity * rollRateIntensity);
+        this.rollCompressionDebug = {
+            rollRate: rates.x,
+            rollRateIntensity,
+            extraDragCoefficient: rollCompressionDrag
+        };
+
         // Clamp CL for induced drag to prevent runaway drag at high angles (stall region)
         const CL_induced_calc = Math.min(Math.abs(CL), 1.35); // Cap effective CL for induced drag
         const CD_induced = this.aircraft.K * CL_induced_calc * CL_induced_calc * groundEffectFactor;
         
-        let CD = this.aircraft.CD0 + CD_induced + CD_flaps + CD_gear + CD_brakes + CD_elevator;
+        let CD = this.aircraft.CD0 + CD_induced + CD_flaps + CD_gear + CD_brakes + CD_elevator + rollCompressionDrag;
         if (icingLevel > 0) {
             CD += 0.1 * icingLevel;
         }
@@ -1051,9 +1060,11 @@ class RealisticFlightPhysicsService {
         const q_inv = new Quaternion(this.state.quat.w, -this.state.quat.x, -this.state.quat.y, -this.state.quat.z);
         const V_wind_body = q_inv.rotate(env.wind || new Vector3(0,0,0));
         
-        // Turbulence: Add random noise to wind body vector
-        if (env.turbulence > 0) {
-            const turbScale = env.turbulence * 5.0; // up to 5 m/s variation
+        const rollCompressionDebug = this.rollCompressionDebug || { rollRate: 0, rollRateIntensity: 0, extraDragCoefficient: 0 };
+        const rollBuffetTurbulence = this.onGround ? 0 : Math.min(0.35, rollCompressionDebug.rollRateIntensity * 0.18);
+        const effectiveTurbulence = (env.turbulence || 0) + rollBuffetTurbulence;
+        if (effectiveTurbulence > 0) {
+            const turbScale = effectiveTurbulence * 5.0; // up to 5 m/s variation
             V_wind_body.x += (Math.random() - 0.5) * turbScale;
             V_wind_body.y += (Math.random() - 0.5) * turbScale;
             V_wind_body.z += (Math.random() - 0.5) * turbScale;
@@ -1119,50 +1130,9 @@ class RealisticFlightPhysicsService {
             Mz_aero += stabilizer.Mz;
         }
         
-        // --- Ground Steering (Nose Wheel) ---
-        // Keep some artificial anti-drift support on runway, but make it speed-faded and bounded
-        // so it behaves more like nosewheel steering plus tire alignment than a raw yaw torque hack.
-        let Mz_steering = 0;
-        let Fy_steering = 0;
-
-        if (this.onGround) {
-             const rudderInput = Number.isFinite(this.controls.rudder) ? this.controls.rudder : 0;
-             const groundSpeed = Math.max(0, this.state.vel.magnitude());
-
-             let damping = 1.0;
-             if (this.groundStatus && this.groundStatus.status === 'GRASS') {
-                 damping = 0.3;
-             }
-
-             // Stronger nosewheel authority at taxi speed, fading quickly as speed builds.
-             const lowSpeedFactor = Math.max(0, Math.min(1, 1 - (groundSpeed / 45)));
-             const steeringForceScale = this.state.mass * 18 * lowSpeedFactor * damping;
-             const steeringMomentScale = this.state.mass * 28 * lowSpeedFactor * damping;
-
-             Fy_steering = steeringForceScale * rudderInput;
-             Mz_steering = steeringMomentScale * rudderInput;
-
-             // Runway anti-drift helper: damp lateral motion and yaw while on paved runway.
-             if (this.groundStatus && this.groundStatus.status === 'RUNWAY') {
-                 const sideVel = Number.isFinite(this.state.vel.y) ? this.state.vel.y : 0;
-                 const yawRate = Number.isFinite(this.state.rates.z) ? this.state.rates.z : 0;
-                 const driftDampingFactor = Math.max(0, Math.min(1, 1 - (groundSpeed / 80)));
-
-                 Fy_steering += -sideVel * this.state.mass * 2.5 * driftDampingFactor;
-                 Mz_steering += -yawRate * (this.aircraft.Iz || 3000000) * 0.35 * driftDampingFactor;
-             }
-
-             if (Math.random() < 0.001) {
-                 console.log(`Physics: Ground Steering Active. Torque: ${Mz_steering.toFixed(0)}`);
-             }
-        }
-
-        // Add Steering to Aero Forces/Moments
-        Mz_aero += Mz_steering;
-        // Fy_aero is already defined as const, need to change it or add to it
-        // Fy_aero was: const Fy_aero = F_side;
-        // We can't reassign const. I need to modify the previous code or add it to force summation.
-        // Let's verify where Fy_aero is defined.
+        let nosewheelSteeringAngle = 0;
+        let nosewheelSteeringAuthority = 0;
+        let noseGearContactForce = 0;
         
         // --- Thrust ---
         let F_thrust_body = new Vector3(0, 0, 0);
@@ -1248,10 +1218,15 @@ class RealisticFlightPhysicsService {
                 // Steering Angle (Nose Gear only)
                 let steeringAngle = 0;
                 if (gear.name === 'nose') {
-                    // Map rudder to steering (-1 to 1 -> -70 to 70 degrees)
-                    // Fade out steering at speed to prevent twitchiness? 
-                    // Or trust user input. Real planes reduce nose wheel authority at speed.
-                    steeringAngle = this.controls.rudder * 70 * Math.PI / 180;
+                    const rudderInput = Math.max(-1, Math.min(1, Number.isFinite(this.controls.rudder) ? this.controls.rudder : 0));
+                    const groundSpeed = Math.max(0, this.state.vel.magnitude());
+                    const speedAuthority = Math.max(0, Math.min(1, 1 - (groundSpeed / 55)));
+                    const loadAuthority = Math.max(0, Math.min(1, Math.abs(F_n) / (this.state.mass * this.CONSTANTS.G * 0.18)));
+                    const surfaceAuthority = this.groundStatus?.status === 'GRASS' ? 0.55 : 1;
+                    nosewheelSteeringAuthority = speedAuthority * loadAuthority * surfaceAuthority;
+                    steeringAngle = rudderInput * nosewheelSteeringAuthority * 70 * Math.PI / 180;
+                    nosewheelSteeringAngle = steeringAngle;
+                    noseGearContactForce = Math.abs(F_n);
                 }
 
                 // Velocity at wheel in Body Frame
@@ -1468,7 +1443,7 @@ class RealisticFlightPhysicsService {
         // --- Totals ---
         const totalForces = new Vector3(
             Fx_aero + Fx_thrust + gravityBody.x + F_ground.x,
-            Fy_aero + gravityBody.y + F_ground.y + Fy_steering,
+            Fy_aero + gravityBody.y + F_ground.y,
             Fz_aero + gravityBody.z + F_ground.z
         );
 
@@ -1489,10 +1464,15 @@ class RealisticFlightPhysicsService {
                 alpha, beta, q, 
                 CL, CD, Cm, Cl, Cn,
                 lift: F_lift, drag: F_drag, side: F_side,
+                rollCompressionDrag: rollCompressionDebug.extraDragCoefficient,
+                rollRateIntensity: rollCompressionDebug.rollRateIntensity,
+                effectiveTurbulence,
                 pitchMoment: My_aero,
                 groundMomentY: M_ground.y,
                 yawMoment: Mz_aero,
-                steeringMoment: Mz_steering,
+                nosewheelSteeringAngle,
+                nosewheelSteeringAuthority,
+                noseGearContactForce,
                 thrustMomentYaw: M_thrust_body.z,
                 thrustMomentPitch: M_thrust_body.y
             }
@@ -1698,6 +1678,7 @@ class RealisticFlightPhysicsService {
     getOutputState() {
         // Convert internal physics state to the App's expected format
         const euler = this.state.quat.toEuler(); // Rads
+        const headingDeg = (euler.psi * 180 / Math.PI + 360) % 360;
         const altitude = -this.state.pos.z; // Altitude relative to Origin (usually Runway)
         const altitudeAMSL = altitude + (this.airportElevation || 0);
         const altitudeAGL = this.currentGroundZ - this.state.pos.z;
@@ -1760,6 +1741,7 @@ class RealisticFlightPhysicsService {
             trueAirspeed: airspeeds.trueAirspeed,
             indicatedAirspeed: airspeeds.indicatedAirspeed,
             groundSpeed: airspeeds.groundSpeed,
+            heading: applyNoise(headingDeg),
             autopilot: autopilotStatus,
             autopilotTargets: autopilotStatus.targets,
             autopilotDebug: this.autopilot.debugState,
@@ -1799,7 +1781,7 @@ class RealisticFlightPhysicsService {
                 airspeed: airspeeds.trueAirspeed,
                 indicatedAirspeed: airspeeds.indicatedAirspeed,
                 groundSpeed: airspeeds.groundSpeed,
-                heading: (euler.psi * 180 / Math.PI + 360) % 360
+                heading: headingDeg
             },
             
             debugPhysics: {

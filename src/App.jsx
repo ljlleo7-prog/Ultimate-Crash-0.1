@@ -8,13 +8,14 @@ import FlightInProgress from './components/FlightInProgress.jsx';
 import RouteSelectionFrame from './components/RouteSelectionFrame.jsx';
 import NarrativeScene from './components/NarrativeScene.jsx';
 import { generateInitialWeather } from './services/weatherService';
-import { generateGate, generateSID, generateSTAR, generateSmartRouteDetails, generateTaxiway, getLastProcedureWaypoint, getRunways, getRunwayHeading } from './utils/routeGenerator';
+import { buildAutoRouteDetails, buildRouteAuthState, DEFAULT_ROUTE_DETAILS, mergeFlightPlanWithRoute, normalizeRouteDetails, normalizeWaypoint } from './utils/routeDetails.js';
 
 import { FadeOverlay, CinematicReview } from './components/CinematicComponents.jsx';
 import { LanguageProvider } from './contexts/LanguageContext';
 import LanguageSwitcher from './components/LanguageSwitcher';
 import Header from './components/Header';
 import HomePage from './components/HomePage';
+import LoginPage from './components/LoginPage.jsx';
 import TutorialHub from './components/TutorialHub';
 import ChallengesHub from './components/ChallengesHub';
 import FMCPanel from './components/fmc/FMCPanel';
@@ -22,7 +23,7 @@ import { airportService } from './services/airportService';
 import { TUTORIALS } from './data/tutorialCatalog';
 import { CHALLENGES } from './data/challengeCatalog';
 import { cloudSaveService } from './services/cloudSaveService.js';
-import { getSupabaseUser, supabase } from './services/skylinetragedy/SupabaseClient.js';
+import { useAuth } from './contexts/AuthContext.jsx';
 
 const APP_SETTINGS_STORAGE_KEY = 'app_settings';
 const DEFAULT_APP_SETTINGS = {
@@ -38,144 +39,6 @@ const DEFAULT_WEATHER = {
   turbulence: 0
 };
 
-const DEFAULT_ROUTE_DETAILS = {
-  departureGate: '',
-  departureTaxiway: '',
-  departureRunway: '',
-  sid: '',
-  waypoints: [],
-  star: '',
-  landingRunway: '',
-  landingTaxiway: '',
-  arrivalGate: '',
-  alternate: null
-};
-
-const normalizeWaypoint = (waypoint, index = 0) => {
-  if (!waypoint) return null;
-  if (typeof waypoint === 'string') {
-    return {
-      name: waypoint,
-      label: waypoint,
-      latitude: 0,
-      longitude: 0
-    };
-  }
-
-  const name = waypoint.name || waypoint.label || waypoint.id || `WPT${index + 1}`;
-
-  return {
-    ...waypoint,
-    name,
-    label: waypoint.label || name,
-    latitude: typeof waypoint.latitude === 'number' ? waypoint.latitude : Number(waypoint.latitude) || 0,
-    longitude: typeof waypoint.longitude === 'number' ? waypoint.longitude : Number(waypoint.longitude) || 0
-  };
-};
-
-const buildApproachWaypoints = (arrivalAirport, departureAirport, landingRunway) => {
-  if (!arrivalAirport || !departureAirport || !landingRunway) return [];
-
-  const isEastward = arrivalAirport.longitude > departureAirport.longitude;
-  const runwayHdg = getRunwayHeading(landingRunway, isEastward);
-  const approachHdg = (runwayHdg + 180) % 360;
-  const distance = 10;
-  const lat1 = arrivalAirport.latitude * Math.PI / 180;
-  const lon1 = arrivalAirport.longitude * Math.PI / 180;
-  const brng = approachHdg * Math.PI / 180;
-  const R = 3440.065;
-
-  const lat2 = Math.asin(Math.sin(lat1) * Math.cos(distance / R) + Math.cos(lat1) * Math.sin(distance / R) * Math.cos(brng));
-  const lon2 = lon1 + Math.atan2(Math.sin(brng) * Math.sin(distance / R) * Math.cos(lat1), Math.cos(distance / R) - Math.sin(lat1) * Math.sin(lat2));
-
-  return [
-    normalizeWaypoint({
-      name: 'FINAL',
-      latitude: lat2 * 180 / Math.PI,
-      longitude: lon2 * 180 / Math.PI,
-      type: 'APPROACH_FIX'
-    }),
-    normalizeWaypoint({
-      name: landingRunway,
-      label: landingRunway,
-      latitude: arrivalAirport.latitude,
-      longitude: arrivalAirport.longitude,
-      type: 'RUNWAY_FIX'
-    })
-  ];
-};
-
-const normalizeRouteDetails = (routeDetails, selectedDeparture, selectedArrival) => {
-  const normalized = {
-    ...DEFAULT_ROUTE_DETAILS,
-    ...(routeDetails || {})
-  };
-
-  const baseWaypoints = (normalized.waypoints || []).map(normalizeWaypoint).filter(Boolean);
-  const hasRunwayFix = baseWaypoints.some((waypoint) => waypoint.type === 'RUNWAY_FIX' || waypoint.name === normalized.landingRunway);
-  const approachWaypoints = normalized.landingRunway && !hasRunwayFix
-    ? buildApproachWaypoints(selectedArrival, selectedDeparture, normalized.landingRunway)
-    : [];
-  const finalWaypoints = [...baseWaypoints, ...approachWaypoints];
-  const baseRouteObject = normalized.routeObject || null;
-  const routeObject = baseRouteObject ? {
-    ...baseRouteObject,
-    waypoints: finalWaypoints,
-    legs: [
-      ...(Array.isArray(baseRouteObject.legs) ? baseRouteObject.legs : []),
-      ...approachWaypoints.map((waypoint, index) => ({
-        from: index === 0 ? (baseWaypoints[baseWaypoints.length - 1]?.name || selectedDeparture?.icao || selectedDeparture?.iata || 'ENROUTE') : approachWaypoints[index - 1]?.name,
-        to: waypoint.name,
-        type: waypoint.type || 'fix',
-        altitude: waypoint.altitude || null,
-        speed: waypoint.speed || null,
-        source: baseRouteObject.source || normalized.routeSource || 'Built-in',
-        provider: baseRouteObject.source || normalized.routeSource || 'Built-in',
-        latitude: waypoint.latitude,
-        longitude: waypoint.longitude,
-        sequence: (baseRouteObject.legs?.length || 0) + index + 1
-      }))
-    ]
-  } : null;
-
-  return {
-    ...normalized,
-    waypoints: finalWaypoints,
-    routeObject,
-    routeSource: normalized.routeSource || routeObject?.source || '',
-    routeFallbackUsed: Boolean(normalized.routeFallbackUsed || routeObject?.fallbackUsed),
-    routeDebug: normalized.routeDebug || routeObject?.debug || [],
-    routeBilling: normalized.routeBilling || routeObject?.billing || null
-  };
-};
-
-const mergeFlightPlanWithRoute = (flightPlan, routeDetails) => {
-  if (!flightPlan) return null;
-
-  const normalizedRoute = routeDetails ? {
-    ...routeDetails,
-    waypoints: (routeDetails.waypoints || []).map(normalizeWaypoint).filter(Boolean),
-    routeObject: routeDetails.routeObject ? {
-      ...routeDetails.routeObject,
-      waypoints: (routeDetails.routeObject.waypoints || []).map(normalizeWaypoint).filter(Boolean)
-    } : null
-  } : null;
-
-  return {
-    ...flightPlan,
-    waypoints: normalizedRoute?.waypoints?.length ? normalizedRoute.waypoints : (flightPlan.waypoints || []).map(normalizeWaypoint).filter(Boolean),
-    routeObject: normalizedRoute?.routeObject || null,
-    departure: {
-      ...flightPlan.departure,
-      runways: normalizedRoute?.departureRunway ? [{ name: normalizedRoute.departureRunway }] : flightPlan.departure?.runways
-    },
-    arrival: {
-      ...flightPlan.arrival,
-      runways: normalizedRoute?.landingRunway ? [{ name: normalizedRoute.landingRunway }] : flightPlan.arrival?.runways
-    }
-  };
-};
-
 const isPositiveNumber = (value) => Number.isFinite(Number(value)) && Number(value) > 0;
 
 const isSameAirport = (departure, arrival) => {
@@ -185,45 +48,8 @@ const isSameAirport = (departure, arrival) => {
   return departureCode && arrivalCode && departureCode === arrivalCode;
 };
 
-const buildAutoRouteDetails = async (departure, arrival, previousRouteDetails = DEFAULT_ROUTE_DETAILS) => {
-  if (!departure || !arrival || isSameAirport(departure, arrival)) {
-    return normalizeRouteDetails(previousRouteDetails, departure, arrival);
-  }
-
-  const routeObject = await generateSmartRouteDetails(departure, arrival);
-  const waypoints = (routeObject.waypoints || []).map(normalizeWaypoint).filter(Boolean);
-  const firstWaypoint = waypoints[0]?.name || waypoints[0]?.label || '';
-  const lastWaypoint = getLastProcedureWaypoint(waypoints);
-  const isEastward = arrival.longitude > departure.longitude;
-  const departureRunways = getRunways(departure);
-  const arrivalRunways = getRunways(arrival);
-  const departureRunway = departureRunways[0] || '';
-  const landingRunway = arrivalRunways.find((runway) => {
-    const heading = getRunwayHeading(runway, isEastward);
-    return isEastward ? heading < 180 : heading >= 180;
-  }) || arrivalRunways[0] || '';
-
-  return normalizeRouteDetails({
-    ...DEFAULT_ROUTE_DETAILS,
-    alternate: previousRouteDetails?.alternate || null,
-    departureGate: generateGate(),
-    departureTaxiway: generateTaxiway(),
-    departureRunway,
-    sid: firstWaypoint ? generateSID(firstWaypoint) : '',
-    waypoints,
-    star: lastWaypoint ? generateSTAR(lastWaypoint) : '',
-    landingRunway,
-    landingTaxiway: generateTaxiway(),
-    arrivalGate: generateGate(),
-    routeObject,
-    routeSource: routeObject.source,
-    routeFallbackUsed: routeObject.fallbackUsed,
-    routeDebug: routeObject.debug || [],
-    routeBilling: routeObject.billing || null
-  }, departure, arrival);
-};
-
 function App() {
+  const { user: authUser, loading: authLoading } = useAuth();
   const [devMode, setDevMode] = useState(false);
   const [appMode, setAppMode] = useState('home');
   const [isTutorial, setIsTutorial] = useState(false);
@@ -254,7 +80,6 @@ function App() {
   const [resumeSave, setResumeSave] = useState(null);
   const [resumeCheckLoading, setResumeCheckLoading] = useState(false);
   const [resumeCheckError, setResumeCheckError] = useState(null);
-  const [activeUser, setActiveUser] = useState(null);
   const { selectedDeparture, selectedArrival, selectDeparture, selectArrival, getAirportByCode } = useAirportSearch();
   const [aircraftSuggestions, setAircraftSuggestions] = useState([]);
   const [failureType, setFailureType] = useState('random');
@@ -287,6 +112,8 @@ function App() {
   const routeGenerationRequestRef = useRef(0);
 
   const offlineMode = appSettings.offlineMode;
+  const activeUser = offlineMode ? null : authUser;
+  const routeAuthState = buildRouteAuthState({ offlineMode, activeUser });
 
   useEffect(() => {
     if (typeof window === 'undefined') {
@@ -317,7 +144,12 @@ function App() {
   const regenerateRouteDetails = async (departure, arrival, previousRouteDetails) => {
     const requestId = routeGenerationRequestRef.current + 1;
     routeGenerationRequestRef.current = requestId;
-    const nextRouteDetails = await buildAutoRouteDetails(departure, arrival, previousRouteDetails);
+    const nextRouteDetails = await buildAutoRouteDetails({
+      departure,
+      arrival,
+      previousRouteDetails,
+      routeOptions: { authState: routeAuthState }
+    });
     if (routeGenerationRequestRef.current !== requestId) return;
     setPreflightConfig((prev) => ({
       ...prev,
@@ -485,40 +317,6 @@ function App() {
 
   useEffect(() => {
     if (offlineMode) {
-      setActiveUser(null);
-      return;
-    }
-
-    let isMounted = true;
-
-    const syncUser = async () => {
-      const user = await getSupabaseUser();
-      if (isMounted) {
-        setActiveUser(user);
-      }
-    };
-
-    syncUser();
-
-    if (!supabase?.auth?.onAuthStateChange) {
-      return () => {
-        isMounted = false;
-      };
-    }
-
-    const { data } = supabase.auth.onAuthStateChange((_event, session) => {
-      if (!isMounted) return;
-      setActiveUser(session?.user ?? null);
-    });
-
-    return () => {
-      isMounted = false;
-      data?.subscription?.unsubscribe?.();
-    };
-  }, []);
-
-  useEffect(() => {
-    if (offlineMode) {
       setResumeSave(null);
       setResumeCheckError(null);
       setResumeCheckLoading(false);
@@ -528,7 +326,7 @@ function App() {
     let isMounted = true;
 
     const loadResumeSave = async () => {
-      if (!activeUser || appMode !== 'init') {
+      if (authLoading || !activeUser || appMode !== 'init') {
         if (isMounted) {
           setResumeSave(null);
           setResumeCheckError(null);
@@ -554,7 +352,7 @@ function App() {
     return () => {
       isMounted = false;
     };
-  }, [activeUser, appMode]);
+  }, [activeUser, appMode, authLoading, offlineMode]);
 
   useEffect(() => {
     const calculateFlightPlanAsync = async () => {
@@ -817,6 +615,10 @@ function App() {
     updatePreflightConfig({ flightPlan: null, routeDetails: DEFAULT_ROUTE_DETAILS });
   };
 
+  if (typeof window !== 'undefined' && window.location.pathname === '/login') {
+    return <LoginPage />;
+  }
+
   if (cinematicPhase !== 'none') {
     return (
       <LanguageProvider>
@@ -934,6 +736,7 @@ function App() {
                 departure={preflightConfig.selectedDeparture}
                 arrival={preflightConfig.selectedArrival}
                 routeData={runtimeRouteDetails}
+                routeAuthState={routeAuthState}
               />
             ) : (
               <>

@@ -1,6 +1,6 @@
 
 import { NPCFlightModel, NPC_STAGE } from './NPCFlightModel.js';
-import airlineData from '../data/airlinesDatabase.json' with { type: "json" };
+import airlineData from '../data/airlinesDatabase.json';
 import { airportService } from './airportService.js';
 
 class NPCManagerService {

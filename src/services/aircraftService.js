@@ -2,7 +2,7 @@
 // Provides aircraft-specific performance data for fuel calculations
 
 // Import aircraft database directly
-import aircraftData from '../data/aircraftDatabase.json' with { type: 'json' };
+import aircraftData from '../data/aircraftDatabase.json';
 
 // Load aircraft database
 let aircraftDatabase = null;

@@ -1,4 +1,5 @@
 import { PROVIDER_STATUS } from './routeTypes.js';
+import { buildProviderNegativeCacheKey, getCachedProviderNegative, setCachedProviderNegative } from './routeCacheService.js';
 
 const getSupabaseClient = async () => {
   try {
@@ -28,6 +29,12 @@ export const callGuardedRouteProvider = async ({ provider, payload = {}, mockRes
     };
   }
 
+  const negativeCacheKey = buildProviderNegativeCacheKey({ provider, payload, authState: 'authenticated' });
+  const cachedNegative = getCachedProviderNegative(negativeCacheKey);
+  if (cachedNegative) {
+    return cachedNegative;
+  }
+
   try {
     const { data, error } = await supabase.functions.invoke('route-provider-gateway', {
       body: {
@@ -37,20 +44,31 @@ export const callGuardedRouteProvider = async ({ provider, payload = {}, mockRes
     });
 
     if (error) {
-      return {
+      const failed = {
         status: PROVIDER_STATUS.PROVIDER_FAILED,
         message: error.message || 'Route provider gateway failed.'
       };
+      setCachedProviderNegative(negativeCacheKey, failed);
+      return failed;
     }
 
-    return data || {
+    const response = data || {
       status: PROVIDER_STATUS.PROVIDER_FAILED,
       message: 'Route provider gateway returned an empty response.'
     };
+
+    if (response.status !== PROVIDER_STATUS.OK) {
+      setCachedProviderNegative(negativeCacheKey, response);
+    }
+
+    return response;
   } catch (error) {
-    return {
+    const failed = {
       status: PROVIDER_STATUS.PROVIDER_FAILED,
       message: error.message || 'Route provider gateway request failed.'
     };
+    setCachedProviderNegative(negativeCacheKey, failed);
+    return failed;
   }
 };
+

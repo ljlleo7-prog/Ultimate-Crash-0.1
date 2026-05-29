@@ -158,11 +158,12 @@ const NavigationPanel = ({ flightState, selectedArrival, flightPlan, npcs = [], 
     canvas.width = canvas.clientWidth;
     canvas.height = canvas.clientHeight;
 
-    const size = canvas.width;
+    const size = Math.min(canvas.width, canvas.height);
+    if (size < 20) return;
     const center = size / 2;
     const arcOriginY = size - 20;
     const arcOriginX = center;
-    const radius = arcOriginY - 40;
+    const radius = Math.max(1, arcOriginY - 40);
 
     const toRad = (d) => d * Math.PI / 180;
     const toDeg = (r) => r * 180 / Math.PI;

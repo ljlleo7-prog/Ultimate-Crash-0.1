@@ -1,0 +1,1109 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>AIP Route Map Preview</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #07111f;
+      --panel: rgba(10, 18, 32, 0.92);
+      --panel-2: rgba(15, 28, 48, 0.94);
+      --text: #dcecff;
+      --muted: #8ea6bf;
+      --airport: #4dd2ff;
+      --waypoint: #ffd166;
+      --missing: #ff5f6d;
+      --published: #6ce5a3;
+      --measured: #54a4ff;
+      --grid: rgba(146, 180, 212, 0.14);
+    }
+
+    html, body {
+      margin: 0;
+      min-height: 100%;
+      background: radial-gradient(circle at top, #0f2442 0, var(--bg) 52%, #020711 100%);
+      color: var(--text);
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+
+    body {
+      display: grid;
+      grid-template-columns: 360px 1fr;
+      overflow: hidden;
+    }
+
+    aside {
+      height: 100vh;
+      box-sizing: border-box;
+      padding: 18px;
+      background: linear-gradient(180deg, var(--panel) 0%, rgba(6, 12, 22, 0.96) 100%);
+      border-right: 1px solid rgba(160, 196, 230, 0.2);
+      overflow: auto;
+      box-shadow: 8px 0 30px rgba(0, 0, 0, 0.22);
+      z-index: 2;
+    }
+
+    main {
+      position: relative;
+      height: 100vh;
+      overflow: hidden;
+    }
+
+    h1 {
+      margin: 0 0 6px;
+      font-size: 22px;
+      letter-spacing: 0.02em;
+    }
+
+    .subtitle {
+      margin: 0 0 18px;
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.4;
+    }
+
+    label {
+      display: block;
+      margin: 14px 0 6px;
+      color: #bdd5ee;
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+
+    input, select, button {
+      width: 100%;
+      box-sizing: border-box;
+      border: 1px solid rgba(165, 204, 240, 0.25);
+      border-radius: 10px;
+      background: rgba(3, 9, 18, 0.8);
+      color: var(--text);
+      padding: 10px 12px;
+      font: inherit;
+      outline: none;
+    }
+
+    button {
+      margin-top: 14px;
+      background: linear-gradient(180deg, #1d71c9 0%, #114f91 100%);
+      border-color: rgba(107, 180, 255, 0.6);
+      cursor: pointer;
+      font-weight: 700;
+    }
+
+    button:hover { filter: brightness(1.12); }
+
+    .row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
+
+    .chips {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin: 14px 0;
+    }
+
+    .chip {
+      width: auto;
+      padding: 7px 9px;
+      border-radius: 999px;
+      background: rgba(86, 151, 218, 0.16);
+      color: #cfe8ff;
+      border: 1px solid rgba(134, 190, 245, 0.24);
+      font-size: 12px;
+    }
+
+    .metrics, .legend, .route-list {
+      margin-top: 16px;
+      padding: 12px;
+      border: 1px solid rgba(160, 196, 230, 0.16);
+      border-radius: 14px;
+      background: rgba(7, 17, 31, 0.72);
+    }
+
+    .metric {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 5px 0;
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .metric strong { color: var(--text); text-align: right; }
+
+    .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 9px;
+      margin: 8px 0;
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .swatch {
+      width: 18px;
+      height: 4px;
+      border-radius: 99px;
+      background: var(--measured);
+    }
+
+    .dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: var(--waypoint);
+    }
+
+    .route-list {
+      max-height: 260px;
+      overflow: auto;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      white-space: pre-wrap;
+      font-size: 11px;
+      color: #bdd5ee;
+    }
+
+    .toolbar {
+      position: absolute;
+      top: 14px;
+      right: 14px;
+      display: flex;
+      gap: 8px;
+      z-index: 3;
+    }
+
+    .toolbar button {
+      width: auto;
+      margin: 0;
+      padding: 8px 12px;
+      border-radius: 10px;
+      font-size: 13px;
+    }
+
+    #mapWrap {
+      position: absolute;
+      inset: 0;
+      overflow: hidden;
+      cursor: grab;
+      user-select: none;
+      -webkit-user-select: none;
+      touch-action: none;
+    }
+
+    #mapWrap.dragging { cursor: grabbing; }
+
+    svg {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      display: block;
+      background: transparent;
+      z-index: 1;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+
+    #tileLayer {
+      position: absolute;
+      inset: 0;
+      overflow: hidden;
+      background: #06111f;
+      z-index: 0;
+    }
+
+    .map-tile {
+      position: absolute;
+      width: 256px;
+      height: 256px;
+      image-rendering: auto;
+      user-select: none;
+      -webkit-user-drag: none;
+      pointer-events: none;
+    }
+
+    .graticule { stroke: var(--grid); stroke-width: 1; vector-effect: non-scaling-stroke; }
+    .land-hint { fill: rgba(70, 113, 88, 0.14); stroke: rgba(135, 190, 150, 0.18); stroke-width: 1; vector-effect: non-scaling-stroke; }
+    .published-leg { stroke: var(--published); stroke-width: 2.3; stroke-dasharray: 8 7; fill: none; opacity: 0.82; vector-effect: non-scaling-stroke; }
+    .brute-airway-leg { stroke: #30e39a; stroke-width: 3; fill: none; opacity: 0.95; vector-effect: non-scaling-stroke; }
+    .brute-direct-leg { stroke: #ff9f43; stroke-width: 2.4; stroke-dasharray: 10 8; fill: none; opacity: 0.9; vector-effect: non-scaling-stroke; }
+    .measured-leg { stroke: var(--measured); stroke-width: 3.4; fill: none; opacity: 0.95; vector-effect: non-scaling-stroke; }
+    .missing-leg { stroke: var(--missing); stroke-width: 2; stroke-dasharray: 2 8; fill: none; opacity: 0.82; vector-effect: non-scaling-stroke; }
+    .airport { fill: var(--airport); stroke: #e8fbff; stroke-width: 1.5; vector-effect: non-scaling-stroke; }
+    .waypoint { fill: var(--waypoint); stroke: #2d2203; stroke-width: 1.2; vector-effect: non-scaling-stroke; }
+    .missing-point { fill: var(--missing); stroke: #ffe5e8; stroke-width: 1.1; vector-effect: non-scaling-stroke; }
+    .coverage-point { fill: rgba(255, 209, 102, 0.35); stroke: none; }
+    .label {
+      fill: #ffffff;
+      paint-order: stroke;
+      stroke: rgba(0, 8, 18, 0.95);
+      font-weight: 800;
+      pointer-events: none;
+      vector-effect: non-scaling-stroke;
+    }
+    .small-label {
+      fill: #ffe88a;
+      paint-order: stroke;
+      stroke: rgba(0, 8, 18, 0.95);
+      font-weight: 800;
+      pointer-events: none;
+      vector-effect: non-scaling-stroke;
+    }
+
+    .notice {
+      margin-top: 12px;
+      padding: 10px;
+      border-left: 3px solid #ffcf70;
+      background: rgba(255, 197, 92, 0.08);
+      color: #ffe2aa;
+      font-size: 12px;
+      line-height: 1.4;
+    }
+
+    .toggle-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-top: 14px;
+      color: #bdd5ee;
+      font-size: 13px;
+    }
+
+    .toggle-row input {
+      width: auto;
+      margin: 0;
+    }
+  </style>
+</head>
+<body>
+  <aside>
+    <h1>AIP Route Map Preview</h1>
+    <p class="subtitle">Standalone preview for exported local AIP CSV data. It renders published route legs, resolved measured geometry, missing fixes, airports, and labels.</p>
+
+    <div class="row">
+      <div>
+        <label for="departure">Departure</label>
+        <input id="departure" value="ZMCK" autocomplete="off" />
+      </div>
+      <div>
+        <label for="arrival">Arrival</label>
+        <input id="arrival" value="ZSPD" autocomplete="off" />
+      </div>
+    </div>
+
+    <label for="routeSelect">Indexed route</label>
+    <select id="routeSelect"></select>
+
+    <button id="renderBtn">Render route</button>
+
+    <div class="chips">
+      <button class="chip" data-route="ZMCK-ZSPD">ZMCK-ZSPD</button>
+      <button class="chip" data-route="ZMCK-ZBTJ">ZMCK-ZBTJ</button>
+      <button class="chip" data-route="KBFI-ZSSS">KBFI-ZSSS</button>
+      <button class="chip" data-route="KJFK-ZBTJ">KJFK-ZBTJ</button>
+    </div>
+
+    <div class="metrics" id="metrics"></div>
+
+    <div class="legend">
+      <div class="legend-item"><span class="swatch" style="background: var(--measured)"></span>Resolved/measured route linkage</div>
+      <div class="legend-item"><span class="swatch" style="background: var(--published); border-top: 2px dashed var(--published)"></span>Published AIP leg where both fixes resolve</div>
+      <div class="legend-item"><span class="swatch" style="background: #30e39a"></span>Brute-force leg following an airway edge</div>
+      <div class="legend-item"><span class="swatch" style="background: #ff9f43; border-top: 2px dashed #ff9f43"></span>Brute-force direct/synthetic connection</div>
+      <div class="legend-item"><span class="swatch" style="background: var(--missing)"></span>Published AIP leg with missing coordinate(s)</div>
+      <div class="legend-item"><span class="dot" style="background: var(--airport)"></span>Airport</div>
+      <div class="legend-item"><span class="dot" style="background: var(--waypoint)"></span>Resolved waypoint/navaid</div>
+      <div class="legend-item"><span class="dot" style="background: var(--missing)"></span>Published fix missing coordinates</div>
+    </div>
+
+    <div class="notice">Tip: drag to pan, mouse wheel or toolbar to zoom. Missing fixes are placed along their published leg sequence between the nearest resolved neighbors, so their labels show coverage gaps without pretending to know real coordinates.</div>
+
+    <label>Published legs</label>
+    <div class="route-list" id="routeList"></div>
+  </aside>
+
+  <main>
+    <div class="toolbar">
+      <button id="zoomIn">Zoom +</button>
+      <button id="zoomOut">Zoom −</button>
+      <button id="resetView">Fit</button>
+    </div>
+    <div id="mapWrap">
+      <div id="tileLayer" aria-hidden="true"></div>
+      <svg id="map" viewBox="0 0 1200 800" aria-label="AIP route map preview"></svg>
+    </div>
+  </main>
+
+  <script type="module">
+    const CSV_DIR = '../AIP_DATA/supabase_csv';
+    const AIRPORTS_CSV = '../AIP_DATA/airports.csv';
+    const routeSelect = document.getElementById('routeSelect');
+    const departureInput = document.getElementById('departure');
+    const arrivalInput = document.getElementById('arrival');
+    const metricsEl = document.getElementById('metrics');
+    const routeListEl = document.getElementById('routeList');
+    const map = document.getElementById('map');
+    const mapWrap = document.getElementById('mapWrap');
+    const tileLayer = document.getElementById('tileLayer');
+
+    const state = {
+      lookup: [],
+      legsByRoute: new Map(),
+      edgesByFrom: new Map(),
+      pointsByIdent: new Map(),
+      airports: new Map(),
+      bruteForceCache: new Map(),
+      viewBox: { x: 0, y: 0, w: 1200, h: 800 },
+      fitBox: { x: 0, y: 0, w: 1200, h: 800 },
+      drag: null
+    };
+
+    const parseCsvLine = (line) => {
+      const values = [];
+      let value = '';
+      let quoted = false;
+      for (let index = 0; index < line.length; index += 1) {
+        const char = line[index];
+        const next = line[index + 1];
+        if (char === '"' && quoted && next === '"') {
+          value += '"';
+          index += 1;
+        } else if (char === '"') {
+          quoted = !quoted;
+        } else if (char === ',' && !quoted) {
+          values.push(value);
+          value = '';
+        } else {
+          value += char;
+        }
+      }
+      values.push(value);
+      return values;
+    };
+
+    const parseCsv = (text) => {
+      const lines = text.replace(/^﻿/, '').split(/\r?\n/).filter(Boolean);
+      const headers = parseCsvLine(lines[0] || '');
+      return lines.slice(1).map((line) => {
+        const values = parseCsvLine(line);
+        return Object.fromEntries(headers.map((header, index) => [header, values[index] || '']));
+      });
+    };
+
+    const loadCsv = async (url) => parseCsv(await fetch(url).then((response) => {
+      if (!response.ok) throw new Error(`Failed to load ${url}: ${response.status}`);
+      return response.text();
+    }));
+
+    const addToListMap = (mapValue, key, value) => {
+      const normalizedKey = String(key || '').toUpperCase();
+      if (!normalizedKey) return;
+      if (!mapValue.has(normalizedKey)) mapValue.set(normalizedKey, []);
+      mapValue.get(normalizedKey).push(value);
+    };
+
+    const toNumber = (value) => {
+      const number = Number(value);
+      return Number.isFinite(number) ? number : null;
+    };
+
+    const loadData = async () => {
+      const [lookup, legs, edges, points, airports] = await Promise.all([
+        loadCsv(`${CSV_DIR}/aip_route_lookup_index.csv`),
+        loadCsv(`${CSV_DIR}/aip_route_legs.csv`),
+        loadCsv(`${CSV_DIR}/aip_route_edge_index.csv`),
+        loadCsv(`${CSV_DIR}/aip_reference_points.csv`),
+        loadCsv(AIRPORTS_CSV)
+      ]);
+
+      state.lookup = lookup;
+      for (const leg of legs) {
+        addToListMap(state.legsByRoute, leg.route_id, { ...leg, leg_sequence: Number(leg.leg_sequence || 0) });
+      }
+      for (const routeLegs of state.legsByRoute.values()) routeLegs.sort((a, b) => a.leg_sequence - b.leg_sequence);
+
+      for (const edge of edges) {
+        const fromFix = String(edge.from_fix || '').toUpperCase();
+        const toFix = String(edge.to_fix || '').toUpperCase();
+        if (!fromFix || !toFix) continue;
+        addToListMap(state.edgesByFrom, fromFix, {
+          ...edge,
+          from_fix: fromFix,
+          to_fix: toFix,
+          leg_sequence: Number(edge.leg_sequence || 0)
+        });
+      }
+
+      for (const point of points) {
+        const latitude = toNumber(point.latitude_deg);
+        const longitude = toNumber(point.longitude_deg);
+        if (latitude === null || longitude === null) continue;
+        addToListMap(state.pointsByIdent, point.ident, {
+          ident: String(point.ident || '').toUpperCase(),
+          latitude,
+          longitude,
+          type: point.point_type || 'waypoint',
+          isoCountry: point.iso_country || '',
+          associatedAirport: point.associated_airport || '',
+          frequencyKhz: point.frequency_khz || '',
+          sourceSystem: point.source_system || '',
+          regionCode: point.region_code || ''
+        });
+      }
+
+      for (const airport of airports) {
+        const latitude = toNumber(airport.latitude_deg);
+        const longitude = toNumber(airport.longitude_deg);
+        if (latitude === null || longitude === null) continue;
+        const codes = [airport.ident, airport.icao_code, airport.gps_code].filter(Boolean);
+        for (const code of codes) {
+          state.airports.set(String(code).toUpperCase(), {
+            ident: String(code).toUpperCase(),
+            name: airport.name || code,
+            latitude,
+            longitude,
+            type: 'airport',
+            isoCountry: airport.iso_country || '',
+            sourceSystem: 'OurAirports'
+          });
+        }
+      }
+    };
+
+    const calculateGreatCircleNm = (from, to) => {
+      const toRad = (degrees) => degrees * Math.PI / 180;
+      const radiusNm = 3440.065;
+      const deltaLat = toRad(to.latitude - from.latitude);
+      const deltaLon = toRad(to.longitude - from.longitude);
+      const a = Math.sin(deltaLat / 2) ** 2 + Math.cos(toRad(from.latitude)) * Math.cos(toRad(to.latitude)) * Math.sin(deltaLon / 2) ** 2;
+      return radiusNm * (2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a)));
+    };
+
+    const resolvePoint = (ident, previousPoint = null, nextPoint = null, regionCode = '') => {
+      const normalized = String(ident || '').toUpperCase();
+      const airport = state.airports.get(normalized);
+      if (airport) return airport;
+      const candidates = state.pointsByIdent.get(normalized) || [];
+      if (!candidates.length) return null;
+
+      return [...candidates].sort((a, b) => {
+        const score = (point) => {
+          let value = 0;
+          if (regionCode && (point.regionCode === regionCode || point.isoCountry === regionCode)) value += 100;
+          if (point.frequencyKhz) value += 4;
+          if (previousPoint) value -= Math.min(calculateGreatCircleNm(previousPoint, point) / 40, 80);
+          if (nextPoint) value -= Math.min(calculateGreatCircleNm(point, nextPoint) / 40, 80);
+          return value;
+        };
+        return score(b) - score(a);
+      })[0];
+    };
+
+    const bruteForceCacheKey = (departure, arrival) => `${departure}-${arrival}`;
+
+    const routeRowsForPair = (departure, arrival) => state.lookup.filter((row) => (
+      String(row.departure_code || '').toUpperCase() === departure && String(row.arrival_code || '').toUpperCase() === arrival
+    ));
+
+    const populateRouteSelect = () => {
+      const departure = departureInput.value.trim().toUpperCase();
+      const arrival = arrivalInput.value.trim().toUpperCase();
+      const rows = routeRowsForPair(departure, arrival);
+      routeSelect.innerHTML = '';
+      if (!rows.length) {
+        const departurePoint = resolvePoint(departure) || state.airports.get(departure);
+        const arrivalPoint = resolvePoint(arrival) || state.airports.get(arrival);
+        const bruteRoutes = buildBruteForceRoutes(departure, arrival, departurePoint, arrivalPoint, 5);
+        state.bruteForceCache.set(bruteForceCacheKey(departure, arrival), bruteRoutes);
+        if (!bruteRoutes.length) {
+          const option = document.createElement('option');
+          option.value = '';
+          option.textContent = 'No indexed route or brute-force graph route found';
+          routeSelect.append(option);
+          return;
+        }
+        for (const route of bruteRoutes) {
+          const option = document.createElement('option');
+          option.value = route.routeId;
+          option.textContent = `${route.routeCode} | fixes ${route.resolvedCount}/${route.path.length} | est ${Math.round(route.estimatedNm)} NM | final ${Math.round(route.finalSpacingNm)} NM`;
+          routeSelect.append(option);
+        }
+        return;
+      }
+      state.bruteForceCache.delete(bruteForceCacheKey(departure, arrival));
+      for (const row of rows) {
+        const option = document.createElement('option');
+        option.value = row.route_id;
+        option.textContent = `${row.route_code || row.route_id} (${row.region_code || '?'}, cycle ${row.aip_cycle || '?'})`;
+        routeSelect.append(option);
+      }
+    };
+
+    const buildBruteForceLookupRow = (departure, arrival) => ({
+      route_id: `BRUTE-${departure}-${arrival}`,
+      route_code: `BRUTE-${departure}-${arrival}`,
+      departure_code: departure,
+      arrival_code: arrival,
+      region_code: departure.startsWith('Z') || arrival.startsWith('Z') ? 'CN' : '*',
+      aip_cycle: 'preview'
+    });
+
+    const buildBruteForceRoutes = (departure, arrival, departurePoint, arrivalPoint, limit = 5) => {
+      const startRows = state.lookup.filter((row) => String(row.departure_code || '').toUpperCase() === departure).slice(0, 12);
+      const goalRows = state.lookup.filter((row) => String(row.arrival_code || '').toUpperCase() === arrival).slice(0, 12);
+      const starts = new Set();
+      const goals = new Set();
+
+      for (const row of startRows) {
+        const legs = state.legsByRoute.get(row.route_id) || [];
+        if (legs[0]?.from_fix) starts.add(String(legs[0].from_fix).toUpperCase());
+      }
+      for (const row of goalRows) {
+        const legs = state.legsByRoute.get(row.route_id) || [];
+        if (legs.at(-1)?.to_fix) goals.add(String(legs.at(-1).to_fix).toUpperCase());
+      }
+      if (!starts.size) starts.add(departure);
+      if (!goals.size) goals.add(arrival);
+
+      const greatCircleNm = departurePoint && arrivalPoint ? calculateGreatCircleNm(departurePoint, arrivalPoint) : Number.POSITIVE_INFINITY;
+      const queue = [...starts].map((ident) => {
+        const point = resolvePoint(ident, departurePoint, arrivalPoint, 'CN') || (ident === departure ? departurePoint : null);
+        return {
+          ident,
+          path: [ident],
+          airways: [],
+          edgeTypes: [],
+          resolvedCount: point ? 1 : 0,
+          lastPoint: point || departurePoint,
+          routedNm: point && departurePoint ? calculateGreatCircleNm(departurePoint, point) : 0,
+          remainingNm: point && arrivalPoint ? calculateGreatCircleNm(point, arrivalPoint) : greatCircleNm
+        };
+      });
+      const candidates = [];
+      const bestVisit = new Map();
+      let expanded = 0;
+      let relaxations = 0;
+
+      while (queue.length && expanded < 2500 && relaxations < 12000) {
+        queue.sort((a, b) => {
+          const scoreA = (a.resolvedCount / a.path.length) * 100 - (a.remainingNm / 50) - (a.routedNm / 100);
+          const scoreB = (b.resolvedCount / b.path.length) * 100 - (b.remainingNm / 50) - (b.routedNm / 100);
+          return scoreB - scoreA;
+        });
+        const current = queue.shift();
+        expanded += 1;
+
+        if (goals.has(current.ident) || current.ident === arrival) {
+          if (current.path.length > 1) candidates.push(current);
+          if (candidates.length >= 12) break;
+          continue;
+        }
+        if (current.path.length > 8) continue;
+
+        const edges = (state.edgesByFrom.get(current.ident) || [])
+          .map((edge) => {
+            const toFix = String(edge.to_fix || '').toUpperCase();
+            const toPoint = resolvePoint(toFix, current.lastPoint, arrivalPoint, edge.region_code || 'CN');
+            const legNm = current.lastPoint && toPoint ? calculateGreatCircleNm(current.lastPoint, toPoint) || 0 : 0;
+            const remainingNm = toPoint && arrivalPoint ? calculateGreatCircleNm(toPoint, arrivalPoint) : current.remainingNm;
+            const progressNm = current.remainingNm - remainingNm;
+            return { ...edge, to_fix: toFix, toPoint, legNm, remainingNm, progressNm, hasPoint: Boolean(toPoint) };
+          })
+          .filter((edge) => edge.to_fix && !current.path.includes(edge.to_fix))
+          .filter((edge) => !edge.hasPoint || edge.progressNm >= -120)
+          .filter((edge) => !Number.isFinite(greatCircleNm) || current.routedNm + edge.legNm + edge.remainingNm <= greatCircleNm * 1.8)
+          .sort((a, b) => {
+            const scoreA = Number(a.hasPoint) * 100 + a.progressNm - (a.legNm / 20);
+            const scoreB = Number(b.hasPoint) * 100 + b.progressNm - (b.legNm / 20);
+            return scoreB - scoreA;
+          })
+          .slice(0, 12);
+
+        for (const edge of edges) {
+          relaxations += 1;
+          const nextResolvedCount = current.resolvedCount + (edge.hasPoint ? 1 : 0);
+          const visitKey = `${edge.to_fix}|${current.path.length + 1}`;
+          if ((bestVisit.get(visitKey) ?? -1) >= nextResolvedCount) continue;
+          bestVisit.set(visitKey, nextResolvedCount);
+          queue.push({
+            ident: edge.to_fix,
+            path: [...current.path, edge.to_fix],
+            airways: [...current.airways, edge.airway || ''],
+            edgeTypes: [...current.edgeTypes, edge.airway ? 'airway' : 'direct'],
+            resolvedCount: nextResolvedCount,
+            lastPoint: edge.toPoint || current.lastPoint,
+            routedNm: current.routedNm + edge.legNm,
+            remainingNm: edge.remainingNm
+          });
+        }
+      }
+
+      const minArrivalSpacingNm = 20;
+      const scoredCandidates = candidates.map((candidate) => {
+        const finalPoint = candidate.lastPoint;
+        const finalSpacingNm = finalPoint && arrivalPoint ? calculateGreatCircleNm(finalPoint, arrivalPoint) : Number.POSITIVE_INFINITY;
+        return {
+          ...candidate,
+          finalSpacingNm,
+          approachSpaced: finalSpacingNm >= minArrivalSpacingNm
+        };
+      });
+      const spacedCandidates = scoredCandidates.filter((candidate) => candidate.approachSpaced);
+      const rankingPool = spacedCandidates.length ? spacedCandidates : scoredCandidates;
+      const ranked = rankingPool.sort((a, b) => {
+        const coverageA = a.resolvedCount / a.path.length;
+        const coverageB = b.resolvedCount / b.path.length;
+        if (coverageA !== coverageB) return coverageB - coverageA;
+        return (a.routedNm + a.remainingNm) - (b.routedNm + b.remainingNm);
+      }).slice(0, limit);
+
+      return ranked.map((candidate, candidateIndex) => {
+        const routeId = `BRUTE-${departure}-${arrival}-${candidateIndex + 1}`;
+        return {
+          routeId,
+          routeCode: routeId,
+          path: candidate.path,
+          resolvedCount: candidate.resolvedCount,
+          estimatedNm: candidate.routedNm + candidate.remainingNm,
+          finalSpacingNm: candidate.finalSpacingNm,
+          approachSpaced: candidate.approachSpaced,
+          legs: candidate.path.slice(0, -1).map((fromFix, index) => ({
+            route_id: routeId,
+            leg_sequence: index + 1,
+            from_fix: fromFix,
+            to_fix: candidate.path[index + 1],
+            airway: candidate.airways[index] || '',
+            edge_type: candidate.edgeTypes[index] || (candidate.airways[index] ? 'airway' : 'direct'),
+            region_code: 'CN',
+            aip_cycle: 'preview'
+          }))
+        };
+      });
+    };
+
+    const buildRoute = () => {
+      const departure = departureInput.value.trim().toUpperCase();
+      const arrival = arrivalInput.value.trim().toUpperCase();
+      const routeId = routeSelect.value;
+      let lookupRow = state.lookup.find((row) => row.route_id === routeId) || routeRowsForPair(departure, arrival)[0];
+      const departurePoint = resolvePoint(departure) || state.airports.get(departure);
+      const arrivalPoint = resolvePoint(arrival) || state.airports.get(arrival);
+      let routeLegs = state.legsByRoute.get(lookupRow?.route_id || '') || [];
+      if (!routeLegs.length) {
+        const bruteRoutes = state.bruteForceCache.get(bruteForceCacheKey(departure, arrival)) || buildBruteForceRoutes(departure, arrival, departurePoint, arrivalPoint, 5);
+        state.bruteForceCache.set(bruteForceCacheKey(departure, arrival), bruteRoutes);
+        const selectedBrute = bruteRoutes.find((route) => route.routeId === routeId) || bruteRoutes[0];
+        if (selectedBrute) {
+          lookupRow = buildBruteForceLookupRow(departure, arrival);
+          lookupRow.route_id = selectedBrute.routeId;
+          lookupRow.route_code = selectedBrute.routeCode;
+          routeLegs = selectedBrute.legs;
+        }
+      }
+      const routeFixes = [];
+      const seen = new Set();
+      const addFix = (ident, airway = '') => {
+        const normalized = String(ident || '').toUpperCase();
+        if (!normalized || seen.has(normalized)) return;
+        routeFixes.push({ ident: normalized, airway });
+        seen.add(normalized);
+      };
+
+      if (routeLegs[0]) addFix(routeLegs[0].from_fix, routeLegs[0].airway);
+      for (const leg of routeLegs) addFix(leg.to_fix, leg.airway);
+
+      const resolved = [];
+      const plotted = [];
+      let previousPoint = departurePoint;
+
+      for (const fix of routeFixes) {
+        const point = resolvePoint(fix.ident, previousPoint, arrivalPoint, lookupRow?.region_code || '');
+        if (point) {
+          const waypoint = { ...point, ident: fix.ident, airway: fix.airway, missing: false };
+          resolved.push(waypoint);
+          plotted.push(waypoint);
+          previousPoint = waypoint;
+        } else {
+          plotted.push({ ident: fix.ident, airway: fix.airway, missing: true, type: 'missing' });
+        }
+      }
+
+      const measured = [departurePoint, ...resolved, arrivalPoint].filter(Boolean);
+      const resolvedIds = new Set(resolved.map((point) => point.ident));
+      const publishedFixCoverage = routeFixes.length ? resolved.length / routeFixes.length * 100 : 0;
+      const resolvedLegs = routeLegs.filter((leg) => resolvedIds.has(String(leg.from_fix || '').toUpperCase()) && resolvedIds.has(String(leg.to_fix || '').toUpperCase()));
+      const publishedLegCoverage = routeLegs.length ? resolvedLegs.length / routeLegs.length * 100 : 0;
+      const measuredNm = measured.reduce((total, point, index) => index ? total + calculateGreatCircleNm(measured[index - 1], point) : total, 0);
+      const greatCircleNm = departurePoint && arrivalPoint ? calculateGreatCircleNm(departurePoint, arrivalPoint) : null;
+
+      return {
+        lookupRow,
+        routeLegs,
+        routeFixes,
+        plotted,
+        resolved,
+        measured,
+        departurePoint,
+        arrivalPoint,
+        metrics: {
+          publishedFixCoverage,
+          publishedLegCoverage,
+          resolvedFixes: resolved.length,
+          publishedFixes: routeFixes.length,
+          resolvedLegs: resolvedLegs.length,
+          publishedLegs: routeLegs.length,
+          measuredNm,
+          greatCircleNm,
+          overLimit: greatCircleNm ? ((measuredNm / greatCircleNm) - 1) * 100 : null
+        }
+      };
+    };
+
+    const mercator = ({ latitude, longitude }) => {
+      const x = (longitude + 180) / 360 * 1200;
+      const latRad = latitude * Math.PI / 180;
+      const y = (1 - Math.log(Math.tan(latRad) + 1 / Math.cos(latRad)) / Math.PI) / 2 * 800;
+      return { x, y };
+    };
+
+    const interpolate = (from, to, ratio) => ({
+      x: from.x + (to.x - from.x) * ratio,
+      y: from.y + (to.y - from.y) * ratio
+    });
+
+    const attachProjectedPoints = (route) => {
+      const mercatorRaw = ({ latitude, longitude }) => {
+        const x = (longitude + 180) / 360 * 1200;
+        const latRad = latitude * Math.PI / 180;
+        const y = (1 - Math.log(Math.tan(latRad) + 1 / Math.cos(latRad)) / Math.PI) / 2 * 800;
+        return { x, y };
+      };
+
+      const unwrapProjectedSequence = (items) => {
+        const result = [];
+        for (const item of items) {
+          const next = { ...item };
+          if (result.length) {
+            const dx = next.projected.x - result.at(-1).projected.x;
+            if (dx > 600) next.projected = { ...next.projected, x: next.projected.x - 1200 };
+            else if (dx < -600) next.projected = { ...next.projected, x: next.projected.x + 1200 };
+          }
+          result.push(next);
+        }
+        return result;
+      };
+
+      const known = unwrapProjectedSequence(route.plotted
+        .map((point, index) => point.missing ? null : { ...point, projected: mercatorRaw(point), index })
+        .filter(Boolean));
+      const knownByIndex = new Map(known.map((point) => [point.index, point]));
+
+      const projected = route.plotted.map((point, index) => {
+        if (knownByIndex.has(index)) return knownByIndex.get(index);
+
+        let before = null;
+        let after = null;
+        for (let i = index - 1; i >= 0; i -= 1) {
+          if (knownByIndex.has(i)) { before = knownByIndex.get(i); break; }
+        }
+        for (let i = index + 1; i < route.plotted.length; i += 1) {
+          if (knownByIndex.has(i)) { after = knownByIndex.get(i); break; }
+        }
+        if (before && after) {
+          return { ...point, projected: interpolate(before.projected, after.projected, (index - before.index) / (after.index - before.index)) };
+        }
+        const fallback = before?.projected || after?.projected || mercatorRaw(route.departurePoint || route.arrivalPoint || { latitude: 0, longitude: 0 });
+        return { ...point, projected: { x: fallback.x + 22 * (index + 1), y: fallback.y + 18 * (index + 1) } };
+      });
+
+      const measured = unwrapProjectedSequence(route.measured.map((point) => ({ ...point, projected: mercatorRaw(point) })));
+      return { ...route, plotted: projected, measured };
+    };
+
+    const svgEl = (name, attrs = {}) => {
+      const element = document.createElementNS('http://www.w3.org/2000/svg', name);
+      for (const [key, value] of Object.entries(attrs)) element.setAttribute(key, value);
+      return element;
+    };
+
+    const pathFromPoints = (points) => points.map((point, index) => `${index ? 'L' : 'M'} ${point.projected.x.toFixed(1)} ${point.projected.y.toFixed(1)}`).join(' ');
+
+    const currentSvgScale = () => state.viewBox.w / mapWrap.clientWidth;
+
+    const screenPx = (pixels) => pixels * currentSvgScale();
+
+    const svgViewport = () => {
+      const containerRatio = mapWrap.clientWidth / mapWrap.clientHeight;
+      const viewRatio = state.viewBox.w / state.viewBox.h;
+      if (containerRatio > viewRatio) {
+        const width = mapWrap.clientHeight * viewRatio;
+        return { left: (mapWrap.clientWidth - width) / 2, top: 0, width, height: mapWrap.clientHeight };
+      }
+      const height = mapWrap.clientWidth / viewRatio;
+      return { left: 0, top: (mapWrap.clientHeight - height) / 2, width: mapWrap.clientWidth, height };
+    };
+
+    const worldToScreen = (point) => {
+      const viewport = svgViewport();
+      return {
+        x: viewport.left + (point.x - state.viewBox.x) / state.viewBox.w * viewport.width,
+        y: viewport.top + (point.y - state.viewBox.y) / state.viewBox.h * viewport.height
+      };
+    };
+
+    const screenToWorld = (point) => {
+      const viewport = svgViewport();
+      return {
+        x: state.viewBox.x + (point.x - viewport.left) / viewport.width * state.viewBox.w,
+        y: state.viewBox.y + (point.y - viewport.top) / viewport.height * state.viewBox.h
+      };
+    };
+
+    const updateTileLayer = () => {
+      const tileZoom = Math.max(1, Math.min(6, Math.round(Math.log2(1200 / state.viewBox.w) + 2)));
+      const maxTile = 2 ** tileZoom;
+      const startX = Math.floor(state.viewBox.x / 1200 * maxTile) - 1;
+      const endX = Math.ceil((state.viewBox.x + state.viewBox.w) / 1200 * maxTile) + 1;
+      const startY = Math.max(0, Math.floor(state.viewBox.y / 800 * maxTile) - 1);
+      const endY = Math.min(maxTile - 1, Math.ceil((state.viewBox.y + state.viewBox.h) / 800 * maxTile) + 1);
+      const fragments = [];
+
+      for (let tileX = startX; tileX <= endX; tileX += 1) {
+        for (let tileY = startY; tileY <= endY; tileY += 1) {
+          const wrappedX = ((tileX % maxTile) + maxTile) % maxTile;
+          const worldLeft = tileX / maxTile * 1200;
+          const worldTop = tileY / maxTile * 800;
+          const worldRight = (tileX + 1) / maxTile * 1200;
+          const worldBottom = (tileY + 1) / maxTile * 800;
+          const topLeft = worldToScreen({ x: worldLeft, y: worldTop });
+          const bottomRight = worldToScreen({ x: worldRight, y: worldBottom });
+          fragments.push(`<img class="map-tile" src="https://tile.openstreetmap.org/${tileZoom}/${wrappedX}/${tileY}.png" style="left:${topLeft.x}px;top:${topLeft.y}px;width:${bottomRight.x - topLeft.x}px;height:${bottomRight.y - topLeft.y}px" />`);
+        }
+      }
+
+      tileLayer.innerHTML = fragments.join('');
+    };
+
+    const updateFixedSizeSymbols = () => {
+      for (const circle of map.querySelectorAll('circle[data-screen-r]')) {
+        circle.setAttribute('r', screenPx(Number(circle.dataset.screenR)));
+      }
+      for (const label of map.querySelectorAll('text[data-screen-font]')) {
+        label.setAttribute('font-size', screenPx(Number(label.dataset.screenFont)));
+        label.setAttribute('stroke-width', screenPx(Number(label.dataset.screenStroke || 3)));
+        const anchorX = Number(label.dataset.anchorX);
+        const anchorY = Number(label.dataset.anchorY);
+        label.setAttribute('x', anchorX + screenPx(Number(label.dataset.offsetX || 0)));
+        label.setAttribute('y', anchorY + screenPx(Number(label.dataset.offsetY || 0)));
+      }
+      for (const path of map.querySelectorAll('[data-screen-dash]')) {
+        path.setAttribute('stroke-dasharray', path.dataset.screenDash.split(' ').map((value) => screenPx(Number(value))).join(' '));
+      }
+    };
+
+    const setViewBox = (box) => {
+      state.viewBox = box;
+      map.setAttribute('viewBox', `${box.x} ${box.y} ${box.w} ${box.h}`);
+      updateFixedSizeSymbols();
+      updateTileLayer();
+    };
+
+    const fitRoute = (route) => {
+      const points = [...route.plotted, ...route.measured].map((point) => point.projected).filter(Boolean);
+      if (!points.length) return setViewBox({ x: 0, y: 0, w: 1200, h: 800 });
+      const xs = points.map((point) => point.x);
+      const ys = points.map((point) => point.y);
+      const minX = Math.min(...xs) - 90;
+      const maxX = Math.max(...xs) + 90;
+      const minY = Math.max(0, Math.min(...ys) - 90);
+      const maxY = Math.min(800, Math.max(...ys) + 90);
+      const width = Math.max(120, maxX - minX);
+      const height = Math.max(120, maxY - minY);
+      state.fitBox = { x: minX, y: minY, w: width, h: height };
+      setViewBox(state.fitBox);
+    };
+
+    const drawMapBase = () => {
+      const startWrap = Math.floor(state.viewBox.x / 1200) - 1;
+      const endWrap = Math.ceil((state.viewBox.x + state.viewBox.w) / 1200) + 1;
+      for (let wrap = startWrap; wrap <= endWrap; wrap += 1) {
+        const offsetX = wrap * 1200;
+        for (let lon = -180; lon <= 180; lon += 30) {
+          const x = (lon + 180) / 360 * 1200 + offsetX;
+          map.append(svgEl('line', { x1: x, y1: 0, x2: x, y2: 800, class: 'graticule' }));
+        }
+        const asiaHint = `M ${850 + offsetX} 205 C ${950 + offsetX} 160 ${1080 + offsetX} 190 ${1160 + offsetX} 250 L ${1125 + offsetX} 450 C ${1010 + offsetX} 510 ${910 + offsetX} 475 ${820 + offsetX} 390 Z`;
+        const northAmericaHint = `M ${120 + offsetX} 200 C ${250 + offsetX} 120 ${420 + offsetX} 155 ${510 + offsetX} 260 L ${430 + offsetX} 430 C ${280 + offsetX} 430 ${170 + offsetX} 360 ${90 + offsetX} 285 Z`;
+        map.append(svgEl('path', { d: asiaHint, class: 'land-hint' }));
+        map.append(svgEl('path', { d: northAmericaHint, class: 'land-hint' }));
+      }
+      for (let lat = -60; lat <= 80; lat += 20) {
+        const y = mercator({ latitude: lat, longitude: 0 }).y;
+        map.append(svgEl('line', { x1: state.viewBox.x - 1200, y1: y, x2: state.viewBox.x + state.viewBox.w + 1200, y2: y, class: 'graticule' }));
+      }
+    };
+
+    const drawLabel = (text, x, y, className = 'label') => {
+      const label = svgEl('text', {
+        x: x + screenPx(8),
+        y: y - screenPx(8),
+        class: className,
+        'data-screen-font': className === 'small-label' ? 7 : 9,
+        'data-screen-stroke': 2,
+        'data-anchor-x': x,
+        'data-anchor-y': y,
+        'data-offset-x': 8,
+        'data-offset-y': -8
+      });
+      label.textContent = text;
+      map.append(label);
+      updateFixedSizeSymbols();
+    };
+
+    const drawRoute = () => {
+      try {
+        const route = attachProjectedPoints(buildRoute());
+        map.innerHTML = '';
+        drawMapBase();
+
+        if (route.measured.length > 1) {
+          map.append(svgEl('path', { d: pathFromPoints(route.measured), class: 'measured-leg' }));
+        }
+
+        for (const leg of route.routeLegs) {
+          const from = route.plotted.find((point) => point.ident === String(leg.from_fix || '').toUpperCase());
+          const to = route.plotted.find((point) => point.ident === String(leg.to_fix || '').toUpperCase());
+          if (!from?.projected || !to?.projected) continue;
+          const missing = from.missing || to.missing;
+          const isBrute = String(leg.route_id || '').startsWith('BRUTE-');
+          const isDirect = isBrute && leg.edge_type === 'direct';
+          const pathClass = missing ? 'missing-leg' : (isBrute ? (isDirect ? 'brute-direct-leg' : 'brute-airway-leg') : 'published-leg');
+          const publishedPath = svgEl('path', {
+            d: pathFromPoints([from, to]),
+            class: pathClass,
+            'data-screen-dash': missing ? '2 8' : (isDirect ? '10 8' : '8 7')
+          });
+          map.append(publishedPath);
+          updateFixedSizeSymbols();
+          const mid = interpolate(from.projected, to.projected, 0.5);
+          if (leg.airway) drawLabel(leg.airway, mid.x, mid.y, 'small-label');
+          else if (isDirect) drawLabel('DCT', mid.x, mid.y, 'small-label');
+        }
+
+        for (const point of route.measured) {
+          const screenRadius = point.type === 'airport' ? 6 : 4;
+          const circle = svgEl('circle', {
+            cx: point.projected.x,
+            cy: point.projected.y,
+            r: screenPx(screenRadius),
+            class: point.type === 'airport' ? 'airport' : 'waypoint',
+            'data-screen-r': screenRadius
+          });
+          map.append(circle);
+          drawLabel(point.ident, point.projected.x, point.projected.y);
+        }
+
+        for (const point of route.plotted.filter((item) => item.missing)) {
+          map.append(svgEl('circle', {
+            cx: point.projected.x,
+            cy: point.projected.y,
+            r: screenPx(4),
+            class: 'missing-point',
+            'data-screen-r': 4
+          }));
+          drawLabel(`${point.ident}?`, point.projected.x, point.projected.y);
+        }
+
+        fitRoute(route);
+        updateMetrics(route);
+      } catch (error) {
+        metricsEl.innerHTML = `<div class="notice">${error.message}</div>`;
+      }
+    };
+
+    const metricRow = (name, value) => `<div class="metric"><span>${name}</span><strong>${value}</strong></div>`;
+    const number = (value, digits = 1) => Number.isFinite(value) ? value.toFixed(digits) : 'n/a';
+
+    const updateMetrics = (route) => {
+      const routeName = route.lookupRow?.route_code || route.lookupRow?.route_id || 'n/a';
+      metricsEl.innerHTML = [
+        metricRow('Route', routeName),
+        metricRow('Fix coverage', `${number(route.metrics.publishedFixCoverage)}% (${route.metrics.resolvedFixes}/${route.metrics.publishedFixes})`),
+        metricRow('Leg coverage', `${number(route.metrics.publishedLegCoverage)}% (${route.metrics.resolvedLegs}/${route.metrics.publishedLegs})`),
+        metricRow('Great-circle NM', number(route.metrics.greatCircleNm)),
+        metricRow('Measured NM', number(route.metrics.measuredNm)),
+        metricRow('Over limit', `${number(route.metrics.overLimit, 2)}%`)
+      ].join('');
+      routeListEl.textContent = route.routeLegs.map((leg) => `${String(leg.leg_sequence).padStart(2, '0')}. ${leg.from_fix} -> ${leg.to_fix} via ${leg.airway || 'DCT'}`).join('\n') || 'No published legs.';
+    };
+
+    const zoomAt = (scale, clientX = mapWrap.clientWidth / 2, clientY = mapWrap.clientHeight / 2) => {
+      const box = state.viewBox;
+      const rect = mapWrap.getBoundingClientRect();
+      const relX = (clientX - rect.left) / rect.width;
+      const relY = (clientY - rect.top) / rect.height;
+      const newW = box.w * scale;
+      const newH = box.h * scale;
+      const x = box.x + box.w * relX - newW * relX;
+      const y = box.y + box.h * relY - newH * relY;
+      setViewBox({ x, y, w: newW, h: newH });
+    };
+
+    mapWrap.addEventListener('wheel', (event) => {
+      event.preventDefault();
+      zoomAt(event.deltaY < 0 ? 0.86 : 1.16, event.clientX, event.clientY);
+    }, { passive: false });
+
+    mapWrap.addEventListener('dragstart', (event) => event.preventDefault());
+    mapWrap.addEventListener('selectstart', (event) => event.preventDefault());
+
+    mapWrap.addEventListener('pointerdown', (event) => {
+      event.preventDefault();
+      mapWrap.setPointerCapture(event.pointerId);
+      mapWrap.classList.add('dragging');
+      state.drag = { x: event.clientX, y: event.clientY, box: { ...state.viewBox } };
+    });
+
+    mapWrap.addEventListener('pointermove', (event) => {
+      if (!state.drag) return;
+      const dx = (event.clientX - state.drag.x) / mapWrap.clientWidth * state.drag.box.w;
+      const dy = (event.clientY - state.drag.y) / mapWrap.clientHeight * state.drag.box.h;
+      setViewBox({ ...state.drag.box, x: state.drag.box.x - dx, y: state.drag.box.y - dy });
+    });
+
+    mapWrap.addEventListener('pointerup', () => {
+      mapWrap.classList.remove('dragging');
+      state.drag = null;
+    });
+
+    document.getElementById('zoomIn').addEventListener('click', () => zoomAt(0.82));
+    document.getElementById('zoomOut').addEventListener('click', () => zoomAt(1.22));
+    document.getElementById('resetView').addEventListener('click', () => setViewBox(state.fitBox));
+    document.getElementById('renderBtn').addEventListener('click', () => {
+      populateRouteSelect();
+      drawRoute();
+    });
+    routeSelect.addEventListener('change', drawRoute);
+    for (const chip of document.querySelectorAll('[data-route]')) {
+      chip.addEventListener('click', () => {
+        const [departure, arrival] = chip.dataset.route.split('-');
+        departureInput.value = departure;
+        arrivalInput.value = arrival;
+        populateRouteSelect();
+        drawRoute();
+      });
+    }
+
+    await loadData();
+    populateRouteSelect();
+    drawRoute();
+  </script>
+</body>
+</html>
