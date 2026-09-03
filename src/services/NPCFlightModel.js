@@ -13,32 +13,35 @@ export const NPC_STAGE = {
 };
 
 export class NPCFlightModel {
-  constructor(id, callsign, initialPos, targetAirport) {
+  constructor(id, callsign, initialPos, targetAirport, route = null) {
     this.id = id;
     this.callsign = callsign;
-    
+
     // Position
     this.latitude = initialPos.latitude;
     this.longitude = initialPos.longitude;
     this.altitude = initialPos.altitude || 30000; // ft
     this.heading = initialPos.heading || 0; // degrees
-    
+
     // Physics State
     this.speed = initialPos.speed || 450; // TAS knots
     this.verticalSpeed = 0; // fpm
     this.targetAltitude = this.altitude;
     this.targetHeading = this.heading;
     this.targetSpeed = this.speed;
-    
+
     // Navigation
     this.destination = targetAirport; // Code or object
     this.stage = initialPos.stage || NPC_STAGE.CRUISE;
-    
+    this.waypoints = route?.waypoints || [];
+    this.currentWaypointIndex = 0;
+    this.waypointReachedThresholdNm = 3;
+
     // Communication
     this.lastCommTime = Date.now();
     this.nextCommDelay = 10000 + Math.random() * 60000; // Random delay for next msg
     this.pendingMessage = null;
-    
+
     // Conversation State
     this.conversationQueue = [];
     this.conversationState = 'IDLE'; // IDLE, QUEUED, WAITING
@@ -48,7 +51,62 @@ export class NPCFlightModel {
     this.decideNextAction();
   }
 
+  calculateDistance(pos1, pos2) {
+    if (!pos1 || !pos2) return Number.POSITIVE_INFINITY;
+    const radiusNm = 3440.065;
+    const dLat = (pos2.latitude - pos1.latitude) * Math.PI / 180;
+    const dLon = (pos2.longitude - pos1.longitude) * Math.PI / 180;
+    const a = Math.sin(dLat / 2) ** 2
+      + Math.cos(pos1.latitude * Math.PI / 180) * Math.cos(pos2.latitude * Math.PI / 180) * Math.sin(dLon / 2) ** 2;
+    return radiusNm * (2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a)));
+  }
+
+  calculateBearing(from, to) {
+    const fromLat = from.latitude * Math.PI / 180;
+    const toLat = to.latitude * Math.PI / 180;
+    const dLon = (to.longitude - from.longitude) * Math.PI / 180;
+    const y = Math.sin(dLon) * Math.cos(toLat);
+    const x = Math.cos(fromLat) * Math.sin(toLat) - Math.sin(fromLat) * Math.cos(toLat) * Math.cos(dLon);
+    return (Math.atan2(y, x) * 180 / Math.PI + 360) % 360;
+  }
+
+  getCurrentWaypoint() {
+    return this.waypoints[this.currentWaypointIndex] || null;
+  }
+
+  updateRouteGuidance() {
+    const waypoint = this.getCurrentWaypoint();
+    if (!waypoint) return false;
+
+    const position = { latitude: this.latitude, longitude: this.longitude };
+    const distanceNm = this.calculateDistance(position, waypoint);
+    if (distanceNm <= this.waypointReachedThresholdNm && this.currentWaypointIndex < this.waypoints.length - 1) {
+      this.currentWaypointIndex += 1;
+      return this.updateRouteGuidance();
+    }
+
+    this.targetHeading = this.calculateBearing(position, waypoint);
+    if (this.stage === NPC_STAGE.CRUISE) {
+      const destinationDistanceNm = this.destination ? this.calculateDistance(position, this.waypoints.at(-1)) : Number.POSITIVE_INFINITY;
+      if (destinationDistanceNm < 80) {
+        this.stage = NPC_STAGE.DESCENT;
+        this.targetAltitude = Math.max(8000, Math.min(this.altitude, 18000));
+        this.targetSpeed = 300;
+      } else {
+        this.targetSpeed = 430;
+      }
+    } else if (this.stage === NPC_STAGE.DESCENT) {
+      const destinationDistanceNm = this.calculateDistance(position, this.waypoints.at(-1));
+      this.targetAltitude = destinationDistanceNm < 35 ? 5000 : 12000;
+      this.targetSpeed = destinationDistanceNm < 35 ? 240 : 300;
+      if (destinationDistanceNm < 20) this.stage = NPC_STAGE.APPROACH;
+    }
+    return true;
+  }
+
   decideNextAction() {
+    if (this.updateRouteGuidance()) return;
+
     // Logic dependent on stage
     if (this.stage === NPC_STAGE.CRUISE) {
         if (Math.random() > 0.5) {
@@ -126,6 +184,7 @@ export class NPCFlightModel {
     this.longitude += distDeg * Math.sin(radHeading) / Math.cos(this.latitude * Math.PI / 180);
     
     // 2. Logic Update
+    this.updateRouteGuidance();
     this.updateLogic(dt, atcManager);
   }
 
@@ -157,6 +216,16 @@ export class NPCFlightModel {
     }
   }
 
+  getCurrentWaypointName() {
+    const waypoint = this.getCurrentWaypoint();
+    return waypoint?.label || waypoint?.name || 'present position';
+  }
+
+  getDestinationName() {
+    if (typeof this.destination === 'string' && this.destination) return this.destination;
+    return this.waypoints.at(-1)?.label || this.waypoints.at(-1)?.name || 'destination';
+  }
+
   determineFreqInfo() {
       if (this.altitude >= 5000) {
           const region = regionControlService.getRegionInfo(this.latitude, this.longitude);
@@ -171,34 +240,48 @@ export class NPCFlightModel {
 
   generateConversation() {
     const { station, freq } = this.determineFreqInfo();
-    
+
     let reqText = '';
     let replyText = '';
     let readbackText = '';
     let hasReply = true;
+    const flightLevel = Math.round(this.altitude / 100);
+    const targetFlightLevel = Math.round(this.targetAltitude / 100);
+    const nextFix = this.getCurrentWaypointName();
+    const destination = this.getDestinationName();
 
-    // Generate Contextual Messages
     if (this.stage === NPC_STAGE.CLIMB) {
-        const fl = Math.round(this.targetAltitude / 100);
-        reqText = `${station}, ${this.callsign} climbing FL${fl}.`;
-        replyText = `${this.callsign}, radar contact, climb and maintain FL${fl}.`;
-        readbackText = `Climb maintain FL${fl}, ${this.callsign}.`;
+      reqText = `${station}, ${this.callsign} leaving ${Math.max(1, Math.round(this.altitude / 100))} for FL${targetFlightLevel}, direct ${nextFix}.`;
+      replyText = `${this.callsign}, radar contact, climb and maintain FL${targetFlightLevel}, proceed direct ${nextFix}.`;
+      readbackText = `Climb maintain FL${targetFlightLevel}, direct ${nextFix}, ${this.callsign}.`;
+    } else if (this.stage === NPC_STAGE.DESCENT) {
+      reqText = `${station}, ${this.callsign} descending via route, next ${nextFix}, information current for ${destination}.`;
+      replyText = `${this.callsign}, descend and maintain ${Math.round(this.targetAltitude / 100) * 100}, expect further clearance approaching ${nextFix}.`;
+      readbackText = `Descend maintain ${Math.round(this.targetAltitude / 100) * 100}, expect further clearance ${nextFix}, ${this.callsign}.`;
     } else if (this.stage === NPC_STAGE.APPROACH) {
-        reqText = `${station}, ${this.callsign} with you, request approach.`;
-        replyText = `${this.callsign}, expect vectors for visual approach.`;
-        readbackText = `Expect vectors, ${this.callsign}.`;
+      reqText = `${station}, ${this.callsign} ${Math.round(this.calculateDistance({ latitude: this.latitude, longitude: this.longitude }, this.waypoints.at(-1) || { latitude: this.latitude, longitude: this.longitude }))} miles from ${destination}, request approach.`;
+      replyText = `${this.callsign}, cleared visual approach ${destination}, maintain ${Math.round(this.targetSpeed)} knots until five miles.`;
+      readbackText = `Cleared visual approach ${destination}, ${this.callsign}.`;
     } else if (Math.abs(this.verticalSpeed) > 100) {
-        const action = this.verticalSpeed > 0 ? 'climbing' : 'descending';
-        const fl = Math.round(this.targetAltitude / 100);
-        reqText = `${station}, ${this.callsign} ${action} FL${fl}.`;
-        replyText = `${this.callsign}, roger.`;
-        readbackText = ''; // No readback needed for simple report
-        hasReply = false; // Just one message
+      const action = this.verticalSpeed > 0 ? 'climbing' : 'descending';
+      reqText = `${station}, ${this.callsign} ${action} FL${targetFlightLevel}, direct ${nextFix}.`;
+      replyText = `${this.callsign}, roger, report crossing ${nextFix}.`;
+      readbackText = `Wilco, ${this.callsign}.`;
+    } else if (this.waypoints.length > 0) {
+      const handoff = Math.random() < 0.25;
+      if (handoff) {
+        reqText = `${station}, ${this.callsign} level FL${flightLevel}, direct ${nextFix}.`;
+        replyText = `${this.callsign}, contact next sector on ${this.altitude >= 18000 ? '132.85' : '124.70'}, good day.`;
+        readbackText = `Over to ${this.altitude >= 18000 ? '132.85' : '124.70'}, ${this.callsign}.`;
+      } else {
+        reqText = `${station}, ${this.callsign} FL${flightLevel}, estimating ${nextFix}.`;
+        replyText = `${this.callsign}, roger, maintain FL${flightLevel}, traffic advisory available on request.`;
+        readbackText = `Maintain FL${flightLevel}, ${this.callsign}.`;
+      }
     } else {
-        // Routine check-in or turn
-        reqText = `${station}, ${this.callsign} FL${Math.round(this.altitude/100)}.`;
-        replyText = `${this.callsign}, roger.`;
-        hasReply = false; 
+      reqText = `${station}, ${this.callsign} FL${flightLevel}.`;
+      replyText = `${this.callsign}, roger.`;
+      hasReply = false;
     }
 
     this.conversationQueue = [];

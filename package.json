@@ -7,6 +7,9 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
+    "prepare:local-aip-assets": "node scripts/prepare_local_aip_assets.js",
+    "clean:local-aip-assets": "node scripts/prepare_local_aip_assets.js --clean",
+    "build:local-aip": "npm run prepare:local-aip-assets && vite build; npm run clean:local-aip-assets",
     "preview": "vite preview",
     "lint": "eslint src --ext js,jsx --report-unused-disable-directives --max-warnings 0",
     "test": "node --test --test-force-exit",
@@ -19,8 +22,11 @@
     "build:failure-pipeline": "npm run fetch:authoritative-sources && npm run process:failure-graph",
     "build:atc-phraseology": "NODE_TLS_REJECT_UNAUTHORIZED=0 node scripts/build_atc_phraseology_pipeline.js",
     "export:aip-supabase-csv": "node scripts/export_aip_supabase_csv.js",
+    "import:aip-supabase-csv": "node scripts/import_aip_supabase_csv.js",
+    "deploy:aip-supabase": "./scripts/deploy_aip_supabase.sh",
     "test:aip-route-search": "node scripts/test_aip_route_search_smoke.js",
-    "predeploy": "npm run build",
+    "test:aip-supabase-rpc": "node scripts/test_aip_supabase_rpc_smoke.js",
+    "predeploy": "npm run build:local-aip",
     "deploy": "gh-pages -d dist"
   },
   "dependencies": {

@@ -239,7 +239,7 @@
     .airport { fill: var(--airport); stroke: #e8fbff; stroke-width: 1.5; vector-effect: non-scaling-stroke; }
     .waypoint { fill: var(--waypoint); stroke: #2d2203; stroke-width: 1.2; vector-effect: non-scaling-stroke; }
     .missing-point { fill: var(--missing); stroke: #ffe5e8; stroke-width: 1.1; vector-effect: non-scaling-stroke; }
-    .coverage-point { fill: rgba(255, 209, 102, 0.35); stroke: none; }
+    .coverage-point { fill: #ff2bd6; stroke: #ffffff; stroke-width: 0.8; opacity: 0.9; vector-effect: non-scaling-stroke; filter: drop-shadow(0 0 3px rgba(255, 43, 214, 0.85)); }
     .label {
       fill: #ffffff;
       paint-order: stroke;
@@ -303,6 +303,22 @@
 
     <button id="renderBtn">Render route</button>
 
+    <label class="toggle-row">
+      <input id="showCoverageLayer" type="checkbox" />
+      Plot all reference waypoints for coverage
+    </label>
+
+    <label class="toggle-row">
+      <input id="relaxAirwayLimits" type="checkbox" />
+      Relax airway limits and use direct fallback legs
+    </label>
+
+    <label>Minimum relaxed leg distance (NM)</label>
+    <input id="minRelaxedLegNm" type="number" min="0" max="500" step="10" value="80" />
+
+    <label>Relaxed waypoint limit</label>
+    <input id="relaxedWaypointLimit" type="number" min="4" max="40" step="1" value="14" />
+
     <div class="chips">
       <button class="chip" data-route="ZMCK-ZSPD">ZMCK-ZSPD</button>
       <button class="chip" data-route="ZMCK-ZBTJ">ZMCK-ZBTJ</button>
@@ -343,7 +359,7 @@
 
   <script type="module">
     const CSV_DIR = '../AIP_DATA/supabase_csv';
-    const AIRPORTS_CSV = '../AIP_DATA/airports.csv';
+    const AIRPORTS_CSV = `${CSV_DIR}/aip_airports.csv`;
     const routeSelect = document.getElementById('routeSelect');
     const departureInput = document.getElementById('departure');
     const arrivalInput = document.getElementById('arrival');
@@ -360,6 +376,13 @@
       pointsByIdent: new Map(),
       airports: new Map(),
       bruteForceCache: new Map(),
+      relaxedPointCache: new Map(),
+      showCoverageLayer: false,
+      relaxAirwayLimits: false,
+      minRelaxedLegNm: 80,
+      relaxedWaypointLimit: 14,
+      relaxedDebug: null,
+      coverageRenderToken: 0,
       viewBox: { x: 0, y: 0, w: 1200, h: 800 },
       fitBox: { x: 0, y: 0, w: 1200, h: 800 },
       drag: null
@@ -486,24 +509,34 @@
       return radiusNm * (2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a)));
     };
 
-    const resolvePoint = (ident, previousPoint = null, nextPoint = null, regionCode = '') => {
+    const resolvePoint = (ident, previousPoint = null, nextPoint = null, regionCode = '', options = {}) => {
       const normalized = String(ident || '').toUpperCase();
       const airport = state.airports.get(normalized);
       if (airport) return airport;
       const candidates = state.pointsByIdent.get(normalized) || [];
       if (!candidates.length) return null;
 
-      return [...candidates].sort((a, b) => {
-        const score = (point) => {
-          let value = 0;
-          if (regionCode && (point.regionCode === regionCode || point.isoCountry === regionCode)) value += 100;
-          if (point.frequencyKhz) value += 4;
-          if (previousPoint) value -= Math.min(calculateGreatCircleNm(previousPoint, point) / 40, 80);
-          if (nextPoint) value -= Math.min(calculateGreatCircleNm(point, nextPoint) / 40, 80);
-          return value;
+      const strictRegionDistance = options.strictRegionDistance !== false;
+      const hasContinuityContext = Boolean(previousPoint || nextPoint);
+      const ranked = [...candidates].map((point) => {
+        const previousDistance = previousPoint ? calculateGreatCircleNm(previousPoint, point) : null;
+        const nextDistance = nextPoint ? calculateGreatCircleNm(point, nextPoint) : null;
+        return {
+          point,
+          continuityDistance: hasContinuityContext ? (previousDistance ?? 0) + (nextDistance ?? 0) : Number.POSITIVE_INFINITY,
+          nearestContextDistance: Math.min(previousDistance ?? Number.POSITIVE_INFINITY, nextDistance ?? Number.POSITIVE_INFINITY),
+          regionMatch: regionCode && (point.regionCode === regionCode || point.isoCountry === regionCode),
+          regionMismatch: regionCode && point.isoCountry && point.isoCountry !== regionCode && point.regionCode !== regionCode,
+          frequency: Boolean(point.frequencyKhz)
         };
-        return score(b) - score(a);
-      })[0];
+      }).sort((a, b) => {
+        if (hasContinuityContext && Math.abs(a.continuityDistance - b.continuityDistance) > 1) return a.continuityDistance - b.continuityDistance;
+        if (a.regionMatch !== b.regionMatch) return Number(b.regionMatch) - Number(a.regionMatch);
+        return Number(b.frequency) - Number(a.frequency);
+      });
+      const best = ranked[0];
+      if (strictRegionDistance && best.regionMismatch && best.nearestContextDistance > 1200) return null;
+      return best.point;
     };
 
     const bruteForceCacheKey = (departure, arrival) => `${departure}-${arrival}`;
@@ -517,9 +550,33 @@
       const arrival = arrivalInput.value.trim().toUpperCase();
       const rows = routeRowsForPair(departure, arrival);
       routeSelect.innerHTML = '';
+
+      const appendBruteRoutes = (bruteRoutes, labelSuffix = '') => {
+        for (const route of bruteRoutes) {
+          const option = document.createElement('option');
+          option.value = route.routeId;
+          option.textContent = `${route.routeCode}${labelSuffix} | fixes ${route.resolvedCount}/${route.path.length} | total ${Math.round(route.estimatedNm)} NM | max leg ${Math.round(route.maxLegNm)} NM`;
+          routeSelect.append(option);
+        }
+      };
+
+      const departurePoint = resolvePoint(departure) || state.airports.get(departure);
+      const arrivalPoint = resolvePoint(arrival) || state.airports.get(arrival);
+      if (state.relaxAirwayLimits) {
+        const bruteRoutes = buildBruteForceRoutes(departure, arrival, departurePoint, arrivalPoint, 16);
+        state.bruteForceCache.set(bruteForceCacheKey(departure, arrival), bruteRoutes);
+        if (!bruteRoutes.length) {
+          const option = document.createElement('option');
+          option.value = '';
+          option.textContent = 'No relaxed waypoint route found';
+          routeSelect.append(option);
+          return;
+        }
+        appendBruteRoutes(bruteRoutes, ' relaxed');
+        return;
+      }
+
       if (!rows.length) {
-        const departurePoint = resolvePoint(departure) || state.airports.get(departure);
-        const arrivalPoint = resolvePoint(arrival) || state.airports.get(arrival);
         const bruteRoutes = buildBruteForceRoutes(departure, arrival, departurePoint, arrivalPoint, 5);
         state.bruteForceCache.set(bruteForceCacheKey(departure, arrival), bruteRoutes);
         if (!bruteRoutes.length) {
@@ -529,12 +586,7 @@
           routeSelect.append(option);
           return;
         }
-        for (const route of bruteRoutes) {
-          const option = document.createElement('option');
-          option.value = route.routeId;
-          option.textContent = `${route.routeCode} | fixes ${route.resolvedCount}/${route.path.length} | est ${Math.round(route.estimatedNm)} NM | final ${Math.round(route.finalSpacingNm)} NM`;
-          routeSelect.append(option);
-        }
+        appendBruteRoutes(bruteRoutes);
         return;
       }
       state.bruteForceCache.delete(bruteForceCacheKey(departure, arrival));
@@ -555,7 +607,266 @@
       aip_cycle: 'preview'
     });
 
+    const bearingDegrees = (from, to) => {
+      const toRad = (degrees) => degrees * Math.PI / 180;
+      const toDeg = (radians) => radians * 180 / Math.PI;
+      const lat1 = toRad(from.latitude);
+      const lat2 = toRad(to.latitude);
+      const deltaLon = toRad(to.longitude - from.longitude);
+      const y = Math.sin(deltaLon) * Math.cos(lat2);
+      const x = Math.cos(lat1) * Math.sin(lat2) - Math.sin(lat1) * Math.cos(lat2) * Math.cos(deltaLon);
+      return (toDeg(Math.atan2(y, x)) + 360) % 360;
+    };
+
+    const turnAngleDegrees = (a, b, c) => {
+      if (!a || !b || !c) return 0;
+      const inbound = bearingDegrees(a, b);
+      const outbound = bearingDegrees(b, c);
+      const delta = Math.abs(outbound - inbound);
+      return Math.min(delta, 360 - delta);
+    };
+
+    const relaxedPointPool = (departure, arrival, departurePoint, arrivalPoint) => {
+      const cacheKey = `${departure}-${arrival}`;
+      if (state.relaxedPointCache.has(cacheKey)) return state.relaxedPointCache.get(cacheKey);
+      const greatCircleNm = calculateGreatCircleNm(departurePoint, arrivalPoint);
+      const corridorBearing = bearingDegrees(departurePoint, arrivalPoint);
+      const allPoints = [...state.pointsByIdent.values()].flat()
+        .filter((point) => point.type !== 'airport')
+        .filter((point) => /^[A-Z][A-Z0-9]{1,6}$/.test(point.ident));
+      const points = allPoints
+        .filter((point) => point.ident !== departure && point.ident !== arrival)
+        .map((point) => {
+          const fromDepartureNm = calculateGreatCircleNm(departurePoint, point);
+          const toArrivalNm = calculateGreatCircleNm(point, arrivalPoint);
+          const projectedNm = fromDepartureNm + toArrivalNm;
+          const alongRouteNm = Math.max(0, Math.min(greatCircleNm, (greatCircleNm ** 2 + fromDepartureNm ** 2 - toArrivalNm ** 2) / (2 * greatCircleNm)));
+          const bearingDelta = Math.abs(bearingDegrees(departurePoint, point) - corridorBearing);
+          return {
+            ...point,
+            fromDepartureNm,
+            toArrivalNm,
+            projectedNm,
+            alongRouteNm,
+            detourPenalty: Math.max(0, projectedNm - greatCircleNm),
+            typePenalty: point.type === 'waypoint' ? 0 : 35,
+            identPenalty: point.ident.length === 5 ? 0 : (point.ident.length >= 4 ? 12 : 45),
+            corridorPenalty: Math.min(bearingDelta, 360 - bearingDelta)
+          };
+        })
+        .filter((point) => point.projectedNm <= greatCircleNm * 1.35)
+        .sort((a, b) => (a.detourPenalty - b.detourPenalty) || (a.typePenalty - b.typePenalty) || (a.identPenalty - b.identPenalty) || (a.corridorPenalty - b.corridorPenalty))
+        .slice(0, 1800);
+      state.relaxedPointCache.set(cacheKey, points);
+      return points;
+    };
+
+    const buildRelaxedWaypointRoutes = (departure, arrival, departurePoint, arrivalPoint, limit = 16) => {
+      if (!departurePoint || !arrivalPoint) return [];
+      const pool = relaxedPointPool(departure, arrival, departurePoint, arrivalPoint);
+      const maxBranches = 36;
+      const maxPartials = 90;
+      const greatCircleNm = calculateGreatCircleNm(departurePoint, arrivalPoint);
+      const targetLegNm = Math.max(140, Math.min(320, greatCircleNm / 7));
+      const stationCount = Math.max(4, Math.min(10, Math.ceil(greatCircleNm / targetLegNm)));
+      const stationSpacingNm = greatCircleNm / stationCount;
+      const maxPreferredLegNm = targetLegNm * 1.35;
+      const midpointNm = greatCircleNm / 2;
+      const maxHalfFixes = Math.max(3, Math.ceil(state.relaxedWaypointLimit / 2));
+
+      const expandHalf = (fromStart) => {
+        const originIdent = fromStart ? departure : arrival;
+        const originPoint = fromStart ? departurePoint : arrivalPoint;
+        const goalPoint = fromStart ? arrivalPoint : departurePoint;
+        const queue = [{
+          path: [originIdent],
+          points: [originPoint],
+          routedNm: 0,
+          maxLegNm: 0,
+          turnPenalty: 0,
+          spacingPenalty: 0,
+          alongRouteNm: fromStart ? 0 : greatCircleNm,
+          station: fromStart ? 0 : stationCount,
+          remainingNm: calculateGreatCircleNm(originPoint, goalPoint)
+        }];
+        const partials = [];
+        const bestVisit = new Map();
+        let expanded = 0;
+
+        while (queue.length && partials.length < maxPartials && expanded < 650) {
+          queue.sort((a, b) => {
+            const midpointA = Math.abs(a.alongRouteNm - midpointNm);
+            const midpointB = Math.abs(b.alongRouteNm - midpointNm);
+            const scoreA = (midpointA * 0.9) + (a.maxLegNm * 7) + (a.routedNm * 0.2) + (a.turnPenalty * 12) + (a.spacingPenalty * 20);
+            const scoreB = (midpointB * 0.9) + (b.maxLegNm * 7) + (b.routedNm * 0.2) + (b.turnPenalty * 12) + (b.spacingPenalty * 20);
+            return scoreA - scoreB;
+          });
+          const current = queue.shift();
+          expanded += 1;
+          const currentPoint = current.points.at(-1);
+          const reachedMiddle = fromStart ? current.alongRouteNm >= midpointNm * 0.72 : current.alongRouteNm <= midpointNm * 1.28;
+          if (current.path.length > 2 && reachedMiddle) partials.push(current);
+          if (current.path.length >= maxHalfFixes) continue;
+
+          const branches = pool
+            .filter((point) => !current.path.includes(point.ident))
+            .map((point) => {
+              const legNm = calculateGreatCircleNm(currentPoint, point);
+              const remainingNm = calculateGreatCircleNm(point, goalPoint);
+              const station = Math.floor(point.alongRouteNm / stationSpacingNm);
+              const stationAdvance = fromStart ? station - current.station : current.station - station;
+              const nextStation = fromStart ? current.station + 1 : current.station - 1;
+              const targetStationNm = Math.max(0, Math.min(greatCircleNm, nextStation * stationSpacingNm));
+              const stationPenalty = Math.abs(point.alongRouteNm - targetStationNm) / stationSpacingNm;
+              const turn = turnAngleDegrees(current.points.at(-2), currentPoint, point);
+              const nextMaxLegNm = Math.max(current.maxLegNm, legNm);
+              const nextTurnPenalty = current.turnPenalty + Math.max(0, turn - 35) / 35;
+              const nextSpacingPenalty = current.spacingPenalty + Math.abs(legNm - targetLegNm) / targetLegNm;
+              const progressNm = current.remainingNm - remainingNm;
+              return { point, legNm, remainingNm, station, stationAdvance, stationPenalty, turn, nextMaxLegNm, nextTurnPenalty, nextSpacingPenalty, progressNm };
+            })
+            .filter((branch) => branch.stationAdvance >= 0 && branch.stationAdvance <= 3)
+            .filter((branch) => branch.legNm >= state.minRelaxedLegNm)
+            .filter((branch) => branch.progressNm > 20 && branch.legNm <= Math.max(180, maxPreferredLegNm, current.remainingNm * 0.45))
+            .sort((a, b) => {
+              const scoreA = (a.stationPenalty * 900) + (a.nextMaxLegNm * 16) + (Math.abs(a.legNm - targetLegNm) * 5) + (a.remainingNm * 0.25) + ((current.routedNm + a.legNm) * 0.12) + (a.nextTurnPenalty * 20) + a.point.typePenalty + a.point.identPenalty + a.point.corridorPenalty * 0.4;
+              const scoreB = (b.stationPenalty * 900) + (b.nextMaxLegNm * 16) + (Math.abs(b.legNm - targetLegNm) * 5) + (b.remainingNm * 0.25) + ((current.routedNm + b.legNm) * 0.12) + (b.nextTurnPenalty * 20) + b.point.typePenalty + b.point.identPenalty + b.point.corridorPenalty * 0.4;
+              return scoreA - scoreB;
+            })
+            .slice(0, maxBranches);
+
+          for (const branch of branches) {
+            const nextPath = [...current.path, branch.point.ident];
+            const visitKey = `${branch.point.ident}|${nextPath.length}`;
+            const visitScore = current.routedNm + branch.legNm + branch.remainingNm + branch.nextMaxLegNm + branch.nextTurnPenalty;
+            if ((bestVisit.get(visitKey) ?? Infinity) <= visitScore) continue;
+            bestVisit.set(visitKey, visitScore);
+            queue.push({
+              path: nextPath,
+              points: [...current.points, branch.point],
+              routedNm: current.routedNm + branch.legNm,
+              maxLegNm: branch.nextMaxLegNm,
+              turnPenalty: branch.nextTurnPenalty,
+              spacingPenalty: branch.nextSpacingPenalty,
+              alongRouteNm: branch.point.alongRouteNm,
+              station: branch.station,
+              remainingNm: branch.remainingNm
+            });
+          }
+        }
+
+        return partials.length ? partials : queue.slice(0, maxPartials);
+      };
+
+      const forwardPartials = expandHalf(true);
+      const backwardPartials = expandHalf(false);
+      const candidates = [];
+      let rejectedOverlap = 0;
+      let rejectedJoinDistance = 0;
+      const maxJoinLegNm = greatCircleNm;
+
+      for (const forward of forwardPartials) {
+        const forwardPoint = forward.points.at(-1);
+        for (const backward of backwardPartials) {
+          const backwardPoint = backward.points.at(-1);
+          const overlap = new Set(forward.path.slice(1));
+          if (backward.path.slice(1).some((ident) => overlap.has(ident))) {
+            rejectedOverlap += 1;
+            continue;
+          }
+          const joinLegNm = calculateGreatCircleNm(forwardPoint, backwardPoint);
+          if (joinLegNm < state.minRelaxedLegNm || joinLegNm > maxJoinLegNm) {
+            rejectedJoinDistance += 1;
+            continue;
+          }
+          const reversedBackwardPath = [...backward.path].reverse();
+          const reversedBackwardPoints = [...backward.points].reverse();
+          const path = [...forward.path, ...reversedBackwardPath];
+          const points = [...forward.points, ...reversedBackwardPoints];
+          const legDistances = [];
+          let spacingPenalty = forward.spacingPenalty + backward.spacingPenalty + Math.abs(joinLegNm - targetLegNm) / targetLegNm;
+          let turnPenalty = forward.turnPenalty + backward.turnPenalty;
+          for (let index = 0; index < points.length - 1; index += 1) {
+            const legNm = calculateGreatCircleNm(points[index], points[index + 1]);
+            legDistances.push(legNm);
+            if (index > 0) turnPenalty += Math.max(0, turnAngleDegrees(points[index - 1], points[index], points[index + 1]) - 35) / 35;
+            spacingPenalty += Math.abs(legNm - targetLegNm) / targetLegNm;
+          }
+          const routedNm = legDistances.reduce((total, legNm) => total + legNm, 0);
+          const maxLegNm = Math.max(...legDistances);
+          candidates.push({
+            path,
+            resolvedCount: path.length,
+            routedNm,
+            maxLegNm,
+            turnPenalty,
+            spacingPenalty,
+            joinLegNm
+          });
+        }
+      }
+
+      const ranked = candidates.sort((a, b) => {
+        if (Math.abs(a.maxLegNm - b.maxLegNm) > 0.5) return a.maxLegNm - b.maxLegNm;
+        if (Math.abs(a.joinLegNm - b.joinLegNm) > 3) return a.joinLegNm - b.joinLegNm;
+        if (Math.abs(a.spacingPenalty - b.spacingPenalty) > 0.25) return a.spacingPenalty - b.spacingPenalty;
+        if (Math.abs(a.routedNm - b.routedNm) > 3) return a.routedNm - b.routedNm;
+        return a.turnPenalty - b.turnPenalty;
+      });
+      const uniqueRanked = [];
+      const seenSignatures = new Set();
+      for (const candidate of ranked) {
+        const signature = candidate.path.join('-');
+        if (seenSignatures.has(signature)) continue;
+        seenSignatures.add(signature);
+        uniqueRanked.push(candidate);
+        if (uniqueRanked.length >= limit) break;
+      }
+
+      state.relaxedDebug = {
+        poolSize: pool.length,
+        forwardPartials: forwardPartials.length,
+        backwardPartials: backwardPartials.length,
+        joinPairs: forwardPartials.length * backwardPartials.length,
+        joinedCandidates: candidates.length,
+        uniqueCandidates: uniqueRanked.length,
+        rejectedOverlap,
+        rejectedJoinDistance,
+        maxJoinLegNm,
+        minRelaxedLegNm: state.minRelaxedLegNm,
+        waypointLimit: state.relaxedWaypointLimit,
+        maxHalfFixes
+      };
+
+      return uniqueRanked.map((candidate, candidateIndex) => {
+        const routeId = `BRUTE-${departure}-${arrival}-${candidateIndex + 1}`;
+        return {
+          routeId,
+          routeCode: routeId,
+          path: candidate.path,
+          resolvedCount: candidate.resolvedCount,
+          estimatedNm: candidate.routedNm,
+          finalSpacingNm: 0,
+          maxLegNm: candidate.maxLegNm,
+          approachSpaced: true,
+          legs: candidate.path.slice(0, -1).map((fromFix, index) => ({
+            route_id: routeId,
+            leg_sequence: index + 1,
+            from_fix: fromFix,
+            to_fix: candidate.path[index + 1],
+            airway: 'DCT',
+            edge_type: 'direct',
+            region_code: 'CN',
+            aip_cycle: 'preview'
+          }))
+        };
+      });
+    };
+
     const buildBruteForceRoutes = (departure, arrival, departurePoint, arrivalPoint, limit = 5) => {
+      if (state.relaxAirwayLimits) return buildRelaxedWaypointRoutes(departure, arrival, departurePoint, arrivalPoint, limit);
+      state.relaxedDebug = null;
+
       const startRows = state.lookup.filter((row) => String(row.departure_code || '').toUpperCase() === departure).slice(0, 12);
       const goalRows = state.lookup.filter((row) => String(row.arrival_code || '').toUpperCase() === arrival).slice(0, 12);
       const starts = new Set();
@@ -602,12 +913,21 @@
 
         if (goals.has(current.ident) || current.ident === arrival) {
           if (current.path.length > 1) candidates.push(current);
-          if (candidates.length >= 12) break;
+          if (candidates.length >= (state.relaxAirwayLimits ? 48 : 12)) break;
           continue;
         }
         if (current.path.length > 8) continue;
 
-        const edges = (state.edgesByFrom.get(current.ident) || [])
+        const rawEdges = state.edgesByFrom.get(current.ident) || [];
+        const relaxedEdges = state.relaxAirwayLimits ? [...goals].filter((goal) => goal !== current.ident && !current.path.includes(goal)).map((goal) => ({
+          from_fix: current.ident,
+          to_fix: goal,
+          airway: 'DCT',
+          region_code: '',
+          relaxed_direct: true
+        })) : [];
+
+        const edges = [...rawEdges, ...relaxedEdges]
           .map((edge) => {
             const toFix = String(edge.to_fix || '').toUpperCase();
             const toPoint = resolvePoint(toFix, current.lastPoint, arrivalPoint, edge.region_code || 'CN');
@@ -617,8 +937,8 @@
             return { ...edge, to_fix: toFix, toPoint, legNm, remainingNm, progressNm, hasPoint: Boolean(toPoint) };
           })
           .filter((edge) => edge.to_fix && !current.path.includes(edge.to_fix))
-          .filter((edge) => !edge.hasPoint || edge.progressNm >= -120)
-          .filter((edge) => !Number.isFinite(greatCircleNm) || current.routedNm + edge.legNm + edge.remainingNm <= greatCircleNm * 1.8)
+          .filter((edge) => !edge.hasPoint || edge.progressNm >= -120 || edge.relaxed_direct)
+          .filter((edge) => !Number.isFinite(greatCircleNm) || current.routedNm + edge.legNm + edge.remainingNm <= greatCircleNm * 1.8 || edge.relaxed_direct)
           .sort((a, b) => {
             const scoreA = Number(a.hasPoint) * 100 + a.progressNm - (a.legNm / 20);
             const scoreB = Number(b.hasPoint) * 100 + b.progressNm - (b.legNm / 20);
@@ -636,7 +956,7 @@
             ident: edge.to_fix,
             path: [...current.path, edge.to_fix],
             airways: [...current.airways, edge.airway || ''],
-            edgeTypes: [...current.edgeTypes, edge.airway ? 'airway' : 'direct'],
+            edgeTypes: [...current.edgeTypes, edge.relaxed_direct || !edge.airway ? 'direct' : 'airway'],
             resolvedCount: nextResolvedCount,
             lastPoint: edge.toPoint || current.lastPoint,
             routedNm: current.routedNm + edge.legNm,
@@ -649,22 +969,48 @@
       const scoredCandidates = candidates.map((candidate) => {
         const finalPoint = candidate.lastPoint;
         const finalSpacingNm = finalPoint && arrivalPoint ? calculateGreatCircleNm(finalPoint, arrivalPoint) : Number.POSITIVE_INFINITY;
+        const legDistances = [];
+        for (let i = 0; i < candidate.path.length - 1; i += 1) {
+          const fromPoint = i === 0 ? departurePoint : (resolvePoint(candidate.path[i], departurePoint, arrivalPoint, 'CN') || departurePoint);
+          const toPoint = resolvePoint(candidate.path[i + 1], fromPoint, arrivalPoint, 'CN') || arrivalPoint;
+          if (fromPoint && toPoint) legDistances.push(calculateGreatCircleNm(fromPoint, toPoint));
+        }
+        const maxLegNm = legDistances.length ? Math.max(...legDistances) : Number.POSITIVE_INFINITY;
         return {
           ...candidate,
           finalSpacingNm,
+          maxLegNm,
           approachSpaced: finalSpacingNm >= minArrivalSpacingNm
         };
       });
       const spacedCandidates = scoredCandidates.filter((candidate) => candidate.approachSpaced);
       const rankingPool = spacedCandidates.length ? spacedCandidates : scoredCandidates;
       const ranked = rankingPool.sort((a, b) => {
+        if (state.relaxAirwayLimits) {
+          const totalA = a.routedNm + a.remainingNm;
+          const totalB = b.routedNm + b.remainingNm;
+          if (Math.abs(a.maxLegNm - b.maxLegNm) > 1) return a.maxLegNm - b.maxLegNm;
+          if (Math.abs(totalA - totalB) > 5) return totalA - totalB;
+        }
         const coverageA = a.resolvedCount / a.path.length;
         const coverageB = b.resolvedCount / b.path.length;
         if (coverageA !== coverageB) return coverageB - coverageA;
-        return (a.routedNm + a.remainingNm) - (b.routedNm + b.remainingNm);
-      }).slice(0, limit);
+        const totalA = a.routedNm + a.remainingNm;
+        const totalB = b.routedNm + b.remainingNm;
+        return totalA - totalB;
+      });
+      const uniqueRanked = [];
+      const seenLengths = new Set();
+      for (const candidate of ranked) {
+        const lengthKey = Math.round((candidate.routedNm + candidate.remainingNm) * 10);
+        if (seenLengths.has(lengthKey)) continue;
+        seenLengths.add(lengthKey);
+        uniqueRanked.push(candidate);
+        if (uniqueRanked.length >= limit) break;
+      }
+      const selectedRanked = uniqueRanked;
 
-      return ranked.map((candidate, candidateIndex) => {
+      return selectedRanked.map((candidate, candidateIndex) => {
         const routeId = `BRUTE-${departure}-${arrival}-${candidateIndex + 1}`;
         return {
           routeId,
@@ -673,6 +1019,7 @@
           resolvedCount: candidate.resolvedCount,
           estimatedNm: candidate.routedNm + candidate.remainingNm,
           finalSpacingNm: candidate.finalSpacingNm,
+          maxLegNm: candidate.maxLegNm,
           approachSpaced: candidate.approachSpaced,
           legs: candidate.path.slice(0, -1).map((fromFix, index) => ({
             route_id: routeId,
@@ -692,14 +1039,14 @@
       const departure = departureInput.value.trim().toUpperCase();
       const arrival = arrivalInput.value.trim().toUpperCase();
       const routeId = routeSelect.value;
-      let lookupRow = state.lookup.find((row) => row.route_id === routeId) || routeRowsForPair(departure, arrival)[0];
+      let lookupRow = state.lookup.find((row) => row.route_id === routeId) || null;
       const departurePoint = resolvePoint(departure) || state.airports.get(departure);
       const arrivalPoint = resolvePoint(arrival) || state.airports.get(arrival);
-      let routeLegs = state.legsByRoute.get(lookupRow?.route_id || '') || [];
-      if (!routeLegs.length) {
-        const bruteRoutes = state.bruteForceCache.get(bruteForceCacheKey(departure, arrival)) || buildBruteForceRoutes(departure, arrival, departurePoint, arrivalPoint, 5);
+      let routeLegs = lookupRow ? (state.legsByRoute.get(lookupRow.route_id) || []) : [];
+      if (!routeLegs.length || String(routeId || '').startsWith('BRUTE-')) {
+        const bruteRoutes = state.bruteForceCache.get(bruteForceCacheKey(departure, arrival)) || buildBruteForceRoutes(departure, arrival, departurePoint, arrivalPoint, state.relaxAirwayLimits ? 16 : 5);
         state.bruteForceCache.set(bruteForceCacheKey(departure, arrival), bruteRoutes);
-        const selectedBrute = bruteRoutes.find((route) => route.routeId === routeId) || bruteRoutes[0];
+        const selectedBrute = bruteRoutes.find((route) => route.routeId === routeId) || (!lookupRow ? bruteRoutes[0] : null);
         if (selectedBrute) {
           lookupRow = buildBruteForceLookupRow(departure, arrival);
           lookupRow.route_id = selectedBrute.routeId;
@@ -707,6 +1054,7 @@
           routeLegs = selectedBrute.legs;
         }
       }
+      if (!lookupRow) lookupRow = routeRowsForPair(departure, arrival)[0];
       const routeFixes = [];
       const seen = new Set();
       const addFix = (ident, airway = '') => {
@@ -724,7 +1072,7 @@
       let previousPoint = departurePoint;
 
       for (const fix of routeFixes) {
-        const point = resolvePoint(fix.ident, previousPoint, arrivalPoint, lookupRow?.region_code || '');
+        const point = resolvePoint(fix.ident, previousPoint, arrivalPoint, lookupRow?.region_code || '', { strictRegionDistance: !String(lookupRow?.route_id || '').startsWith('BRUTE-') });
         if (point) {
           const waypoint = { ...point, ident: fix.ident, airway: fix.airway, missing: false };
           resolved.push(waypoint);
@@ -967,9 +1315,43 @@
       updateFixedSizeSymbols();
     };
 
+    const drawCoverageLayerProgressively = () => {
+      state.coverageRenderToken += 1;
+      const token = state.coverageRenderToken;
+      if (!state.showCoverageLayer) return;
+
+      const layer = svgEl('g', { id: 'coverageLayer' });
+      map.append(layer);
+      const allPoints = [...state.pointsByIdent.values()].flat();
+      let index = 0;
+      const batchSize = 450;
+
+      const renderBatch = () => {
+        if (token !== state.coverageRenderToken || !state.showCoverageLayer || !layer.isConnected) return;
+        const fragment = document.createDocumentFragment();
+        const end = Math.min(index + batchSize, allPoints.length);
+        for (; index < end; index += 1) {
+          const projected = mercator(allPoints[index]);
+          fragment.append(svgEl('circle', {
+            cx: projected.x,
+            cy: projected.y,
+            r: screenPx(2.2),
+            class: 'coverage-point',
+            'data-screen-r': 2.2
+          }));
+        }
+        layer.append(fragment);
+        updateFixedSizeSymbols();
+        if (index < allPoints.length) requestAnimationFrame(renderBatch);
+      };
+
+      requestAnimationFrame(renderBatch);
+    };
+
     const drawRoute = () => {
       try {
         const route = attachProjectedPoints(buildRoute());
+        state.coverageRenderToken += 1;
         map.innerHTML = '';
         drawMapBase();
 
@@ -1023,6 +1405,7 @@
 
         fitRoute(route);
         updateMetrics(route);
+        drawCoverageLayerProgressively();
       } catch (error) {
         metricsEl.innerHTML = `<div class="notice">${error.message}</div>`;
       }
@@ -1039,7 +1422,8 @@
         metricRow('Leg coverage', `${number(route.metrics.publishedLegCoverage)}% (${route.metrics.resolvedLegs}/${route.metrics.publishedLegs})`),
         metricRow('Great-circle NM', number(route.metrics.greatCircleNm)),
         metricRow('Measured NM', number(route.metrics.measuredNm)),
-        metricRow('Over limit', `${number(route.metrics.overLimit, 2)}%`)
+        metricRow('Over limit', `${number(route.metrics.overLimit, 2)}%`),
+        ...(state.relaxedDebug ? [metricRow('Relax debug', `pool ${state.relaxedDebug.poolSize}, F/B ${state.relaxedDebug.forwardPartials}/${state.relaxedDebug.backwardPartials}, joined ${state.relaxedDebug.joinedCandidates}/${state.relaxedDebug.joinPairs}, unique ${state.relaxedDebug.uniqueCandidates}, join rejects ${state.relaxedDebug.rejectedJoinDistance}, overlap rejects ${state.relaxedDebug.rejectedOverlap}, max join ${Math.round(state.relaxedDebug.maxJoinLegNm)} NM, min leg ${state.relaxedDebug.minRelaxedLegNm} NM, waypoint limit ${state.relaxedDebug.waypointLimit}`)] : [])
       ].join('');
       routeListEl.textContent = route.routeLegs.map((leg) => `${String(leg.leg_sequence).padStart(2, '0')}. ${leg.from_fix} -> ${leg.to_fix} via ${leg.airway || 'DCT'}`).join('\n') || 'No published legs.';
     };
@@ -1086,6 +1470,29 @@
     document.getElementById('zoomIn').addEventListener('click', () => zoomAt(0.82));
     document.getElementById('zoomOut').addEventListener('click', () => zoomAt(1.22));
     document.getElementById('resetView').addEventListener('click', () => setViewBox(state.fitBox));
+    document.getElementById('showCoverageLayer').addEventListener('change', (event) => {
+      state.showCoverageLayer = event.target.checked;
+      drawRoute();
+    });
+    document.getElementById('relaxAirwayLimits').addEventListener('change', (event) => {
+      state.relaxAirwayLimits = event.target.checked;
+      state.bruteForceCache.clear();
+      state.relaxedPointCache.clear();
+      populateRouteSelect();
+      drawRoute();
+    });
+    document.getElementById('minRelaxedLegNm').addEventListener('change', (event) => {
+      state.minRelaxedLegNm = Math.max(0, Number(event.target.value) || 0);
+      state.bruteForceCache.clear();
+      populateRouteSelect();
+      drawRoute();
+    });
+    document.getElementById('relaxedWaypointLimit').addEventListener('change', (event) => {
+      state.relaxedWaypointLimit = Math.max(4, Number(event.target.value) || 14);
+      state.bruteForceCache.clear();
+      populateRouteSelect();
+      drawRoute();
+    });
     document.getElementById('renderBtn').addEventListener('click', () => {
       populateRouteSelect();
       drawRoute();

@@ -4,6 +4,12 @@ import { getNearbyOurAirports, getOurAirportByCode, searchOurAirports } from './
 import { fetchOpenAipReferences } from './routes/adapters/openAipAdapter.js';
 import { buildReferenceCacheKey, getCachedReferenceData, setCachedReferenceData } from './routes/routeCacheService.js';
 import { REFERENCE_DATA_TTL_MS } from './routes/routeTypes.js';
+import {
+  findSupabaseEmergencyLandingOptions,
+  getSupabaseAirportDetails,
+  getSupabaseAirportsWithinRadius,
+  searchSupabaseAirports
+} from './airportSupabaseService.js';
 
 class AirportService {
   constructor(apiKey = '') {
@@ -65,11 +71,13 @@ class AirportService {
 
   async searchAirportsRemote(query, options = {}) {
     const localResults = this.searchAirports(query, options);
-    const [ourAirportsResponse, referenceResponse] = await Promise.all([
+    const [supabaseResponse, ourAirportsResponse, referenceResponse] = await Promise.all([
+      searchSupabaseAirports(query, options),
       searchOurAirports({ query }),
       searchAirportReferences({ query })
     ]);
     return this.mergeAirportResults(
+      supabaseResponse?.status === 'ok' && Array.isArray(supabaseResponse.airports) ? supabaseResponse.airports : [],
       localResults,
       ourAirportsResponse?.status === 'ok' && Array.isArray(ourAirportsResponse.airports) ? ourAirportsResponse.airports : [],
       referenceResponse?.status === 'ok' && Array.isArray(referenceResponse.airports) ? referenceResponse.airports : []
@@ -78,11 +86,13 @@ class AirportService {
 
   async getAirportByCodeRemote(code) {
     const localAirport = this.getAirportByCode(code);
-    const [ourAirportResponse, referenceResponse] = await Promise.all([
+    const [supabaseResponse, ourAirportResponse, referenceResponse] = await Promise.all([
+      getSupabaseAirportDetails(code),
       getOurAirportByCode({ code }),
       getAirportReferenceByCode({ code })
     ]);
     const remoteAirports = [
+      ...(supabaseResponse?.status === 'ok' && supabaseResponse.airport ? [supabaseResponse.airport] : []),
       ...(ourAirportResponse?.status === 'ok' && Array.isArray(ourAirportResponse.airports) ? ourAirportResponse.airports : []),
       ...(referenceResponse?.status === 'ok' && Array.isArray(referenceResponse.airports) ? referenceResponse.airports : [])
     ];
@@ -91,15 +101,42 @@ class AirportService {
 
   async getAirportsWithinRadiusRemote(latitude, longitude, radiusNm, options = {}) {
     const localResults = this.getAirportsWithinRadius(latitude, longitude, radiusNm, options);
-    const [ourAirportsResponse, referenceResponse] = await Promise.all([
+    const [supabaseResponse, ourAirportsResponse, referenceResponse] = await Promise.all([
+      getSupabaseAirportsWithinRadius(latitude, longitude, radiusNm, options),
       getNearbyOurAirports({ latitude, longitude, radiusNm }),
       getNearbyAirportReferences({ latitude, longitude, radiusNm })
     ]);
     return this.mergeAirportResults(
+      supabaseResponse?.status === 'ok' && Array.isArray(supabaseResponse.airports) ? supabaseResponse.airports : [],
       localResults,
       ourAirportsResponse?.status === 'ok' && Array.isArray(ourAirportsResponse.airports) ? ourAirportsResponse.airports : [],
       referenceResponse?.status === 'ok' && Array.isArray(referenceResponse.airports) ? referenceResponse.airports : []
     );
+  }
+
+  async getEmergencyLandingOptionsRemote(options = {}) {
+    const response = await findSupabaseEmergencyLandingOptions(options);
+    if (response?.status === 'ok' && Array.isArray(response.options)) return response.options;
+
+    const localAirports = this.getAirportsWithinRadius(
+      options.latitude,
+      options.longitude,
+      options.maxRadiusNm || 150,
+      { type: 'all' }
+    );
+
+    return localAirports
+      .map((airport) => ({
+        airport,
+        bestRunway: this.getSuitableRunways(airport.icao || airport.iata, options.aircraftCategory || 'Light')[0] || this.getRunwayInfo(airport.icao || airport.iata)[0] || null,
+        distanceNm: this.calculateDistance({ latitude: options.latitude, longitude: options.longitude }, airport),
+        suitabilityScore: null,
+        frequencies: this.getFrequencyInfo(airport.icao || airport.iata),
+        navaids: []
+      }))
+      .filter((option) => option.bestRunway)
+      .sort((a, b) => a.distanceNm - b.distanceNm)
+      .slice(0, options.limit || 10);
   }
 
   searchEmergencyAirports(query) {
@@ -250,6 +287,26 @@ class AirportService {
     return enhancedData;
   }
 
+  getIlsFrequency(airportCode, finalRunwayName, rawRunwayName) {
+    const ILS_FREQUENCIES = {
+      "KLAX": { "24R": 108.50, "24L": 108.40, "25R": 108.75, "25L": 109.90, "06L": 108.40, "06R": 108.50, "07L": 109.90, "07R": 108.75 },
+      "KSFO": { "28L": 109.55, "28R": 111.70, "19L": 108.90, "19R": 108.70, "01L": 110.50, "01R": 109.30 },
+      "KJFK": { "04R": 109.50, "22L": 110.90, "13L": 111.50, "31R": 112.30 },
+      "ZSSS": { "18L": 109.30, "36R": 110.30, "18R": 109.90, "36L": 111.90 },
+      "SHA": { "18L": 109.30, "36R": 110.30, "18R": 109.90, "36L": 111.90 }
+    };
+    if (ILS_FREQUENCIES[airportCode]?.[finalRunwayName]) {
+      return ILS_FREQUENCIES[airportCode][finalRunwayName];
+    }
+    const seedSource = `${String(airportCode || '').trim().toUpperCase()}:${String(finalRunwayName || rawRunwayName || '').trim().toUpperCase()}`;
+    let seed = 0;
+    for (let i = 0; i < seedSource.length; i++) {
+      seed = (seed * 31 + seedSource.charCodeAt(i)) % 200000;
+    }
+    const channel = seed % 40;
+    return Number((108.10 + (channel * 0.1)).toFixed(2));
+  }
+
   getRunwayGeometry(airportCode, runwayName) {
     const airport = this.getAirportByCode(airportCode);
     if (!airport) return null;
@@ -299,7 +356,38 @@ class AirportService {
       return runwayNumber === 36 ? 360 : runwayNumber * 10;
     };
 
-    const primaryHeadingDeg = parseRunwayHeading(primaryRunwayEnd);
+    const primaryHeadingDeg = runway.bearing != null ? Number(runway.bearing) : parseRunwayHeading(primaryRunwayEnd);
+    const hasStoredGeometry = runway.startLatitude != null && runway.startLongitude != null && runway.endLatitude != null && runway.endLongitude != null;
+
+    if (hasStoredGeometry) {
+      const startThreshold = {
+        latitude: Number(runway.startLatitude),
+        longitude: Number(runway.startLongitude),
+        elevation: Number(airport.elevation) || 0
+      };
+      const endThreshold = {
+        latitude: Number(runway.endLatitude),
+        longitude: Number(runway.endLongitude),
+        elevation: Number(airport.elevation) || 0
+      };
+      const selectedIsReciprocal = selectedRunwayEnd && selectedRunwayEnd === reciprocalRunwayEnd;
+      const finalRunwayName = selectedRunwayEnd || requestedRunway || primaryRunwayEnd || runway.name;
+      const finalHeading = selectedIsReciprocal
+        ? parseRunwayHeading(reciprocalRunwayEnd)
+        : primaryHeadingDeg;
+      return {
+        airportCode: String(airportCode || airport.iata || airport.icao || '').trim().toUpperCase(),
+        airportLat: airport.latitude,
+        airportLon: airport.longitude,
+        heading: finalHeading,
+        length: (Number(runway.length) || 8000) * 0.3048,
+        width: (Number(runway.width) || 45 * 3.28084) * 0.3048,
+        thresholdStart: selectedIsReciprocal ? endThreshold : startThreshold,
+        thresholdEnd: selectedIsReciprocal ? startThreshold : endThreshold,
+        runwayName: finalRunwayName,
+        ilsFrequency: this.getIlsFrequency(airportCode, finalRunwayName, runway.name)
+      };
+    }
 
     // Dimensions
     // Assuming length is in feet (standard in aviation databases here), convert to meters
@@ -348,61 +436,7 @@ class AirportService {
       finalRunwayName = primaryRunwayEnd;
     }
 
-    // Lookup ILS Frequency
-    // Hardcoded map for common test airports/runways
-    const ILS_FREQUENCIES = {
-        "KLAX": {
-            "24R": 108.50,
-            "24L": 108.40,
-            "25R": 108.75,
-            "25L": 109.90,
-            "06L": 108.40,
-            "06R": 108.50,
-            "07L": 109.90,
-            "07R": 108.75
-        },
-        "KSFO": {
-            "28L": 109.55,
-            "28R": 111.70,
-            "19L": 108.90,
-            "19R": 108.70,
-            "01L": 110.50,
-            "01R": 109.30
-        },
-        "KJFK": {
-            "04R": 109.50,
-            "22L": 110.90,
-            "13L": 111.50,
-            "31R": 112.30
-        },
-        "ZSSS": {
-            "18L": 109.30,
-            "36R": 110.30,
-            "18R": 109.90,
-            "36L": 111.90
-        },
-        "SHA": { // Handle IATA code too
-             "18L": 109.30,
-             "36R": 110.30,
-             "18R": 109.90,
-             "36L": 111.90
-        }
-    };
-
-    let ilsFrequency = null;
-    if (ILS_FREQUENCIES[airportCode] && ILS_FREQUENCIES[airportCode][finalRunwayName]) {
-        ilsFrequency = ILS_FREQUENCIES[airportCode][finalRunwayName];
-    } else {
-        const runwayKey = String(finalRunwayName || runway.name || '').trim().toUpperCase();
-        const airportKey = String(airportCode || airport.iata || airport.icao || '').trim().toUpperCase();
-        const seedSource = `${airportKey}:${runwayKey}`;
-        let seed = 0;
-        for (let i = 0; i < seedSource.length; i++) {
-          seed = (seed * 31 + seedSource.charCodeAt(i)) % 200000;
-        }
-        const channel = seed % 40; // 108.10 -> 111.95 in 0.10-ish distinct slots for UI purposes
-        ilsFrequency = Number((108.10 + (channel * 0.1)).toFixed(2));
-    }
+    const ilsFrequency = this.getIlsFrequency(airportCode, finalRunwayName, runway.name);
 
     return {
       airportCode: String(airportCode || airport.iata || airport.icao || '').trim().toUpperCase(),

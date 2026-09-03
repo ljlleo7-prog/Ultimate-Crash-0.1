@@ -99,48 +99,11 @@ export const normalizeRouteDetails = (routeDetails, selectedDeparture, selectedA
   };
 
   const baseWaypoints = (normalized.waypoints || []).map(normalizeWaypoint).filter(Boolean);
-  const hasPublishedProcedures = Boolean(normalized.procedureSegments?.length || normalized.procedures?.sid || normalized.procedures?.star);
-  const sidWaypoints = !hasPublishedProcedures && normalized.departureRunway && baseWaypoints.length
-    ? buildSyntheticSIDWaypoints(selectedDeparture, normalized.departureRunway, baseWaypoints[0])
-    : [];
-  const starWaypoints = !hasPublishedProcedures && normalized.landingRunway && baseWaypoints.length
-    ? buildSyntheticSTARWaypoints(selectedArrival, normalized.landingRunway, getLastProcedureWaypoint(baseWaypoints) ? baseWaypoints[baseWaypoints.length - 1] : null)
-    : [];
-  const enrouteWaypoints = [
-    ...sidWaypoints.slice(0, -1),
-    ...baseWaypoints,
-    ...starWaypoints.slice(1)
-  ];
-  const hasFinalFix = enrouteWaypoints.some((waypoint) => waypoint.type === 'APPROACH_FIX' || waypoint.name === 'FINAL');
-  const hasRunwayFix = enrouteWaypoints.some((waypoint) => waypoint.type === 'RUNWAY_FIX' || waypoint.name === normalized.landingRunway);
-  const approachWaypoints = normalized.landingRunway && (!hasFinalFix || !hasRunwayFix)
-    ? buildApproachWaypoints(selectedArrival, selectedDeparture, normalized.landingRunway).filter((waypoint) => {
-        if (waypoint.type === 'APPROACH_FIX') return !hasFinalFix;
-        if (waypoint.type === 'RUNWAY_FIX') return !hasRunwayFix;
-        return true;
-      })
-    : [];
-  const finalWaypoints = [...enrouteWaypoints, ...approachWaypoints];
+  const finalWaypoints = baseWaypoints;
   const baseRouteObject = normalized.routeObject || null;
-  const baseLegs = Array.isArray(baseRouteObject?.legs) ? baseRouteObject.legs : [];
   const routeObject = baseRouteObject ? {
     ...baseRouteObject,
-    waypoints: finalWaypoints,
-    legs: [
-      ...baseLegs,
-      ...approachWaypoints.map((waypoint, index) => ({
-        from: index === 0 ? (enrouteWaypoints[enrouteWaypoints.length - 1]?.name || selectedDeparture?.icao || selectedDeparture?.iata || 'ENROUTE') : approachWaypoints[index - 1]?.name,
-        to: waypoint.name,
-        type: waypoint.type || 'fix',
-        altitude: waypoint.altitude || null,
-        speed: waypoint.speed || null,
-        source: baseRouteObject.source || normalized.routeSource || 'Built-in',
-        provider: baseRouteObject.source || normalized.routeSource || 'Built-in',
-        latitude: waypoint.latitude,
-        longitude: waypoint.longitude,
-        sequence: baseLegs.length + index + 1
-      }))
-    ]
+    waypoints: finalWaypoints
   } : null;
 
   return {
@@ -148,11 +111,14 @@ export const normalizeRouteDetails = (routeDetails, selectedDeparture, selectedA
     waypoints: finalWaypoints,
     routeObject,
     routeSource: normalized.routeSource || routeObject?.source || '',
+    routeSourceChain: normalized.routeSourceChain || routeObject?.sourceChain || [],
     routeFallbackUsed: Boolean(normalized.routeFallbackUsed || routeObject?.fallbackUsed),
     routeDebug: normalized.routeDebug || routeObject?.debug || [],
     routeBilling: normalized.routeBilling || routeObject?.billing || null,
     procedures: normalized.procedures || routeObject?.procedures || null,
-    procedureSegments: normalized.procedureSegments || routeObject?.procedureSegments || []
+    procedureSegments: normalized.procedureSegments || routeObject?.procedureSegments || [],
+    routeAlternatives: normalized.routeAlternatives || routeObject?.routeAlternatives || routeObject?.metadata?.routeAlternatives || [],
+    selectedRouteAlternativeId: normalized.selectedRouteAlternativeId || routeObject?.selectedRouteAlternativeId || routeObject?.metadata?.selectedRouteAlternativeId || ''
   };
 };
 
@@ -173,10 +139,13 @@ export const mergeFlightPlanWithRoute = (flightPlan, routeDetails) => {
     waypoints: normalizedRoute?.waypoints?.length ? normalizedRoute.waypoints : (flightPlan.waypoints || []).map(normalizeWaypoint).filter(Boolean),
     routeObject: normalizedRoute?.routeObject || null,
     routeSource: normalizedRoute?.routeSource || normalizedRoute?.routeObject?.source || flightPlan.routeSource || '',
+    routeSourceChain: normalizedRoute?.routeSourceChain || normalizedRoute?.routeObject?.sourceChain || flightPlan.routeSourceChain || [],
     routeFallbackUsed: normalizedRoute ? Boolean(normalizedRoute.routeFallbackUsed || normalizedRoute.routeObject?.fallbackUsed) : Boolean(flightPlan.routeFallbackUsed),
     routeBilling: normalizedRoute?.routeBilling || normalizedRoute?.routeObject?.billing || flightPlan.routeBilling || null,
     procedures: normalizedRoute?.procedures || normalizedRoute?.routeObject?.procedures || flightPlan.procedures || null,
     procedureSegments: normalizedRoute?.procedureSegments || normalizedRoute?.routeObject?.procedureSegments || flightPlan.procedureSegments || [],
+    routeAlternatives: normalizedRoute?.routeAlternatives || normalizedRoute?.routeObject?.routeAlternatives || normalizedRoute?.routeObject?.metadata?.routeAlternatives || flightPlan.routeAlternatives || [],
+    selectedRouteAlternativeId: normalizedRoute?.selectedRouteAlternativeId || normalizedRoute?.routeObject?.selectedRouteAlternativeId || normalizedRoute?.routeObject?.metadata?.selectedRouteAlternativeId || flightPlan.selectedRouteAlternativeId || '',
     departure: {
       ...flightPlan.departure,
       runways: normalizedRoute?.departureRunway ? [{ name: normalizedRoute.departureRunway }] : flightPlan.departure?.runways
@@ -237,10 +206,13 @@ export const buildAutoRouteDetails = async ({
     arrivalGate: generateGate(),
     routeObject,
     routeSource: routeObject.source,
+    routeSourceChain: routeObject.sourceChain || [],
     routeFallbackUsed: routeObject.fallbackUsed,
     routeDebug: routeObject.debug || [],
     routeBilling: routeObject.billing || null,
     procedures: routeObject.procedures || null,
-    procedureSegments: routeObject.procedureSegments || []
+    procedureSegments: routeObject.procedureSegments || [],
+    routeAlternatives: routeObject.routeAlternatives || routeObject.metadata?.routeAlternatives || [],
+    selectedRouteAlternativeId: routeObject.selectedRouteAlternativeId || routeObject.metadata?.selectedRouteAlternativeId || ''
   }, departure, arrival);
 };

@@ -2,6 +2,7 @@
 import { NPCFlightModel, NPC_STAGE } from './NPCFlightModel.js';
 import airlineData from '../data/airlinesDatabase.json';
 import { airportService } from './airportService.js';
+import { searchLocalAipRoute } from './routes/aipRouteSearch.js';
 
 class NPCManagerService {
   constructor() {
@@ -12,6 +13,7 @@ class NPCManagerService {
     this.despawnRadius = 320; // nm
     this.maxNPCs = 15;
     this.minNPCs = 1;
+    this.pendingSpawns = 0;
   }
 
   // Calculate distance in NM
@@ -26,6 +28,73 @@ class NPCManagerService {
       Math.sin(dLon/2) * Math.sin(dLon/2);
     const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
     return R * c;
+  }
+
+  calculateBearing(from, to) {
+    const fromLat = from.latitude * Math.PI / 180;
+    const toLat = to.latitude * Math.PI / 180;
+    const dLon = (to.longitude - from.longitude) * Math.PI / 180;
+    const y = Math.sin(dLon) * Math.cos(toLat);
+    const x = Math.cos(fromLat) * Math.sin(toLat) - Math.sin(fromLat) * Math.cos(toLat) * Math.cos(dLon);
+    return (Math.atan2(y, x) * 180 / Math.PI + 360) % 360;
+  }
+
+  offsetPosition(centerPos, distanceNm, bearingDeg) {
+    const dDeg = distanceNm / 60;
+    const bearing = bearingDeg * Math.PI / 180;
+    return {
+      latitude: centerPos.latitude + dDeg * Math.cos(bearing),
+      longitude: centerPos.longitude + dDeg * Math.sin(bearing) / Math.cos(centerPos.latitude * Math.PI / 180)
+    };
+  }
+
+  getAirportCode(airport) {
+    return String(airport?.icao || airport?.iata || '').toUpperCase();
+  }
+
+  buildDirectRoute(from, to) {
+    if (!from || !to) return null;
+    const midpoint = {
+      name: 'DCT',
+      label: 'DCT',
+      latitude: (from.latitude + to.latitude) / 2,
+      longitude: (from.longitude + to.longitude) / 2,
+      type: 'WAYPOINT',
+      airway: 'DCT'
+    };
+    return {
+      waypoints: [
+        { name: this.getAirportCode(from) || 'FROM', label: this.getAirportCode(from) || 'FROM', latitude: from.latitude, longitude: from.longitude, type: 'AIRPORT' },
+        midpoint,
+        { name: this.getAirportCode(to) || 'TO', label: this.getAirportCode(to) || 'TO', latitude: to.latitude, longitude: to.longitude, type: 'AIRPORT' }
+      ],
+      source: 'Direct'
+    };
+  }
+
+  async buildNpcRoute(departure, arrival) {
+    const fallback = this.buildDirectRoute(departure, arrival);
+    if (!departure || !arrival || this.getAirportCode(departure) === this.getAirportCode(arrival)) return fallback;
+
+    try {
+      const response = await searchLocalAipRoute({
+        departure,
+        arrival,
+        options: {
+          maxElapsedMs: 120,
+          maxExpandedNodes: 600,
+          maxEdgeRelaxations: 2500,
+          useGraphFallback: true,
+          useBruteForceFallback: true,
+          relaxAirwayLimitations: true
+        }
+      });
+      if (response?.status === 'ok' && response.route?.waypoints?.length >= 2) return response.route;
+    } catch {
+      return fallback;
+    }
+
+    return fallback;
   }
 
   generateRandomPos(centerPos, radiusNm) {
@@ -85,7 +154,7 @@ class NPCManagerService {
         playerPos
       );
       return dist <= this.spawnRadius;
-    }).length;
+    }).length + this.pendingSpawns;
 
     // Must have at least minNPCs
     if (nearbyCount < this.minNPCs) {
@@ -99,87 +168,78 @@ class NPCManagerService {
     return messages;
   }
 
-  spawnNPC(centerPos) {
-    const roll = Math.random();
-    let pos = null;
-    let targetAirport = null;
-    const callsign = this.generateCallsign();
-
-    // 40% Cruise, 30% Climb (Takeoff), 30% Approach
-    if (roll < 0.4) {
-      // Cruise
-      pos = this.generateRandomPos(centerPos, this.spawnRadius);
-      pos.stage = NPC_STAGE.CRUISE;
-    } else {
-      // Try to find airport for Takeoff/Landing
-      // Search slightly larger radius to find suitable airports
-      const airports = airportService.getAirportsWithinRadius(centerPos.latitude, centerPos.longitude, this.spawnRadius);
-
-      // Filter out airports too close to player (likely user's current airport)
-      // Assume user is on runway if < 3nm
+  async spawnNPC(centerPos) {
+    this.pendingSpawns += 1;
+    try {
+      const roll = Math.random();
+      let pos = null;
+      let targetAirport = null;
+      let route = null;
+      const callsign = this.generateCallsign();
+      const airports = airportService.getAirportsWithinRadius(centerPos.latitude, centerPos.longitude, this.spawnRadius, { type: 'normal' });
       const validAirports = airports.filter(ap => {
-        const dist = this.calculateDistance(centerPos, {latitude: ap.latitude, longitude: ap.longitude});
-        return dist > 5; // Keep airports > 5nm away to avoid user's runway
+        const dist = this.calculateDistance(centerPos, { latitude: ap.latitude, longitude: ap.longitude });
+        return dist > 5;
       });
 
-      if (validAirports.length === 0) {
-        // Fallback to Cruise if no other airports nearby
-        pos = this.generateRandomPos(centerPos, this.spawnRadius);
-        pos.stage = NPC_STAGE.CRUISE;
-      } else {
-        // Pick random airport
-        const airport = validAirports[Math.floor(Math.random() * validAirports.length)];
-        targetAirport = airport.iata;
+      if (validAirports.length >= 2) {
+        const departure = validAirports[Math.floor(Math.random() * validAirports.length)];
+        const destinationCandidates = validAirports.filter((airport) => this.getAirportCode(airport) !== this.getAirportCode(departure));
+        const arrival = destinationCandidates[Math.floor(Math.random() * destinationCandidates.length)] || validAirports[0];
+        targetAirport = arrival.iata || arrival.icao;
+        route = await this.buildNpcRoute(departure, arrival);
+        const routeWaypoints = route?.waypoints || [];
 
-        if (roll < 0.7) {
-          // CLIMB (Takeoff)
-          // Spawn just after takeoff, climbing out
-          const heading = Math.random() * 360; // Random heading (simulating random runway)
-          // 1-2nm out
-          const distOut = 1 + Math.random();
-          const dDeg = distOut / 60;
-
+        if (roll < 0.35 && routeWaypoints.length >= 2) {
+          const startIndex = routeWaypoints.length > 2 ? 1 + Math.floor(Math.random() * (routeWaypoints.length - 2)) : 0;
+          const startWaypoint = routeWaypoints[startIndex];
+          const nextWaypoint = routeWaypoints[startIndex + 1] || arrival;
           pos = {
-            latitude: airport.latitude + dDeg * Math.cos(heading * Math.PI / 180),
-            longitude: airport.longitude + dDeg * Math.sin(heading * Math.PI / 180),
-            altitude: 500 + Math.random() * 1000, // 500-1500ft AGL
-            heading: heading,
-            speed: 160 + Math.random() * 40,
+            latitude: startWaypoint.latitude,
+            longitude: startWaypoint.longitude,
+            altitude: 28000 + Math.random() * 10000,
+            heading: this.calculateBearing(startWaypoint, nextWaypoint),
+            speed: 400 + Math.random() * 60,
+            stage: NPC_STAGE.CRUISE
+          };
+          route = { ...route, waypoints: routeWaypoints.slice(startIndex + 1) };
+        } else if (roll < 0.7) {
+          const runwayHeading = airportService.getRunwayGeometry(this.getAirportCode(departure))?.heading ?? Math.random() * 360;
+          const climbout = this.offsetPosition(departure, 2 + Math.random() * 2, runwayHeading);
+          pos = {
+            ...climbout,
+            altitude: 500 + Math.random() * 1200,
+            heading: runwayHeading,
+            speed: 165 + Math.random() * 35,
             stage: NPC_STAGE.CLIMB
           };
-
+          route = { ...route, waypoints: routeWaypoints.slice(1) };
         } else {
-          // APPROACH
-          // Spawn on approach vector
-          const distOut = 10 + Math.random() * 10; // 10-20nm out
-          const approachAngle = Math.random() * 2 * Math.PI;
-          const dDeg = distOut / 60;
-
-          // Position relative to airport
-          const lat = airport.latitude + dDeg * Math.cos(approachAngle);
-          const lon = airport.longitude + dDeg * Math.sin(approachAngle);
-
-          // Heading pointing towards airport
-          // atan2(dy, dx) gives angle from pos to airport
-          const dy = airport.latitude - lat;
-          const dx = (airport.longitude - lon) * Math.cos(lat * Math.PI / 180); // Adjust for longitude
-          const bearing = Math.atan2(dx, dy) * 180 / Math.PI; // Simple bearing calculation
-
+          const bearingToAirport = Math.random() * 360;
+          const approachStart = this.offsetPosition(arrival, 12 + Math.random() * 10, (bearingToAirport + 180) % 360);
           pos = {
-            latitude: lat,
-            longitude: lon,
-            altitude: 3000 + Math.random() * 2000, // 3000-5000ft
-            heading: (bearing + 360) % 360,
+            ...approachStart,
+            altitude: 3000 + Math.random() * 2500,
+            heading: this.calculateBearing(approachStart, arrival),
             speed: 200 + Math.random() * 30,
             stage: NPC_STAGE.APPROACH
           };
+          route = { ...route, waypoints: [{ name: targetAirport, label: targetAirport, latitude: arrival.latitude, longitude: arrival.longitude, type: 'AIRPORT' }] };
         }
       }
-    }
 
-    const npc = new NPCFlightModel(this.nextId++, callsign, pos, targetAirport);
-    this.npcs.push(npc);
-    // console.log(`Spawned NPC ${callsign} (${pos.stage}) at ${pos.latitude.toFixed(2)}, ${pos.longitude.toFixed(2)}`);
+      if (!pos) {
+        pos = this.generateRandomPos(centerPos, this.spawnRadius);
+        pos.stage = NPC_STAGE.CRUISE;
+        const destination = this.offsetPosition(pos, 180, pos.heading);
+        route = { waypoints: [{ name: 'DCT', label: 'DCT', latitude: destination.latitude, longitude: destination.longitude, type: 'WAYPOINT', airway: 'DCT' }], source: 'Direct' };
+      }
+
+      const npc = new NPCFlightModel(this.nextId++, callsign, pos, targetAirport, route);
+      this.npcs.push(npc);
+    } finally {
+      this.pendingSpawns = Math.max(0, this.pendingSpawns - 1);
+    }
   }
 
   getNPCs() {

@@ -1,5 +1,7 @@
+import { execFile } from 'node:child_process';
 import fs from 'node:fs/promises';
 import path from 'node:path';
+import { promisify } from 'node:util';
 import { fileURLToPath } from 'node:url';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -7,6 +9,7 @@ const __dirname = path.dirname(__filename);
 const rootDir = path.resolve(__dirname, '..');
 const defaultInputDir = path.join(rootDir, 'AIP_DATA');
 const defaultOutputDir = path.join(rootDir, 'AIP_DATA', 'supabase_csv');
+const execFileAsync = promisify(execFile);
 const now = new Date().toISOString();
 
 const REGION_CONFIGS = {
@@ -15,8 +18,9 @@ const REGION_CONFIGS = {
     aipCycle: '2605',
     regionAipNumber: 'Nr2605',
     validFrom: '2026-05-13T16:00:00Z',
-    sourceSystem: 'China AIP CSV',
-    sourceDir: 'CHINA_AIP'
+    sourceSystem: 'China AIP CSV / Waypoint Markdown',
+    sourceDir: 'CHINA_AIP',
+    waypointSourceFile: path.join('WAYPOINTS-CN.md', 'Directory of Waypoints in China.md')
   },
   US: {
     regionName: 'United States',
@@ -25,6 +29,73 @@ const REGION_CONFIGS = {
     validFrom: '2026-05-14T00:00:00Z',
     sourceSystem: 'FAA CIFP / OurAirports',
     sourceDir: 'US_FAA_CIFP'
+  },
+  SG: {
+    regionName: 'Singapore',
+    aipCycle: '2605',
+    regionAipNumber: 'AIP AMDT 02/2026',
+    validFrom: '2026-03-19T00:00:00Z',
+    sourceSystem: 'Singapore AIP PDF',
+    sourceFile: 'SG-ENR-3.1.pdf'
+  },
+  HK: {
+    regionName: 'Hong Kong',
+    aipCycle: '2605',
+    regionAipNumber: 'AIP Hong Kong ENR 3.1',
+    validFrom: '2023-11-30T00:00:00Z',
+    sourceSystem: 'Hong Kong AIP PDF',
+    sourceFile: 'VH-ENR-3.1.pdf'
+  },
+  FR: {
+    regionName: 'France',
+    aipCycle: '2605',
+    regionAipNumber: 'AIRAC AMDT 02/26',
+    validFrom: '2026-02-19T00:00:00Z',
+    sourceSystem: 'France AIP PDF',
+    sourceFile: 'FR-ENR-3.2-fr-FR.pdf'
+  },
+  DE: {
+    regionName: 'Germany',
+    aipCycle: '2605',
+    regionAipNumber: 'AIXM 2026-05-14',
+    validFrom: '2026-05-14T00:00:00Z',
+    sourceSystem: 'Germany AIXM XML',
+    sourceFiles: [
+      'ED_Waypoints_2026-05-14_2026-06-11_revision.xml',
+      'ED_Navaids_2026-05-14_2026-05-14_snapshot.xml'
+    ]
+  },
+  GB: {
+    regionName: 'United Kingdom',
+    aipCycle: '2605',
+    regionAipNumber: 'AMDT 05/2026',
+    validFrom: '2026-05-14T00:00:00Z',
+    sourceSystem: 'UK AIP PDF',
+    sourceFile: 'EG-ENR-3.2-en-GB.pdf'
+  },
+  RU: {
+    regionName: 'Russia',
+    aipCycle: '2605',
+    regionAipNumber: 'AIRAC AMDT 05/25',
+    validFrom: '2025-05-15T00:00:00Z',
+    sourceSystem: 'Russia AIP PDF',
+    sourceFile: 'RU-ENR-3.2.pdf'
+  },
+  JP: {
+    regionName: 'Japan',
+    aipCycle: '2605',
+    regionAipNumber: 'Waypoint directory import',
+    validFrom: '2026-05-14T00:00:00Z',
+    sourceSystem: 'Japan Waypoint Markdown',
+    sourceFile: path.join('WAYPOINTS-JP.md', 'Directory of Waypoints in Japan.md')
+  },
+  CA: {
+    regionName: 'Canada',
+    aipCycle: '2605',
+    regionAipNumber: 'Waypoint directory import',
+    validFrom: '2026-05-14T00:00:00Z',
+    sourceSystem: 'Canada Waypoint Markdown',
+    sourceFile: path.join('WAYPOINTS-CA.md', 'Directory of Waypoints in Canada.md')
   }
 };
 
@@ -154,7 +225,7 @@ const parseArgs = (args) => {
   const options = {
     inputDir: defaultInputDir,
     outputDir: defaultOutputDir,
-    regions: ['CN', 'US']
+    regions: ['CN', 'US', 'SG', 'HK', 'FR', 'DE', 'GB', 'RU', 'JP', 'CA']
   };
 
   for (let index = 0; index < args.length; index += 1) {
@@ -171,6 +242,30 @@ const parseArgs = (args) => {
 };
 
 const readText = async (filePath) => fs.readFile(filePath, 'utf8');
+
+const fileExists = async (filePath) => {
+  try {
+    await fs.access(filePath);
+    return true;
+  } catch {
+    return false;
+  }
+};
+
+const extractPdfText = async (filePath) => {
+  try {
+    const { stdout } = await execFileAsync('pdftotext', ['-layout', filePath, '-'], {
+      encoding: 'utf8',
+      maxBuffer: 50 * 1024 * 1024
+    });
+    return stdout;
+  } catch (error) {
+    if (error.code === 'ENOENT') {
+      throw new Error('pdftotext is required to parse AIP PDFs. Install poppler and retry.');
+    }
+    throw error;
+  }
+};
 
 const parseCsvLine = (line) => {
   const values = [];
@@ -230,6 +325,150 @@ const listFiles = async (dirPath) => {
 };
 
 const normalizeToken = (token) => token.trim().toUpperCase();
+
+const normalizePdfPointIdent = (value) => {
+  const text = String(value || '')
+    .replace(/[]/g, ' ')
+    .replace(/\([^)]*FIR[^)]*\)/gi, ' ')
+    .replace(/\([^)]*BDRY[^)]*\)/gi, ' ')
+    .replace(/\([^)]*Airspace[^)]*\)/gi, ' ')
+    .replace(/\([^)]*DME\s+[A-Z0-9]+[^)]*\)/gi, ' ')
+    .trim();
+  const parenIdents = [...text.matchAll(/\(([A-Z0-9]{2,5})\)/g)].map((match) => match[1]);
+  const navaidIdent = parenIdents.at(-1);
+  if (/\b(?:DVOR|VOR|DME|NDB|TACAN)\b/i.test(text) && navaidIdent) return navaidIdent;
+
+  const withoutParens = text
+    .replace(/\([^)]*\)/g, ' ')
+    .replace(/\b(?:DVOR|VOR|DME|NDB|TACAN)\b/gi, ' ')
+    .replace(/[^A-Z0-9]+/gi, ' ')
+    .trim()
+    .toUpperCase();
+
+  return withoutParens.replace(/\s+/g, '');
+};
+
+const parseDmsDecimal = (degrees, minutes, seconds, hemisphere) => {
+  const value = Number(degrees) + Number(minutes) / 60 + Number(seconds) / 3600;
+  return ['S', 'W'].includes(hemisphere) ? -value : value;
+};
+
+const parseCompactDmsCoordinate = (latitudeText, longitudeText) => {
+  const latMatch = /^(\d{2})(\d{2})(\d{2}(?:\.\d+)?)([NS])$/.exec(String(latitudeText || '').trim());
+  const lonMatch = /^(\d{3})(\d{2})(\d{2}(?:\.\d+)?)([EW])$/.exec(String(longitudeText || '').trim());
+  if (!latMatch || !lonMatch) return null;
+  return {
+    latitude_deg: parseDmsDecimal(latMatch[1], latMatch[2], latMatch[3], latMatch[4]).toFixed(8),
+    longitude_deg: parseDmsDecimal(lonMatch[1], lonMatch[2], lonMatch[3], lonMatch[4]).toFixed(8)
+  };
+};
+
+const parseDelimitedDmsCoordinate = (latitudeText, longitudeText) => {
+  const pattern = /^\s*(\d{1,3})[°\s]+(\d{1,2})['’\s]+(\d{1,2}(?:\.\d+)?)"?\s*([NSEW])\s*$/i;
+  const latMatch = pattern.exec(String(latitudeText || '').trim());
+  const lonMatch = pattern.exec(String(longitudeText || '').trim());
+  if (!latMatch || !lonMatch) return null;
+  return {
+    latitude_deg: parseDmsDecimal(latMatch[1], latMatch[2], latMatch[3], latMatch[4].toUpperCase()).toFixed(8),
+    longitude_deg: parseDmsDecimal(lonMatch[1], lonMatch[2], lonMatch[3], lonMatch[4].toUpperCase()).toFixed(8)
+  };
+};
+
+const parseDecimalPosition = (positionText) => {
+  const [latitude, longitude] = String(positionText || '').trim().split(/\s+/).map(Number);
+  if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) return null;
+  return {
+    latitude_deg: latitude.toFixed(8),
+    longitude_deg: longitude.toFixed(8)
+  };
+};
+
+const parseSingaporeCoordinateLine = (line) => {
+  const match = String(line || '').match(/\b(\d{6}(?:\.\d+)?[NS])\s+(\d{7}(?:\.\d+)?[EW])\b/);
+  return match ? parseCompactDmsCoordinate(match[1], match[2]) : null;
+};
+
+const parseHongKongLatitudeLine = (line) => String(line || '').match(/^\s*(\d{6}(?:\.\d+)?[NS])\s*$/)?.[1] || '';
+
+const parseHongKongLongitudeLine = (line) => String(line || '').match(/^\s*(\d{7}(?:\.\d+)?[EW])\s*$/)?.[1] || '';
+
+const createReferencePointId = (regionCode, config, ident, sourceIndex) => `${regionCode}-${config.aipCycle}-pdf-${ident}-${sourceIndex}`;
+
+const addPdfReferencePoint = ({ tables, regionCode, config, ident, name, coords, sourceFile, sourceIndex }) => {
+  if (!ident || !coords) return;
+  const pointId = createReferencePointId(regionCode, config, ident, sourceIndex);
+  if (tables.referencePoints.some((row) => row.point_id === pointId)) return;
+  tables.referencePoints.push({
+    point_id: pointId,
+    region_code: regionCode,
+    aip_cycle: config.aipCycle,
+    ident,
+    point_type: /^[A-Z0-9]{2,4}$/.test(ident) && /\b(?:DVOR|VOR|DME|NDB|TACAN)\b/i.test(name) ? 'navaid' : 'waypoint',
+    name,
+    latitude_deg: coords.latitude_deg,
+    longitude_deg: coords.longitude_deg,
+    elevation_ft: '',
+    iso_country: regionCode,
+    associated_airport: '',
+    frequency_khz: '',
+    dme_frequency_khz: '',
+    dme_channel: '',
+    usage_type: '',
+    power: '',
+    source_system: config.sourceSystem,
+    source_file: sourceFile
+  });
+};
+
+const emitPdfRoute = ({ tables, regionCode, config, routeCode, points, sourceFile, sourceRow }) => {
+  const uniquePoints = points.filter((point, index) => point.ident && points.findIndex((candidate) => candidate.ident === point.ident) === index);
+  if (!routeCode || uniquePoints.length < 2) return false;
+
+  const routeId = `${regionCode}-${config.aipCycle}-${routeCode}-${sourceRow}`;
+  const routeText = uniquePoints.map((point) => point.ident).join(' ');
+  const tokens = uniquePoints.map((point) => point.ident);
+  const { tokenRows, legs } = buildRouteParts(tokens);
+
+  tables.routeCatalog.push({
+    route_id: routeId,
+    region_code: regionCode,
+    aip_cycle: config.aipCycle,
+    route_code: routeCode,
+    route_family: 'ats_airway',
+    direction: 'bidirectional',
+    origin_key: uniquePoints[0].ident,
+    destination_key: uniquePoints.at(-1).ident,
+    route_text: routeText,
+    source_file: sourceFile,
+    source_row: sourceRow,
+    status: '',
+    created_at: now
+  });
+  tables.routeTokens.push(...tokenRows.map((tokenRow) => ({ ...tokenRow, route_id: routeId, region_code: regionCode, aip_cycle: config.aipCycle })));
+  tables.routeLegs.push(...legs.map((leg) => ({ ...leg, route_id: routeId, region_code: regionCode, aip_cycle: config.aipCycle, airway: routeCode })));
+  tables.routeEdgeIndex.push(...legs.map((leg) => ({
+    region_code: regionCode,
+    aip_cycle: config.aipCycle,
+    from_fix: leg.from_fix,
+    to_fix: leg.to_fix,
+    airway: routeCode,
+    route_id: routeId,
+    route_code: routeCode,
+    leg_sequence: leg.leg_sequence
+  })));
+  uniquePoints.forEach((point, index) => addPdfReferencePoint({
+    tables,
+    regionCode,
+    config,
+    ident: point.ident,
+    name: point.name,
+    coords: point.coords,
+    sourceFile,
+    sourceIndex: `${routeCode}-${index + 1}`
+  }));
+
+  return true;
+};
 
 const isAirwayToken = (token) => /^[A-Z]{1,3}\d{1,4}[A-Z]?$/.test(token);
 
@@ -462,6 +701,265 @@ const parseChinaRoutes = async (inputDir, tables) => {
   return { files, routeCount };
 };
 
+const parsePdfRouteBlocks = async ({ inputDir, tables, regionCode, pointParser }) => {
+  const config = REGION_CONFIGS[regionCode];
+  const sourceFile = config.sourceFile;
+  const text = await extractPdfText(path.join(inputDir, sourceFile));
+  const lines = text.split(/\r?\n/);
+  const routeHeaderPattern = /^\s*([A-Z]{1,3}\d{1,4}[A-Z]?)\s*(?:Route availability:)?\s*$/;
+  let currentRoute = null;
+  let currentPoints = [];
+  let currentSourceRow = 1;
+  let routeCount = 0;
+
+  const flush = () => {
+    if (emitPdfRoute({ tables, regionCode, config, routeCode: currentRoute, points: currentPoints, sourceFile, sourceRow: currentSourceRow })) {
+      routeCount += 1;
+    }
+    currentPoints = [];
+  };
+
+  for (let index = 0; index < lines.length; index += 1) {
+    const line = lines[index];
+    const headerMatch = routeHeaderPattern.exec(line);
+    if (headerMatch && !/^(ENR|AIP|AMDT)$/i.test(headerMatch[1])) {
+      if (currentRoute) flush();
+      currentRoute = headerMatch[1];
+      currentSourceRow = index + 1;
+      continue;
+    }
+
+    if (!currentRoute) continue;
+    if (/^\s*(?:Route remarks|Point\/Segment Remarks|AIP AMDT|Amendment|Civil Aviation Department|©|ENR 3\.1-|AIP Singapore|AIP HONG KONG)/i.test(line)) continue;
+
+    const point = pointParser(lines, index);
+    if (point?.ident && point.coords) currentPoints.push(point);
+  }
+
+  if (currentRoute) flush();
+
+  tables.rawSources.push({
+    source_id: `${regionCode}-${config.aipCycle}-${sourceFile}`,
+    region_code: regionCode,
+    aip_cycle: config.aipCycle,
+    source_file: sourceFile,
+    source_kind: 'route_pdf',
+    parsed: routeCount > 0,
+    row_count: routeCount,
+    imported_at: now
+  });
+
+  return { files: [sourceFile], routeCount };
+};
+
+const parseSingaporePoint = (lines, index) => {
+  const coordMatch = String(lines[index] || '').match(/^(.*?)(\d{6}(?:\.\d+)?[NS])\s+(\d{7}(?:\.\d+)?[EW])\b/);
+  if (!coordMatch) return null;
+  const coords = parseCompactDmsCoordinate(coordMatch[2], coordMatch[3]);
+  if (!coords) return null;
+
+  const nameParts = [coordMatch[1].replace(/[]/g, ' ').trim()].filter(Boolean);
+  for (let cursor = index + 1; cursor <= Math.min(lines.length - 1, index + 4); cursor += 1) {
+    const clean = lines[cursor].replace(/[]/g, ' ').trim();
+    if (!clean || /^\d|^Route|^[↓↑-]+$/.test(clean)) continue;
+    if (/\d{6}(?:\.\d+)?[NS]\s+\d{7}(?:\.\d+)?[EW]/.test(clean)) break;
+    if (/^(?:Route remarks|Point\/Segment Remarks|Flight Planning|Singapore ACC|P\d|RMK:)/i.test(clean)) break;
+    if (/\b(?:Track|Dist|FL |FT |Odd|Even|Class|AIP|AMDT|Remarks|Frequency)\b/i.test(clean)) break;
+    nameParts.push(clean);
+  }
+
+  const name = nameParts.join(' ').trim();
+  const ident = normalizePdfPointIdent(name);
+  return ident ? { ident, name: name || ident, coords } : null;
+};
+
+const currentRouteHeaderLike = (line) => /^\s*[A-Z]{1,3}\d{1,4}[A-Z]?\s*(?:Route availability:)?\s*$/.test(line);
+
+const parseHongKongPoint = (lines, index) => {
+  const latitudeText = parseHongKongLatitudeLine(lines[index]);
+  if (!latitudeText) return null;
+  const longitudeText = parseHongKongLongitudeLine(lines[index + 1]);
+  const coords = longitudeText ? parseCompactDmsCoordinate(latitudeText, longitudeText) : null;
+  if (!coords) return null;
+  const nameParts = [];
+  for (let cursor = index - 1; cursor >= Math.max(0, index - 6); cursor -= 1) {
+    const clean = lines[cursor].replace(/[]/g, ' ').trim();
+    if (!clean || /^\d|^Route|^\(|^[↓↑-]+$/.test(clean)) break;
+    if (currentRouteHeaderLike(clean)) break;
+    if (/\b(?:Route designator|MAG|Track|DIST|Upper limit|Lower limit|Remarks|Frequency|Classification|AIP|ENR|Hong Kong Radar|Class A|MHZ)\b/i.test(clean)) break;
+    nameParts.unshift(clean);
+  }
+  const name = nameParts.join(' ').trim();
+  const ident = normalizePdfPointIdent(name);
+  return ident ? { ident, name: name || ident, coords } : null;
+};
+
+const parseSingaporePdfRoutes = (inputDir, tables) => parsePdfRouteBlocks({
+  inputDir,
+  tables,
+  regionCode: 'SG',
+  pointParser: parseSingaporePoint
+});
+
+const parseHongKongPdfRoutes = (inputDir, tables) => parsePdfRouteBlocks({
+  inputDir,
+  tables,
+  regionCode: 'HK',
+  pointParser: parseHongKongPoint
+});
+
+const parseGenericInlinePoint = (line, coordinatePattern, coordinateParser) => {
+  const match = coordinatePattern.exec(String(line || ''));
+  if (!match) return null;
+  const name = match[1].replace(/[▲∆]/g, ' ').trim();
+  const coords = coordinateParser(match);
+  const ident = normalizePdfPointIdent(name);
+  return ident ? { ident, name: name || ident, coords } : null;
+};
+
+const parseFrancePoint = (lines, index) => parseGenericInlinePoint(
+  lines[index],
+  /^\s*[▲∆]?\s*(.*?)\s+(\d{1,2})°(\d{1,2})'(\d{1,2}(?:\.\d+)?)"([NS])\s+(\d{1,3})°(\d{1,2})'(\d{1,2}(?:\.\d+)?)"([EW])\b/,
+  (match) => ({
+    latitude_deg: parseDmsDecimal(match[2], match[3], match[4], match[5]).toFixed(8),
+    longitude_deg: parseDmsDecimal(match[6], match[7], match[8], match[9]).toFixed(8)
+  })
+);
+
+const parseUkPoint = (lines, index) => parseGenericInlinePoint(
+  lines[index],
+  /^\s*(.*?)\s+(\d{6}(?:\.\d+)?[NS])\s+(\d{7}(?:\.\d+)?[EW])\b/,
+  (match) => parseCompactDmsCoordinate(match[2], match[3])
+);
+
+const parseRussiaPoint = (lines, index) => parseGenericInlinePoint(
+  lines[index],
+  /^\s*[]?\s*(.*?)\s+(\d{6}(?:\.\d+)?[NS])\s+(\d{7}(?:\.\d+)?[EW])\b/,
+  (match) => parseCompactDmsCoordinate(match[2], match[3])
+);
+
+const parseFrancePdfRoutes = (inputDir, tables) => parsePdfRouteBlocks({
+  inputDir,
+  tables,
+  regionCode: 'FR',
+  pointParser: parseFrancePoint
+});
+
+const parseUkPdfRoutes = (inputDir, tables) => parsePdfRouteBlocks({
+  inputDir,
+  tables,
+  regionCode: 'GB',
+  pointParser: parseUkPoint
+});
+
+const parseRussiaPdfRoutes = (inputDir, tables) => parsePdfRouteBlocks({
+  inputDir,
+  tables,
+  regionCode: 'RU',
+  pointParser: parseRussiaPoint
+});
+
+const xmlLocalName = (tag) => String(tag || '').split('}').pop();
+
+const xmlChildText = (element, localName) => {
+  for (const child of element.iter()) {
+    if (xmlLocalName(child.tag) === localName && String(child.text || '').trim()) return child.text.trim();
+  }
+  return '';
+};
+
+const parseXmlElements = (xmlText, localNames) => localNames.flatMap((localName) => {
+  const pattern = new RegExp(`<[A-Za-z0-9_.-]+:${localName}\\b[\\s\\S]*?<\\/[A-Za-z0-9_.-]+:${localName}>|<${localName}\\b[\\s\\S]*?<\\/${localName}>`, 'g');
+  return [...xmlText.matchAll(pattern)].map((match) => match[0]);
+});
+
+const parseGermanyAixmReferencePoints = async (inputDir, tables) => {
+  const config = REGION_CONFIGS.DE;
+  let count = 0;
+
+  for (const sourceFile of config.sourceFiles) {
+    const xmlText = await readText(path.join(inputDir, sourceFile));
+    const elements = parseXmlElements(xmlText, ['DesignatedPoint', 'DME', 'VOR', 'NDB', 'TACAN']);
+
+    for (const elementText of elements) {
+      const ident = normalizeToken(elementText.match(/<[^>]*designator[^>]*>([^<]+)<\/[^>]+>/)?.[1] || '');
+      const name = elementText.match(/<[^>]*name[^>]*>([^<]+)<\/[^>]+>/)?.[1]?.trim() || ident;
+      const pos = elementText.match(/<[^>]*pos[^>]*>([^<]+)<\/[^>]+>/)?.[1] || '';
+      const coords = parseDecimalPosition(pos);
+      if (!ident || !coords) continue;
+      addPdfReferencePoint({
+        tables,
+        regionCode: 'DE',
+        config,
+        ident,
+        name,
+        coords,
+        sourceFile,
+        sourceIndex: `${count + 1}`
+      });
+      count += 1;
+    }
+  }
+
+  tables.rawSources.push({
+    source_id: `DE-${config.aipCycle}-AIXM-reference`,
+    region_code: 'DE',
+    aip_cycle: config.aipCycle,
+    source_file: config.sourceFiles.join(';'),
+    source_kind: 'aixm_reference_xml',
+    parsed: count > 0,
+    row_count: count,
+    imported_at: now
+  });
+
+  return { files: config.sourceFiles, routeCount: 0 };
+};
+
+const parseWaypointMarkdown = async (inputDir, tables, regionCode) => {
+  const config = REGION_CONFIGS[regionCode];
+  const sourceFile = config.waypointSourceFile || config.sourceFile;
+  const text = await readText(path.join(inputDir, sourceFile));
+  let count = 0;
+
+  for (const line of text.split(/\r?\n/)) {
+    const cells = line.split('|').map((cell) => cell.trim());
+    const ident = normalizeToken(cells[1] || '');
+    if (!/^[A-Z0-9]{2,6}$/.test(ident) || ident === 'IDENT') continue;
+    const coords = parseDelimitedDmsCoordinate(cells[3], cells[5]);
+    if (!coords) continue;
+    addPdfReferencePoint({
+      tables,
+      regionCode,
+      config,
+      ident,
+      name: ident,
+      coords,
+      sourceFile,
+      sourceIndex: count + 1
+    });
+    count += 1;
+  }
+
+  tables.rawSources.push({
+    source_id: `${regionCode}-${config.aipCycle}-${path.basename(sourceFile)}`,
+    region_code: regionCode,
+    aip_cycle: config.aipCycle,
+    source_file: sourceFile,
+    source_kind: 'waypoint_markdown',
+    parsed: count > 0,
+    row_count: count,
+    imported_at: now
+  });
+
+  return { files: [sourceFile], routeCount: 0 };
+};
+
+const parseChinaWaypointMarkdown = (inputDir, tables) => parseWaypointMarkdown(inputDir, tables, 'CN');
+
+const parseJapanWaypointMarkdown = (inputDir, tables) => parseWaypointMarkdown(inputDir, tables, 'JP');
+
+const parseCanadaWaypointMarkdown = (inputDir, tables) => parseWaypointMarkdown(inputDir, tables, 'CA');
+
 const coordinateToDecimal = (coord) => {
   const match = /^([NS])(\d{2})(\d{2})(\d{2})(\d{2})([EW])(\d{3})(\d{2})(\d{2})(\d{2})$/.exec(coord);
   if (!match) return null;
@@ -475,19 +973,24 @@ const coordinateToDecimal = (coord) => {
 
 const parseAirportReferencePoints = async (inputDir, tables) => {
   const fileName = 'airports.csv';
-  const rows = parseCsvRows(await readText(path.join(inputDir, fileName)));
+  const filePath = path.join(inputDir, fileName);
+  if (!(await fileExists(filePath))) {
+    console.warn(`Skipping airport reference points: ${fileName} not found.`);
+    return;
+  }
+  const rows = parseCsvRows(await readText(filePath));
   const headers = rows[0];
   const index = Object.fromEntries(headers.map((header, columnIndex) => [header, columnIndex]));
   let count = 0;
 
   for (const row of rows.slice(1)) {
     const isoCountry = row[index.iso_country];
-    if (!['CN', 'US'].includes(isoCountry)) continue;
+    if (!['CN', 'US', 'SG', 'HK', 'FR', 'DE', 'GB', 'RU', 'JP', 'CA'].includes(isoCountry)) continue;
     const ident = row[index.icao_code] || row[index.gps_code] || row[index.ident];
     if (!ident) continue;
 
     tables.referencePoints.push({
-      point_id: `${isoCountry}-2605-airport-${ident}`,
+      point_id: `${isoCountry}-2605-airport-${ident}-${row[index.latitude_deg]}-${row[index.longitude_deg]}`,
       region_code: isoCountry,
       aip_cycle: '2605',
       ident,
@@ -523,14 +1026,19 @@ const parseAirportReferencePoints = async (inputDir, tables) => {
 
 const parseNavaidReferencePoints = async (inputDir, tables) => {
   const fileName = 'navaids.csv';
-  const rows = parseCsvRows(await readText(path.join(inputDir, fileName)));
+  const filePath = path.join(inputDir, fileName);
+  if (!(await fileExists(filePath))) {
+    console.warn(`Skipping navaid reference points: ${fileName} not found.`);
+    return;
+  }
+  const rows = parseCsvRows(await readText(filePath));
   const headers = rows[0];
   const index = Object.fromEntries(headers.map((header, columnIndex) => [header, columnIndex]));
   let count = 0;
 
   for (const row of rows.slice(1)) {
     const isoCountry = row[index.iso_country];
-    if (!['CN', 'US'].includes(isoCountry)) continue;
+    if (!['CN', 'US', 'SG', 'HK', 'FR', 'DE', 'GB', 'RU', 'JP', 'CA'].includes(isoCountry)) continue;
     const ident = row[index.ident];
     if (!ident) continue;
 
@@ -621,7 +1129,7 @@ const parseFaaCifpReferencePoints = async (inputDir, tables) => {
 };
 
 const addRegionRows = (tables, regionSummaries) => {
-  for (const regionCode of ['CN', 'US']) {
+  for (const regionCode of Object.keys(REGION_CONFIGS)) {
     const config = REGION_CONFIGS[regionCode];
     const summary = regionSummaries[regionCode] || { files: [], routeCount: 0 };
     const referencePointCount = tables.referencePoints.filter((row) => row.region_code === regionCode).length;
@@ -641,7 +1149,9 @@ const addRegionRows = (tables, regionSummaries) => {
       last_updated_at: now,
       notes: regionCode === 'US'
         ? 'First export includes airport/navaid reference data; detailed FAA procedure route extraction should be added after ARINC record mapping is finalized.'
-        : 'First export includes published China route catalogs expanded into route lookup and leg indexes.'
+        : (['SG', 'HK'].includes(regionCode)
+          ? 'PDF-derived ENR airway graph and reference-point export; airport-pair lookup rows are intentionally conservative.'
+          : 'First export includes published China route catalogs expanded into route lookup and leg indexes.')
     });
   }
 };
@@ -664,7 +1174,12 @@ const main = async () => {
   await fs.mkdir(options.outputDir, { recursive: true });
 
   if (options.regions.includes('CN')) {
-    regionSummaries.CN = await parseChinaRoutes(options.inputDir, tables);
+    const chinaRoutes = await parseChinaRoutes(options.inputDir, tables);
+    const chinaWaypoints = await parseChinaWaypointMarkdown(options.inputDir, tables);
+    regionSummaries.CN = {
+      files: [...chinaRoutes.files.map((file) => path.join(REGION_CONFIGS.CN.sourceDir, file)), ...chinaWaypoints.files],
+      routeCount: chinaRoutes.routeCount
+    };
   }
 
   await parseAirportReferencePoints(options.inputDir, tables);
@@ -673,6 +1188,38 @@ const main = async () => {
   if (options.regions.includes('US')) {
     const count = await parseFaaCifpReferencePoints(options.inputDir, tables);
     regionSummaries.US = { files: ['US_FAA_CIFP/FAACIFP18.txt', 'airports.csv', 'navaids.csv'], routeCount: 0, referencePointCount: count };
+  }
+
+  if (options.regions.includes('SG')) {
+    regionSummaries.SG = await parseSingaporePdfRoutes(options.inputDir, tables);
+  }
+
+  if (options.regions.includes('HK')) {
+    regionSummaries.HK = await parseHongKongPdfRoutes(options.inputDir, tables);
+  }
+
+  if (options.regions.includes('FR')) {
+    regionSummaries.FR = await parseFrancePdfRoutes(options.inputDir, tables);
+  }
+
+  if (options.regions.includes('DE')) {
+    regionSummaries.DE = await parseGermanyAixmReferencePoints(options.inputDir, tables);
+  }
+
+  if (options.regions.includes('GB')) {
+    regionSummaries.GB = await parseUkPdfRoutes(options.inputDir, tables);
+  }
+
+  if (options.regions.includes('RU')) {
+    regionSummaries.RU = await parseRussiaPdfRoutes(options.inputDir, tables);
+  }
+
+  if (options.regions.includes('JP')) {
+    regionSummaries.JP = await parseJapanWaypointMarkdown(options.inputDir, tables);
+  }
+
+  if (options.regions.includes('CA')) {
+    regionSummaries.CA = await parseCanadaWaypointMarkdown(options.inputDir, tables);
   }
 
   addRegionRows(tables, regionSummaries);

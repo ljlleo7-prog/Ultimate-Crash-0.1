@@ -47,7 +47,7 @@ const parseCsvText = (text) => {
 
 const joinUrlPath = (base, file) => `${String(base || '').replace(/\/$/, '')}/${file}`;
 
-const readCsvText = async (csvDir, fileName, readFile) => {
+const readCsvText = async (csvDir, fileName, readFile, progressCallback) => {
   const filePath = joinUrlPath(csvDir, fileName);
   if (readFile) return readFile(filePath);
 
@@ -57,10 +57,29 @@ const readCsvText = async (csvDir, fileName, readFile) => {
 
   const response = await fetch(filePath);
   if (!response.ok) throw new Error(`Failed to load ${filePath}: ${response.status}`);
-  return response.text();
+
+  if (!progressCallback || !response.body) return response.text();
+
+  const total = parseInt(response.headers.get('content-length') || '0', 10);
+  const reader = response.body.getReader();
+  const chunks = [];
+  let loaded = 0;
+
+  if (progressCallback) progressCallback(fileName, loaded, total);
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    chunks.push(value);
+    loaded += value.length;
+    if (progressCallback) progressCallback(fileName, loaded, total);
+  }
+
+  const decoder = new TextDecoder('utf-8');
+  return chunks.map(chunk => decoder.decode(chunk, { stream: true })).join('') + decoder.decode();
 };
 
-const parseCsv = async (csvDir, fileName, readFile) => parseCsvText(await readCsvText(csvDir, fileName, readFile));
+const parseCsv = async (csvDir, fileName, readFile, progressCallback) => parseCsvText(await readCsvText(csvDir, fileName, readFile, progressCallback));
 
 const key = (...parts) => parts.map((part) => String(part || '').toUpperCase()).join('|');
 
@@ -81,14 +100,14 @@ const addToListMap = (map, mapKey, value) => {
   map.get(mapKey).push(value);
 };
 
-const loadLocalAipCsvStore = async ({ csvDir = defaultCsvDir, forceReload = false, readFile = null } = {}) => {
+const loadLocalAipCsvStore = async ({ csvDir = defaultCsvDir, forceReload = false, readFile = null, progressCallback = null } = {}) => {
   if (cachedStore && !forceReload) return cachedStore;
 
   const [lookupRows, legRows, pointRows, edgeRows] = await Promise.all([
-    parseCsv(csvDir, FILES.lookup, readFile),
-    parseCsv(csvDir, FILES.legs, readFile),
-    parseCsv(csvDir, FILES.points, readFile),
-    parseCsv(csvDir, FILES.edges, readFile)
+    parseCsv(csvDir, FILES.lookup, readFile, progressCallback),
+    parseCsv(csvDir, FILES.legs, readFile, progressCallback),
+    parseCsv(csvDir, FILES.points, readFile, progressCallback),
+    parseCsv(csvDir, FILES.edges, readFile, progressCallback)
   ]);
 
   const lookupByPair = new Map();

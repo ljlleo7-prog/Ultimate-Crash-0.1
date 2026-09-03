@@ -24,6 +24,8 @@ import { TUTORIALS } from './data/tutorialCatalog';
 import { CHALLENGES } from './data/challengeCatalog';
 import { cloudSaveService } from './services/cloudSaveService.js';
 import { useAuth } from './contexts/AuthContext.jsx';
+import AipLoadingProgress from './components/AipLoadingProgress.jsx';
+import { preloadLocalAipData } from './services/routes/aipPreload.js';
 
 const APP_SETTINGS_STORAGE_KEY = 'app_settings';
 const DEFAULT_APP_SETTINGS = {
@@ -80,7 +82,7 @@ function App() {
   const [resumeSave, setResumeSave] = useState(null);
   const [resumeCheckLoading, setResumeCheckLoading] = useState(false);
   const [resumeCheckError, setResumeCheckError] = useState(null);
-  const { selectedDeparture, selectedArrival, selectDeparture, selectArrival, getAirportByCode } = useAirportSearch();
+  const { selectedDeparture, selectedArrival, selectDeparture, selectArrival, getAirportByCode, getAirportByCodeRemote } = useAirportSearch();
   const [aircraftSuggestions, setAircraftSuggestions] = useState([]);
   const [failureType, setFailureType] = useState('random');
   const [weatherData, setWeatherData] = useState(DEFAULT_WEATHER);
@@ -122,9 +124,34 @@ function App() {
 
     window.localStorage.setItem(APP_SETTINGS_STORAGE_KEY, JSON.stringify(appSettings));
   }, [appSettings]);
+
+  useEffect(() => {
+    preloadLocalAipData();
+  }, []);
+
   const departureResults = useMemo(() => airportService.searchAirports(departureQuery).slice(0, 10), [departureQuery]);
   const arrivalResults = useMemo(() => airportService.searchAirports(arrivalQuery).slice(0, 10), [arrivalQuery]);
   const alternateResults = useMemo(() => airportService.searchAirports(alternateQuery).slice(0, 10), [alternateQuery]);
+
+  const hydrateExactAirportCode = async (query, localResults, selectAirport) => {
+    const code = String(query || '').trim().toUpperCase();
+    if (!/^[A-Z0-9]{3,4}$/.test(code)) return;
+    if (localResults.length > 0) return;
+    const airport = await getAirportByCodeRemote(code);
+    if (airport) selectAirport(airport);
+  };
+
+  useEffect(() => {
+    hydrateExactAirportCode(departureQuery, departureResults, setPreflightDeparture);
+  }, [departureQuery, departureResults]);
+
+  useEffect(() => {
+    hydrateExactAirportCode(arrivalQuery, arrivalResults, setPreflightArrival);
+  }, [arrivalQuery, arrivalResults]);
+
+  useEffect(() => {
+    hydrateExactAirportCode(alternateQuery, alternateResults, setPreflightAlternate);
+  }, [alternateQuery, alternateResults]);
 
   const updatePreflightConfig = (patch) => {
     setPreflightConfig((prev) => ({ ...prev, ...patch }));
@@ -144,11 +171,17 @@ function App() {
   const regenerateRouteDetails = async (departure, arrival, previousRouteDetails) => {
     const requestId = routeGenerationRequestRef.current + 1;
     routeGenerationRequestRef.current = requestId;
+    const relaxAirwayLimitations = Boolean(previousRouteDetails?.relaxAirwayLimitations);
     const nextRouteDetails = await buildAutoRouteDetails({
       departure,
       arrival,
       previousRouteDetails,
-      routeOptions: { authState: routeAuthState }
+      routeOptions: {
+        authState: routeAuthState,
+        aircraftType: preflightConfig.aircraftModel,
+        localAip: { relaxAirwayLimitations },
+        supabaseAip: { relaxAirwayLimitations }
+      }
     });
     if (routeGenerationRequestRef.current !== requestId) return;
     setPreflightConfig((prev) => ({
@@ -157,41 +190,50 @@ function App() {
     }));
   };
 
-  const setPreflightDeparture = (airport) => {
-    selectDeparture(airport);
+  const resolveAirportDetails = async (airport) => {
+    const code = airport?.icao || airport?.iata || airport?.ident;
+    if (!code) return airport || null;
+    return await getAirportByCodeRemote(code) || airport;
+  };
+
+  const setPreflightDeparture = async (airport) => {
+    const resolvedAirport = await resolveAirportDetails(airport);
+    selectDeparture(resolvedAirport);
     setDepartureQuery('');
-    const routeDetails = normalizeRouteDetails(preflightConfig.routeDetails, airport, preflightConfig.selectedArrival);
+    const routeDetails = normalizeRouteDetails(preflightConfig.routeDetails, resolvedAirport, preflightConfig.selectedArrival);
     setPreflightConfig((prev) => ({
       ...prev,
-      selectedDeparture: airport,
+      selectedDeparture: resolvedAirport,
       routeDetails
     }));
-    if (airport && preflightConfig.selectedArrival && !isSameAirport(airport, preflightConfig.selectedArrival)) {
-      regenerateRouteDetails(airport, preflightConfig.selectedArrival, routeDetails);
+    if (resolvedAirport && preflightConfig.selectedArrival && !isSameAirport(resolvedAirport, preflightConfig.selectedArrival)) {
+      regenerateRouteDetails(resolvedAirport, preflightConfig.selectedArrival, routeDetails);
     } else {
       routeGenerationRequestRef.current += 1;
     }
   };
 
-  const setPreflightArrival = (airport) => {
-    selectArrival(airport);
+  const setPreflightArrival = async (airport) => {
+    const resolvedAirport = await resolveAirportDetails(airport);
+    selectArrival(resolvedAirport);
     setArrivalQuery('');
-    const routeDetails = normalizeRouteDetails(preflightConfig.routeDetails, preflightConfig.selectedDeparture, airport);
+    const routeDetails = normalizeRouteDetails(preflightConfig.routeDetails, preflightConfig.selectedDeparture, resolvedAirport);
     setPreflightConfig((prev) => ({
       ...prev,
-      selectedArrival: airport,
+      selectedArrival: resolvedAirport,
       routeDetails
     }));
-    if (preflightConfig.selectedDeparture && airport && !isSameAirport(preflightConfig.selectedDeparture, airport)) {
-      regenerateRouteDetails(preflightConfig.selectedDeparture, airport, routeDetails);
+    if (preflightConfig.selectedDeparture && resolvedAirport && !isSameAirport(preflightConfig.selectedDeparture, resolvedAirport)) {
+      regenerateRouteDetails(preflightConfig.selectedDeparture, resolvedAirport, routeDetails);
     } else {
       routeGenerationRequestRef.current += 1;
     }
   };
 
-  const setPreflightAlternate = (airport) => {
+  const setPreflightAlternate = async (airport) => {
+    const resolvedAirport = await resolveAirportDetails(airport);
     setAlternateQuery('');
-    updateRouteDetails({ alternate: airport || null });
+    updateRouteDetails({ alternate: resolvedAirport || null });
   };
 
   const mergedFlightPlan = useMemo(
@@ -378,14 +420,12 @@ function App() {
   }, [preflightConfig.selectedDeparture, preflightConfig.selectedArrival, preflightConfig.aircraftModel, preflightConfig.payload, preflightConfig.fuelReserve]);
 
   const handleInitializeFlight = () => {
-    if (!tabletReadiness.isFinalizeReady) {
-      alert('Complete the tablet route and loadout setup before continuing.');
-      return;
-    }
     setShowRouteSelection(true);
   };
 
   const handleRouteConfirm = (routeData) => {
+    if (routeData.departure) setPreflightDeparture(routeData.departure);
+    if (routeData.arrival) setPreflightArrival(routeData.arrival);
     updateRouteDetails(routeData);
     setShowRouteSelection(false);
     startSimulation(routeData);
@@ -622,6 +662,7 @@ function App() {
   if (cinematicPhase !== 'none') {
     return (
       <LanguageProvider>
+        <AipLoadingProgress />
         <div className={`cinematic-container ${cinematicPhase}`}>
           <LanguageSwitcher style={{ position: 'absolute', top: '20px', right: '20px', zIndex: 2000 }} />
 
@@ -726,65 +767,24 @@ function App() {
           <Header devMode={devMode} setDevMode={setDevMode} handleDevStart={handleDevStart} />
 
           <main className="app-main">
-            {showRouteSelection ? (
-              <RouteSelectionFrame
-                isOpen={showRouteSelection}
+            <RouteSelectionFrame
+                isOpen
                 onConfirm={handleRouteConfirm}
                 onSkip={handleRouteSkip}
                 onChange={updateRouteDetails}
                 difficulty={difficulty}
+                onSetDifficulty={setDifficulty}
                 departure={preflightConfig.selectedDeparture}
                 arrival={preflightConfig.selectedArrival}
+                onSelectDeparture={setPreflightDeparture}
+                onSelectArrival={setPreflightArrival}
                 routeData={runtimeRouteDetails}
                 routeAuthState={routeAuthState}
+                aircraftType={preflightConfig.aircraftModel}
+                preflightConfig={preflightConfig}
+                updatePreflightConfig={updatePreflightConfig}
+                aircraftSuggestions={aircraftSuggestions}
               />
-            ) : (
-              <>
-                <div className="preflight-init-layout">
-                  <FlightInitialization
-                    difficulty={difficulty}
-                    setDifficulty={setDifficulty}
-                    preflightConfig={preflightConfig}
-                    updatePreflightConfig={updatePreflightConfig}
-                    selectedDeparture={preflightConfig.selectedDeparture}
-                    selectedArrival={preflightConfig.selectedArrival}
-                    aircraftSuggestions={aircraftSuggestions}
-                    handleInitializeFlight={handleInitializeFlight}
-                    tabletReadiness={tabletReadiness}
-                    resumeSave={resumeSave}
-                    resumeCheckLoading={resumeCheckLoading}
-                    resumeCheckError={resumeCheckError}
-                    onResumeFlight={handleResumeFlight}
-                    onDiscardResumeSave={handleDiscardResumeSave}
-                    isLoggedIn={Boolean(activeUser)}
-                    offlineMode={offlineMode}
-                  />
-                  <div className="preflight-tablet-shell">
-                    <FMCPanel
-                      preflightMode
-                      flightPlan={mergedFlightPlan}
-                      preflightConfig={preflightConfig}
-                      routeDetails={runtimeRouteDetails}
-                      onUpdatePreflight={updatePreflightConfig}
-                      onUpdateRouteDetails={(patch) => {
-                        if (patch && Object.prototype.hasOwnProperty.call(patch, 'alternate')) {
-                          setPreflightAlternate(patch.alternate);
-                        }
-                        updateRouteDetails(patch);
-                      }}
-                      onSelectDeparture={setPreflightDeparture}
-                      onSelectArrival={setPreflightArrival}
-                      aircraftData={{ name: aircraftModel, mass: 70000 }}
-                      aircraftSuggestions={aircraftSuggestions}
-                      weatherData={weatherData}
-                      routeSearchState={routeSearchState}
-                      tabletReadiness={tabletReadiness}
-                      routeValidation={routeValidation}
-                    />
-                  </div>
-                </div>
-              </>
-            )}
           </main>
 
           <footer className="app-footer">

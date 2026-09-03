@@ -386,7 +386,93 @@ const FlightComputerPanel = ({ onClose, flightPlan, onUpdateFlightPlan, flightSt
             {waypoints.length === 0 ? (
               <div className="empty-state">{t('ui.flight_computer.empty.no_waypoints')}</div>
             ) : (
-              <ul>
+              <>
+                {waypoints.length > 1 && (() => {
+                  const lats = waypoints.map(w => w.latitude).filter(v => Number.isFinite(v));
+                  const lons = waypoints.map(w => w.longitude).filter(v => Number.isFinite(v));
+                  if (lats.length < 2) return null;
+
+                  const minLat = Math.min(...lats);
+                  const maxLat = Math.max(...lats);
+                  const minLon = Math.min(...lons);
+                  const maxLon = Math.max(...lons);
+                  const latRange = maxLat - minLat || 1;
+                  const lonRange = maxLon - minLon || 1;
+                  const padding = 0.1;
+
+                  const mapWidth = 320;
+                  const mapHeight = 140;
+
+                  const toX = (lon) => ((lon - minLon) / lonRange) * (mapWidth * (1 - 2 * padding)) + mapWidth * padding;
+                  const toY = (lat) => mapHeight - (((lat - minLat) / latRange) * (mapHeight * (1 - 2 * padding)) + mapHeight * padding);
+
+                  const currentIdx = flightState?.currentWaypointIndex ?? 0;
+                  const aircraftLat = flightState?.latitude;
+                  const aircraftLon = flightState?.longitude;
+
+                  return (
+                    <div className="route-mini-map">
+                      <svg width={mapWidth} height={mapHeight} viewBox={`0 0 ${mapWidth} ${mapHeight}`}>
+                        <rect width={mapWidth} height={mapHeight} fill="rgba(0,0,0,0.3)" />
+                        {waypoints.map((wp, i) => {
+                          if (i === 0 || !Number.isFinite(wp.latitude) || !Number.isFinite(wp.longitude)) return null;
+                          const prev = waypoints[i - 1];
+                          if (!Number.isFinite(prev.latitude) || !Number.isFinite(prev.longitude)) return null;
+                          const isPassed = i <= currentIdx;
+                          const isActive = i === currentIdx;
+                          return (
+                            <line
+                              key={`leg-${i}`}
+                              x1={toX(prev.longitude)}
+                              y1={toY(prev.latitude)}
+                              x2={toX(wp.longitude)}
+                              y2={toY(wp.latitude)}
+                              stroke={isActive ? '#4facfe' : isPassed ? '#555' : '#0f0'}
+                              strokeWidth={isActive ? 2 : 1}
+                              opacity={isPassed && !isActive ? 0.4 : 1}
+                            />
+                          );
+                        })}
+                        {waypoints.map((wp, i) => {
+                          if (!Number.isFinite(wp.latitude) || !Number.isFinite(wp.longitude)) return null;
+                          const isActive = i === currentIdx;
+                          const isDeparture = i === 0;
+                          const isArrival = i === waypoints.length - 1;
+                          const showLabel = isDeparture || isArrival || isActive;
+                          return (
+                            <g key={`wp-${i}`}>
+                              <circle
+                                cx={toX(wp.longitude)}
+                                cy={toY(wp.latitude)}
+                                r={isActive ? 4 : 3}
+                                fill={isActive ? '#4facfe' : isDeparture || isArrival ? '#fff' : '#0f0'}
+                              />
+                              {showLabel && (
+                                <text
+                                  x={toX(wp.longitude)}
+                                  y={toY(wp.latitude) - 8}
+                                  fill={isActive ? '#4facfe' : '#fff'}
+                                  fontSize="10"
+                                  textAnchor="middle"
+                                  fontFamily="monospace"
+                                >
+                                  {wp.label || wp.name || `WP${i + 1}`}
+                                </text>
+                              )}
+                            </g>
+                          );
+                        })}
+                        {aircraftLat != null && aircraftLon != null && Number.isFinite(aircraftLat) && Number.isFinite(aircraftLon) && (
+                          <g>
+                            <circle cx={toX(aircraftLon)} cy={toY(aircraftLat)} r="5" fill="none" stroke="#ff0" strokeWidth="2" />
+                            <circle cx={toX(aircraftLon)} cy={toY(aircraftLat)} r="2" fill="#ff0" />
+                          </g>
+                        )}
+                      </svg>
+                    </div>
+                  );
+                })()}
+                <ul>
                 {waypoints.map((wp, index) => {
                   // Determine status based on flightState.currentWaypointIndex
                   const currentIdx = flightState && flightState.currentWaypointIndex !== undefined ? flightState.currentWaypointIndex : 0;
@@ -451,6 +537,7 @@ const FlightComputerPanel = ({ onClose, flightPlan, onUpdateFlightPlan, flightSt
                   );
                 })}
               </ul>
+              </>
             )}
           </div>
         )}

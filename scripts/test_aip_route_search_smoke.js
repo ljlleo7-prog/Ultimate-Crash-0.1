@@ -9,7 +9,7 @@ const timeout = setTimeout(() => {
 timeout.unref?.();
 
 const csvDir = path.resolve('AIP_DATA/supabase_csv');
-const airportCsvPath = path.resolve('AIP_DATA/airports.csv');
+const airportCsvPath = path.resolve('AIP_DATA/supabase_csv/aip_airports.csv');
 const lookupCsvPath = path.join(csvDir, 'aip_route_lookup_index.csv');
 const readFile = (filePath) => fs.readFile(path.isAbsolute(filePath) ? filePath : path.join(csvDir, path.basename(filePath)), 'utf8');
 
@@ -270,6 +270,43 @@ let skipped = 0;
 const airports = await loadAirports();
 const lookupRows = await loadLookupRows();
 
+console.log('AIP route search smoke test');
+console.log('\nVerifying expanded AIP export presence');
+
+const regionsCsvPath = path.join(csvDir, 'aip_regions.csv');
+const rawSourcesCsvPath = path.join(csvDir, 'aip_raw_sources.csv');
+const referencePointsCsvPath = path.join(csvDir, 'aip_reference_points.csv');
+
+const regionsRows = parseCsv(await fs.readFile(regionsCsvPath, 'utf8'));
+const rawSourcesRows = parseCsv(await fs.readFile(rawSourcesCsvPath, 'utf8'));
+const referencePointsRows = parseCsv(await fs.readFile(referencePointsCsvPath, 'utf8'));
+const expectedRegionCodes = ['SG', 'HK', 'FR', 'DE', 'GB', 'RU', 'JP', 'CA'];
+const expectedSourceSnippets = [
+  'SG-ENR-3.1.pdf',
+  'VH-ENR-3.1.pdf',
+  'FR-ENR-3.2-fr-FR.pdf',
+  'ED_Waypoints_2026-05-14_2026-06-11_revision.xml',
+  'EG-ENR-3.2-en-GB.pdf',
+  'RU-ENR-3.2.pdf',
+  'Directory of Waypoints in Japan.md',
+  'Directory of Waypoints in Canada.md'
+];
+const missingRegions = expectedRegionCodes.filter((regionCode) => !regionsRows.some((row) => row.region_code === regionCode));
+const missingSources = expectedSourceSnippets.filter((snippet) => !rawSourcesRows.some((row) => row.source_file?.includes(snippet)));
+const missingReferenceRegions = expectedRegionCodes.filter((regionCode) => !referencePointsRows.some((row) => row.region_code === regionCode));
+
+for (const regionCode of expectedRegionCodes) {
+  const pointCount = referencePointsRows.filter((row) => row.region_code === regionCode).length;
+  console.log(`  ${regionCode} reference points: ${pointCount}`);
+}
+
+if (missingRegions.length || missingSources.length || missingReferenceRegions.length) {
+  console.error(`FAIL: expanded AIP export incomplete | missingRegions=${missingRegions.join(' ') || 'none'} | missingSources=${missingSources.join(' ') || 'none'} | missingReferenceRegions=${missingReferenceRegions.join(' ') || 'none'}`);
+  process.exit(1);
+}
+
+passed += 1;
+
 const zSameRegionRows = lookupRows.filter((row) => /^Z[A-Z0-9]{3}$/.test(row.departure_code) && /^Z[A-Z0-9]{3}$/.test(row.arrival_code));
 const kSameRegionRows = lookupRows.filter((row) => /^K[A-Z0-9]{3}$/.test(row.departure_code) && /^K[A-Z0-9]{3}$/.test(row.arrival_code));
 const kToZRows = lookupRows.filter((row) => /^K[A-Z0-9]{3}$/.test(row.departure_code) && /^Z[A-Z0-9]{3}$/.test(row.arrival_code));
@@ -312,8 +349,6 @@ const sections = [
     skipMessage: 'no covered local AIP lookup rows yet'
   }
 ];
-
-console.log('AIP route search smoke test');
 
 for (const section of sections) {
   console.log(`\n${section.title}`);

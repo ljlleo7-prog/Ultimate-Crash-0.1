@@ -1,5 +1,6 @@
 import { createAipIndexKey, loadLocalAipCsvStore } from './aipCsvDataStore.js';
 import { PROVIDER_STATUS, ROUTE_SOURCES } from './routeTypes.js';
+import { aipLoadingProgress } from './aipLoadingProgress.js';
 
 const DEFAULT_AIP_CYCLE = '2605';
 const DEFAULT_OPTIONS = {
@@ -17,12 +18,16 @@ const DEFAULT_OPTIONS = {
   maxBruteForceBranches: 12,
   maxBruteForceCandidates: 24,
   maxBruteForceDistanceFactor: 1.8,
-  minBruteForceProgressNm: -120
+  minBruteForceProgressNm: -120,
+  relaxAirwayLimitations: false
 };
 
-const getAirportCode = (airport) => String(
-  airport?.icao || airport?.iata || airport?.airport || airport?.code || ''
-).toUpperCase();
+const getAirportCode = (airport) => {
+  const candidates = [airport?.icao, airport?.ident, airport?.gpsCode, airport?.airport, airport?.code, airport?.iata]
+    .map((value) => String(value || '').trim().toUpperCase())
+    .filter(Boolean);
+  return candidates.find((code) => /^[A-Z0-9]{4}$/.test(code)) || candidates[0] || '';
+};
 
 const toRadians = (degrees) => degrees * Math.PI / 180;
 
@@ -102,6 +107,7 @@ const getPointCandidates = (store, ident) => store.pointsByIdent.get(String(iden
 
 const sourceScore = (point, regionCode) => {
   const source = String(point.source_system || '').toUpperCase();
+  if (regionCode && (point.region_code === regionCode || point.iso_country === regionCode) && source.includes('AIP')) return 10;
   if (regionCode === 'US' && source.includes('FAA')) return 8;
   if (regionCode === 'CN' && point.iso_country === 'CN') return 8;
   if (source.includes('OURAIRPORTS')) return 4;
@@ -127,36 +133,57 @@ const resolvePoint = (store, ident, context = {}) => {
   } = context;
 
   const endpointCode = role === 'departure' ? departureCode : (role === 'arrival' ? arrivalCode : '');
+  const hasContinuityContext = Boolean(previousPoint || nextPoint);
   const scored = candidates
     .map((point) => {
-      let score = 0;
-      if (endpointCode && point.ident === endpointCode && point.point_type === 'airport') score += 1000;
-      if (point.region_code === regionCode || point.iso_country === regionCode) score += 120;
-      if (point.associated_airport && [departureCode, arrivalCode].includes(point.associated_airport)) score += 80;
-      if (role === 'enroute' && point.point_type !== 'airport') score += 30;
-      if (role !== 'enroute' && point.point_type === 'airport') score += 30;
-      if (point.frequency_khz) score += 6;
-      score += sourceScore(point, regionCode);
-
+      const endpointMatch = endpointCode && point.ident === endpointCode && point.point_type === 'airport';
+      const regionMatch = point.region_code === regionCode || point.iso_country === regionCode;
+      const associatedWithEndpoint = point.associated_airport && [departureCode, arrivalCode].includes(point.associated_airport);
+      const roleTypeMatch = role === 'enroute' ? point.point_type !== 'airport' : point.point_type === 'airport';
       const previousDistance = previousPoint ? calculateGreatCircleNm(previousPoint, point) : null;
       const nextDistance = nextPoint ? calculateGreatCircleNm(point, nextPoint) : null;
-      const continuityDistance = (previousDistance ?? 0) + (nextDistance ?? 0);
-      if (previousDistance !== null || nextDistance !== null) score -= Math.min(continuityDistance / 50, 80);
+      const continuityDistance = hasContinuityContext
+        ? (previousDistance ?? 0) + (nextDistance ?? 0)
+        : Number.POSITIVE_INFINITY;
 
-      return { point, score, previousDistance, nextDistance };
+      return {
+        point,
+        endpointMatch,
+        regionMatch,
+        associatedWithEndpoint,
+        roleTypeMatch,
+        sourceScore: sourceScore(point, regionCode),
+        previousDistance,
+        nextDistance,
+        continuityDistance
+      };
     })
-    .sort((a, b) => b.score - a.score);
+    .sort((a, b) => {
+      if (a.endpointMatch !== b.endpointMatch) return Number(b.endpointMatch) - Number(a.endpointMatch);
+      if (hasContinuityContext && Math.abs(a.continuityDistance - b.continuityDistance) > 1) return a.continuityDistance - b.continuityDistance;
+      if (a.regionMatch !== b.regionMatch) return Number(b.regionMatch) - Number(a.regionMatch);
+      if (a.associatedWithEndpoint !== b.associatedWithEndpoint) return Number(b.associatedWithEndpoint) - Number(a.associatedWithEndpoint);
+      if (a.roleTypeMatch !== b.roleTypeMatch) return Number(b.roleTypeMatch) - Number(a.roleTypeMatch);
+      if (a.sourceScore !== b.sourceScore) return b.sourceScore - a.sourceScore;
+      return Number(Boolean(b.point.frequency_khz)) - Number(Boolean(a.point.frequency_khz));
+    });
 
   const best = scored[0];
   const regionMismatch = regionCode && best.point.iso_country && best.point.iso_country !== regionCode && best.point.region_code !== regionCode;
   const associatedWithEndpoint = best.point.associated_airport && [departureCode, arrivalCode].includes(best.point.associated_airport);
-  if (role === 'enroute' && regionMismatch && !associatedWithEndpoint && (best.previousDistance ?? 0) > 1200) {
+  const nearestContextDistance = Math.min(
+    best.previousDistance ?? Number.POSITIVE_INFINITY,
+    best.nextDistance ?? Number.POSITIVE_INFINITY,
+    best.continuityDistance ?? Number.POSITIVE_INFINITY
+  );
+  if (role === 'enroute' && regionMismatch && !associatedWithEndpoint && nearestContextDistance > 1200) {
     addDiagnostic(diagnostics, 'rejectedFixes', normalizedIdent, {
       reason: 'candidate-region-or-continuity-rejected',
       candidateCount: candidates.length,
       bestIsoCountry: best.point.iso_country || '',
       bestRegionCode: best.point.region_code || '',
-      previousDistanceNm: best.previousDistance ?? null
+      previousDistanceNm: best.previousDistance ?? null,
+      nextDistanceNm: best.nextDistance ?? null
     });
     return null;
   }
@@ -249,17 +276,25 @@ const buildRouteCandidate = ({ store, routeId, lookupRow = null, metrics, depart
   };
 };
 
-const scoreCandidate = (candidate) => [
-  -(candidate.coverage?.publishedFixCoveragePercent ?? 0),
-  -(candidate.coverage?.publishedLegCoveragePercent ?? 0),
-  (candidate.coverage?.publishedFixCount ?? 0) - (candidate.coverage?.resolvedPublishedFixCount ?? 0),
-  candidate.lookupRank,
-  candidate.routedNm
-];
+const scoreCandidate = (candidate, options = {}) => {
+  if (options.relaxAirwayLimitations) {
+    const maxLegNm = Array.isArray(candidate.legs)
+      ? Math.max(0, ...candidate.legs.map((leg) => Number(leg.distanceNm || 0)))
+      : 0;
+    return [candidate.routedNm, maxLegNm, -(candidate.coverage?.publishedFixCoveragePercent ?? 0)];
+  }
+  return [
+    -(candidate.coverage?.publishedFixCoveragePercent ?? 0),
+    -(candidate.coverage?.publishedLegCoveragePercent ?? 0),
+    (candidate.coverage?.publishedFixCount ?? 0) - (candidate.coverage?.resolvedPublishedFixCount ?? 0),
+    candidate.lookupRank,
+    candidate.routedNm
+  ];
+};
 
-const compareScores = (a, b) => {
-  const scoreA = scoreCandidate(a);
-  const scoreB = scoreCandidate(b);
+const compareScores = (a, b, options = {}) => {
+  const scoreA = scoreCandidate(a, options);
+  const scoreB = scoreCandidate(b, options);
   for (let index = 0; index < scoreA.length; index += 1) {
     if (scoreA[index] !== scoreB[index]) return scoreA[index] - scoreB[index];
   }
@@ -272,7 +307,7 @@ const meetsCoverageThreshold = (candidate, options) => {
     && coverage.publishedLegCoveragePercent >= options.minPublishedLegCoveragePercent;
 };
 
-const exactLookup = ({ store, departureCode, arrivalCode, departurePoint, arrivalPoint, options, metrics }) => {
+const exactLookupCandidates = ({ store, departureCode, arrivalCode, departurePoint, arrivalPoint, options, metrics }) => {
   const keys = [
     createAipIndexKey(options.regionCode, options.aipCycle, departureCode, arrivalCode),
     createAipIndexKey('*', options.aipCycle, departureCode, arrivalCode),
@@ -291,14 +326,14 @@ const exactLookup = ({ store, departureCode, arrivalCode, departurePoint, arriva
   }
 
   metrics.candidateCount = lookupRows.length;
-  const candidates = lookupRows
+  return lookupRows
     .slice(0, options.maxCandidateRoutes)
     .map((row) => buildRouteCandidate({ store, routeId: row.route_id, lookupRow: row, metrics, departureCode, arrivalCode, departurePoint, arrivalPoint }))
     .filter(Boolean)
-    .sort(compareScores);
-
-  return candidates.find((candidate) => meetsCoverageThreshold(candidate, options)) || null;
+    .sort((a, b) => compareScores(a, b, options));
 };
+
+const exactLookup = (params) => exactLookupCandidates(params).find((candidate) => meetsCoverageThreshold(candidate, params.options)) || null;
 
 class MinQueue {
   constructor() {
@@ -422,6 +457,24 @@ const graphSearch = ({ store, departureCode, arrivalCode, arrivalPoint, options,
 
 const getResolvedPointForGraph = (store, ident, context) => resolvePoint(store, ident, context);
 
+const addDirectFallbackEdges = ({ edges, goals, current, options }) => {
+  if (!options.relaxAirwayLimitations) return edges;
+  const seen = new Set(edges.map((edge) => String(edge.to_fix || '').toUpperCase()));
+  const directEdges = [];
+  for (const goal of goals) {
+    const normalizedGoal = String(goal || '').toUpperCase();
+    if (!normalizedGoal || normalizedGoal === current.ident || current.path.includes(normalizedGoal) || seen.has(normalizedGoal)) continue;
+    directEdges.push({
+      from_fix: current.ident,
+      to_fix: normalizedGoal,
+      airway: 'DCT',
+      region_code: '',
+      relaxed_direct: true
+    });
+  }
+  return [...edges, ...directEdges];
+};
+
 const distanceToArrival = (point, arrivalPoint) => {
   if (!point || !arrivalPoint) return Number.POSITIVE_INFINITY;
   return calculateGreatCircleNm(point, arrivalPoint) ?? Number.POSITIVE_INFINITY;
@@ -440,7 +493,11 @@ const buildPathCandidate = ({ store, path, airways, regionCode = '', departureCo
       from_fix: path[index],
       to_fix: path[index + 1],
       airway: airways[index] || '',
-      region_code: regionCode
+      region_code: regionCode,
+      distanceNm: calculateGreatCircleNm(
+        resolvePoint(store, path[index], { regionCode, role: 'enroute', previousPoint: departurePoint, nextPoint: arrivalPoint, departureCode, arrivalCode, diagnostics: null }) || departurePoint,
+        resolvePoint(store, path[index + 1], { regionCode, role: 'enroute', previousPoint: departurePoint, nextPoint: arrivalPoint, departureCode, arrivalCode, diagnostics: null }) || arrivalPoint
+      ) || 0
     });
   }
 
@@ -557,7 +614,12 @@ const bruteForceGraphSearch = ({ store, departureCode, arrivalCode, departurePoi
 
     if (current.path.length > options.maxBruteForceDepth) continue;
 
-    const rawEdges = (store.edgesByFrom.get(current.ident) || [])
+    const rawEdges = addDirectFallbackEdges({
+      edges: store.edgesByFrom.get(current.ident) || [],
+      goals,
+      current,
+      options
+    })
       .map((edge) => {
         const toFix = String(edge.to_fix || '').toUpperCase();
         const toPoint = getResolvedPointForGraph(store, toFix, { regionCode: edge.region_code || regionCode, role: 'enroute', previousPoint: current.lastPoint, nextPoint: arrivalPoint, departureCode, arrivalCode, diagnostics: metrics.diagnostics });
@@ -634,7 +696,8 @@ const bruteForceGraphSearch = ({ store, departureCode, arrivalCode, departurePoi
     }
   }
 
-  return candidates.sort(compareScores).find((candidate) => meetsCoverageThreshold(candidate, options)) || candidates.sort(compareScores)[0] || null;
+  const rankedCandidates = candidates.sort((a, b) => compareScores(a, b, options));
+  return rankedCandidates;
 };
 
 const prependAppendEndpoints = ({ waypoints, departureCode, arrivalCode, departurePoint, arrivalPoint }) => {
@@ -651,7 +714,71 @@ const prependAppendEndpoints = ({ waypoints, departureCode, arrivalCode, departu
   }));
 };
 
-export const searchLocalAipRoute = async ({ departure, arrival, options = {} } = {}) => {
+const buildRouteSummary = (candidate, metrics = {}) => {
+  const coverage = candidate.coverage || {};
+  const totalNm = Number.isFinite(candidate.routedNm) ? Math.round(candidate.routedNm) : Math.round(metrics.routedNm || 0);
+  const maxLegNm = Array.isArray(candidate.legs) && candidate.legs.length
+    ? Math.round(Math.max(0, ...candidate.legs.map((leg) => Number(leg.distanceNm || 0))))
+    : 0;
+  const fixCoverage = Math.round(coverage.publishedFixCoveragePercent ?? metrics.publishedFixCoveragePercent ?? 0);
+  const legCoverage = Math.round(coverage.publishedLegCoveragePercent ?? metrics.publishedLegCoveragePercent ?? 0);
+  return `${candidate.routeCode || candidate.routeId} · ${totalNm} NM${maxLegNm ? ` · max leg ${maxLegNm} NM` : ''}${fixCoverage ? ` · fixes ${fixCoverage}%` : ''}${legCoverage ? ` · legs ${legCoverage}%` : ''}`;
+};
+
+const candidateFamilyFromMethod = (method = '') => {
+  if (method === 'exact') return 'indexed';
+  if (method === 'brute-force') return 'brute';
+  if (method === 'graph') return 'graph';
+  if (method === 'relaxed') return 'relaxed';
+  return method || 'local';
+};
+
+const decorateCandidate = ({ candidate, index, method, metrics, departureCode, arrivalCode, departurePoint, arrivalPoint }) => {
+  const waypoints = prependAppendEndpoints({
+    waypoints: candidate.waypoints,
+    departureCode,
+    arrivalCode,
+    departurePoint,
+    arrivalPoint
+  });
+  const routedNm = routeDistanceNm(waypoints);
+  const candidateMetrics = {
+    ...metrics,
+    ...(candidate.coverage || {}),
+    method,
+    routedNm,
+    distanceOverLimitPercent: metrics.greatCircleNm && routedNm ? ((routedNm / metrics.greatCircleNm) - 1) * 100 : null
+  };
+  const normalizedCandidate = {
+    candidateId: `${candidateFamilyFromMethod(method)}-${candidate.routeId || candidate.routeCode || index}`,
+    family: candidateFamilyFromMethod(method),
+    routeId: candidate.routeId,
+    routeCode: candidate.routeCode,
+    routeString: waypoints.map((waypoint) => waypoint.name).join(' '),
+    waypoints,
+    legs: candidate.legs || [],
+    metrics: candidateMetrics,
+    coverage: candidate.coverage || null,
+    source: ROUTE_SOURCES.LOCAL_AIP,
+    billing: { chargedTokens: 0 }
+  };
+  return {
+    ...normalizedCandidate,
+    summary: buildRouteSummary({ ...candidate, routedNm, legs: candidate.legs || [] }, candidateMetrics)
+  };
+};
+
+const dedupeCandidates = (candidates) => {
+  const seen = new Set();
+  return candidates.filter((candidate) => {
+    const key = candidate.routeString || candidate.waypoints.map((waypoint) => waypoint.name).join(' ');
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+};
+
+export const searchLocalAipRouteAlternatives = async ({ departure, arrival, options = {} } = {}) => {
   const startedAt = performance.now();
   const metrics = createMetrics(startedAt);
   const searchOptions = { ...DEFAULT_OPTIONS, ...options };
@@ -659,12 +786,19 @@ export const searchLocalAipRoute = async ({ departure, arrival, options = {} } =
   const arrivalCode = getAirportCode(arrival);
 
   if (!departureCode || !arrivalCode) {
-    return { status: PROVIDER_STATUS.UNAVAILABLE, message: 'Local AIP route search requires departure and arrival airport codes.', metrics: metrics.finish() };
+    return { status: PROVIDER_STATUS.UNAVAILABLE, message: 'Local AIP route search requires departure and arrival airport codes.', metrics: metrics.finish(), billing: { chargedTokens: 0 } };
   }
 
   let store;
   try {
-    store = await loadLocalAipCsvStore(searchOptions);
+    store = await loadLocalAipCsvStore({
+      ...searchOptions,
+      progressCallback: (fileName, loaded, total) => {
+        if (total > 0) aipLoadingProgress.updateFile(fileName, loaded);
+        else if (loaded === 0) aipLoadingProgress.startFile(fileName, 1000000);
+      }
+    });
+    aipLoadingProgress.complete();
   } catch (error) {
     return {
       status: PROVIDER_STATUS.UNAVAILABLE,
@@ -678,55 +812,87 @@ export const searchLocalAipRoute = async ({ departure, arrival, options = {} } =
   const arrivalPoint = resolvePoint(store, arrivalCode, { role: 'arrival', regionCode: searchOptions.regionCode, departureCode, arrivalCode, previousPoint: departurePoint }) || arrival;
   metrics.greatCircleNm = calculateGreatCircleNm(departurePoint, arrivalPoint);
 
-  let candidate = exactLookup({ store, departureCode, arrivalCode, departurePoint, arrivalPoint, options: searchOptions, metrics });
-  if (candidate) {
-    metrics.method = 'exact';
-  } else if (searchOptions.useBruteForceFallback) {
-    candidate = bruteForceGraphSearch({ store, departureCode, arrivalCode, departurePoint, arrivalPoint, options: searchOptions, metrics, startedAt });
-    if (candidate) metrics.method = 'brute-force';
+  const candidates = [];
+  const exactCandidates = exactLookupCandidates({ store, departureCode, arrivalCode, departurePoint, arrivalPoint, options: searchOptions, metrics });
+  for (const candidate of exactCandidates) {
+    candidates.push(decorateCandidate({ candidate, index: candidates.length, method: 'exact', metrics: { ...metrics }, departureCode, arrivalCode, departurePoint, arrivalPoint }));
   }
 
-  if (!candidate && searchOptions.useGraphFallback) {
-    candidate = graphSearch({ store, departureCode, arrivalCode, arrivalPoint, options: searchOptions, metrics, startedAt });
-    if (candidate) metrics.method = 'graph';
+  if (searchOptions.useBruteForceFallback && candidates.length < searchOptions.maxCandidateRoutes) {
+    const bruteCandidates = bruteForceGraphSearch({ store, departureCode, arrivalCode, departurePoint, arrivalPoint, options: searchOptions, metrics, startedAt });
+    for (const candidate of bruteCandidates) {
+      candidates.push(decorateCandidate({ candidate, index: candidates.length, method: searchOptions.relaxAirwayLimitations ? 'relaxed' : 'brute-force', metrics: { ...metrics }, departureCode, arrivalCode, departurePoint, arrivalPoint }));
+      if (candidates.length >= searchOptions.maxCandidateRoutes) break;
+    }
   }
 
-  if (!candidate) {
-    return { status: PROVIDER_STATUS.UNAVAILABLE, message: 'No local AIP route found for this airport pair.', metrics: metrics.finish() };
+  if (searchOptions.useGraphFallback && candidates.length < searchOptions.maxCandidateRoutes) {
+    const graphCandidate = graphSearch({ store, departureCode, arrivalCode, arrivalPoint, options: searchOptions, metrics, startedAt });
+    if (graphCandidate) {
+      candidates.push(decorateCandidate({ candidate: graphCandidate, index: candidates.length, method: 'graph', metrics: { ...metrics }, departureCode, arrivalCode, departurePoint, arrivalPoint }));
+    }
   }
 
-  candidate.waypoints = prependAppendEndpoints({
-    waypoints: candidate.waypoints,
-    departureCode,
-    arrivalCode,
-    departurePoint,
-    arrivalPoint
-  });
+  const routeAlternatives = dedupeCandidates(candidates).slice(0, searchOptions.limit || searchOptions.maxCandidateRoutes);
+  if (!routeAlternatives.length) {
+    return { status: PROVIDER_STATUS.UNAVAILABLE, message: 'No local AIP route found for this airport pair.', metrics: metrics.finish(), billing: { chargedTokens: 0 } };
+  }
 
-  metrics.routedNm = routeDistanceNm(candidate.waypoints);
-  if (metrics.greatCircleNm && metrics.routedNm) {
-    metrics.distanceOverLimitPercent = ((metrics.routedNm / metrics.greatCircleNm) - 1) * 100;
-  }
-  if (candidate.coverage) {
-    Object.assign(metrics, candidate.coverage);
-  }
+  const selected = routeAlternatives[0];
+  const finishedMetrics = {
+    ...metrics.finish(),
+    ...(selected.metrics || {}),
+    candidateCount: routeAlternatives.length
+  };
 
   return {
     status: PROVIDER_STATUS.OK,
     route: {
-      waypoints: candidate.waypoints,
+      waypoints: selected.waypoints,
       source: ROUTE_SOURCES.LOCAL_AIP,
       metadata: {
-        routeId: candidate.routeId,
-        routeCode: candidate.routeCode,
-        localAipMetrics: metrics.finish(),
-        localAipCoverage: candidate.coverage || null,
+        routeId: selected.routeId,
+        routeCode: selected.routeCode,
+        routeString: selected.routeString,
+        selectedRouteAlternativeId: selected.candidateId,
+        routeAlternatives,
+        localAipMetrics: finishedMetrics,
+        localAipCoverage: selected.coverage || null,
         localAipDiagnostics: metrics.diagnostics,
-        localAipLegs: candidate.legs || []
+        localAipLegs: selected.legs || []
       },
       billing: { chargedTokens: 0 }
     },
-    metrics,
+    routeAlternatives,
+    selectedRouteAlternativeId: selected.candidateId,
+    metrics: finishedMetrics,
+    billing: { chargedTokens: 0 }
+  };
+};
+
+export const searchLocalAipRoute = async ({ departure, arrival, options = {} } = {}) => {
+  const response = await searchLocalAipRouteAlternatives({ departure, arrival, options: { ...options, limit: 1 } });
+  if (response?.status !== PROVIDER_STATUS.OK) return response;
+  const selected = response.routeAlternatives?.find((candidate) => candidate.candidateId === response.selectedRouteAlternativeId) || response.routeAlternatives?.[0];
+  return {
+    status: PROVIDER_STATUS.OK,
+    route: {
+      waypoints: selected?.waypoints || response.route?.waypoints || [],
+      source: ROUTE_SOURCES.LOCAL_AIP,
+      metadata: {
+        ...(response.route?.metadata || {}),
+        routeId: selected?.routeId || response.route?.metadata?.routeId || '',
+        routeCode: selected?.routeCode || response.route?.metadata?.routeCode || '',
+        routeString: selected?.routeString || response.route?.metadata?.routeString || '',
+        localAipMetrics: response.metrics,
+        localAipCoverage: selected?.coverage || response.route?.metadata?.localAipCoverage || null,
+        localAipLegs: selected?.legs || response.route?.metadata?.localAipLegs || []
+      },
+      billing: { chargedTokens: 0 }
+    },
+    routeAlternatives: response.routeAlternatives || [],
+    selectedRouteAlternativeId: selected?.candidateId || response.selectedRouteAlternativeId || '',
+    metrics: response.metrics,
     billing: { chargedTokens: 0 }
   };
 };

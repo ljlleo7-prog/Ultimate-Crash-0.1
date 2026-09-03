@@ -1,5 +1,6 @@
 import { useState, useCallback } from 'react';
 import airportData from '../data/airportDatabase.json';
+import { airportService } from '../services/airportService';
 
 const useAirportSearch = () => {
   const [searchResults, setSearchResults] = useState([]);
@@ -59,9 +60,18 @@ const useAirportSearch = () => {
   }, []);
 
   const getAirportByCode = useCallback((code) => {
-    return airportData.airports.find(airport => 
+    return airportData.airports.find(airport =>
       airport.iata === code || airport.icao === code
     );
+  }, []);
+
+  const getAirportByCodeRemote = useCallback(async (code) => {
+    if (!code || code.trim().length < 3) return null;
+    try {
+      return await airportService.getAirportByCodeRemote(code.trim().toUpperCase());
+    } catch {
+      return airportService.getAirportByCode(code.trim().toUpperCase());
+    }
   }, []);
 
   return {
@@ -73,8 +83,8 @@ const useAirportSearch = () => {
     searchAirports,
     selectDeparture,
     selectArrival,
-    clearSelection,
-    getAirportByCode
+    getAirportByCode,
+    getAirportByCodeRemote
   };
 };
 

@@ -7,6 +7,7 @@ export const ROUTE_SOURCES = Object.freeze({
   OUR_AIRPORTS: 'OurAirports',
   FAA_CIFP: 'FAACIFP',
   LOCAL_AIP: 'LocalAIP',
+  SUPABASE_AIP: 'SupabaseAIP',
   BUILT_IN: 'Built-in'
 });
 
@@ -20,7 +21,7 @@ export const PROVIDER_STATUS = Object.freeze({
   CACHE_HIT: 'cache_hit'
 });
 
-export const ROUTE_CACHE_VERSION = 'route-v1';
+export const ROUTE_CACHE_VERSION = 'route-v2';
 export const EXTERNAL_ROUTE_TTL_MS = 24 * 60 * 60 * 1000;
 export const REFERENCE_DATA_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 

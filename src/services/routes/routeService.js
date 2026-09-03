@@ -1,7 +1,8 @@
 import { fetchFlightPlanDbRoute } from './adapters/flightPlanDbAdapter.js';
 import { fetchProcedureData } from './adapters/procedureDataAdapter.js';
 import { fetchFaaCifpProcedures } from './adapters/faaCifpAdapter.js';
-import { searchLocalAipRoute } from './aipRouteSearch.js';
+import { searchSupabaseAipRoute } from './aipSupabaseRouteSearch.js';
+import { searchLocalAipRoute, searchLocalAipRouteAlternatives } from './aipRouteSearch.js';
 import { getNavaidReferencesAlongRoute } from './adapters/airportReferenceAdapter.js';
 import { getOurAirportsNavaidsAlongRoute } from './adapters/ourAirportsAdapter.js';
 import { buildBuiltInRoute } from './adapters/builtInRouteAdapter.js';
@@ -37,7 +38,11 @@ const buildRouteWithProcedures = (route, procedureResponse) => {
   };
 };
 
-const getBestProcedureResponse = async ({ departure, arrival, aircraftType, options, debugResponses, debug } = {}) => {
+const getBestProcedureResponse = async ({ departure, arrival, aircraftType, options, debugResponses, debug, authState } = {}) => {
+  if (authState !== 'authenticated') {
+    appendRouteDebug(debug, { provider: ROUTE_SOURCES.PROCEDURE_DATA, status: PROVIDER_STATUS.UNAUTHENTICATED, message: 'Procedure data skipped for unauthenticated requests.', fallback: true, billing: { chargedTokens: 0 } });
+    return null;
+  }
   const request = {
     departure,
     arrival,
@@ -113,6 +118,38 @@ const buildReferenceEnrichedRoute = (route, referenceResponse) => {
   });
 };
 
+const attachAlternatives = (route, response) => ({
+  ...route,
+  routeAlternatives: response.routeAlternatives || response.route?.metadata?.routeAlternatives || [],
+  selectedRouteAlternativeId: response.selectedRouteAlternativeId || response.route?.metadata?.selectedRouteAlternativeId || ''
+});
+
+const buildSelectedAipRoute = async ({ providerSource, providerResponse, departure, arrival, aircraftType, options, debugResponses, debug, authState } = {}) => {
+  const normalized = normalizeRoute({
+    ...providerResponse.route,
+    departure,
+    arrival,
+    source: providerSource,
+    sourceChain: [providerSource],
+    fallbackUsed: false,
+    debug,
+    billing: providerResponse.billing || { chargedTokens: 0 }
+  });
+  const procedureResponse = await getBestProcedureResponse({
+    departure,
+    arrival,
+    aircraftType,
+    options,
+    debugResponses,
+    debug,
+    authState
+  });
+  return attachAlternatives(
+    buildRouteWithProcedures({ ...normalized, debug, fallbackUsed: false, source: providerSource }, procedureResponse),
+    providerResponse
+  );
+};
+
 export const generateUnifiedRoute = async ({
   departure,
   arrival,
@@ -138,50 +175,94 @@ export const generateUnifiedRoute = async ({
   }
 
   const routeProviders = authState === 'authenticated' ? guardedRouteProviders : [];
+  const aipProviderMode = options.aipProviderMode || options.localAip?.providerMode || options.supabaseAip?.providerMode || 'local-only';
 
-  const localAipResponse = await searchLocalAipRoute({
-    departure,
-    arrival,
-    options: options.localAip || options
-  });
-
-  if (localAipResponse?.status === PROVIDER_STATUS.OK && localAipResponse.route?.waypoints?.length) {
-    const normalized = normalizeRoute({
-      ...localAipResponse.route,
+  const tryLocalAip = async () => {
+    const response = await searchLocalAipRouteAlternatives({
       departure,
       arrival,
-      source: ROUTE_SOURCES.LOCAL_AIP,
-      sourceChain: [ROUTE_SOURCES.LOCAL_AIP],
-      fallbackUsed: false,
-      debug,
-      billing: localAipResponse.billing || { chargedTokens: 0 }
+      options: {
+        ...(options.localAip || options),
+        limit: options.routeAlternativeLimit || options.localAip?.limit || 8
+      }
     });
+
+    if (response?.status === PROVIDER_STATUS.OK && response.route?.waypoints?.length) {
+      appendRouteDebug(debug, {
+        provider: ROUTE_SOURCES.LOCAL_AIP,
+        status: PROVIDER_STATUS.OK,
+        message: `Local AIP route alternatives found (${response.routeAlternatives?.length || 1})`,
+        billing: response.billing || { chargedTokens: 0 }
+      });
+      return buildSelectedAipRoute({ providerSource: ROUTE_SOURCES.LOCAL_AIP, providerResponse: response, departure, arrival, aircraftType, options, debugResponses, debug, authState });
+    }
+
     appendRouteDebug(debug, {
       provider: ROUTE_SOURCES.LOCAL_AIP,
-      status: PROVIDER_STATUS.OK,
-      message: `Local AIP route found (${localAipResponse.metrics?.method || 'indexed'})`,
-      billing: localAipResponse.billing || { chargedTokens: 0 }
+      status: response?.status || PROVIDER_STATUS.UNAVAILABLE,
+      message: response?.message || 'Local AIP route unavailable.',
+      fallback: true,
+      billing: response?.billing || { chargedTokens: 0 }
     });
-    const procedureResponse = await getBestProcedureResponse({
+    return null;
+  };
+
+  const trySupabaseAip = async () => {
+    const response = await searchSupabaseAipRoute({
       departure,
       arrival,
-      aircraftType,
-      options,
-      debugResponses,
-      debug
+      options: {
+        ...(options.supabaseAip || options.localAip || options),
+        limit: options.routeAlternativeLimit || options.supabaseAip?.limit || 5
+      }
     });
-    const finalRoute = buildRouteWithProcedures({ ...normalized, debug, fallbackUsed: false, source: ROUTE_SOURCES.LOCAL_AIP }, procedureResponse);
-    setCachedRoute(cacheKey, finalRoute);
-    return finalRoute;
+
+    if (response?.status === PROVIDER_STATUS.OK && response.route?.waypoints?.length) {
+      appendRouteDebug(debug, {
+        provider: ROUTE_SOURCES.SUPABASE_AIP,
+        status: PROVIDER_STATUS.OK,
+        message: `Supabase AIP route found (${response.metrics?.method || 'indexed'})`,
+        billing: response.billing || { chargedTokens: 0 }
+      });
+      return buildSelectedAipRoute({ providerSource: ROUTE_SOURCES.SUPABASE_AIP, providerResponse: response, departure, arrival, aircraftType, options, debugResponses, debug, authState });
+    }
+
+    appendRouteDebug(debug, {
+      provider: ROUTE_SOURCES.SUPABASE_AIP,
+      status: response?.status || PROVIDER_STATUS.UNAVAILABLE,
+      message: response?.message || 'Supabase AIP route unavailable.',
+      fallback: true,
+      billing: response?.billing || { chargedTokens: 0 }
+    });
+    return null;
+  };
+
+  if (aipProviderMode !== 'remote-first') {
+    const localRoute = await tryLocalAip();
+    if (localRoute) {
+      setCachedRoute(cacheKey, localRoute);
+      return localRoute;
+    }
+    if (aipProviderMode === 'local-only') {
+      const builtIn = buildBuiltInRoute({ departure, arrival, debug });
+      setCachedRoute(cacheKey, { ...builtIn.route, debug, fallbackUsed: true });
+      return { ...builtIn.route, debug, fallbackUsed: true };
+    }
   }
 
-  appendRouteDebug(debug, {
-    provider: ROUTE_SOURCES.LOCAL_AIP,
-    status: localAipResponse?.status || PROVIDER_STATUS.UNAVAILABLE,
-    message: localAipResponse?.message || 'Local AIP route unavailable; trying external providers.',
-    fallback: true,
-    billing: localAipResponse?.billing || { chargedTokens: 0 }
-  });
+  const supabaseRoute = await trySupabaseAip();
+  if (supabaseRoute) {
+    setCachedRoute(cacheKey, supabaseRoute);
+    return supabaseRoute;
+  }
+
+  if (aipProviderMode === 'remote-first') {
+    const localRoute = await tryLocalAip();
+    if (localRoute) {
+      setCachedRoute(cacheKey, localRoute);
+      return localRoute;
+    }
+  }
 
   if (authState !== 'authenticated') {
     guardedRouteProviders.forEach((providerFn) => {

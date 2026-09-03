@@ -87,6 +87,20 @@
 }
 
 /* Waypoints List */
+.route-mini-map {
+  margin-bottom: 12px;
+  border: 1px solid rgba(79, 172, 254, 0.25);
+  border-radius: 6px;
+  overflow: hidden;
+  background: radial-gradient(circle at center, rgba(79, 172, 254, 0.12), rgba(0, 0, 0, 0.35));
+}
+
+.route-mini-map svg {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
 .waypoints-list ul {
   list-style: none;
   padding: 0;
