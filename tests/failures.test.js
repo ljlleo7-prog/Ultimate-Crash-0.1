@@ -4,6 +4,7 @@ import { createRequire } from 'node:module';
 import RealisticFlightPhysicsService from '../src/services/RealisticFlightPhysicsService.js';
 import { createCanonicalFailureGraph } from '../src/services/failures/CanonicalFailureGraph.js';
 import { validateFailureGraphArtifact } from '../src/services/failures/FailureGraphArtifact.js';
+import FailureGraphExecutor from '../src/services/failures/FailureGraphExecutor.js';
 import { failureGraphManager } from '../src/services/skylinetragedy/FailureGraphManager.js';
 
 const require = createRequire(import.meta.url);
@@ -123,6 +124,90 @@ test('engine fire cascade reaches hydraulic failure after stage/time guard', () 
   });
 });
 
+test('cascade probability is decided once instead of retried every update', () => {
+  let randomCalls = 0;
+  const original = Math.random;
+  Math.random = () => {
+    randomCalls += 1;
+    return 0.99;
+  };
+  try {
+    const edge = {
+      id: 'TEST_EDGE', sourceRuntimeId: 'source', targetRuntimeId: 'target',
+      sourceStage: 'active', probability: 0.3, delaySeconds: 0,
+      requiredObservables: [], inhibitedObservables: []
+    };
+    const executor = new FailureGraphExecutor({ edges: [edge] });
+    const activeFailures = new Map([['source', {
+      id: 'source', instanceId: 1, currentStage: 'active', timeInStage: 10,
+      variation: { context: {} }
+    }]]);
+    for (let index = 0; index < 400; index += 1) {
+      executor.update(0.05, {
+        activeFailures,
+        flightState: {},
+        triggerFailure: () => assert.fail('rejected edge must not trigger'),
+        getCascadePolicy: () => ({})
+      });
+    }
+
+    assert.equal(randomCalls, 1);
+  } finally {
+    Math.random = original;
+  }
+});
+
+test('recovered failure stops applying effects and cannot cascade afterward', () => {
+  withFixedRandom(0.0, () => {
+    const service = new RealisticFlightPhysicsService(aircraft);
+    service.failureSystem.triggerFailure('compressor_stall', { engineIndex: 0 });
+    runFailureTicks(service, 25, 0.25);
+
+    assert.equal(service.failureSystem.activeFailures.has('compressor_stall'), false);
+    assert.equal(service.failureSystem.activeFailures.has('engine_fire'), false);
+    assert.equal(service.failureSystem.getIncidentLog().some(entry =>
+      entry.type === 'failure_recovered' && entry.failureId === 'compressor_stall'), true);
+  });
+});
+
+test('electrical bus failure persists through normal overhead updates', () => {
+  withFixedRandom(0.5, () => {
+    const service = new RealisticFlightPhysicsService(aircraft);
+    service.failureSystem.triggerFailure('electrical_bus_failure');
+    service.update({}, 0.25);
+
+    assert.equal(service.systems.damage.electricalMainBusFailed, true);
+    assert.equal(service.systems.electrical.acVolts, 0);
+    assert.equal(service.systems.electrical.sourceOff1, true);
+    assert.equal(service.systems.electrical.sourceOff2, true);
+  });
+});
+
+test('hydraulic damage cannot be repaired by selected pumps', () => {
+  withFixedRandom(0.5, () => {
+    const service = new RealisticFlightPhysicsService(aircraft);
+    service.failureSystem.triggerFailure('hydraulic_failure');
+    service.systems.hydraulics.sysA.engPump = true;
+    service.systems.hydraulics.sysA.elecPump = true;
+    service.update({}, 0.25);
+
+    assert.equal(service.systems.damage.hydraulicsFailed, true);
+    assert.equal(service.systems.hydraulics.sysA.pressure, 0);
+    assert.equal(service.systems.hydraulics.sysB.pressure, 0);
+  });
+});
+
+test('autopilot disconnect failure disengages autoflight persistently', () => {
+  withFixedRandom(0.5, () => {
+    const service = new RealisticFlightPhysicsService(aircraft);
+    service.setAutopilot(true, { mode: 'HDG', heading: 90 });
+    service.failureSystem.triggerFailure('autopilot_disconnect');
+    service.update({}, 0.25);
+
+    assert.equal(service.getOutputState().autopilot.engaged, false);
+  });
+});
+
 test('rookie mode blocks catastrophic uncontained engine cascades', () => {
   withFixedRandom(0.0, () => {
     const rookieService = createServiceForDifficulty('rookie');
@@ -183,5 +268,4 @@ test('engine start switch stays in GRD without electrical power for ignition', (
 });
 
 after(() => {
-  setTimeout(() => process.exit(0), 0);
 });

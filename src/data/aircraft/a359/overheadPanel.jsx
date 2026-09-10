@@ -1,13 +1,5 @@
-// Airbus A350-900 overhead panel — stub
-import React from 'react';
+import AirbusWidebodyOverhead from '../../../components/overhead/AirbusWidebodyOverhead.jsx';
 
-const OverheadPanelA359 = ({ flightState, onSystemAction }) => (
-  <div style={{ display:'flex', alignItems:'center', justifyContent:'center', height:'100%', color:'#666', fontSize:'14px', fontFamily:'monospace' }}>
-    <div style={{ textAlign:'center' }}>
-      <div style={{ fontSize:'11px', color:'#444', marginBottom:'8px' }}>Airbus A350-900</div>
-      <div style={{ border:'2px solid #c00', color:'#c00', padding:'4px 12px', transform:'rotate(-5deg)', opacity:0.7 }}>PANEL NOT YET IMPLEMENTED</div>
-    </div>
-  </div>
-);
-
-export default OverheadPanelA359;
+export default function OverheadPanelA350(props) {
+  return <AirbusWidebodyOverhead model="A350" {...props} />;
+}

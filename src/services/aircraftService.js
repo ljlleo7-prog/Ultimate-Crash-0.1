@@ -90,22 +90,6 @@ class AircraftService {
     );
   }
 
-  // Get control surface profiles (flaps, airbrakes) for a specific aircraft model
-  async getControlSurfaceProfiles(modelName) {
-    const aircraft = await this.getAircraftByModel(modelName);
-    if (!aircraft) {
-      console.warn(`Aircraft model '${modelName}' not found, returning default profiles`);
-      return {
-        flaps: { positions: [] },
-        airbrakes: { positions: [] }
-      };
-    }
-    return {
-      flaps: aircraft.flapProfile || { positions: [] },
-      airbrakes: aircraft.airbrakeProfile || { positions: [] }
-    };
-  }
-
   // Get all aircraft models
   async getAllAircraft() {
     const db = await this.initialize();
@@ -122,7 +106,7 @@ class AircraftService {
 
   // Get popular aircraft models for suggestions
   async getPopularAircraft() {
-    const db = await this.initialize();
+    await this.initialize();
     
     // Return all available aircraft models for user selection
     return this.aircraftDatabase.map(aircraft => ({

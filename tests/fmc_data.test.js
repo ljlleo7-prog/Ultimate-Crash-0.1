@@ -4,7 +4,7 @@
  */
 
 import { describe, it } from 'node:test';
-import assert from 'node:assert';
+import assert from 'node:assert/strict';
 import FMCService from '../src/services/FMCService.js';
 
 describe('FMC Data Integration', () => {
@@ -131,5 +131,3 @@ describe('FMC Data Integration', () => {
     assert.equal(executed.fms.activePlan.waypoints[1].type, 'discontinuity');
   });
 });
-
-setTimeout(() => process.exit(0), 5000);

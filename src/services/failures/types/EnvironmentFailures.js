@@ -32,9 +32,17 @@ const EnvironmentFailures = {
                     sound: "explosion_dull",
                     visual: "shake_violent"
                 }),
-                effect: (sys) => {
+                effect: (sys, intensity, ctx) => {
                     sys.systems.pressurization.breach = true;
-                    // Drag increase?
+                    if (!ctx.regionalDamageApplied) {
+                        sys.applyRegionalDamage?.({
+                            eventId: ctx.eventId || 'hull-breach',
+                            zone: ctx.zone || 'center_fuselage',
+                            energy: ctx.damageEnergy ?? 0.55,
+                            mechanisms: { pressureImpulse: 1 }
+                        });
+                        ctx.regionalDamageApplied = true;
+                    }
                 }
             }
         }
@@ -158,6 +166,16 @@ const EnvironmentFailures = {
                     system_alert: "ENG VIB HIGH"
                 }),
                 effect: (sys, intensity, ctx) => {
+                    if (!ctx.regionalDamageApplied) {
+                        const idx = ctx.engineIndex !== undefined ? ctx.engineIndex : 0;
+                        sys.applyRegionalDamage?.({
+                            eventId: ctx.eventId || `uncontained-engine-${idx + 1}`,
+                            zone: idx === 0 ? 'left_engine' : 'right_engine',
+                            energy: ctx.damageEnergy ?? 0.85,
+                            mechanisms: { fragmentation: 1, fire: 0.35 }
+                        });
+                        ctx.regionalDamageApplied = true;
+                    }
                     const idx = ctx.engineIndex !== undefined ? ctx.engineIndex : 0;
                     if (sys.engines[idx]) sys.engines[idx].setFailed(true);
                 }

@@ -21,11 +21,19 @@ const createColdDarkService = () => {
   return service;
 };
 
+const connectBattery = (service) => {
+  service.systems.electrical.batterySelector = 'AUTO';
+};
+
+const selectApuGenerators = (service) => {
+  service.systems.electrical.apuGen1 = true;
+  service.systems.electrical.apuGen2 = true;
+};
+
 test('battery-only state keeps DC alive but leaves AC-powered pumps unavailable', () => {
   const service = createColdDarkService();
 
-  service.systems.electrical.battery = true;
-  service.systems.electrical.stbyPower = true;
+  connectBattery(service);
   service.systems.electrical.busTie = true;
   service.systems.fuel.leftPumps = true;
   service.systems.fuel.rightPumps = true;
@@ -43,11 +51,10 @@ test('battery-only state keeps DC alive but leaves AC-powered pumps unavailable'
 test('apu generator can repower AC buses from a cold and dark state', () => {
   const service = createColdDarkService();
 
-  service.systems.electrical.battery = true;
-  service.systems.electrical.stbyPower = true;
+  connectBattery(service);
   service.systems.apu.master = true;
   service.systems.apu.start = true;
-  service.systems.electrical.apuGen = true;
+  selectApuGenerators(service);
 
   tickSystems(service, 35);
 
@@ -60,11 +67,10 @@ test('apu generator can repower AC buses from a cold and dark state', () => {
 test('engine start does not light off without bleed pressure even with fuel available', () => {
   const service = createColdDarkService();
 
-  service.systems.electrical.battery = true;
-  service.systems.electrical.stbyPower = true;
+  connectBattery(service);
   service.systems.fuel.leftPumps = true;
   service.systems.fuel.rightPumps = true;
-  service.systems.electrical.apuGen = true;
+  selectApuGenerators(service);
   service.systems.apu.master = true;
   service.systems.apu.start = true;
 
@@ -87,11 +93,10 @@ test('engine start does not light off without bleed pressure even with fuel avai
 test('engine start can light off once bleed and fuel feed are both available', () => {
   const service = createColdDarkService();
 
-  service.systems.electrical.battery = true;
-  service.systems.electrical.stbyPower = true;
+  connectBattery(service);
   service.systems.fuel.leftPumps = true;
   service.systems.fuel.rightPumps = true;
-  service.systems.electrical.apuGen = true;
+  selectApuGenerators(service);
   service.systems.apu.master = true;
   service.systems.apu.start = true;
 
@@ -115,8 +120,7 @@ test('hydraulic pressure decays without pump supply and rebuilds with electrical
   const service = createColdDarkService();
   const sysA = service.systems.hydraulics.sysA;
 
-  service.systems.electrical.battery = true;
-  service.systems.electrical.stbyPower = true;
+  connectBattery(service);
   service.systems.electrical.acVolts = 0;
   sysA.engPump = false;
   sysA.elecPump = false;
@@ -125,7 +129,7 @@ test('hydraulic pressure decays without pump supply and rebuilds with electrical
   tickSystems(service, 6);
   assert.equal(sysA.pressure < 3000, true);
 
-  service.systems.electrical.apuGen = true;
+  selectApuGenerators(service);
   service.systems.apu.master = true;
   service.systems.apu.start = true;
 

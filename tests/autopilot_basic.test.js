@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import RealisticFlightPhysicsService from '../src/services/RealisticFlightPhysicsService.js';
 import { loadAircraftData } from '../src/services/aircraftService.js';
 import { Quaternion } from '../src/utils/flightMath.js';
+import { installDeterministicRandom } from './support/deterministicRandom.js';
 
 const SIM_DT = 0.05;
 let cachedAircraft = null;
@@ -411,7 +412,8 @@ test('Autopilot heading intercept respects 25 degree normal bank limit while avo
   assert.ok(maxTargetRoll >= 18, `Target roll ${maxTargetRoll.toFixed(2)}° is too weak to recover decisively`);
 });
 
-test('Autopilot stabilizes VS altitude and IAS under wind with low signed average drift', async () => {
+test('Autopilot stabilizes VS altitude and IAS under wind with low signed average drift', async (t) => {
+  t.after(installDeterministicRandom(737801));
   const physics = await createPhysics({ altitudeFt: 9800, heading: 90, speedKt: 178 });
   physics.state.quat = Quaternion.fromEuler(0, 3 * Math.PI / 180, Math.PI / 2);
   physics.setEnvironment({ windSpeed: 18, windDirection: 230, windGust: 24, windShear: 0.06, turbulence: 0.12, temperature: 15, pressure: 1013.25 });
@@ -452,6 +454,7 @@ test('ILS exposes debug info and reduces localizer deviation during intercept', 
     ilsFrequency: 110.3,
     thresholdStart: { latitude: 34.0, longitude: -118.01, elevation: 100 }
   });
+  physics.autopilot.setNavFrequency(110.3);
   physics.setAutopilot(true, { mode: 'ILS', speed: 160, heading: 90, vs: -700, altitude: 2500 });
 
   let initialDev = null;
@@ -469,7 +472,8 @@ test('ILS exposes debug info and reduces localizer deviation during intercept', 
   assert.ok((finalDev ?? Infinity) < (initialDev ?? 0), `Localizer deviation did not improve: initial ${(initialDev ?? 0).toFixed(2)}° final ${(finalDev ?? 0).toFixed(2)}°`);
 });
 
-test('Autopilot stabilizes under stronger gusting crosswind with low signed average drift', async () => {
+test('Autopilot stabilizes under stronger gusting crosswind with low signed average drift', async (t) => {
+  t.after(installDeterministicRandom(737800));
   const physics = await createPhysics({ altitudeFt: 9800, heading: 90, speedKt: 178 });
   physics.state.quat = Quaternion.fromEuler(0, 3 * Math.PI / 180, Math.PI / 2);
   physics.setEnvironment({ windSpeed: 21, windDirection: 230, windGust: 30, windShear: 0.07, turbulence: 0.14, temperature: 15, pressure: 1013.25 });
@@ -496,5 +500,3 @@ test('Autopilot stabilizes under stronger gusting crosswind with low signed aver
   assert.ok(Math.abs(avgAltDrift) <= 20, `Strong-wind average altitude drift ${avgAltDrift.toFixed(2)}ft exceeds 20ft`);
   assert.ok(Math.abs(avgIasDrift) <= 1, `Strong-wind average IAS drift ${avgIasDrift.toFixed(2)}kts exceeds 1kt`);
 });
-
-setTimeout(() => process.exit(process.exitCode ?? 0), 10000).unref();

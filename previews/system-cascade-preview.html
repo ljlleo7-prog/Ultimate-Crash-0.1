@@ -1,0 +1,143 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>B737 System Cascade Inspector</title>
+  <style>
+    :root { color-scheme: dark; --bg:#071014; --panel:#0c181e; --line:#28404a; --text:#dce9ed; --muted:#78909a; --cyan:#36d1c4; --green:#71dc83; --amber:#f4b942; --red:#ff6262; }
+    * { box-sizing:border-box; }
+    body { margin:0; min-width:1100px; height:100vh; overflow:hidden; background:radial-gradient(circle at 20% 0,#12303a 0,transparent 35%),var(--bg); color:var(--text); font:12px Inter,ui-sans-serif,system-ui,sans-serif; }
+    button { font:inherit; }
+    header { height:72px; padding:14px 20px; display:flex; align-items:center; justify-content:space-between; border-bottom:1px solid var(--line); background:#09151acc; }
+    .brand { display:flex; gap:12px; align-items:center; }
+    .pulse { width:13px; height:13px; border-radius:50%; background:var(--green); box-shadow:0 0 18px var(--green); }
+    h1 { margin:0; font-size:17px; letter-spacing:.12em; }
+    .sub { color:var(--muted); margin-top:4px; font:10px ui-monospace,monospace; }
+    .controls,.tabs { display:flex; gap:7px; }
+    button { color:#9fb2ba; background:#0b1b21; border:1px solid #29434d; border-radius:6px; padding:8px 11px; cursor:pointer; }
+    button:hover,button.active { color:#edffff; border-color:var(--cyan); background:#123036; }
+    button.danger.active { color:#fff; border-color:var(--red); background:#3a1b20; }
+    main { height:calc(100vh - 72px); display:grid; grid-template-columns:minmax(720px,1fr) 340px; }
+    .workspace { min-width:0; padding:14px; display:flex; flex-direction:column; gap:10px; }
+    .toolbar { display:flex; justify-content:space-between; align-items:center; }
+    .timeline { display:flex; align-items:center; gap:8px; min-width:430px; color:var(--muted); font:10px ui-monospace,monospace; }
+    .timeline input { flex:1; accent-color:var(--cyan); }
+    .timeline button { padding:5px 9px; min-width:36px; }
+    .legend { display:flex; gap:14px; color:var(--muted); font-size:10px; }
+    .key:before { content:""; display:inline-block; width:9px; height:9px; margin-right:5px; border-radius:50%; background:var(--green); }
+    .key.off:before { background:#40515a; }.key.bad:before { background:var(--red); }.key.resource:before { border-radius:2px; background:var(--cyan); }
+    #graph { position:relative; flex:1; min-height:0; overflow:auto; border:1px solid var(--line); border-radius:9px; background-color:#081318; background-image:linear-gradient(#12242a 1px,transparent 1px),linear-gradient(90deg,#12242a 1px,transparent 1px); background-size:28px 28px; }
+    #graphInner { position:relative; min-width:1180px; min-height:720px; padding:18px; }
+    svg { position:absolute; inset:0; width:1180px; height:720px; pointer-events:none; overflow:visible; }
+    .edge { fill:none; stroke:#31515b; stroke-width:1.5; opacity:.65; marker-end:url(#arrow); }
+    .edge.live { stroke:var(--cyan); opacity:.9; filter:drop-shadow(0 0 2px #36d1c477); }
+    .columns { position:relative; z-index:1; display:grid; grid-template-columns:repeat(6,170px); gap:24px; }
+    .column-title { color:#6f8b94; letter-spacing:.13em; font-size:9px; border-bottom:1px solid #23404a; padding:0 3px 8px; margin-bottom:11px; }
+    .node { position:relative; height:74px; padding:9px; margin-bottom:25px; border:1px solid #2b434c; border-radius:7px; background:#0c1a20ee; cursor:pointer; transition:.15s; }
+    .node.dragging { cursor:grabbing; transition:none; z-index:4; box-shadow:0 12px 28px #000a; }
+    .node:hover,.node.selected { transform:translateY(-1px); border-color:#80dbe0; }
+    .node.active { border-color:#3b8d91; box-shadow:inset 3px 0 var(--green); }
+    .node.failed { border-color:#77363b; box-shadow:inset 3px 0 var(--red); background:#211418ee; }
+    .node.inactive { opacity:.52; }
+    .node-name { font:600 10px ui-monospace,monospace; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .node-zone { color:var(--muted); font-size:9px; margin-top:5px; }
+    .health { height:3px; background:#24343a; margin-top:8px; border-radius:4px; overflow:hidden; }.health i { display:block; height:100%; background:var(--green); }
+    .provides { color:var(--cyan); font:8px ui-monospace,monospace; margin-top:6px; overflow:hidden; white-space:nowrap; text-overflow:ellipsis; }
+    aside { border-left:1px solid var(--line); background:#09151a; overflow:auto; padding:14px; }
+    .card { border:1px solid #243a43; background:#0c191f; border-radius:8px; padding:12px; margin-bottom:10px; }
+    .card h2 { margin:0 0 10px; color:#829ba5; font-size:9px; letter-spacing:.14em; }
+    .metric-grid { display:grid; grid-template-columns:1fr 1fr; gap:7px; }
+    .metric { padding:8px; border-radius:5px; background:#101f25; }.metric span { display:block; color:#718791; font-size:8px; }.metric b { display:block; margin-top:4px; font:12px ui-monospace,monospace; }
+    .row { display:grid; grid-template-columns:105px 1fr; gap:8px; padding:5px 0; border-bottom:1px solid #172a31; font:9px ui-monospace,monospace; }.row label { color:#708791; }.row div { overflow-wrap:anywhere; }
+    .tag { display:inline-block; padding:3px 5px; margin:2px; border:1px solid #2c4c55; border-radius:4px; color:#83d9dc; font:8px ui-monospace,monospace; }
+    .log { padding:7px 0; border-bottom:1px solid #1a2b32; }.log time { color:#617780; font:8px ui-monospace,monospace; }.log div { margin-top:3px; font-size:10px; }.log.bad div { color:#ff8585; }.log.good div { color:#87db94; }
+    .note { color:#77909a; line-height:1.5; font-size:10px; }
+    .failure-form { display:grid; grid-template-columns:1fr 86px; gap:7px; }
+    select,input[type="number"],input[type="range"] { width:100%; color:var(--text); background:#09161b; border:1px solid #29434d; border-radius:5px; padding:7px; font:9px ui-monospace,monospace; }
+    .failure-form .wide { grid-column:1/-1; }.failure-form button { padding:7px; }
+    #cascade { display:none; position:relative; min-width:1100px; height:680px; }
+    .event { position:absolute; width:185px; min-height:74px; border:1px solid #38505a; border-radius:8px; padding:10px; background:#0c1a20; z-index:2; }
+    .event.root { border-color:var(--amber); }.event.damage { border-color:var(--red); }.event.effect { border-color:#44939a; }
+    .event b { font-size:10px; }.event p { color:#78909a; font-size:9px; line-height:1.4; margin:6px 0 0; }
+    .empty { padding:30px; color:#78909a; }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="brand"><div class="pulse" id="pulse"></div><div><h1>B737 SYSTEM CASCADE INSPECTOR</h1><div class="sub">REFERENCE TOPOLOGY · COMPONENT → RESOURCE → CONSUMER</div></div></div>
+    <div class="controls" id="scenarios"></div>
+  </header>
+  <main>
+    <section class="workspace">
+      <div class="toolbar"><div class="tabs"><button class="active" data-view="system">SYSTEM FLOW</button><button data-view="cascade">EVENT CASCADE</button></div><div class="timeline"><button id="play">▶</button><span id="clock">T+00.0s</span><input id="time" type="range" min="0" max="30" step="0.1" value="0"><button id="resetLayout" title="Reset dragged modules">LAYOUT</button></div><div class="legend"><span class="key">SUPPLIED</span><span class="key off">UNSUPPLIED</span><span class="key bad">DAMAGED</span></div></div>
+      <div id="graph"><div id="graphInner"><svg id="edges"><defs><marker id="arrow" markerWidth="7" markerHeight="7" refX="6" refY="3.5" orient="auto"><path d="M0,0 L7,3.5 L0,7 z" fill="#4d747e"/></marker></defs></svg><div class="columns" id="columns"></div><div id="cascade"></div></div></div>
+    </section>
+    <aside>
+      <div class="card"><h2>LIVE SYSTEM DATA</h2><div class="metric-grid" id="metrics"></div></div>
+      <div class="card"><h2>SELECTED COMPONENT</h2><div id="details" class="note">Select a component in the graph.</div></div>
+      <div class="card"><h2>CUSTOM FAILURE INJECTOR</h2><div class="failure-form"><select id="failureComponent" class="wide"></select><label class="note">HEALTH %</label><input id="failureHealth" type="number" min="0" max="100" value="0"><label class="note">ONSET T+</label><input id="failureOnset" type="number" min="0" max="30" step="0.5" value="0"><button id="inject" class="wide">SCHEDULE / APPLY</button><button id="repair">REPAIR SELECTED</button><button id="clearCustom">CLEAR ALL</button></div><div id="customList" class="note" style="margin-top:8px"></div></div>
+      <div class="card"><h2>HOW STATE IS STORED</h2><div class="row"><label>componentStore</label><div>health, damageModes, lastEventId</div></div><div class="row"><label>resources</label><div>derived Set; rebuilt every update</div></div><div class="row"><label>activeComponents</label><div>operable + commanded + supplied</div></div><div class="row"><label>suppliedBy</label><div>resource → provider IDs</div></div><div class="row"><label>damageLedger</label><div>append-only causal evidence</div></div><p class="note">Commands and physical seed resources enter the solver. It repeatedly activates valid components, derives resources, then computes aircraft capabilities. Damage changes stored component health; resource loss is derived rather than separately scripted.</p></div>
+      <div class="card"><h2>STATE CHANGE LOG</h2><div id="log"></div></div>
+    </aside>
+  </main>
+  <script>
+    const groups=['SOURCE','ELECTRICAL','HYDRAULIC','PNEUMATIC','FUEL','CONSUMERS'];
+    const C=(id,g,req=[],out=[],zone='center fuselage')=>({id,g,req,out,zone});
+    const components=[
+      C('engine.1','SOURCE',[],['engine_1_shaft'],'left engine'),C('engine.2','SOURCE',[],['engine_2_shaft'],'right engine'),C('apu','SOURCE',[],['apu_shaft'],'tail'),
+      C('generator.1','ELECTRICAL',['engine_1_shaft'],['ac_feed_1'],'left engine'),C('generator.2','ELECTRICAL',['engine_2_shaft'],['ac_feed_2'],'right engine'),C('apu_generator','ELECTRICAL',['apu_shaft'],['ac_feed_1','ac_feed_2'],'tail'),C('ac_bus.1','ELECTRICAL',['ac_feed_1|ac_tie_1'],['ac_bus_1'],'electronics bay'),C('ac_bus.2','ELECTRICAL',['ac_feed_2|ac_tie_2'],['ac_bus_2'],'electronics bay'),C('bus_tie','ELECTRICAL',['ac_bus_1|ac_bus_2'],['ac_tie_1','ac_tie_2'],'electronics bay'),C('battery','ELECTRICAL',[],['dc_essential'],'electronics bay'),
+      C('hyd_pump.A','HYDRAULIC',['engine_1_shaft|ac_bus_1'],['hyd_feed_A'],'left/center'),C('hyd_pump.B','HYDRAULIC',['engine_2_shaft|ac_bus_2'],['hyd_feed_B'],'right/center'),C('hyd_circuit.A','HYDRAULIC',['hyd_feed_A'],['hydraulic_A']),C('hyd_circuit.B','HYDRAULIC',['hyd_feed_B'],['hydraulic_B']),
+      C('bleed.1','PNEUMATIC',['engine_1_shaft'],['bleed_feed_L'],'left engine'),C('bleed.2','PNEUMATIC',['engine_2_shaft'],['bleed_feed_R'],'right engine'),C('apu_bleed','PNEUMATIC',['apu_shaft'],['bleed_feed_L'],'tail'),C('duct.L','PNEUMATIC',['bleed_feed_L|bleed_tie_L'],['bleed_duct_L']),C('duct.R','PNEUMATIC',['bleed_feed_R|bleed_tie_R'],['bleed_duct_R']),C('isolation_valve','PNEUMATIC',['bleed_duct_L|bleed_duct_R'],['bleed_tie_L','bleed_tie_R']),C('pack.L','PNEUMATIC',['bleed_duct_L','ac_bus_1'],['conditioned_air_L']),C('pack.R','PNEUMATIC',['bleed_duct_R','ac_bus_2'],['conditioned_air_R']),
+      C('fuel_pump.L','FUEL',['ac_bus_1','fuel_tank_L'],['fuel_pressure_L'],'left wing'),C('fuel_pump.R','FUEL',['ac_bus_2','fuel_tank_R'],['fuel_pressure_R'],'right wing'),C('fuel_feed.L','FUEL',['fuel_pressure_L|fuel_pressure_C'],['fuel_feed_engine_1'],'left wing'),C('fuel_feed.R','FUEL',['fuel_pressure_R|fuel_pressure_C'],['fuel_feed_engine_2'],'right wing'),
+      C('pressurization','CONSUMERS',['conditioned_air_L|conditioned_air_R','ac_bus_1'],['cabin_pressure_control'],'electronics bay'),C('aileron','CONSUMERS',['hydraulic_A|hydraulic_B'],['roll_control'],'wings'),C('elevator','CONSUMERS',['hydraulic_A|hydraulic_B'],['pitch_control'],'tail'),C('rudder','CONSUMERS',['hydraulic_A|hydraulic_B'],['yaw_control'],'tail'),C('brakes','CONSUMERS',['hydraulic_A|hydraulic_B'],['wheel_braking'],'main gear')
+    ];
+    const scenarios={
+      normal:{label:'NORMAL',damage:{},note:'All primary sources and distribution paths available.'},
+      gen:{label:'GEN 1 LOSS',damage:{'generator.1':0},note:'Bus tie preserves AC bus 1 from generator 2.'},
+      dual:{label:'DUAL ENGINE LOSS',damage:{'engine.1':0,'engine.2':0},note:'Battery bridges the blackout while the APU starts, then assumes AC generation and bleed-air supply.'},
+      engine:{label:'UNCONTAINED ENG 1',damage:{'engine.1':0,'generator.1':0,'hyd_pump.A':.1,'bleed.1':0,'fuel_feed.L':0},note:'One physical event damages co-located systems; downstream effects emerge from lost resources.'},
+      decompression:{label:'DECOMPRESSION',damage:{'pressurization':0,'duct.L':.25,'fuel_feed.L':.35,'aileron':.55},note:'Pressure impulse causes region-dependent collateral damage instead of an isolated cabin flag.'}
+    };
+    let current='normal',selected=null,view='system',previous=null,log=[],simTime=0,running=false,lastFrame=0;
+    let customFailures=[],drag=null;
+    const offsets=JSON.parse(localStorage.getItem('systemCascadeLayout')||'{}');
+    const scenarioBox=document.querySelector('#scenarios');
+    Object.entries(scenarios).forEach(([id,s])=>{const b=document.createElement('button');b.textContent=s.label;b.dataset.scenario=id;b.className=id==='normal'?'active':'danger';b.onclick=()=>setScenario(id);scenarioBox.appendChild(b)});
+    function solve(){
+      const damage={};
+      Object.entries(scenarios[current].damage).forEach(([id,health],index)=>{if(simTime>=2+index*1.5)damage[id]=health});
+      customFailures.forEach(f=>{if(simTime>=f.onset)damage[f.id]=Math.min(damage[f.id]??1,f.health)});
+      const res=new Set(['fuel_tank_L','fuel_tank_R']),active=new Set(),by={fuel_tank_L:['external'],fuel_tank_R:['external']};
+      let changed=true;while(changed){changed=false;for(const c of components){if(active.has(c.id)||(damage[c.id]??1)<=.05)continue;if(c.id==='apu'&&(current!=='dual'||simTime<6))continue;if(c.id==='apu_generator'&&(current!=='dual'||simTime<8))continue;if(c.id==='apu_bleed'&&(current!=='dual'||simTime<10))continue;const ok=c.req.every(expr=>expr.split('|').some(r=>res.has(r)));if(!ok)continue;active.add(c.id);changed=true;for(const r of c.out){res.add(r);(by[r]??=[]).push(c.id)}}}
+      return {res,active,by,damage,cap:{roll:res.has('roll_control')*(damage.aileron??1),pitch:res.has('pitch_control')*(damage.elevator??1),yaw:res.has('yaw_control')*(damage.rudder??1),brakes:res.has('wheel_braking')*(damage.brakes??1),cabin:+res.has('cabin_pressure_control')}};
+    }
+    function setScenario(id){current=id;simTime=0;previous=null;running=id!=='normal';document.querySelectorAll('#scenarios button').forEach(b=>b.classList.toggle('active',b.dataset.scenario===id));syncTime();render()}
+    function render(){const state=solve();recordChanges(state);renderSystem(state);renderCascade(state);renderMetrics(state);renderDetails(state);renderCustom();renderLog();document.querySelector('#pulse').style.background=Object.values(state.damage).some(v=>v<.5)?'var(--red)':'var(--green)';previous={res:new Set(state.res),damage:{...state.damage}}}
+    function recordChanges(s){if(previous){for(const r of s.res)if(!previous.res.has(r))addLog('good',`RESOURCE RESTORED · ${r}`);for(const r of previous.res)if(!s.res.has(r))addLog('bad',`RESOURCE LOST · ${r}`);for(const [id,h] of Object.entries(s.damage))if(h!==(previous.damage[id]??1))addLog(h<1?'bad':'good',`HEALTH ${id} → ${Math.round(h*100)}%`)}else addLog('good','REFERENCE NETWORK INITIALIZED')}
+    function addLog(type,msg){log.unshift({type,msg,t:new Date().toLocaleTimeString()});log=log.slice(0,14)}
+    function renderSystem(s){const box=document.querySelector('#columns');box.innerHTML='';for(const g of groups){const col=document.createElement('div');col.innerHTML=`<div class="column-title">${g}</div>`;for(const c of components.filter(x=>x.g===g)){const health=s.damage[c.id]??1,n=document.createElement('div'),o=offsets[c.id]||{x:0,y:0};n.className=`node ${health<=.05?'failed':s.active.has(c.id)?'active':'inactive'} ${selected===c.id?'selected':''}`;n.dataset.id=c.id;n.style.transform=`translate(${o.x}px,${o.y}px)`;n.innerHTML=`<div class="node-name">${c.id}</div><div class="node-zone">${c.zone} · ${s.active.has(c.id)?'ACTIVE':'UNSUPPLIED'}</div><div class="health"><i style="width:${health*100}%;background:${health<.5?'var(--red)':health<1?'var(--amber)':'var(--green)'}"></i></div><div class="provides">→ ${c.out.join(', ')}</div>`;n.onpointerdown=e=>startDrag(e,c.id,n);n.onclick=()=>{if(!suppressClick){selected=c.id;failureSelect.value=c.id;render()}};col.appendChild(n)}box.appendChild(col)}document.querySelector('#columns').style.display=view==='system'?'grid':'none';requestAnimationFrame(()=>drawEdges(s))}
+    function drawEdges(s){const svg=document.querySelector('#edges');svg.querySelectorAll('path.edge').forEach(e=>e.remove());if(view!=='system')return;const base=document.querySelector('#graphInner').getBoundingClientRect();for(const target of components){for(const expr of target.req){for(const req of expr.split('|')){for(const source of components.filter(c=>c.out.includes(req))){const a=document.querySelector(`[data-id="${source.id}"]`),b=document.querySelector(`[data-id="${target.id}"]`);if(!a||!b)continue;const ar=a.getBoundingClientRect(),br=b.getBoundingClientRect(),p=document.createElementNS('http://www.w3.org/2000/svg','path');const x1=ar.right-base.left,y1=ar.top-base.top+ar.height/2,x2=br.left-base.left,y2=br.top-base.top+br.height/2;p.setAttribute('d',`M${x1},${y1} C${x1+25},${y1} ${x2-25},${y2} ${x2},${y2}`);p.setAttribute('class',`edge ${s.active.has(source.id)&&s.active.has(target.id)?'live':''}`);svg.appendChild(p)}}}}}
+    function renderMetrics(s){const hyd=+s.res.has('hydraulic_A')+ +s.res.has('hydraulic_B'),decay=Math.min(1,simTime/8);const ac=+s.res.has('ac_bus_1')+ +s.res.has('ac_bus_2'),hydPsi=hyd?1500+hyd*750:Math.round(300*(1-decay)),ductL=s.res.has('bleed_duct_L')?38:Math.round(38*(1-decay)),cabin=s.cap.cabin?6200:Math.round(6200+decay*14800),acSource=s.active.has('apu_generator')?'APU GEN':s.active.has('generator.1')||s.active.has('generator.2')?'ENGINE GEN':'BATTERY ONLY',bleedSource=s.active.has('apu_bleed')?'APU BLEED':s.active.has('bleed.1')||s.active.has('bleed.2')?'ENGINE BLEED':'NONE';const vals=[['SIM TIME',`T+${simTime.toFixed(1)} s`],['AC SOURCE',acSource],['BLEED SOURCE',bleedSource],['AC VOLTAGE',`${ac?115:Math.round(115*(1-decay))} V`],['HYD PRESSURE',`${hydPsi} psi`],['DUCT L / R',`${ductL} · ${s.res.has('bleed_duct_R')?40:0} psi`],['CABIN ALTITUDE',`${cabin.toLocaleString()} ft`],['FUEL FEEDS',`${+s.res.has('fuel_feed_engine_1')+ +s.res.has('fuel_feed_engine_2')} / 2`],['ROLL AUTH',`${Math.round(s.cap.roll*100)}%`],['BRAKE AUTH',`${Math.round(s.cap.brakes*100)}%`]];document.querySelector('#metrics').innerHTML=vals.map(v=>`<div class="metric"><span>${v[0]}</span><b>${v[1]}</b></div>`).join('')}
+    function renderDetails(s){const c=components.find(x=>x.id===selected);const el=document.querySelector('#details');if(!c){el.innerHTML=`<p>${scenarios[current].note}</p><p>Select any component to inspect its stored health and derived state.</p>`;return}const h=s.damage[c.id]??1;el.innerHTML=`<div class="row"><label>ID</label><div>${c.id}</div></div><div class="row"><label>zone</label><div>${c.zone}</div></div><div class="row"><label>stored health</label><div>${Math.round(h*100)}%</div></div><div class="row"><label>derived active</label><div>${s.active.has(c.id)}</div></div><div class="row"><label>requires</label><div>${c.req.map(x=>`<span class="tag">${x}</span>`).join('')||'none'}</div></div><div class="row"><label>provides</label><div>${c.out.map(x=>`<span class="tag">${x}</span>`).join('')}</div></div><div class="row"><label>supplied by</label><div>${c.req.flatMap(x=>x.split('|')).filter(x=>s.res.has(x)).map(x=>s.by[x]?.join(', ')||'external').join('; ')||'—'}</div></div>`}
+    function renderCustom(){const box=document.querySelector('#customList');box.innerHTML=customFailures.length?customFailures.map(f=>`<div class="row"><label>T+${f.onset.toFixed(1)}</label><div>${f.id} → ${Math.round(f.health*100)}%</div></div>`).join(''):'No custom failures scheduled.'}
+    let suppressClick=false;
+    function startDrag(e,id,node){if(e.button!==0)return;running=false;syncTime();const o=offsets[id]||{x:0,y:0};drag={id,node,x:e.clientX,y:e.clientY,ox:o.x,oy:o.y,moved:false};node.classList.add('dragging');node.setPointerCapture(e.pointerId)}
+    window.addEventListener('pointermove',e=>{if(!drag)return;const dx=e.clientX-drag.x,dy=e.clientY-drag.y;if(Math.abs(dx)+Math.abs(dy)>4)drag.moved=true;offsets[drag.id]={x:drag.ox+dx,y:drag.oy+dy};drag.node.style.transform=`translate(${offsets[drag.id].x}px,${offsets[drag.id].y}px)`;drawEdges(solve())});
+    window.addEventListener('pointerup',()=>{if(!drag)return;suppressClick=drag.moved;drag.node.classList.remove('dragging');localStorage.setItem('systemCascadeLayout',JSON.stringify(offsets));drag=null;setTimeout(()=>{suppressClick=false},0)});
+    function renderLog(){document.querySelector('#log').innerHTML=log.map(x=>`<div class="log ${x.type}"><time>${x.t}</time><div>${x.msg}</div></div>`).join('')}
+    function renderCascade(){const box=document.querySelector('#cascade');box.style.display=view==='cascade'?'block':'none';if(view!=='cascade')return;const data={normal:[],gen:[['GENERATOR 1 DISCONNECT','root',50,80,2],['AC FEED 1 LOST','damage',320,80,2.2],['BUS TIE ROUTES GEN 2','effect',590,80,2.5],['AC BUS 1 REMAINS LIVE','effect',860,80,2.7]],dual:[['DUAL ENGINE FLAMEOUT','root',35,260,2],['ENGINE GENERATORS LOST','damage',270,100,3.5],['ENGINE BLEEDS LOST','damage',270,410,3.5],['BATTERY BRIDGES DC ESSENTIAL','effect',510,100,4],['APU START COMMAND','effect',510,255,5],['APU REACHES OPERATING SPEED','effect',735,255,6],['APU GEN POWERS BOTH AC BUSES','effect',950,100,8],['APU BLEED PRESSURIZES DUCTS','effect',950,410,10]],engine:[['UNCONTAINED ENG 1','root',40,260,2],['FRAGMENT FIELD','damage',280,120,2.4],['LOCAL FIRE / HEAT','damage',280,390,2.8],['GEN 1 + BLEED 1 LOST','damage',530,70,3.5],['HYD A DEGRADED','damage',530,245,5],['LEFT FUEL FEED CUT','damage',530,430,6.5],['BUS TIE PRESERVES AC','effect',810,70,4],['REDUCED CONTROL AUTHORITY','effect',810,245,5.5],['ENGINE 1 FLAMEOUT','effect',810,430,7]],decompression:[['RAPID DECOMPRESSION','root',40,250,2],['PRESSURE IMPULSE','damage',290,250,2.5],['LEFT DUCT DAMAGE','damage',530,80,3.5],['FUEL LINE DAMAGE','damage',530,245,5],['AILERON DAMAGE','damage',530,410,6.5],['PACK CAPACITY REDUCED','effect',800,80,4],['ASYMMETRIC FUEL RISK','effect',800,245,5.5],['ROLL AUTHORITY 55%','effect',800,410,7]]}[current];box.innerHTML=data.length?'':'<div class="empty">Normal operation has no failure event cascade. Choose a damage scenario.</div>';for(const [name,type,x,y,onset] of data){const reached=simTime>=onset;box.insertAdjacentHTML('beforeend',`<div class="event ${type}" style="left:${x}px;top:${y}px;opacity:${reached?1:.18}"><b>${name}</b><p>T+${onset.toFixed(1)}s · ${type==='root'?'initiating event':type==='damage'?'component damage':'system response'}</p></div>`)}setTimeout(()=>drawCascadeLines(data),0)}
+    function drawCascadeLines(data){const svg=document.querySelector('#edges');svg.querySelectorAll('path.cascade-line').forEach(e=>e.remove());if(view!=='cascade')return;for(let i=1;i<data.length;i++){const parent=i===1?0:(current==='engine'?(i<3?0:i<6?(i===3?1:2):i-3):(i<5?1:i-3));if(!data[parent])continue;const a=data[parent],b=data[i],p=document.createElementNS('http://www.w3.org/2000/svg','path');p.setAttribute('d',`M${a[2]+185},${a[3]+37} C${a[2]+230},${a[3]+37} ${b[2]-45},${b[3]+37} ${b[2]},${b[3]+37}`);p.setAttribute('class','edge live cascade-line');svg.appendChild(p)}}
+    const failureSelect=document.querySelector('#failureComponent');failureSelect.innerHTML=components.map(c=>`<option value="${c.id}">${c.id} · ${c.zone}</option>`).join('');failureSelect.onchange=()=>{selected=failureSelect.value;render()};
+    document.querySelector('#inject').onclick=()=>{const id=failureSelect.value,health=Math.max(0,Math.min(100,+document.querySelector('#failureHealth').value))/100,onset=Math.max(0,Math.min(30,+document.querySelector('#failureOnset').value));customFailures=customFailures.filter(f=>f.id!==id);customFailures.push({id,health,onset});selected=id;addLog('bad',`CUSTOM FAILURE SCHEDULED · ${id} @ T+${onset.toFixed(1)}`);render()};
+    document.querySelector('#repair').onclick=()=>{const id=failureSelect.value;customFailures=customFailures.filter(f=>f.id!==id);addLog('good',`CUSTOM DAMAGE REMOVED · ${id}`);render()};
+    document.querySelector('#clearCustom').onclick=()=>{customFailures=[];addLog('good','ALL CUSTOM DAMAGE REMOVED');render()};
+    document.querySelector('#resetLayout').onclick=()=>{Object.keys(offsets).forEach(k=>delete offsets[k]);localStorage.removeItem('systemCascadeLayout');render()};
+    const slider=document.querySelector('#time'),play=document.querySelector('#play');
+    function syncTime(){slider.value=simTime;document.querySelector('#clock').textContent=`T+${simTime.toFixed(1).padStart(4,'0')}s`;play.textContent=running?'❚❚':'▶'}
+    slider.oninput=()=>{simTime=+slider.value;running=false;previous=null;syncTime();render()};play.onclick=()=>{running=!running;if(simTime>=30)simTime=0;syncTime()};
+    let lastRender=0;function animate(now){if(running){if(!lastFrame)lastFrame=now;simTime=Math.min(30,simTime+(now-lastFrame)/1000);if(simTime>=30)running=false;syncTime();if(now-lastRender>100&&!drag){render();lastRender=now}}lastFrame=now;requestAnimationFrame(animate)}
+    document.querySelectorAll('[data-view]').forEach(b=>b.onclick=()=>{view=b.dataset.view;document.querySelectorAll('[data-view]').forEach(x=>x.classList.toggle('active',x===b));render()});window.addEventListener('resize',()=>drawEdges(solve()));syncTime();render();requestAnimationFrame(animate);
+  </script>
+</body>
+</html>

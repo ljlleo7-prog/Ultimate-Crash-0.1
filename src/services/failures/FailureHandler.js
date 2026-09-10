@@ -18,6 +18,7 @@ class FailureHandler {
         this.activeFailures = new Map(); // id -> failureInstance
         this.registry = new Map();
         this.incidentLog = [];
+        this.failureSequence = 0;
         this.graph = createCanonicalFailureGraph();
         this.settings = this.getDifficultySettings(this.difficulty);
         this.graphExecutor = new FailureGraphExecutor(this.graph, {
@@ -114,6 +115,14 @@ class FailureHandler {
             failure.update(dt, flightState);
         });
 
+        // Recovered incidents no longer apply effects or originate cascades.
+        this.activeFailures.forEach((failure, id) => {
+            if (failure.currentStage === 'recovered') {
+                this.activeFailures.delete(id);
+                this.recordIncident('failure_recovered', { failureId: id });
+            }
+        });
+
         this.graphExecutor.update(dt, {
             activeFailures: this.activeFailures,
             flightState,
@@ -206,6 +215,7 @@ class FailureHandler {
         }
 
         const failure = new BaseFailure(def, context, this.handleTransition);
+        failure.instanceId = ++this.failureSequence;
         const initialStage = def.stages?.inactive?.next || (def.stages?.incipient ? 'incipient' : 'active');
         failure.transitionTo(initialStage);
 
@@ -276,25 +286,8 @@ class FailureHandler {
         }
     }
 
-    checkRandomFailures(state) {
-        return; // DISABLED: User requested to disable failures for now
-        if (this.activeFailures.size >= this.settings.maxFailures) return;
-        
-        const baseProb = 0.005 * this.settings.probMultiplier;
-        if (Math.random() > baseProb) return;
-
-        // Filter valid candidates based on conditions
-        const candidates = Array.from(this.registry.values()).filter(def => {
-            if (def.condition && typeof def.condition === 'function') {
-                return def.condition(state);
-            }
-            return true;
-        });
-
-        if (candidates.length === 0) return;
-
-        const def = candidates[Math.floor(Math.random() * candidates.length)];
-        this.triggerFailure(def.id);
+    checkRandomFailures() {
+        // Random failures remain disabled; scenarios trigger failures explicitly.
     }
 
     reset() {

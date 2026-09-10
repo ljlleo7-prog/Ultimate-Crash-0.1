@@ -1,0 +1,52 @@
+const components = [
+    { id: 'electrical.generator.1', zone: 'left_engine', command: 'gen1', requires: ['engine_1_shaft'], provides: ['ac_feed_1'] },
+    { id: 'electrical.generator.2', zone: 'right_engine', command: 'gen2', requires: ['engine_2_shaft'], provides: ['ac_feed_2'] },
+    { id: 'electrical.apu_generator.1', zone: 'tail', command: 'apuGen1', requires: ['apu_shaft'], provides: ['ac_feed_1'] },
+    { id: 'electrical.apu_generator.2', zone: 'tail', command: 'apuGen2', requires: ['apu_shaft'], provides: ['ac_feed_2'] },
+    { id: 'electrical.ac_bus.1', zone: 'electronics_bay', requiresAny: ['ac_feed_1', 'ac_tie_1'], provides: ['ac_bus_1'] },
+    { id: 'electrical.ac_bus.2', zone: 'electronics_bay', requiresAny: ['ac_feed_2', 'ac_tie_2'], provides: ['ac_bus_2'] },
+    { id: 'electrical.bus_tie.1_to_2', zone: 'electronics_bay', command: 'busTie', requires: ['ac_bus_1'], provides: ['ac_tie_2'] },
+    { id: 'electrical.bus_tie.2_to_1', zone: 'electronics_bay', command: 'busTie', requires: ['ac_bus_2'], provides: ['ac_tie_1'] },
+    { id: 'electrical.battery', zone: 'electronics_bay', command: 'battery', provides: ['dc_essential'] },
+    { id: 'hydraulic.engine_pump.A', zone: 'left_engine', command: 'engPumpA', requires: ['engine_1_shaft'], provides: ['hyd_feed_A'] },
+    { id: 'hydraulic.electric_pump.A', zone: 'center_fuselage', command: 'elecPumpA', requires: ['ac_bus_1'], provides: ['hyd_feed_A'] },
+    { id: 'hydraulic.engine_pump.B', zone: 'right_engine', command: 'engPumpB', requires: ['engine_2_shaft'], provides: ['hyd_feed_B'] },
+    { id: 'hydraulic.electric_pump.B', zone: 'center_fuselage', command: 'elecPumpB', requires: ['ac_bus_2'], provides: ['hyd_feed_B'] },
+    { id: 'hydraulic.circuit.A', zone: 'center_fuselage', requires: ['hyd_feed_A'], provides: ['hydraulic_A'] },
+    { id: 'hydraulic.circuit.B', zone: 'center_fuselage', requires: ['hyd_feed_B'], provides: ['hydraulic_B'] },
+    { id: 'apu', zone: 'tail', command: 'apuRunning', provides: ['apu_shaft'] },
+    { id: 'pneumatic.engine_bleed.1', zone: 'left_engine', command: 'bleed1', requires: ['engine_1_shaft'], provides: ['bleed_feed_L'] },
+    { id: 'pneumatic.engine_bleed.2', zone: 'right_engine', command: 'bleed2', requires: ['engine_2_shaft'], provides: ['bleed_feed_R'] },
+    { id: 'pneumatic.apu_bleed', zone: 'tail', command: 'apuBleed', requires: ['apu_shaft'], provides: ['bleed_feed_L'] },
+    { id: 'pneumatic.duct.L', zone: 'center_fuselage', requiresAny: ['bleed_feed_L', 'bleed_tie_L'], provides: ['bleed_duct_L'] },
+    { id: 'pneumatic.duct.R', zone: 'center_fuselage', requiresAny: ['bleed_feed_R', 'bleed_tie_R'], provides: ['bleed_duct_R'] },
+    { id: 'pneumatic.isolation.L_to_R', zone: 'center_fuselage', command: 'isolationValve', requires: ['bleed_duct_L'], provides: ['bleed_tie_R'] },
+    { id: 'pneumatic.isolation.R_to_L', zone: 'center_fuselage', command: 'isolationValve', requires: ['bleed_duct_R'], provides: ['bleed_tie_L'] },
+    { id: 'pneumatic.pack.L', zone: 'center_fuselage', command: 'packL', requires: ['bleed_duct_L', 'ac_bus_1'], provides: ['conditioned_air_L'] },
+    { id: 'pneumatic.pack.R', zone: 'center_fuselage', command: 'packR', requires: ['bleed_duct_R', 'ac_bus_2'], provides: ['conditioned_air_R'] },
+    { id: 'pressurization.controller', zone: 'electronics_bay', requires: ['ac_bus_1'], requiresAny: ['conditioned_air_L', 'conditioned_air_R'], provides: ['cabin_pressure_control'] },
+    { id: 'fuel.pump.left', zone: 'left_wing', command: 'leftPumps', requires: ['ac_bus_1', 'fuel_tank_L'], provides: ['fuel_pressure_L'] },
+    { id: 'fuel.pump.right', zone: 'right_wing', command: 'rightPumps', requires: ['ac_bus_2', 'fuel_tank_R'], provides: ['fuel_pressure_R'] },
+    { id: 'fuel.pump.center', zone: 'center_fuselage', command: 'centerPumps', requires: ['ac_bus_1', 'fuel_tank_C'], provides: ['fuel_pressure_C'] },
+    { id: 'fuel.feed.left', zone: 'left_wing', requiresAny: ['fuel_pressure_L', 'fuel_pressure_C'], provides: ['fuel_feed_engine_1'] },
+    { id: 'fuel.feed.right', zone: 'right_wing', requiresAny: ['fuel_pressure_R', 'fuel_pressure_C'], provides: ['fuel_feed_engine_2'] },
+    { id: 'controls.aileron', zone: 'center_fuselage', requiresAny: ['hydraulic_A', 'hydraulic_B'], provides: ['roll_control'] },
+    { id: 'controls.elevator', zone: 'tail', requiresAny: ['hydraulic_A', 'hydraulic_B'], provides: ['pitch_control'] },
+    { id: 'controls.rudder', zone: 'tail', requiresAny: ['hydraulic_A', 'hydraulic_B'], provides: ['yaw_control'] },
+    { id: 'controls.spoilers', zone: 'left_wing', requiresAny: ['hydraulic_A', 'hydraulic_B'], provides: ['spoiler_control'] },
+    { id: 'controls.normal_brakes', zone: 'main_gear', requiresAny: ['hydraulic_A', 'hydraulic_B'], provides: ['wheel_braking'] },
+    { id: 'controls.landing_gear', zone: 'center_fuselage', requires: ['hydraulic_A'], provides: ['gear_actuation'] }
+];
+
+const zones = {
+    left_engine: { exposure: { fragmentation: 1, fire: 0.8 }, components: components.filter(c => c.zone === 'left_engine').map(c => c.id) },
+    right_engine: { exposure: { fragmentation: 1, fire: 0.8 }, components: components.filter(c => c.zone === 'right_engine').map(c => c.id) },
+    electronics_bay: { exposure: { fragmentation: 0.5, fire: 1 }, components: components.filter(c => c.zone === 'electronics_bay').map(c => c.id) },
+    center_fuselage: { exposure: { fragmentation: 0.7, pressureImpulse: 0.8 }, components: components.filter(c => c.zone === 'center_fuselage').map(c => c.id) },
+    tail: { exposure: { fragmentation: 0.6, fire: 0.8 }, components: components.filter(c => c.zone === 'tail').map(c => c.id) },
+    left_wing: { exposure: { fragmentation: 0.8, fire: 0.9, pressureImpulse: 0.4 }, components: components.filter(c => c.zone === 'left_wing').map(c => c.id) },
+    right_wing: { exposure: { fragmentation: 0.8, fire: 0.9, pressureImpulse: 0.4 }, components: components.filter(c => c.zone === 'right_wing').map(c => c.id) },
+    main_gear: { exposure: { impact: 1, fire: 0.5 }, components: components.filter(c => c.zone === 'main_gear').map(c => c.id) }
+};
+
+export default { id: 'b738-reference-v2', aircraft: ['B738', 'Boeing 737-800'], components, zones };

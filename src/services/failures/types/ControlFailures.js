@@ -190,7 +190,7 @@ const ControlFailures = {
     }
 };
 
-const createSupplementalControlFailure = (id, name, systemAlert) => ({
+const createSupplementalControlFailure = (id, name, systemAlert, effect = () => {}) => ({
     id,
     name,
     category: 'controls',
@@ -201,24 +201,51 @@ const createSupplementalControlFailure = (id, name, systemAlert) => ({
                 text: name,
                 system_alert: systemAlert
             }),
-            effect: () => {}
+            effect
         }
     }
 });
 
 const SupplementalControlFailures = {
-    AUTOPILOT_DISCONNECT: createSupplementalControlFailure('autopilot_disconnect', 'Autopilot Disconnect', 'A/P DISC'),
-    SPOILER_ASYMMETRY: createSupplementalControlFailure('spoiler_asymmetry', 'Spoiler Asymmetry', 'SPOILER ASYM'),
-    AILERON_LOCKOUT: createSupplementalControlFailure('aileron_lockout', 'Aileron Lockout', 'AIL LOCKOUT'),
-    ELEVATOR_REVERSION: createSupplementalControlFailure('elevator_reversion', 'Elevator Feel Reversion', 'ELEV FEEL'),
+    AUTOPILOT_DISCONNECT: {
+        id: 'autopilot_disconnect',
+        name: 'Autopilot Disconnect',
+        category: 'controls',
+        stages: {
+            inactive: { next: 'active' },
+            active: {
+                description: () => ({
+                    text: 'Autopilot Disconnect',
+                    system_alert: 'A/P DISC',
+                    sound: 'ap_disconnect'
+                }),
+                effect: (sys) => {
+                    if (typeof sys.setAutopilot === 'function') sys.setAutopilot(false);
+                }
+            }
+        }
+    },
+    SPOILER_ASYMMETRY: createSupplementalControlFailure('spoiler_asymmetry', 'Spoiler Asymmetry', 'SPOILER ASYM', sys => {
+        sys.applyComponentDamage?.({ componentId: 'controls.spoilers', type: 'asymmetry_lockout', severity: 1 });
+    }),
+    AILERON_LOCKOUT: createSupplementalControlFailure('aileron_lockout', 'Aileron Lockout', 'AIL LOCKOUT', sys => {
+        sys.applyComponentDamage?.({ componentId: 'controls.aileron', type: 'mechanical_lockout', severity: 1 });
+    }),
+    ELEVATOR_REVERSION: createSupplementalControlFailure('elevator_reversion', 'Elevator Feel Reversion', 'ELEV FEEL', sys => {
+        sys.applyComponentDamage?.({ componentId: 'controls.elevator', type: 'reversion', severity: 0.75 });
+    }),
     RUDDER_TRIM_RUNAWAY: createSupplementalControlFailure('rudder_trim_runaway', 'Rudder Trim Runaway', 'RUD TRIM'),
     FLAP_DRIVE_OVERHEAT: createSupplementalControlFailure('flap_drive_overheat', 'Flap Drive Overheat', 'FLAP DRIVE'),
     SPEEDBRAKE_UNCOMMANDED: createSupplementalControlFailure('speedbrake_uncommanded', 'Uncommanded Speedbrake Deployment', 'SPD BRK'),
-    BRAKE_FAILURE: createSupplementalControlFailure('brake_failure', 'Brake System Failure', 'BRAKES'),
+    BRAKE_FAILURE: createSupplementalControlFailure('brake_failure', 'Brake System Failure', 'BRAKES', sys => {
+        sys.applyComponentDamage?.({ componentId: 'controls.normal_brakes', type: 'brake_failure', severity: 1 });
+    }),
     NOSEWHEEL_STEERING_FAIL: createSupplementalControlFailure('nosewheel_steering_fail', 'Nosewheel Steering Failure', 'NWS FAIL'),
     SLAT_DISAGREE: createSupplementalControlFailure('slat_disagree', 'Slat Disagree', 'SLAT DISAGREE'),
     ELEVATOR_SPLIT: createSupplementalControlFailure('elevator_split', 'Elevator Split Condition', 'ELEV SPLIT'),
-    YAW_DAMPER_FAIL: createSupplementalControlFailure('yaw_damper_fail', 'Yaw Damper Failure', 'YAW DAMPER')
+    YAW_DAMPER_FAIL: createSupplementalControlFailure('yaw_damper_fail', 'Yaw Damper Failure', 'YAW DAMPER', sys => {
+        sys.applyComponentDamage?.({ componentId: 'controls.rudder', type: 'yaw_damper_fault', severity: 0.35 });
+    })
 };
 
 export default {

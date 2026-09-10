@@ -1,39 +1,39 @@
 {
-  "timestamp": "2026-04-22T11:06:16.357Z",
+  "timestamp": "2026-09-03T05:33:29.819Z",
   "results": [
     {
       "scenario": "calm_on_axis",
-      "crossTrackFt": 0.6043545736088195,
-      "altErrorFt": 22.416619063268783,
-      "headingErrorDeg": 0.43308251714347534,
-      "finalSpeedKts": 156.2439521525568,
+      "crossTrackFt": 1.6178635914023756,
+      "altErrorFt": 8.199060452496127,
+      "headingErrorDeg": 0.8673867386595475,
+      "finalSpeedKts": 155.4360972141427,
       "flaps": 1,
       "gear": true
     },
     {
       "scenario": "15kt_crosswind",
-      "crossTrackFt": 0.6891502315102066,
-      "altErrorFt": 22.87306142573013,
-      "headingErrorDeg": 0.6468701411081383,
-      "finalSpeedKts": 155.1355340027406,
+      "crossTrackFt": 0.5005542450089288,
+      "altErrorFt": 13.738956767508299,
+      "headingErrorDeg": 0.6760793295427447,
+      "finalSpeedKts": 153.7600094373431,
       "flaps": 1,
       "gear": true
     },
     {
       "scenario": "offset_30deg",
-      "crossTrackFt": 8.125094527209416,
-      "altErrorFt": 7.080692957954398,
-      "headingErrorDeg": 0.10174817695633465,
-      "finalSpeedKts": 176.02507976644614,
+      "crossTrackFt": 8.981043808483294,
+      "altErrorFt": 51.12698918764244,
+      "headingErrorDeg": 0.04327053318183971,
+      "finalSpeedKts": 176.39576841830973,
       "flaps": 1,
       "gear": true
     },
     {
       "scenario": "200ft_high",
-      "crossTrackFt": 0.6966036330518509,
-      "altErrorFt": 33.81295364273349,
-      "headingErrorDeg": 0.15793707405964597,
-      "finalSpeedKts": 156.2986124724365,
+      "crossTrackFt": 0.5456206662163108,
+      "altErrorFt": 13.821035600178348,
+      "headingErrorDeg": 0.6320404077068815,
+      "finalSpeedKts": 156.43648740983593,
       "flaps": 1,
       "gear": true
     }

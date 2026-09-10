@@ -4,7 +4,7 @@
  */
 
 import { describe, it } from 'node:test';
-import assert from 'node:assert';
+import assert from 'node:assert/strict';
 
 // Mock minimal aircraft data
 const testAircraft = {
@@ -77,4 +77,3 @@ describe('Ground Physics Stability', () => {
 });
 
 // Auto-terminate
-setTimeout(() => process.exit(0), 5000);

@@ -1,13 +1,10 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import fs from 'node:fs';
 import {
   buildApproachTelemetrySample,
   appendApproachTelemetrySample,
   summarizeApproachTelemetry
 } from '../src/utils/approachTelemetry.js';
-
-const testResults = [];
 
 // ─── helpers ────────────────────────────────────────────────────────────────
 
@@ -217,63 +214,4 @@ test('summarizeApproachTelemetry sampleCount matches input length', () => {
   assert.ok(summary);
   assert.equal(summary.sampleCount, 7);
 
-  testResults.push({
-    test: 'sampleCount_matches_input',
-    samples,
-    summary
-  });
 });
-
-// ─── JSON export ─────────────────────────────────────────────────────────────
-
-const improvingSamples = buildSamples(20, (i) => ({
-  distCross: i < 10 ? 200 - i * 5 : 150 - i * 10,
-  locDeviationDeg: i < 10 ? 5 - i * 0.2 : 3 - i * 0.2,
-  altError: i < 10 ? 100 - i * 3 : 70 - i * 5,
-  gsDeviationDeg: i < 10 ? 2 - i * 0.1 : 1 - i * 0.05,
-  locCaptured: i >= 5,
-  gsCaptured: i >= 8
-}), 1000);
-
-const worseSamples = buildSamples(20, (i) => ({
-  distCross: i * 15,
-  locDeviationDeg: i * 0.3,
-  altError: i * 8,
-  gsDeviationDeg: i * 0.2
-}), 1000);
-
-const stableSamples = buildSamples(20, () => ({
-  distCross: 50,
-  locDeviationDeg: 1.0,
-  altError: 40,
-  gsDeviationDeg: 0.8
-}), 1000);
-
-const exportData = {
-  timestamp: new Date().toISOString(),
-  scenarios: [
-    {
-      name: 'improving_approach',
-      samples: improvingSamples,
-      summary: summarizeApproachTelemetry(improvingSamples)
-    },
-    {
-      name: 'worsening_approach',
-      samples: worseSamples,
-      summary: summarizeApproachTelemetry(worseSamples)
-    },
-    {
-      name: 'stable_approach',
-      samples: stableSamples,
-      summary: summarizeApproachTelemetry(stableSamples)
-    }
-  ],
-  testResults
-};
-
-const outputPath = process.env.TELEMETRY_JSON_OUT || 'telemetry_test_results.json';
-fs.writeFileSync(outputPath, JSON.stringify(exportData, null, 2));
-console.log(`✓ Telemetry test data exported to ${outputPath}`);
-
-// auto-terminate
-process.exit(0);

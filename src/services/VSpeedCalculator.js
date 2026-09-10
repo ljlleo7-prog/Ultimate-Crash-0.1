@@ -53,7 +53,9 @@ class VSpeedCalculator {
     const windAdjustment = this.clamp(headwind * 0.2, -8, 8);
 
     const baseStall = stallSpeed * Math.sqrt(weightRatio) * flapLiftBenefit;
-    const vr = Math.round(this.clamp((baseStall * 1.13 * altitudeFactor * runwayFactor) - windAdjustment, 105, 195));
+    // The supplied stall speed is a clean/reference value, not the configured
+    // takeoff stall speed. Keep enough rotation margin after the flap benefit.
+    const vr = Math.round(this.clamp((baseStall * 1.35 * altitudeFactor * runwayFactor) - windAdjustment, 105, 195));
     const v2 = Math.round(this.clamp(vr + 8 + (runwayCondition === 'contaminated' ? 4 : 0), vr + 5, 205));
     const v1 = Math.round(this.clamp(vr - 5, 100, vr - 1));
 

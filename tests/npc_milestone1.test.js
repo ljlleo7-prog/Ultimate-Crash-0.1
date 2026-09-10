@@ -99,5 +99,4 @@ test('NPCCrewService publishes typed and legacy crew events during migration', (
 });
 
 after(() => {
-  setTimeout(() => process.exit(0), 5000);
 });

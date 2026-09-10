@@ -16,14 +16,14 @@ import FADECService from './FADECService.js';
 import RealisticAutopilotService from './RealisticAutopilotService.js';
 import FailureHandler from './failures/FailureHandler.js';
 import WarningSystem from './WarningSystem.js';
-import OverheadLogic from './OverheadLogic.js';
 import { airportService } from './airportService.js';
-import { Vector3, Quaternion, calculateDistanceMeters, calculateBearing } from '../utils/flightMath.js';
+import { Vector3, Quaternion, calculateDistanceMeters } from '../utils/flightMath.js';
 import EnvironmentService from './physics/EnvironmentService.js';
 import GroundInteractionService from './physics/GroundInteractionService.js';
 import SystemsService from './physics/SystemsService.js';
 import AerodynamicsService from './physics/AerodynamicsService.js';
 import NavigationService from './physics/NavigationService.js';
+import AircraftSystemModel from './systems/AircraftSystemModel.js';
 
 // ==========================================
 // Main Service
@@ -226,6 +226,7 @@ class RealisticFlightPhysicsService {
     }
 
     initializeSystems(difficulty) {
+        this.systemModel = new AircraftSystemModel(this.aircraft);
         this.systems = this.systemsService.initializeSystems(this.aircraft, difficulty, this.state.fuel, this.engines);
         if (this.systems?.flightControls && this.systems.flightControls.yawDamper !== undefined) {
             this.systems.flightControls.yawDamper = !['pro', 'devil', 'professional', 'survival'].includes(difficulty);
@@ -616,7 +617,8 @@ class RealisticFlightPhysicsService {
             this.failureParams,
             this.aircraft,
             this.payloadMass,
-            dt
+            dt,
+            this.systemModel
         );
 
         this.updateControlEffectiveness(dt);
@@ -723,6 +725,14 @@ class RealisticFlightPhysicsService {
         }
     }
 
+    applyComponentDamage(damage) {
+        return this.systemModel?.applyDamage({ time: this.time, ...damage });
+    }
+
+    applyRegionalDamage(event) {
+        return this.systemModel?.applyRegionalDamage({ time: this.time, ...event }) || [];
+    }
+
     calculateEnvironment(z_down) {
         return this.environmentService.calculateEnvironment(z_down);
     }
@@ -820,6 +830,10 @@ class RealisticFlightPhysicsService {
                 // Suction feed is available at low altitude as a fallback when tanks contain fuel.
                 // Pumps/pressure are still required at cruise altitude.
                 const suctionAvailable = this.onGround || currentAltFt < 20000;
+                const feedComponent = this.systems.resourceNetwork?.components?.[`fuel.feed.${isLeft ? 'left' : 'right'}`];
+                // Pump loss still permits the modeled low-altitude suction feed. Physical
+                // feed-line damage does not: it is downstream of every tank and pump path.
+                const feedLineIntact = !feedComponent || feedComponent.health > 0.05;
                 
                 if (fuel.pressC > 10 && fuel.tanks.center > 0) fuelSourceAvailable = true;
                  else if (isLeft) {
@@ -829,7 +843,8 @@ class RealisticFlightPhysicsService {
                      if ((fuel.pressR > 10 || suctionAvailable) && fuel.tanks.right > 0) fuelSourceAvailable = true;
                      else if (fuel.crossfeed && fuel.pressL > 10 && fuel.tanks.left > 0) fuelSourceAvailable = true;
                  }
-                 
+                fuelSourceAvailable = fuelSourceAvailable && feedLineIntact;
+
                  // Update Engine Physics State
                 const hasIgnitionPower = (this.systems.electrical?.dcVolts || 0) > 20;
                 const ignitionCommanded = hasIgnitionPower && (sysEng.startSwitch === 'GRD' || sysEng.startSwitch === 'FLT');
@@ -854,6 +869,7 @@ class RealisticFlightPhysicsService {
                          if ((fuel.pressR > 10 || suctionAvailable) && fuel.tanks.right > 0) activeSources.push('right');
                          if (fuel.crossfeed && fuel.pressL > 10 && fuel.tanks.left > 0) activeSources.push('left');
                      }
+                     if (!feedLineIntact) activeSources = [];
                      
                      // Fallback if logic mismatch (shouldn't happen if fuelSourceAvailable is true)
                      if (activeSources.length > 0) {
@@ -881,7 +897,7 @@ class RealisticFlightPhysicsService {
                  sysEng.egt = engine.state.egt;
                  sysEng.ff = engine.state.fuelFlow;
 
-                 const engineSelfSustaining = engine.state.running || engine.state.n2 >= engine._lightoffN2Threshold || sysEng.n2 >= 50;
+                 const engineSelfSustaining = engine.state.running || sysEng.n2 >= 50;
                  if (sysEng.startSwitch === 'GRD' && engineSelfSustaining) {
                      sysEng.startSwitch = 'OFF';
                  }
@@ -1253,6 +1269,10 @@ class RealisticFlightPhysicsService {
                 if (this.failureParams.friction_increase > 0) {
                     mu_roll += this.failureParams.friction_increase;
                     mu_slide += this.failureParams.friction_increase * 0.5;
+                }
+
+                if (isBraking && this.systems?.resourceNetwork?.capabilities) {
+                    mu_roll *= this.systems.resourceNetwork.capabilities.brakes;
                 }
 
                 if (brakingData) {
@@ -2039,11 +2059,6 @@ class RealisticFlightPhysicsService {
         // this.updateSystemLogic(system, action, newValue);
     }
 
-    updateSystemLogic(system, action, value) {
-        // Legacy logic removed. 
-        // All system logic is now handled by OverheadLogic.js in the update loop.
-    }
-
     /**
      * Handle Radio Tuning Event
      * Automatically sets ILS/Runway Geometry if a tower/approach frequency is tuned.
@@ -2184,12 +2199,6 @@ class RealisticFlightPhysicsService {
             this.groundStatus,
             this.difficulty
         );
-    }
-
-    getRunwayBrakingData() {
-        const stage = this.groundInteractionService.getRunwayBrakingData(this.runwayGeometry, this.environment);
-        this.runwayBraking = stage;
-        return stage;
     }
 
     /**

@@ -912,7 +912,11 @@ class RealisticAutopilotService {
         if (!altitudeControlActive) {
             this.resetAltitudeCapture();
             this.altitudePID.reset();
-            if (!ilsDebug.active) this.targets.vs = this.userVsTarget;
+            if (!ilsDebug.active) {
+                this.targets.vs = lnavHandlingVS && Number.isFinite(effectiveVS)
+                    ? this.normalizeVerticalSpeedTarget(effectiveVS, this.userVsTarget)
+                    : this.userVsTarget;
+            }
         } else {
             const altError = this.targets.altitude - altitude;
             const previousAltError = this.lastAltitudeError;

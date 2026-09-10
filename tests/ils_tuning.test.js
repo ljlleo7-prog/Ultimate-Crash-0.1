@@ -1,6 +1,5 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import fs from 'node:fs';
 import RealisticFlightPhysicsService from '../src/services/RealisticFlightPhysicsService.js';
 import { loadAircraftData } from '../src/services/aircraftService.js';
 import { airportService } from '../src/services/airportService.js';
@@ -153,7 +152,7 @@ test('ILS tuning: calm wind, on-axis', async () => {
   let finalMetrics = null;
   let lastState = null;
   let stepCount = 0;
-  const state = runUntil(
+  runUntil(
     physics,
     { throttle: 0.5, pitch: 0, roll: 0, yaw: 0, trim: 0, flaps: 1.0, gear: true },
     120,
@@ -224,7 +223,7 @@ test('ILS tuning: 15kt crosswind from left', async () => {
 
   let finalMetrics = null;
   let lastState = null;
-  const state = runUntil(
+  runUntil(
     physics,
     { throttle: 0.5, pitch: 0, roll: 0, yaw: 0, trim: 0, flaps: 1.0, gear: true },
     120,
@@ -290,7 +289,7 @@ test('ILS tuning: 0.5nm left offset, waypoint intercept', async () => {
   let finalMetrics = null;
   let lastState = null;
   let stepCount = 0;
-  const state = runUntil(
+  runUntil(
     physics,
     { throttle: 0.5, pitch: 0, roll: 0, yaw: 0, trim: 0, flaps: 1.0, gear: true },
     120,
@@ -361,7 +360,7 @@ test('ILS tuning: 200ft high, on-axis', async () => {
 
   let finalMetrics = null;
   let lastState = null;
-  const state = runUntil(
+  runUntil(
     physics,
     { throttle: 0.5, pitch: 0, roll: 0, yaw: 0, trim: 0, flaps: 1.0, gear: true },
     120,
@@ -402,12 +401,4 @@ test('ILS tuning: 200ft high, on-axis', async () => {
 
   assert.ok(finalMetrics.headingErrorDeg <= 5.0);
   assert.ok(finalMetrics.finalSpeedKts >= 100 && finalMetrics.finalSpeedKts <= 180);
-});
-
-test('Export results', () => {
-  const outputPath = 'ils_tuning_results.json';
-  fs.writeFileSync(outputPath, JSON.stringify({ timestamp: new Date().toISOString(), results: tuningResults }, null, 2));
-  console.log(`\n✓ ILS tuning results exported to ${outputPath}`);
-  console.log(`Total scenarios: ${tuningResults.length}`);
-  process.exit(0);
 });

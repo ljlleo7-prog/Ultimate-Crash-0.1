@@ -13,6 +13,10 @@ const SystemFailures = {
                     sound: "master_caution"
                 }),
                 effect: (sys, intensity) => {
+                    sys.applyComponentDamage?.({ componentId: 'hydraulic.circuit.A', type: 'pressure_loss', severity: 1 });
+                    sys.applyComponentDamage?.({ componentId: 'hydraulic.circuit.B', type: 'pressure_loss', severity: 1 });
+                    sys.systems.damage ??= {};
+                    sys.systems.damage.hydraulicsFailed = true;
                     const limit = 1.0 - (intensity * 0.8);
                     sys.controls.aileron *= limit;
                     sys.controls.elevator *= limit;
@@ -67,6 +71,10 @@ const SystemFailures = {
                     visual: 'buffet_minor'
                 }),
                 effect: (sys, intensity) => {
+                    sys.applyComponentDamage?.({ componentId: 'hydraulic.circuit.A', type: 'rupture', severity: 1 });
+                    sys.applyComponentDamage?.({ componentId: 'hydraulic.circuit.B', type: 'rupture', severity: 0.9 });
+                    sys.systems.damage ??= {};
+                    sys.systems.damage.hydraulicsFailed = true;
                     const controlLimit = 0.75 - (intensity * 0.2);
                     sys.controls.aileron *= Math.max(0.45, controlLimit);
                     sys.controls.elevator *= Math.max(0.5, controlLimit);
@@ -87,6 +95,10 @@ const SystemFailures = {
                     visual: 'controls_stiff'
                 }),
                 effect: (sys, intensity) => {
+                    sys.applyComponentDamage?.({ componentId: 'hydraulic.circuit.A', type: 'rupture', severity: 1 });
+                    sys.applyComponentDamage?.({ componentId: 'hydraulic.circuit.B', type: 'rupture', severity: 0.9 });
+                    sys.systems.damage ??= {};
+                    sys.systems.damage.hydraulicsFailed = true;
                     const limit = Math.max(0.1, 0.3 - (intensity * 0.15));
                     sys.controls.aileron *= limit;
                     sys.controls.elevator *= limit;
@@ -117,6 +129,10 @@ const SystemFailures = {
                     system_alert: "ELEC BUS 1 OFF"
                 }),
                 effect: (sys) => {
+                    sys.applyComponentDamage?.({ componentId: 'electrical.ac_bus.1', type: 'bus_fault', severity: 1 });
+                    sys.applyComponentDamage?.({ componentId: 'electrical.ac_bus.2', type: 'bus_fault', severity: 1 });
+                    sys.systems.damage ??= {};
+                    sys.systems.damage.electricalMainBusFailed = true;
                     sys.systems.electrical.gen1 = false;
                     sys.systems.electrical.gen2 = false;
                     sys.systems.electrical.dcVolts = 0;
@@ -138,6 +154,9 @@ const SystemFailures = {
                     sound: "thump"
                 }),
                 effect: (sys) => {
+                    sys.applyComponentDamage?.({ componentId: 'electrical.generator.1', type: 'mechanical_disconnect', severity: 1 });
+                    sys.systems.damage ??= {};
+                    sys.systems.damage.generator1Failed = true;
                     sys.systems.electrical.gen1 = false;
                     // Cannot be reset in flight
                 }
@@ -182,6 +201,9 @@ const SystemFailures = {
                     smell: "chemical_fumes"
                 }),
                 effect: (sys) => {
+                    sys.applyComponentDamage?.({ componentId: 'electrical.battery', type: 'thermal_runaway', severity: 1 });
+                    sys.systems.damage ??= {};
+                    sys.systems.damage.batteryFailed = true;
                     sys.systems.electrical.battery = false;
                 }
             }
@@ -202,6 +224,7 @@ const SystemFailures = {
                     sound: "hissing_stop"
                 }),
                 effect: (sys) => {
+                    sys.applyComponentDamage?.({ componentId: 'pneumatic.pack.L', type: 'pack_trip', severity: 1 });
                     sys.systems.pressurization.packL = false;
                     // Cabin altitude climbs slowly
                 }
@@ -222,7 +245,7 @@ const SystemFailures = {
                     sound: "horn_intermittent"
                 }),
                 effect: (sys) => {
-                    // Manual control only
+                    sys.applyComponentDamage?.({ componentId: 'pressurization.controller', type: 'controller_fault', severity: 1 });
                 }
             }
         }
@@ -281,7 +304,7 @@ const SystemFailures = {
                     sound: "chime_single"
                 }),
                 effect: (sys) => {
-                    sys.systems.fuel.pressL *= 0.5;
+                    sys.applyComponentDamage?.({ componentId: 'fuel.pump.left', type: 'pump_failure', severity: 1 });
                 }
             }
         }
@@ -352,6 +375,9 @@ const SystemFailures = {
                     visual: "red_light_flash"
                 }),
                 effect: (sys) => {
+                    sys.applyComponentDamage?.({ componentId: 'apu', type: 'fire_damage', severity: 1 });
+                    sys.systems.damage ??= {};
+                    sys.systems.damage.apuFailed = true;
                     sys.systems.fire.apu = true;
                     sys.systems.apu.running = false;
                 }
@@ -421,7 +447,7 @@ const SystemFailures = {
     }
 };
 
-const createSupplementalSystemFailure = (id, name, systemAlert) => ({
+const createSupplementalSystemFailure = (id, name, systemAlert, effect = () => {}) => ({
     id,
     name,
     category: 'systems',
@@ -432,7 +458,7 @@ const createSupplementalSystemFailure = (id, name, systemAlert) => ({
                 text: name,
                 system_alert: systemAlert
             }),
-            effect: () => {}
+            effect
         }
     }
 });
@@ -442,11 +468,20 @@ const SupplementalSystemFailures = {
     TRANSFORMER_RECTIFIER_FAIL: createSupplementalSystemFailure('transformer_rectifier_fail', 'Transformer Rectifier Failure', 'TR UNIT'),
     STANDBY_POWER_FAIL: createSupplementalSystemFailure('standby_power_fail', 'Standby Power Failure', 'STBY PWR'),
     CABIN_FAN_FAIL: createSupplementalSystemFailure('cabin_fan_fail', 'Cabin Ventilation Fan Failure', 'CAB FAN'),
-    BLEED_LEAK: createSupplementalSystemFailure('bleed_leak', 'Bleed Duct Leak', 'BLEED DUCT'),
-    ISOLATION_VALVE_FAIL: createSupplementalSystemFailure('isolation_valve_fail', 'Isolation Valve Failure', 'ISOL VALVE'),
-    PACK_OVERHEAT: createSupplementalSystemFailure('pack_overheat', 'Air Conditioning Pack Overheat', 'PACK OVHT'),
+    BLEED_LEAK: createSupplementalSystemFailure('bleed_leak', 'Bleed Duct Leak', 'BLEED DUCT', sys => {
+        sys.applyComponentDamage?.({ componentId: 'pneumatic.duct.L', type: 'duct_rupture', severity: 1 });
+    }),
+    ISOLATION_VALVE_FAIL: createSupplementalSystemFailure('isolation_valve_fail', 'Isolation Valve Failure', 'ISOL VALVE', sys => {
+        sys.applyComponentDamage?.({ componentId: 'pneumatic.isolation.L_to_R', type: 'valve_failure', severity: 1 });
+        sys.applyComponentDamage?.({ componentId: 'pneumatic.isolation.R_to_L', type: 'valve_failure', severity: 1 });
+    }),
+    PACK_OVERHEAT: createSupplementalSystemFailure('pack_overheat', 'Air Conditioning Pack Overheat', 'PACK OVHT', sys => {
+        sys.applyComponentDamage?.({ componentId: 'pneumatic.pack.L', type: 'overheat_trip', severity: 1 });
+    }),
     FUEL_CROSSFEED_STUCK: createSupplementalSystemFailure('fuel_crossfeed_stuck', 'Crossfeed Valve Stuck', 'X FEED'),
-    CENTER_TANK_PUMP_FAIL: createSupplementalSystemFailure('center_tank_pump_fail', 'Center Tank Pump Failure', 'CTR TK PUMP'),
+    CENTER_TANK_PUMP_FAIL: createSupplementalSystemFailure('center_tank_pump_fail', 'Center Tank Pump Failure', 'CTR TK PUMP', sys => {
+        sys.applyComponentDamage?.({ componentId: 'fuel.pump.center', type: 'pump_failure', severity: 1 });
+    }),
     BRAKE_ACCUMULATOR_LOW: createSupplementalSystemFailure('brake_accumulator_low', 'Brake Accumulator Low', 'BRAKE ACCUM'),
     ANTI_SKID_FAIL: createSupplementalSystemFailure('anti_skid_fail', 'Anti-Skid Failure', 'ANTI SKID'),
     CARGO_SMOKE_LOOP_FAIL: createSupplementalSystemFailure('cargo_smoke_loop_fail', 'Cargo Smoke Loop Failure', 'CARGO SMOKE'),

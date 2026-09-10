@@ -98,5 +98,3 @@ describe('MultiplayerSessionService', () => {
     assert.equal(events[0].session.sessionId, 'session-123');
   });
 });
-
-setTimeout(() => process.exit(0), 5000);

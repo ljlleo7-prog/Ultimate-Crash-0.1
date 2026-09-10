@@ -3,7 +3,7 @@
  */
 
 import { describe, it } from 'node:test';
-import assert from 'node:assert';
+import assert from 'node:assert/strict';
 
 const testAircraft = {
   name: 'Test Aircraft',
@@ -70,5 +70,3 @@ describe('Off-Runway Ground Stability', () => {
     assert.ok(maxAltChange < 3.0, 'Should not bounce excessively');
   });
 });
-
-setTimeout(() => process.exit(0), 5000);

@@ -109,5 +109,3 @@ test('reporting service formats accessible system parameters', () => {
   assert.match(report, /Autobrake RTO/);
   assert.match(report, /Startup blockers APU Bleed Switch ON/);
 });
-
-setTimeout(() => process.exit(0), 0);

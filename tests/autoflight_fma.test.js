@@ -40,5 +40,3 @@ test('FMA reports LOC and GS arm/capture states', () => {
   assert.equal(captured.lateral.active.label, 'LOC');
   assert.equal(captured.vertical.active.label, 'G/S');
 });
-
-process.exit(0);

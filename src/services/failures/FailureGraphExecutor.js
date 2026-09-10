@@ -61,12 +61,14 @@ class FailureGraphExecutor {
         this.graph = graph;
         this.time = 0;
         this.pendingActivations = new Map();
+        this.edgeDecisions = new Set();
         this.hooks = hooks;
     }
 
     reset() {
         this.time = 0;
         this.pendingActivations.clear();
+        this.edgeDecisions.clear();
     }
 
     update(dt, payload) {
@@ -86,7 +88,7 @@ class FailureGraphExecutor {
             }
 
             const sourceFailure = activeFailures.get(pending.edge.sourceRuntimeId);
-            if (!sourceFailure || !this.isEdgeEligible(pending.edge, sourceFailure, flightState)) {
+            if (!sourceFailure || sourceFailure.currentStage === 'recovered') {
                 this.pendingActivations.delete(key);
                 continue;
             }
@@ -113,9 +115,13 @@ class FailureGraphExecutor {
             if (!sourceFailure) return;
             if (activeFailures.has(edge.targetRuntimeId)) return;
 
-            const key = `${edge.id}:${sourceFailure.id}:${edge.targetRuntimeId}`;
+            const key = `${edge.id}:${sourceFailure.instanceId ?? sourceFailure.id}:${edge.targetRuntimeId}`;
             if (this.pendingActivations.has(key)) return;
+            if (this.edgeDecisions.has(key)) return;
             if (!this.isEdgeEligible(edge, sourceFailure, flightState)) return;
+
+            // Probability is one decision per source incident, not per frame.
+            this.edgeDecisions.add(key);
 
             const cascadePolicy = typeof getCascadePolicy === 'function'
                 ? getCascadePolicy(sourceFailure)
@@ -147,8 +153,12 @@ class FailureGraphExecutor {
     }
 
     isEdgeEligible(edge, sourceFailure, flightState) {
-        if (edge.sourceStage && getStageRank(sourceFailure.currentStage) < getStageRank(edge.sourceStage)) {
-            return false;
+        if (edge.sourceStage) {
+            if (edge.sourceStageMode === 'minimum') {
+                if (getStageRank(sourceFailure.currentStage) < getStageRank(edge.sourceStage)) return false;
+            } else if (sourceFailure.currentStage !== edge.sourceStage) {
+                return false;
+            }
         }
 
         if ((edge.minSourceTimeInStage || 0) > sourceFailure.timeInStage) {

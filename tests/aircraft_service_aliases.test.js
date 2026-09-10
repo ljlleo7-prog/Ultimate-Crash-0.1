@@ -11,5 +11,3 @@ test('aircraft service resolves B737 aliases to Boeing 737-800', async () => {
   assert.equal(byIcao?.model, 'Boeing 737-800');
   assert.equal(byCanonical?.model, 'Boeing 737-800');
 });
-
-setTimeout(() => process.exit(0), 0);

@@ -2,14 +2,14 @@ import { fetchFlightPlanDbRoute } from './adapters/flightPlanDbAdapter.js';
 import { fetchProcedureData } from './adapters/procedureDataAdapter.js';
 import { fetchFaaCifpProcedures } from './adapters/faaCifpAdapter.js';
 import { searchSupabaseAipRoute } from './aipSupabaseRouteSearch.js';
-import { searchLocalAipRoute, searchLocalAipRouteAlternatives } from './aipRouteSearch.js';
+import { searchLocalAipRouteAlternatives } from './aipRouteSearch.js';
 import { getNavaidReferencesAlongRoute } from './adapters/airportReferenceAdapter.js';
 import { getOurAirportsNavaidsAlongRoute } from './adapters/ourAirportsAdapter.js';
 import { buildBuiltInRoute } from './adapters/builtInRouteAdapter.js';
 import { normalizeRoute } from './routeNormalizer.js';
 import { appendRouteDebug, createRouteDebugLog, summarizeFallback } from './routeDebug.js';
 import { buildRouteCacheKey, getCachedRoute, setCachedRoute } from './routeCacheService.js';
-import { PROVIDER_STATUS, EXTERNAL_ROUTE_TTL_MS, ROUTE_SOURCES } from './routeTypes.js';
+import { AIP_PROVIDER_MODES, PROVIDER_STATUS, EXTERNAL_ROUTE_TTL_MS, ROUTE_SOURCES } from './routeTypes.js';
 
 const guardedRouteProviders = [fetchFlightPlanDbRoute];
 
@@ -175,7 +175,10 @@ export const generateUnifiedRoute = async ({
   }
 
   const routeProviders = authState === 'authenticated' ? guardedRouteProviders : [];
-  const aipProviderMode = options.aipProviderMode || options.localAip?.providerMode || options.supabaseAip?.providerMode || 'local-only';
+  const aipProviderMode = options.aipProviderMode
+    || options.localAip?.providerMode
+    || options.supabaseAip?.providerMode
+    || AIP_PROVIDER_MODES.LOCAL_ONLY;
 
   const tryLocalAip = async () => {
     const response = await searchLocalAipRouteAlternatives({
@@ -237,26 +240,28 @@ export const generateUnifiedRoute = async ({
     return null;
   };
 
-  if (aipProviderMode !== 'remote-first') {
+  if (aipProviderMode !== AIP_PROVIDER_MODES.REMOTE_FIRST && aipProviderMode !== AIP_PROVIDER_MODES.EXTERNAL_ONLY) {
     const localRoute = await tryLocalAip();
     if (localRoute) {
       setCachedRoute(cacheKey, localRoute);
       return localRoute;
     }
-    if (aipProviderMode === 'local-only') {
+    if (aipProviderMode === AIP_PROVIDER_MODES.LOCAL_ONLY) {
       const builtIn = buildBuiltInRoute({ departure, arrival, debug });
       setCachedRoute(cacheKey, { ...builtIn.route, debug, fallbackUsed: true });
       return { ...builtIn.route, debug, fallbackUsed: true };
     }
   }
 
-  const supabaseRoute = await trySupabaseAip();
-  if (supabaseRoute) {
-    setCachedRoute(cacheKey, supabaseRoute);
-    return supabaseRoute;
+  if (aipProviderMode !== AIP_PROVIDER_MODES.EXTERNAL_ONLY) {
+    const supabaseRoute = await trySupabaseAip();
+    if (supabaseRoute) {
+      setCachedRoute(cacheKey, supabaseRoute);
+      return supabaseRoute;
+    }
   }
 
-  if (aipProviderMode === 'remote-first') {
+  if (aipProviderMode === AIP_PROVIDER_MODES.REMOTE_FIRST) {
     const localRoute = await tryLocalAip();
     if (localRoute) {
       setCachedRoute(cacheKey, localRoute);
@@ -302,10 +307,11 @@ export const generateUnifiedRoute = async ({
         departure,
         arrival,
         aircraftType,
-        options,
-        debugResponses,
-        debug
-      });
+      options,
+      debugResponses,
+      debug,
+      authState
+    });
       const finalRoute = buildRouteWithProcedures({ ...normalized, debug, fallbackUsed: false, source: normalized.source || providerName }, procedureResponse);
       setCachedRoute(cacheKey, finalRoute);
       return finalRoute;
@@ -373,4 +379,3 @@ export const generateUnifiedRoute = async ({
   setCachedRoute(cacheKey, finalRoute);
   return finalRoute;
 };
-

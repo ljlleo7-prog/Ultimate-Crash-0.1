@@ -21,6 +21,12 @@ export const PROVIDER_STATUS = Object.freeze({
   CACHE_HIT: 'cache_hit'
 });
 
+export const AIP_PROVIDER_MODES = Object.freeze({
+  LOCAL_ONLY: 'local-only',
+  REMOTE_FIRST: 'remote-first',
+  EXTERNAL_ONLY: 'external-only'
+});
+
 export const ROUTE_CACHE_VERSION = 'route-v2';
 export const EXTERNAL_ROUTE_TTL_MS = 24 * 60 * 60 * 1000;
 export const REFERENCE_DATA_TTL_MS = 7 * 24 * 60 * 60 * 1000;

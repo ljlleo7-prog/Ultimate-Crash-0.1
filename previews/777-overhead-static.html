@@ -1,0 +1,1193 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>777 overhead — static study</title>
+<style>html{color-scheme:dark}body{margin:0;background:#151c20;font-family:Arial,sans-serif}.preview-wrap{width:max-content;margin:28px auto}.preview-label{font-size:11px;letter-spacing:2px;color:#99a7af;margin:0 0 14px}.preview-wrap button,.preview-wrap select{pointer-events:none}.awb-note{display:none}.awb-position{visibility:hidden}</style>
+<style id="visual-polish">
+body{background:radial-gradient(ellipse at 50% 15%,#303a3f,#141b1f 75%);color:#edf0eb}
+.preview-wrap{margin:28px auto 50px;filter:drop-shadow(0 18px 24px #0006)}
+.preview-label{font:10px Arial,sans-serif;letter-spacing:2.5px;margin:0 0 18px;color:#afbbc1}
+button,select{appearance:none;-webkit-appearance:none;opacity:1!important}
+button{cursor:default!important}
+section{position:relative}
+section:after{pointer-events:none}
+
+[data-boeing-panel]{border:6px ridge #443d33!important;border-radius:5px 5px 60px 60px!important;padding:22px 14px 16px!important;background:linear-gradient(110deg,#564d40,#8f8269,#524c40)!important}
+[data-boeing-panel] section{border:1px solid #433b2f!important;background:linear-gradient(110deg,#8b7c63,#746851)!important;padding:9px 7px 6px!important;box-shadow:inset 0 1px 1px #baa27a88,1px 2px 2px #342d26!important}
+[data-boeing-panel] section>div:first-of-type{font-weight:400!important;letter-spacing:1px!important;font-size:8px!important;margin-bottom:5px!important}
+[data-boeing-panel] section div[style*="margin:9px 0"]{margin:6px 0!important;gap:4px!important}
+[data-boeing-panel] button{width:29px!important;height:30px!important;border-width:2px!important;border-radius:2px!important;box-shadow:1px 2px 2px #42392c,inset 0 0 0 1px #121811!important}
+[data-boeing-panel] button[style*="border-radius:50%"]{width:32px!important;height:32px!important;border-radius:50%!important;background:repeating-conic-gradient(#d6cdb4 0 7deg,#bdb797 8deg 10deg)!important}
+[data-boeing-panel] button[style*="border-radius:50%"]>span{left:11px!important;top:0!important;width:7px!important;height:27px!important;background:linear-gradient(90deg,#b9b59b,#eee7cb,#bdbb9d)!important}
+[data-boeing-panel] button>span[style*="width:8px"]{left:10px!important;height:19px!important}
+[data-boeing-panel] section>div[style*="min-height:10px"]{min-height:8px!important}
+[data-boeing-panel] section div[style*="min-height:8px"]{font-size:6px!important;min-height:6px!important}
+[data-boeing-panel] section div[style*="gap:4px"]>span:first-child{font-size:7px!important}
+[data-boeing-panel] section[aria-label="FUEL"] svg{stroke:#e5e5c8}
+[data-boeing-panel]>div:last-child{display:none}
+</style>
+<style id="hardware-detail">
+   .b744-oh .oh-section{overflow:visible}
+   .b744-oh .oh-knob:after{content:''}.b744-oh .oh-lever:after{content:''}
+   .b744-oh .oh-section .oh-ann.lit{color:#cbb658;text-shadow:none}
+   .b744-oh .oh-section[aria-label=""]:first-child>div:first-child{height:45px!important}
+   .b744-oh .oh-section[aria-label="ENGINE START / FUEL JETTISON"]{height:122px!important}
+   .b744-oh .oh-section[aria-label="AIR CONDITIONING"]{height:210px!important}
+   .b744-oh .oh-push{position:relative}
+   .b744-oh .oh-push>.static-legend{font-size:5px!important;color:#d8bb49!important;line-height:6px;min-height:6px}
+   .b744-oh .oh-section[aria-label="ELECTRICAL"]{height:282px!important}
+   .b744-oh .oh-section[aria-label="INERTIAL REFERENCE"]{height:77px!important}
+   .b744-oh .oh-section[aria-label="ENGINE / APU FIRE PROTECTION"] .oh-row:last-child{align-items:center}
+   .a320-overhead section[aria-label="AIR COND"]>div{margin:4px 0!important}
+   .a320-overhead section[aria-label="AIR COND"]{min-height:190px}
+   .a320-overhead section [style*="min-height:19px"]{min-height:10px!important}
+   .a320-overhead section button:not([style*="border-radius:50%"]):not(.static-toggle)>span:first-child{color:#c3c8d3!important;font-size:6px!important;opacity:.8}
+   .a320-overhead section button:not([style*="border-radius:50%"]):not(.static-toggle)>span+span{color:#f0f1ff!important;text-shadow:0 0 4px #b9c3ff!important;border-color:#b6c4ed!important;box-shadow:0 0 2px #abc1ff;line-height:9px}
+   .a320-overhead button.static-toggle{width:18px!important;height:22px!important;border:1px solid #b9c6c6!important;border-radius:50%!important;position:relative;background:radial-gradient(#101c22 40%,#b4c5c3 44% 50%,#334954 55% 66%,#d4d9cc 69%)!important;box-shadow:1px 2px 2px #2d4556!important;margin:5px 0}
+   .a320-overhead button.static-toggle:after{content:'';position:absolute;width:5px;height:20px;top:-4px;left:5px;border:1px solid #98a9a5;border-radius:4px;background:linear-gradient(90deg,#7f9591,#f1f2df,#94a9a2);box-shadow:1px 2px 3px #23363e}
+   .a320-overhead button.static-toggle>*{display:none!important}
+   .a320-overhead section button.static-guard{width:12px!important;height:32px!important;background:linear-gradient(90deg,#74130e,#d02c20,#8d2015)!important;border:1px solid #1b2630!important;box-shadow:2px 2px 1px #1f3541!important;margin:0 10px}
+   .a320-overhead button.static-guard>*{display:none}
+   .a320-overhead section[aria-label="HYD"]{min-height:102px}
+   .a320-overhead section[aria-label="ELEC"]{min-height:168px}
+   .a320-overhead section[aria-label="CARGO VENT"]{min-height:92px}
+   .a320-overhead section[aria-label="RCDR"]{min-height:80px}
+   .a320-overhead section[aria-label="OXYGEN"]{min-height:66px}
+   .a320-overhead section[aria-label="WIPER / RAIN RPLNT"]{min-height:96px}
+   .a320-overhead{clip-path:polygon(0 0,100% 0,100% 90%,75% 100%,25% 100%,0 90%);border-radius:3px!important}
+   .awb-overhead{clip-path:polygon(0 0,100% 0,100% 93%,77% 100%,23% 100%,0 93%);border-radius:3px}
+   .awb-module [data-guard] button{width:13px!important;height:27px!important;margin:1px 8px;background:linear-gradient(90deg,#8d1b14,#d72c1d,#7c1b15)!important;border:1px solid #272b29!important;box-shadow:2px 2px 2px #263d47!important}
+   .awb-module [data-guard] button>*{visibility:hidden}
+   .awb-a350 .awb-side .awb-module[aria-label="APU FIRE"]{min-height:118px}
+   .awb-a350 .awb-side .awb-module[aria-label="APU FIRE"] .awb-fire{display:none}
+   .awb-static-top{height:83px;border:1px solid #3a505e;margin:0 0 4px;background:linear-gradient(110deg,#627581,#6f828d);display:grid;grid-template-columns:23% 54% 23%;box-shadow:inset 0 0 0 1px #889aa366}
+   .awb-static-top>div{position:relative;border-right:1px solid #455a67;padding:12px;font-size:6px;color:#dce4e3;display:flex;align-items:end;justify-content:center;letter-spacing:1px}
+   .awb-static-top>div:before,.awb-static-top>div:after{content:'⊖';position:absolute;font-size:9px;color:#364c59;top:3px}.awb-static-top>div:before{left:3px}.awb-static-top>div:after{right:3px}
+   .awb-side .awb-module[data-stretch]{min-height:120px}
+   .awb-side .awb-module[aria-label="AUDIO"]{min-height:154px}
+   .awb-knob{background:linear-gradient(90deg,#a4b0a4,#e1e3d2,#abb5a7);border-color:#8f9e92}
+   .static-plumbing{position:absolute;inset:0;pointer-events:none;z-index:0;width:100%;height:100%}
+   section:has(.static-plumbing)>:not(.static-plumbing){position:relative;z-index:1}
+   </style>
+<style>
+  .b744-oh .oh-section[aria-label="ENGINE START / FUEL JETTISON"]{height:131px!important}
+  .static-fastener{position:absolute!important;width:7px;height:7px;border:1px solid #40505a;border-radius:50%;background:linear-gradient(135deg,#56626b 0 39%,#bbc1b4 40% 49%,#35414a 50% 58%,#949f98 59%);box-shadow:0 0 0 1px #c1c3a766;z-index:5!important;top:3px}
+  .static-fastener.left{left:3px}.static-fastener.right{right:3px}
+  .a320-overhead section button.static-toggle[style]{width:18px!important;height:22px!important;border:1px solid #b9c6c6!important;border-radius:50%!important;background:radial-gradient(#101c22 40%,#b4c5c3 44% 50%,#334954 55% 66%,#d4d9cc 69%)!important;margin:4px 0!important}
+  .a320-overhead section button.static-guard[style]{width:12px!important;height:30px!important;background:linear-gradient(90deg,#74130e,#d02c20,#8d2015)!important;border:1px solid #1b2630!important}
+  .a320-overhead section button[style*="border-radius:50%"]:not(.static-toggle){background:linear-gradient(95deg,#bcc5bb,#d6d9c8,#a8b6ab)!important}
+  .b744-oh .oh-knob{background:linear-gradient(105deg,#a6ad9b,#d7d9c3,#afb6a3)}
+  .b744-oh .oh-knob:after{width:8px;left:10px}
+  .awb-rotary button{background:linear-gradient(110deg,#aebeb5,#dce2d5,#b2c1b5)}
+  [data-boeing-panel] button[style*="border-radius:50%"]{background:linear-gradient(110deg,#bebda4,#e0dfc5,#adaf97)!important}
+  </style>
+</head>
+<body>
+<div class="preview-wrap">
+<p class="preview-label">777 / OVERHEAD PANEL · STATIC VISUAL STUDY</p>
+<div data-boeing-panel="BOEING 777-300ER" style="width:890px;min-height:940px;box-sizing:border-box;position:relative;padding:30px 22px 24px;background:linear-gradient(100deg,#493f35,#9a876b 45%,#514739);border:5px solid #342e28;border-radius:22px 22px 95px 95px;color:#f1efd9;font-family:Arial,sans-serif;box-shadow:0 15px 35px #0008">
+<div style="position:absolute;top:8px;left:24px;font-size:9px;letter-spacing:.2em">BOEING 777-300ER · OVERHEAD</div>
+<div style="display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:5px;align-items:start">
+<div style="display:flex;flex-direction:column;gap:5px">
+<section aria-label="" style="position:relative;min-height:125px;padding:13px 9px 9px;background:linear-gradient(125deg,#81745f,#6d6051 78%);border:2px solid #453d32;border-radius:5px;box-shadow:inset 0 1px #ac9980, 1px 2px 3px #302b26">
+<span aria-hidden="true" style="position:absolute;width:6px;height:6px;border-radius:50%;background:linear-gradient(130deg,#b2a085,#403a31);border:1px solid #3d362d;top:4px;left:4px">
+</span>
+<span aria-hidden="true" style="position:absolute;width:6px;height:6px;border-radius:50%;background:linear-gradient(130deg,#b2a085,#403a31);border:1px solid #3d362d;top:4px;right:4px">
+</span>
+<span aria-hidden="true" style="position:absolute;width:6px;height:6px;border-radius:50%;background:linear-gradient(130deg,#b2a085,#403a31);border:1px solid #3d362d;bottom:4px;left:4px">
+</span>
+<span aria-hidden="true" style="position:absolute;width:6px;height:6px;border-radius:50%;background:linear-gradient(130deg,#b2a085,#403a31);border:1px solid #3d362d;bottom:4px;right:4px">
+</span>
+</section>
+<section aria-label="FLIGHT CONTROLS" style="position:relative;min-height:160px;padding:13px 9px 9px;background:linear-gradient(125deg,#81745f,#6d6051 78%);border:2px solid #453d32;border-radius:5px;box-shadow:inset 0 1px #ac9980, 1px 2px 3px #302b26">
+<span aria-hidden="true" style="position:absolute;width:6px;height:6px;border-radius:50%;background:linear-gradient(130deg,#b2a085,#403a31);border:1px solid #3d362d;top:4px;left:4px">
+</span>
+<span aria-hidden="true" style="position:absolute;width:6px;height:6px;border-radius:50%;background:linear-gradient(130deg,#b2a085,#403a31);border:1px solid #3d362d;top:4px;right:4px">
+</span>
+<span aria-hidden="true" style="position:absolute;width:6px;height:6px;border-radius:50%;background:linear-gradient(130deg,#b2a085,#403a31);border:1px solid #3d362d;bottom:4px;left:4px">
+</span>
+<span aria-hidden="true" style="position:absolute;width:6px;height:6px;border-radius:50%;background:linear-gradient(130deg,#b2a085,#403a31);border:1px solid #3d362d;bottom:4px;right:4px">
+</span>
+<div style="text-align:center;color:#faf4df;font-weight:700;font-size:10px;letter-spacing:.09em;margin-bottom:8px">FLIGHT CONTROLS</div>
+<div style="display:flex;justify-content:space-evenly;align-items:flex-start;gap:5px;margin:9px 0">
+<div style="display:flex;flex-direction:column;align-items:center;gap:4px;flex:0 1 60px;min-width:33px;text-align:center">
+<span style="font-size:8px;line-height:1.15;white-space:pre-line;min-height:10px">ADIRU</span>
+<button type="button" aria-label="ADIRU" style="position:relative;padding:0;width:35px;height:34px;border:2px solid #c5c7a6;border-radius:4px;background:#262822;box-shadow:0 3px 4px #372f27,inset 0 0 0 2px #171a17;color:#f6f2d9;cursor:default" tabindex="-1">
+<span style="display:block;font-size:7px;color:#676759">OFF</span>
+<span style="display:block;font-size:6px;margin-top:3px;color:#676759">
+</span>
+</button>
+</div>
+</div>
+<div style="display:flex;justify-content:space-evenly;align-items:flex-start;gap:5px;margin:9px 0">
+<div style="display:flex;flex-direction:column;align-items:center;gap:4px;flex:0 1 60px;min-width:33px;text-align:center">
+<span style="font-size:8px;line-height:1.15;white-space:pre-line;min-height:10px">THRUST ASYM COMP</span>
+<button type="button" aria-label="THRUST ASYM COMP" style="position:relative;padding:0;width:35px;height:34px;border:2px solid #c5c7a6;border-radius:4px;background:#262822;box-shadow:0 3px 4px #372f27,inset 0 0 0 2px #171a17;color:#f6f2d9;cursor:default" tabindex="-1">
+<span style="display:block;font-size:7px;color:#676759">OFF</span>
+<span style="display:block;font-size:6px;margin-top:3px;color:#676759">
+</span>
+</button>
+</div>
+<div style="display:flex;flex-direction:column;align-items:center;gap:4px;flex:0 1 60px;min-width:33px;text-align:center">
+<span style="font-size:8px;line-height:1.15;white-space:pre-line;min-height:10px">PRIMARY FLIGHT COMPUTERS</span>
+<button type="button" aria-label="PRIMARY FLIGHT COMPUTERS" style="position:relative;padding:0;width:35px;height:34px;border:2px solid #c5c7a6;border-radius:4px;background:linear-gradient(#9e2520,#4d1310);box-shadow:0 3px 4px #372f27,inset 0 0 0 2px #171a17;color:#f6f2d9;cursor:default" tabindex="-1">
+<span aria-hidden="true" style="position:absolute;top:14px;left:13px;width:8px;height:20px;background:linear-gradient(90deg,#777,#eee,#aaa);border-radius:5px;box-shadow:2px 3px 3px #111">
+</span>
+</button>
+</div>
+</div>
+</section>
+<section aria-label="ELECTRICAL" style="position:relative;min-height:315px;padding:13px 9px 9px;background:linear-gradient(125deg,#81745f,#6d6051 78%);border:2px solid #453d32;border-radius:5px;box-shadow:inset 0 1px #ac9980, 1px 2px 3px #302b26">
+<span aria-hidden="true" style="position:absolute;width:6px;height:6px;border-radius:50%;background:linear-gradient(130deg,#b2a085,#403a31);border:1px solid #3d362d;top:4px;left:4px">
+</span>
+<span aria-hidden="true" style="position:absolute;width:6px;height:6px;border-radius:50%;background:linear-gradient(130deg,#b2a085,#403a31);border:1px solid #3d362d;top:4px;right:4px">
+</span>
+<span aria-hidden="true" style="position:absolute;width:6px;height:6px;border-radius:50%;background:linear-gradient(130deg,#b2a085,#403a31);border:1px solid #3d362d;bottom:4px;left:4px">
+</span>
+<span aria-hidden="true" style="position:absolute;width:6px;height:6px;border-radius:50%;background:linear-gradient(130deg,#b2a085,#403a31);border:1px solid #3d362d;bottom:4px;right:4px">
+</span>
+<div style="text-align:center;color:#faf4df;font-weight:700;font-size:10px;letter-spacing:.09em;margin-bottom:8px">ELECTRICAL</div>
+<div style="display:flex;justify-content:space-evenly;align-items:flex-start;gap:5px;margin:9px 0">
+<div style="display:flex;flex-direction:column;align-items:center;gap:4px;flex:0 1 60px;min-width:33px;text-align:center">
+<span style="font-size:8px;line-height:1.15;white-space:pre-line;min-height:10px">BATTERY</span>
+<button type="button" aria-label="BATTERY" style="position:relative;padding:0;width:35px;height:34px;border:2px solid #c5c7a6;border-radius:4px;background:#262822;box-shadow:0 3px 4px #372f27,inset 0 0 0 2px #171a17;color:#f6f2d9;cursor:pointer" tabindex="-1">
+<span style="display:block;font-size:7px;color:#c2fac4">ON</span>
+<span style="display:block;font-size:6px;margin-top:3px;color:#676759">
+</span>
+</button>
+<span style="font-size:7px;color:#ecdfb7;min-height:8px">ON</span>
+</div>
+<div style="display:flex;flex-direction:column;align-items:center;gap:4px;flex:0 1 60px;min-width:33px;text-align:center">
+<span style="font-size:8px;line-height:1.15;white-space:pre-line;min-height:10px">APU</span>
+<button type="button" aria-label="APU" style="position:relative;padding:0;width:38px;height:38px;border:2px solid #bcae8c;border-radius:50%;background:radial-gradient(circle at 30% 20%,#e5d8b5,#9b8a66);box-shadow:0 3px 4px #372f27,inset 0 0 0 2px #171a17;color:#f6f2d9;cursor:pointer" tabindex="-1">
+<span aria-hidden="true" style="position:absolute;left:13px;top:1px;width:8px;height:29px;background:linear-gradient(90deg,#ac9d7c,#f0e2be,#c3b18c);border-radius:4px;transform:rotate(-28deg);box-shadow:2px 2px 3px #574a35">
+<span style="position:absolute;height:12px;width:2px;background:#302b24;left:3px;top:1px">
+</span>
+</span>
+</button>
+<span style="font-size:7px;color:#ecdfb7;min-height:8px">OFF</span>
+</div>
+</div>
+<div style="border:1px solid #c3c4a0;border-radius:9px;padding:0 2px">
+<div style="display:flex;justify-content:space-evenly;align-items:flex-start;gap:5px;margin:9px 0">
+<div style="display:flex;flex-direction:column;align-items:center;gap:4px;flex:0 1 60px;min-width:33px;text-align:center">
+<span style="font-size:8px;line-height:1.15;white-space:pre-line;min-height:10px">L BUS TIE</span>
+<button type="button" aria-label="L BUS TIE" style="position:relative;padding:0;width:35px;height:34px;border:2px solid #c5c7a6;border-radius:4px;background:#262822;box-shadow:0 3px 4px #372f27,inset 0 0 0 2px #171a17;color:#f6f2d9;cursor:default" tabindex="-1">
+<span style="display:block;font-size:7px;color:#676759">OFF</span>
+<span style="display:block;font-size:6px;margin-top:3px;color:#676759">
+</span>
+</button>
+</div>
+<div style="display:flex;flex-direction:column;align-items:center;gap:4px;flex:0 1 60px;min-width:33px;text-align:center">
+<span style="font-size:8px;line-height:1.15;white-space:pre-line;min-height:10px">APU GEN</span>
+<button type="button" aria-label="APU GEN" style="position:relative;padding:0;width:35px;height:34px;border:2px solid #c5c7a6;border-radius:4px;background:#262822;box-shadow:0 3px 4px #372f27,inset 0 0 0 2px #171a17;color:#f6f2d9;cursor:pointer" tabindex="-1">
+<span style="display:block;font-size:7px;color:#676759">OFF</span>
+<span style="display:block;font-size:6px;margin-top:3px;color:#676759">
+</span>
+</button>
+<span style="font-size:7px;color:#ecdfb7;min-height:8px">OFF</span>
+</div>
+<div style="display:flex;flex-direction:column;align-items:center;gap:4px;flex:0 1 60px;min-width:33px;text-align:center">
+<span style="font-size:8px;line-height:1.15;white-space:pre-line;min-height:10px">R BUS TIE</span>
+<button type="button" aria-label="R BUS TIE" style="position:relative;padding:0;width:35px;height:34px;border:2px solid #c5c7a6;border-radius:4px;background:#262822;box-shadow:0 3px 4px #372f27,inset 0 0 0 2px #171a17;color:#f6f2d9;cursor:default" tabindex="-1">
+<span style="display:block;font-size:7px;color:#676759">OFF</span>
+<span style="display:block;font-size:6px;margin-top:3px;color:#676759">
+</span>
+</button>
+</div>
+</div>
+<div style="display:flex;justify-content:space-evenly;align-items:flex-start;gap:5px;margin:9px 0">
+<div style="display:flex;flex-direction:column;align-items:center;gap:4px;flex:0 1 60px;min-width:33px;text-align:center">
+<span style="font-size:8px;line-height:1.15;white-space:pre-line;min-height:10px">SEC EXT PWR</span>
+<button type="button" aria-label="SEC EXT PWR" style="position:relative;padding:0;width:35px;height:34px;border:2px solid #c5c7a6;border-radius:4px;background:#262822;box-shadow:0 3px 4px #372f27,inset 0 0 0 2px #171a17;color:#f6f2d9;cursor:default" tabindex="-1">
+<span style="display:block;font-size:7px;color:#676759">OFF</span>
+<span style="display:block;font-size:6px;margin-top:3px;color:#676759">
+</span>
+</button>
+</div>
+<div style="display:flex;flex-direction:column;align-items:center;gap:4px;flex:0 1 60px;min-width:33px;text-align:center">
+<span style="font-size:8px;line-height:1.15;white-space:pre-line;min-height:10px">PRI EXT PWR</span>
+<button type="button" aria-label="PRI EXT PWR" style="position:relative;padding:0;width:35px;height:34px;border:2px solid #c5c7a6;border-radius:4px;background:#262822;box-shadow:0 3px 4px #372f27,inset 0 0 0 2px #171a17;color:#f6f2d9;cursor:default" tabindex="-1">
+<span style="display:block;font-size:7px;color:#676759">OFF</span>
+<span style="display:block;font-size:6px;margin-top:3px;color:#676759">
+</span>
+</button>
+</div>
+</div>
+<div style="display:flex;justify-content:space-evenly;align-items:flex-start;gap:5px;margin:9px 0">
+<div style="display:flex;flex-direction:column;align-items:center;gap:4px;flex:0 1 60px;min-width:33px;text-align:center">
+<span style="font-size:8px;line-height:1.15;white-space:pre-line;min-height:10px">L GEN CTRL</span>
+<button type="button" aria-label="L GEN CTRL" style="position:relative;padding:0;width:35px;height:34px;border:2px solid #c5c7a6;border-radius:4px;background:#262822;box-shadow:0 3px 4px #372f27,inset 0 0 0 2px #171a17;color:#f6f2d9;cursor:pointer" tabindex="-1">
+<span style="display:block;font-size:7px;color:#c2fac4">ON</span>
+<span style="display:block;font-size:6px;margin-top:3px;color:#676759">
+</span>
+</button>
+<span style="font-size:7px;color:#ecdfb7;min-height:8px">ON</span>
+</div>
+<div style="display:flex;flex-direction:column;align-items:center;gap:4px;flex:0 1 60px;min-width:33px;text-align:center">
+<span style="font-size:8px;line-height:1.15;white-space:pre-line;min-height:10px">BACKUP GEN</span>
+<button type="button" aria-label="BACKUP GEN" style="position:relative;padding:0;width:35px;height:34px;border:2px solid #c5c7a6;border-radius:4px;background:#262822;box-shadow:0 3px 4px #372f27,inset 0 0 0 2px #171a17;color:#f6f2d9;cursor:default" tabindex="-1">
+<span style="display:block;font-size:7px;color:#676759">OFF</span>
+<span style="display:block;font-size:6px;margin-top:3px;color:#676759">
+</span>
+</button>
+</div>
+<div style="display:flex;flex-direction:column;align-items:center;gap:4px;flex:0 1 60px;min-width:33px;text-align:center">
+<span style="font-size:8px;line-height:1.15;white-space:pre-line;min-height:10px">R GEN CTRL</span>
+<button type="button" aria-label="R GEN CTRL" style="position:relative;padding:0;width:35px;height:34px;border:2px solid #c5c7a6;border-radius:4px;background:#262822;box-shadow:0 3px 4px #372f27,inset 0 0 0 2px #171a17;color:#f6f2d9;cursor:pointer" tabindex="-1">
+<span style="display:block;font-size:7px;color:#c2fac4">ON</span>
+<span style="display:block;font-size:6px;margin-top:3px;color:#676759">
+</span>
+</button>
+<span style="font-size:7px;color:#ecdfb7;min-height:8px">ON</span>
+</div>
+</div>
+</div>
+<div style="display:flex;justify-content:space-evenly;align-items:flex-start;gap:5px;margin:9px 0">
+<div style="display:flex;flex-direction:column;align-items:center;gap:4px;flex:0 1 60px;min-width:33px;text-align:center">
+<span style="font-size:8px;line-height:1.15;white-space:pre-line;min-height:10px">L DRIVE DISC</span>
+<button type="button" aria-label="L DRIVE DISC" style="position:relative;padding:0;width:35px;height:34px;border:2px solid #c5c7a6;border-radius:4px;background:linear-gradient(#9e2520,#4d1310);box-shadow:0 3px 4px #372f27,inset 0 0 0 2px #171a17;color:#f6f2d9;cursor:default" tabindex="-1">
+<span style="display:block;font-size:7px;color:#676759">OFF</span>
+<span style="display:block;font-size:6px;margin-top:3px;color:#676759">GUARD</span>
+</button>
+</div>
+<div style="display:flex;flex-direction:column;align-items:center;gap:4px;flex:0 1 60px;min-width:33px;text-align:center">
+<span style="font-size:8px;line-height:1.15;white-space:pre-line;min-height:10px">R DRIVE DISC</span>
+<button type="button" aria-label="R DRIVE DISC" style="position:relative;padding:0;width:35px;height:34px;border:2px solid #c5c7a6;border-radius:4px;background:linear-gradient(#9e2520,#4d1310);box-shadow:0 3px 4px #372f27,inset 0 0 0 2px #171a17;color:#f6f2d9;cursor:default" tabindex="-1">
+<span style="display:block;font-size:7px;color:#676759">OFF</span>
+<span style="display:block;font-size:6px;margin-top:3px;color:#676759">GUARD</span>
+</button>
+</div>
+</div>
+</section>
+<section aria-label="L WIPER" style="position:relative;min-height:150px;padding:13px 9px 9px;background:linear-gradient(125deg,#81745f,#6d6051 78%);border:2px solid #453d32;border-radius:5px;box-shadow:inset 0 1px #ac9980, 1px 2px 3px #302b26">
+<span aria-hidden="true" style="position:absolute;width:6px;height:6px;border-radius:50%;background:linear-gradient(130deg,#b2a085,#403a31);border:1px solid #3d362d;top:4px;left:4px">
+</span>
+<span aria-hidden="true" style="position:absolute;width:6px;height:6px;border-radius:50%;background:linear-gradient(130deg,#b2a085,#403a31);border:1px solid #3d362d;top:4px;right:4px">
+</span>
+<span aria-hidden="true" style="position:absolute;width:6px;height:6px;border-radius:50%;background:linear-gradient(130deg,#b2a085,#403a31);border:1px solid #3d362d;bottom:4px;left:4px">
+</span>
+<span aria-hidden="true" style="position:absolute;width:6px;height:6px;border-radius:50%;background:linear-gradient(130deg,#b2a085,#403a31);border:1px solid #3d362d;bottom:4px;right:4px">
+</span>
+<div style="text-align:center;color:#faf4df;font-weight:700;font-size:10px;letter-spacing:.09em;margin-bottom:8px">L WIPER</div>
+<div style="display:flex;justify-content:space-evenly;align-items:flex-start;gap:5px;margin:9px 0">
+<div style="display:flex;flex-direction:column;align-items:center;gap:4px;flex:0 1 60px;min-width:33px;text-align:center">
+<span style="font-size:8px;line-height:1.15;white-space:pre-line;min-height:10px">OFF · INT · LOW · HIGH</span>
+<button type="button" aria-label="OFF · INT · LOW · HIGH" style="position:relative;padding:0;width:38px;height:38px;border:2px solid #bcae8c;border-radius:50%;background:radial-gradient(circle at 30% 20%,#e5d8b5,#9b8a66);box-shadow:0 3px 4px #372f27,inset 0 0 0 2px #171a17;color:#f6f2d9;cursor:default" tabindex="-1">
+<span aria-hidden="true" style="position:absolute;left:13px;top:1px;width:8px;height:29px;background:linear-gradient(90deg,#ac9d7c,#f0e2be,#c3b18c);border-radius:4px;transform:rotate(-28deg);box-shadow:2px 2px 3px #574a35">
+<span style="position:absolute;height:12px;width:2px;background:#302b24;left:3px;top:1px">
+</span>
+</span>
+</button>
+</div>
+</div>
+</section>
+</div>
+<div style="display:flex;flex-direction:column;gap:5px">
+<section aria-label="SERVICE / OXYGEN" style="position:relative;min-height:134px;padding:13px 9px 9px;background:linear-gradient(125deg,#81745f,#6d6051 78%);border:2px solid #453d32;border-radius:5px;box-shadow:inset 0 1px #ac9980, 1px 2px 3px #302b26">
+<span aria-hidden="true" style="position:absolute;width:6px;height:6px;border-radius:50%;background:linear-gradient(130deg,#b2a085,#403a31);border:1px solid #3d362d;top:4px;left:4px">
+</span>
+<span aria-hidden="true" style="position:absolute;width:6px;height:6px;border-radius:50%;background:linear-gradient(130deg,#b2a085,#403a31);border:1px solid #3d362d;top:4px;right:4px">
+</span>
+<span aria-hidden="true" style="position:absolute;width:6px;height:6px;border-radius:50%;background:linear-gradient(130deg,#b2a085,#403a31);border:1px solid #3d362d;bottom:4px;left:4px">
+</span>
+<span aria-hidden="true" style="position:absolute;width:6px;height:6px;border-radius:50%;background:linear-gradient(130deg,#b2a085,#403a31);border:1px solid #3d362d;bottom:4px;right:4px">
+</span>
+<div style="text-align:center;color:#faf4df;font-weight:700;font-size:10px;letter-spacing:.09em;margin-bottom:8px">SERVICE / OXYGEN</div>
+<div style="display:flex;justify-content:space-evenly;align-items:flex-start;gap:5px;margin:9px 0">
+<div style="display:flex;flex-direction:column;align-items:center;gap:4px;flex:0 1 60px;min-width:33px;text-align:center">
+<span style="font-size:8px;line-height:1.15;white-space:pre-line;min-height:10px">EMER LIGHTS</span>
+<button type="button" aria-label="EMER LIGHTS" style="position:relative;padding:0;width:35px;height:34px;border:2px solid #c5c7a6;border-radius:4px;background:#262822;box-shadow:0 3px 4px #372f27,inset 0 0 0 2px #171a17;color:#f6f2d9;cursor:pointer" tabindex="-1">
+<span aria-hidden="true" style="position:absolute;top:3px;left:13px;width:8px;height:20px;background:linear-gradient(90deg,#777,#eee,#aaa);border-radius:5px;box-shadow:2px 3px 3px #111">
+</span>
+</button>
+<span style="font-size:7px;color:#ecdfb7;min-height:8px">ON</span>
+</div>
+<div style="display:flex;flex-direction:column;align-items:center;gap:4px;flex:0 1 60px;min-width:33px;text-align:center">
+<span style="font-size:8px;line-height:1.15;white-space:pre-line;min-height:10px">SERV INTPH</span>
+<button type="button" aria-label="SERV INTPH" style="position:relative;padding:0;width:35px;height:34px;border:2px solid #c5c7a6;border-radius:4px;background:#262822;box-shadow:0 3px 4px #372f27,inset 0 0 0 2px #171a17;color:#f6f2d9;cursor:default" tabindex="-1">
+<span aria-hidden="true" style="position:absolute;top:14px;left:13px;width:8px;height:20px;background:linear-gradient(90deg,#777,#eee,#aaa);border-radius:5px;box-shadow:2px 3px 3px #111">
+</span>
+</button>
+</div>
+<div style="display:flex;flex-direction:column;align-items:center;gap:4px;flex:0 1 60px;min-width:33px;text-align:center">
+<span style="font-size:8px;line-height:1.15;white-space:pre-line;min-height:10px">PASS OXYGEN</span>
+<button type="button" aria-label="PASS OXYGEN" style="position:relative;padding:0;width:35px;height:34px;border:2px solid #c5c7a6;border-radius:4px;background:linear-gradient(#9e2520,#4d1310);box-shadow:0 3px 4px #372f27,inset 0 0 0 2px #171a17;color:#f6f2d9;cursor:default" tabindex="-1">
+<span style="display:block;font-size:7px;color:#676759">OFF</span>
+<span style="display:block;font-size:6px;margin-top:3px;color:#676759">GUARD</span>
+</button>
+</div>
+</div>
+</section>
+<section aria-label="WINDOW HEAT" style="position:relative;min-height:103px;padding:13px 9px 9px;background:linear-gradient(125deg,#81745f,#6d6051 78%);border:2px solid #453d32;border-radius:5px;box-shadow:inset 0 1px #ac9980, 1px 2px 3px #302b26">
+<span aria-hidden="true" style="position:absolute;width:6px;height:6px;border-radius:50%;background:linear-gradient(130deg,#b2a085,#403a31);border:1px solid #3d362d;top:4px;left:4px">
+</span>
+<span aria-hidden="true" style="position:absolute;width:6px;height:6px;border-radius:50%;background:linear-gradient(130deg,#b2a085,#403a31);border:1px solid #3d362d;top:4px;right:4px">
+</span>
+<span aria-hidden="true" style="position:absolute;width:6px;height:6px;border-radius:50%;background:linear-gradient(130deg,#b2a085,#403a31);border:1px solid #3d362d;bottom:4px;left:4px">
+</span>
+<span aria-hidden="true" style="position:absolute;width:6px;height:6px;border-radius:50%;background:linear-gradient(130deg,#b2a085,#403a31);border:1px solid #3d362d;bottom:4px;right:4px">
+</span>
+<div style="text-align:center;color:#faf4df;font-weight:700;font-size:10px;letter-spacing:.09em;margin-bottom:8px">WINDOW HEAT</div>
+<div style="display:flex;justify-content:space-evenly;align-items:flex-start;gap:5px;margin:9px 0">
+<div style="display:flex;flex-direction:column;align-items:center;gap:4px;flex:0 1 60px;min-width:33px;text-align:center">
+<span style="font-size:8px;line-height:1.15;white-space:pre-line;min-height:10px">L SIDE</span>
+<button type="button" aria-label="L SIDE" style="position:relative;padding:0;width:35px;height:34px;border:2px solid #c5c7a6;border-radius:4px;background:#262822;box-shadow:0 3px 4px #372f27,inset 0 0 0 2px #171a17;color:#f6f2d9;cursor:default" tabindex="-1">
+<span style="display:block;font-size:7px;color:#676759">OFF</span>
+<span style="display:block;font-size:6px;margin-top:3px;color:#676759">
+</span>
+</button>
+</div>
+<div style="display:flex;flex-direction:column;align-items:center;gap:4px;flex:0 1 60px;min-width:33px;text-align:center">
+<span style="font-size:8px;line-height:1.15;white-space:pre-line;min-height:10px">L FWD</span>
+<button type="button" aria-label="L FWD" style="position:relative;padding:0;width:35px;height:34px;border:2px solid #c5c7a6;border-radius:4px;background:#262822;box-shadow:0 3px 4px #372f27,inset 0 0 0 2px #171a17;color:#f6f2d9;cursor:default" tabindex="-1">
+<span style="display:block;font-size:7px;color:#676759">OFF</span>
+<span style="display:block;font-size:6px;margin-top:3px;color:#676759">
+</span>
+</button>
+</div>
+<div style="display:flex;flex-direction:column;align-items:center;gap:4px;flex:0 1 60px;min-width:33px;text-align:center">
+<span style="font-size:8px;line-height:1.15;white-space:pre-line;min-height:10px">R FWD</span>
+<button type="button" aria-label="R FWD" style="position:relative;padding:0;width:35px;height:34px;border:2px solid #c5c7a6;border-radius:4px;background:#262822;box-shadow:0 3px 4px #372f27,inset 0 0 0 2px #171a17;color:#f6f2d9;cursor:default" tabindex="-1">
+<span style="display:block;font-size:7px;color:#676759">OFF</span>
+<span style="display:block;font-size:6px;margin-top:3px;color:#676759">
+</span>
+</button>
+</div>
+<div style="display:flex;flex-direction:column;align-items:center;gap:4px;flex:0 1 60px;min-width:33px;text-align:center">
+<span style="font-size:8px;line-height:1.15;white-space:pre-line;min-height:10px">R SIDE</span>
+<button type="button" aria-label="R SIDE" style="position:relative;padding:0;width:35px;height:34px;border:2px solid #c5c7a6;border-radius:4px;background:#262822;box-shadow:0 3px 4px #372f27,inset 0 0 0 2px #171a17;color:#f6f2d9;cursor:default" tabindex="-1">
+<span style="display:block;font-size:7px;color:#676759">OFF</span>
+<span style="display:block;font-size:6px;margin-top:3px;color:#676759">
+</span>
+</button>
+</div>
+</div>
+</section>
+<section aria-label="HYDRAULIC" style="position:relative;min-height:270px;padding:13px 9px 9px;background:linear-gradient(125deg,#81745f,#6d6051 78%);border:2px solid #453d32;border-radius:5px;box-shadow:inset 0 1px #ac9980, 1px 2px 3px #302b26">
+<span aria-hidden="true" style="position:absolute;width:6px;height:6px;border-radius:50%;background:linear-gradient(130deg,#b2a085,#403a31);border:1px solid #3d362d;top:4px;left:4px">
+</span>
+<span aria-hidden="true" style="position:absolute;width:6px;height:6px;border-radius:50%;background:linear-gradient(130deg,#b2a085,#403a31);border:1px solid #3d362d;top:4px;right:4px">
+</span>
+<span aria-hidden="true" style="position:absolute;width:6px;height:6px;border-radius:50%;background:linear-gradient(130deg,#b2a085,#403a31);border:1px solid #3d362d;bottom:4px;left:4px">
+</span>
+<span aria-hidden="true" style="position:absolute;width:6px;height:6px;border-radius:50%;background:linear-gradient(130deg,#b2a085,#403a31);border:1px solid #3d362d;bottom:4px;right:4px">
+</span>
+<div style="text-align:center;color:#faf4df;font-weight:700;font-size:10px;letter-spacing:.09em;margin-bottom:8px">HYDRAULIC</div>
+<div style="display:flex;justify-content:space-evenly;align-items:flex-start;gap:5px;margin:9px 0">
+<div style="display:flex;flex-direction:column;align-items:center;gap:4px;flex:0 1 60px;min-width:33px;text-align:center">
+<span style="font-size:8px;line-height:1.15;white-space:pre-line;min-height:10px">RAM AIR TURBINE</span>
+<button type="button" aria-label="RAM AIR TURBINE" style="position:relative;padding:0;width:35px;height:34px;border:2px solid #c5c7a6;border-radius:4px;background:linear-gradient(#9e2520,#4d1310);box-shadow:0 3px 4px #372f27,inset 0 0 0 2px #171a17;color:#f6f2d9;cursor:default" tabindex="-1">
+<span style="display:block;font-size:7px;color:#676759">OFF</span>
+<span style="display:block;font-size:6px;margin-top:3px;color:#676759">GUARD</span>
+</button>
+</div>
+</div>
+<div style="text-align:center;font-size:7px">PRIMARY</div>
+<div style="display:flex;justify-content:space-evenly;align-items:flex-start;gap:5px;margin:9px 0">
+<div style="display:flex;flex-direction:column;align-items:center;gap:4px;flex:0 1 60px;min-width:33px;text-align:center">
+<span style="font-size:8px;line-height:1.15;white-space:pre-line;min-height:10px">L ENG</span>
+<button type="button" aria-label="L ENG" style="position:relative;padding:0;width:35px;height:34px;border:2px solid #c5c7a6;border-radius:4px;background:#262822;box-shadow:0 3px 4px #372f27,inset 0 0 0 2px #171a17;color:#f6f2d9;cursor:default" tabindex="-1">
+<span style="display:block;font-size:7px;color:#676759">OFF</span>
+<span style="display:block;font-size:6px;margin-top:3px;color:#676759">
+</span>
+</button>
+</div>
+<div style="display:flex;flex-direction:column;align-items:center;gap:4px;flex:0 1 60px;min-width:33px;text-align:center">
+<span style="font-size:8px;line-height:1.15;white-space:pre-line;min-height:10px">C1 ELEC</span>
+<button type="button" aria-label="C1 ELEC" style="position:relative;padding:0;width:35px;height:34px;border:2px solid #c5c7a6;border-radius:4px;background:#262822;box-shadow:0 3px 4px #372f27,inset 0 0 0 2px #171a17;color:#f6f2d9;cursor:default" tabindex="-1">
+<span style="display:block;font-size:7px;color:#676759">OFF</span>
+<span style="display:block;font-size:6px;margin-top:3px;color:#676759">
+</span>
+</button>
+</div>
+<div style="display:flex;flex-direction:column;align-items:center;gap:4px;flex:0 1 60px;min-width:33px;text-align:center">
+<span style="font-size:8px;line-height:1.15;white-space:pre-line;min-height:10px">C2 ELEC</span>
+<button type="button" aria-label="C2 ELEC" style="position:relative;padding:0;width:35px;height:34px;border:2px solid #c5c7a6;border-radius:4px;background:#262822;box-shadow:0 3px 4px #372f27,inset 0 0 0 2px #171a17;color:#f6f2d9;cursor:default" tabindex="-1">
+<span style="display:block;font-size:7px;color:#676759">OFF</span>
+<span style="display:block;font-size:6px;margin-top:3px;color:#676759">
+</span>
+</button>
+</div>
+<div style="display:flex;flex-direction:column;align-items:center;gap:4px;flex:0 1 60px;min-width:33px;text-align:center">
+<span style="font-size:8px;line-height:1.15;white-space:pre-line;min-height:10px">R ENG</span>
+<button type="button" aria-label="R ENG" style="position:relative;padding:0;width:35px;height:34px;border:2px solid #c5c7a6;border-radius:4px;background:#262822;box-shadow:0 3px 4px #372f27,inset 0 0 0 2px #171a17;color:#f6f2d9;cursor:default" tabindex="-1">
+<span style="display:block;font-size:7px;color:#676759">OFF</span>
+<span style="display:block;font-size:6px;margin-top:3px;color:#676759">
+</span>
+</button>
+</div>
+</div>
+<div style="text-align:center;font-size:7px">DEMAND · OFF / AUTO / ON</div>
+<div style="display:flex;justify-content:space-evenly;align-items:flex-start;gap:5px;margin:9px 0">
+<div style="display:flex;flex-direction:column;align-items:center;gap:4px;flex:0 1 60px;min-width:33px;text-align:center">
+<span style="font-size:8px;line-height:1.15;white-space:pre-line;min-height:10px">L ELEC</span>
+<button type="button" aria-label="L ELEC" style="position:relative;padding:0;width:38px;height:38px;border:2px solid #bcae8c;border-radius:50%;background:radial-gradient(circle at 30% 20%,#e5d8b5,#9b8a66);box-shadow:0 3px 4px #372f27,inset 0 0 0 2px #171a17;color:#f6f2d9;cursor:default" tabindex="-1">
+<span aria-hidden="true" style="position:absolute;left:13px;top:1px;width:8px;height:29px;background:linear-gradient(90deg,#ac9d7c,#f0e2be,#c3b18c);border-radius:4px;transform:rotate(-28deg);box-shadow:2px 2px 3px #574a35">
+<span style="position:absolute;height:12px;width:2px;background:#302b24;left:3px;top:1px">
+</span>
+</span>
+</button>
+</div>
+<div style="display:flex;flex-direction:column;align-items:center;gap:4px;flex:0 1 60px;min-width:33px;text-align:center">
+<span style="font-size:8px;line-height:1.15;white-space:pre-line;min-height:10px">C1 AIR</span>
+<button type="button" aria-label="C1 AIR" style="position:relative;padding:0;width:38px;height:38px;border:2px solid #bcae8c;border-radius:50%;background:radial-gradient(circle at 30% 20%,#e5d8b5,#9b8a66);box-shadow:0 3px 4px #372f27,inset 0 0 0 2px #171a17;color:#f6f2d9;cursor:default" tabindex="-1">
+<span aria-hidden="true" style="position:absolute;left:13px;top:1px;width:8px;height:29px;background:linear-gradient(90deg,#ac9d7c,#f0e2be,#c3b18c);border-radius:4px;transform:rotate(-28deg);box-shadow:2px 2px 3px #574a35">
+<span style="position:absolute;height:12px;width:2px;background:#302b24;left:3px;top:1px">
+</span>
+</span>
+</button>
+</div>
+<div style="display:flex;flex-direction:column;align-items:center;gap:4px;flex:0 1 60px;min-width:33px;text-align:center">
+<span style="font-size:8px;line-height:1.15;white-space:pre-line;min-height:10px">C2 AIR</span>
+<button type="button" aria-label="C2 AIR" style="position:relative;padding:0;width:38px;height:38px;border:2px solid #bcae8c;border-radius:50%;background:radial-gradient(circle at 30% 20%,#e5d8b5,#9b8a66);box-shadow:0 3px 4px #372f27,inset 0 0 0 2px #171a17;color:#f6f2d9;cursor:default" tabindex="-1">
+<span aria-hidden="true" style="position:absolute;left:13px;top:1px;width:8px;height:29px;background:linear-gradient(90deg,#ac9d7c,#f0e2be,#c3b18c);border-radius:4px;transform:rotate(-28deg);box-shadow:2px 2px 3px #574a35">
+<span style="position:absolute;height:12px;width:2px;background:#302b24;left:3px;top:1px">
+</span>
+</span>
+</button>
+</div>
+<div style="display:flex;flex-direction:column;align-items:center;gap:4px;flex:0 1 60px;min-width:33px;text-align:center">
+<span style="font-size:8px;line-height:1.15;white-space:pre-line;min-height:10px">R ELEC</span>
+<button type="button" aria-label="R ELEC" style="position:relative;padding:0;width:38px;height:38px;border:2px solid #bcae8c;border-radius:50%;background:radial-gradient(circle at 30% 20%,#e5d8b5,#9b8a66);box-shadow:0 3px 4px #372f27,inset 0 0 0 2px #171a17;color:#f6f2d9;cursor:default" tabindex="-1">
+<span aria-hidden="true" style="position:absolute;left:13px;top:1px;width:8px;height:29px;background:linear-gradient(90deg,#ac9d7c,#f0e2be,#c3b18c);border-radius:4px;transform:rotate(-28deg);box-shadow:2px 2px 3px #574a35">
+<span style="position:absolute;height:12px;width:2px;background:#302b24;left:3px;top:1px">
+</span>
+</span>
+</button>
+</div>
+</div>
+</section>
+<section aria-label="PASS SIGNS" style="position:relative;min-height:108px;padding:13px 9px 9px;background:linear-gradient(125deg,#81745f,#6d6051 78%);border:2px solid #453d32;border-radius:5px;box-shadow:inset 0 1px #ac9980, 1px 2px 3px #302b26">
+<span aria-hidden="true" style="position:absolute;width:6px;height:6px;border-radius:50%;background:linear-gradient(130deg,#b2a085,#403a31);border:1px solid #3d362d;top:4px;left:4px">
+</span>
+<span aria-hidden="true" style="position:absolute;width:6px;height:6px;border-radius:50%;background:linear-gradient(130deg,#b2a085,#403a31);border:1px solid #3d362d;top:4px;right:4px">
+</span>
+<span aria-hidden="true" style="position:absolute;width:6px;height:6px;border-radius:50%;background:linear-gradient(130deg,#b2a085,#403a31);border:1px solid #3d362d;bottom:4px;left:4px">
+</span>
+<span aria-hidden="true" style="position:absolute;width:6px;height:6px;border-radius:50%;background:linear-gradient(130deg,#b2a085,#403a31);border:1px solid #3d362d;bottom:4px;right:4px">
+</span>
+<div style="text-align:center;color:#faf4df;font-weight:700;font-size:10px;letter-spacing:.09em;margin-bottom:8px">PASS SIGNS</div>
+<div style="display:flex;justify-content:space-evenly;align-items:flex-start;gap:5px;margin:9px 0">
+<div style="display:flex;flex-direction:column;align-items:center;gap:4px;flex:0 1 60px;min-width:33px;text-align:center">
+<span style="font-size:8px;line-height:1.15;white-space:pre-line;min-height:10px">NO SMOKING</span>
+<button type="button" aria-label="NO SMOKING" style="position:relative;padding:0;width:38px;height:38px;border:2px solid #bcae8c;border-radius:50%;background:radial-gradient(circle at 30% 20%,#e5d8b5,#9b8a66);box-shadow:0 3px 4px #372f27,inset 0 0 0 2px #171a17;color:#f6f2d9;cursor:pointer" tabindex="-1">
+<span aria-hidden="true" style="position:absolute;left:13px;top:1px;width:8px;height:29px;background:linear-gradient(90deg,#ac9d7c,#f0e2be,#c3b18c);border-radius:4px;transform:rotate(25deg);box-shadow:2px 2px 3px #574a35">
+<span style="position:absolute;height:12px;width:2px;background:#302b24;left:3px;top:1px">
+</span>
+</span>
+</button>
+<span style="font-size:7px;color:#ecdfb7;min-height:8px">ON</span>
+</div>
+<div style="display:flex;flex-direction:column;align-items:center;gap:4px;flex:0 1 60px;min-width:33px;text-align:center">
+<span style="font-size:8px;line-height:1.15;white-space:pre-line;min-height:10px">SEAT BELTS</span>
+<button type="button" aria-label="SEAT BELTS" style="position:relative;padding:0;width:38px;height:38px;border:2px solid #bcae8c;border-radius:50%;background:radial-gradient(circle at 30% 20%,#e5d8b5,#9b8a66);box-shadow:0 3px 4px #372f27,inset 0 0 0 2px #171a17;color:#f6f2d9;cursor:pointer" tabindex="-1">
+<span aria-hidden="true" style="position:absolute;left:13px;top:1px;width:8px;height:29px;background:linear-gradient(90deg,#ac9d7c,#f0e2be,#c3b18c);border-radius:4px;transform:rotate(25deg);box-shadow:2px 2px 3px #574a35">
+<span style="position:absolute;height:12px;width:2px;background:#302b24;left:3px;top:1px">
+</span>
+</span>
+</button>
+<span style="font-size:7px;color:#ecdfb7;min-height:8px">ON</span>
+</div>
+</div>
+</section>
+<section aria-label="FLIGHT DECK LIGHTING" style="position:relative;min-height:192px;padding:13px 9px 9px;background:linear-gradient(125deg,#81745f,#6d6051 78%);border:2px solid #453d32;border-radius:5px;box-shadow:inset 0 1px #ac9980, 1px 2px 3px #302b26">
+<span aria-hidden="true" style="position:absolute;width:6px;height:6px;border-radius:50%;background:linear-gradient(130deg,#b2a085,#403a31);border:1px solid #3d362d;top:4px;left:4px">
+</span>
+<span aria-hidden="true" style="position:absolute;width:6px;height:6px;border-radius:50%;background:linear-gradient(130deg,#b2a085,#403a31);border:1px solid #3d362d;top:4px;right:4px">
+</span>
+<span aria-hidden="true" style="position:absolute;width:6px;height:6px;border-radius:50%;background:linear-gradient(130deg,#b2a085,#403a31);border:1px solid #3d362d;bottom:4px;left:4px">
+</span>
+<span aria-hidden="true" style="position:absolute;width:6px;height:6px;border-radius:50%;background:linear-gradient(130deg,#b2a085,#403a31);border:1px solid #3d362d;bottom:4px;right:4px">
+</span>
+<div style="text-align:center;color:#faf4df;font-weight:700;font-size:10px;letter-spacing:.09em;margin-bottom:8px">FLIGHT DECK LIGHTING</div>
+<div style="display:flex;justify-content:space-evenly;align-items:flex-start;gap:5px;margin:9px 0">
+<div style="display:flex;flex-direction:column;align-items:center;gap:4px;flex:0 1 60px;min-width:33px;text-align:center">
+<span style="font-size:8px;line-height:1.15;white-space:pre-line;min-height:10px">OVHD / CB</span>
+<button type="button" aria-label="OVHD / CB" style="position:relative;padding:0;width:38px;height:38px;border:2px solid #bcae8c;border-radius:50%;background:radial-gradient(circle at 30% 20%,#e5d8b5,#9b8a66);box-shadow:0 3px 4px #372f27,inset 0 0 0 2px #171a17;color:#f6f2d9;cursor:default" tabindex="-1">
+<span aria-hidden="true" style="position:absolute;left:13px;top:1px;width:8px;height:29px;background:linear-gradient(90deg,#ac9d7c,#f0e2be,#c3b18c);border-radius:4px;transform:rotate(-28deg);box-shadow:2px 2px 3px #574a35">
+<span style="position:absolute;height:12px;width:2px;background:#302b24;left:3px;top:1px">
+</span>
+</span>
+</button>
+</div>
+<div style="display:flex;flex-direction:column;align-items:center;gap:4px;flex:0 1 60px;min-width:33px;text-align:center">
+<span style="font-size:8px;line-height:1.15;white-space:pre-line;min-height:10px">DOME</span>
+<button type="button" aria-label="DOME" style="position:relative;padding:0;width:38px;height:38px;border:2px solid #bcae8c;border-radius:50%;background:radial-gradient(circle at 30% 20%,#e5d8b5,#9b8a66);box-shadow:0 3px 4px #372f27,inset 0 0 0 2px #171a17;color:#f6f2d9;cursor:default" tabindex="-1">
+<span aria-hidden="true" style="position:absolute;left:13px;top:1px;width:8px;height:29px;background:linear-gradient(90deg,#ac9d7c,#f0e2be,#c3b18c);border-radius:4px;transform:rotate(-28deg);box-shadow:2px 2px 3px #574a35">
+<span style="position:absolute;height:12px;width:2px;background:#302b24;left:3px;top:1px">
+</span>
+</span>
+</button>
+</div>
+</div>
+<div style="display:flex;justify-content:space-evenly;align-items:flex-start;gap:5px;margin:9px 0">
+<div style="display:flex;flex-direction:column;align-items:center;gap:4px;flex:0 1 60px;min-width:33px;text-align:center">
+<span style="font-size:8px;line-height:1.15;white-space:pre-line;min-height:10px">STORM</span>
+<button type="button" aria-label="STORM" style="position:relative;padding:0;width:35px;height:34px;border:2px solid #c5c7a6;border-radius:4px;background:#262822;box-shadow:0 3px 4px #372f27,inset 0 0 0 2px #171a17;color:#f6f2d9;cursor:default" tabindex="-1">
+<span style="display:block;font-size:7px;color:#676759">OFF</span>
+<span style="display:block;font-size:6px;margin-top:3px;color:#676759">
+</span>
+</button>
+</div>
+<div style="display:flex;flex-direction:column;align-items:center;gap:4px;flex:0 1 60px;min-width:33px;text-align:center">
+<span style="font-size:8px;line-height:1.15;white-space:pre-line;min-height:10px">MASTER BRIGHT</span>
+<button type="button" aria-label="MASTER BRIGHT" style="position:relative;padding:0;width:38px;height:38px;border:2px solid #bcae8c;border-radius:50%;background:radial-gradient(circle at 30% 20%,#e5d8b5,#9b8a66);box-shadow:0 3px 4px #372f27,inset 0 0 0 2px #171a17;color:#f6f2d9;cursor:default" tabindex="-1">
+<span aria-hidden="true" style="position:absolute;left:13px;top:1px;width:8px;height:29px;background:linear-gradient(90deg,#ac9d7c,#f0e2be,#c3b18c);border-radius:4px;transform:rotate(-28deg);box-shadow:2px 2px 3px #574a35">
+<span style="position:absolute;height:12px;width:2px;background:#302b24;left:3px;top:1px">
+</span>
+</span>
+</button>
+</div>
+</div>
+</section>
+<section aria-label="LANDING" style="position:relative;min-height:105px;padding:13px 9px 9px;background:linear-gradient(125deg,#81745f,#6d6051 78%);border:2px solid #453d32;border-radius:5px;box-shadow:inset 0 1px #ac9980, 1px 2px 3px #302b26">
+<span aria-hidden="true" style="position:absolute;width:6px;height:6px;border-radius:50%;background:linear-gradient(130deg,#b2a085,#403a31);border:1px solid #3d362d;top:4px;left:4px">
+</span>
+<span aria-hidden="true" style="position:absolute;width:6px;height:6px;border-radius:50%;background:linear-gradient(130deg,#b2a085,#403a31);border:1px solid #3d362d;top:4px;right:4px">
+</span>
+<span aria-hidden="true" style="position:absolute;width:6px;height:6px;border-radius:50%;background:linear-gradient(130deg,#b2a085,#403a31);border:1px solid #3d362d;bottom:4px;left:4px">
+</span>
+<span aria-hidden="true" style="position:absolute;width:6px;height:6px;border-radius:50%;background:linear-gradient(130deg,#b2a085,#403a31);border:1px solid #3d362d;bottom:4px;right:4px">
+</span>
+<div style="text-align:center;color:#faf4df;font-weight:700;font-size:10px;letter-spacing:.09em;margin-bottom:8px">LANDING</div>
+<div style="display:flex;justify-content:space-evenly;align-items:flex-start;gap:5px;margin:9px 0">
+<div style="display:flex;flex-direction:column;align-items:center;gap:4px;flex:0 1 60px;min-width:33px;text-align:center">
+<span style="font-size:8px;line-height:1.15;white-space:pre-line;min-height:10px">L / NOSE / R</span>
+<button type="button" aria-label="L / NOSE / R" style="position:relative;padding:0;width:35px;height:34px;border:2px solid #c5c7a6;border-radius:4px;background:#262822;box-shadow:0 3px 4px #372f27,inset 0 0 0 2px #171a17;color:#f6f2d9;cursor:pointer" tabindex="-1">
+<span aria-hidden="true" style="position:absolute;top:14px;left:13px;width:8px;height:20px;background:linear-gradient(90deg,#777,#eee,#aaa);border-radius:5px;box-shadow:2px 3px 3px #111">
+</span>
+</button>
+<span style="font-size:7px;color:#ecdfb7;min-height:8px">OFF</span>
+</div>
+<div style="display:flex;flex-direction:column;align-items:center;gap:4px;flex:0 1 60px;min-width:33px;text-align:center">
+<span style="font-size:8px;line-height:1.15;white-space:pre-line;min-height:10px">GLARESHIELD</span>
+<button type="button" aria-label="GLARESHIELD" style="position:relative;padding:0;width:38px;height:38px;border:2px solid #bcae8c;border-radius:50%;background:radial-gradient(circle at 30% 20%,#e5d8b5,#9b8a66);box-shadow:0 3px 4px #372f27,inset 0 0 0 2px #171a17;color:#f6f2d9;cursor:default" tabindex="-1">
+<span aria-hidden="true" style="position:absolute;left:13px;top:1px;width:8px;height:29px;background:linear-gradient(90deg,#ac9d7c,#f0e2be,#c3b18c);border-radius:4px;transform:rotate(-28deg);box-shadow:2px 2px 3px #574a35">
+<span style="position:absolute;height:12px;width:2px;background:#302b24;left:3px;top:1px">
+</span>
+</span>
+</button>
+</div>
+</div>
+</section>
+</div>
+<div style="display:flex;flex-direction:column;gap:5px">
+<section aria-label="CARGO FIRE" style="position:relative;min-height:115px;padding:13px 9px 9px;background:linear-gradient(125deg,#81745f,#6d6051 78%);border:2px solid #453d32;border-radius:5px;box-shadow:inset 0 1px #ac9980, 1px 2px 3px #302b26">
+<span aria-hidden="true" style="position:absolute;width:6px;height:6px;border-radius:50%;background:linear-gradient(130deg,#b2a085,#403a31);border:1px solid #3d362d;top:4px;left:4px">
+</span>
+<span aria-hidden="true" style="position:absolute;width:6px;height:6px;border-radius:50%;background:linear-gradient(130deg,#b2a085,#403a31);border:1px solid #3d362d;top:4px;right:4px">
+</span>
+<span aria-hidden="true" style="position:absolute;width:6px;height:6px;border-radius:50%;background:linear-gradient(130deg,#b2a085,#403a31);border:1px solid #3d362d;bottom:4px;left:4px">
+</span>
+<span aria-hidden="true" style="position:absolute;width:6px;height:6px;border-radius:50%;background:linear-gradient(130deg,#b2a085,#403a31);border:1px solid #3d362d;bottom:4px;right:4px">
+</span>
+<div style="text-align:center;color:#faf4df;font-weight:700;font-size:10px;letter-spacing:.09em;margin-bottom:8px">CARGO FIRE</div>
+<div style="display:flex;justify-content:space-evenly;align-items:flex-start;gap:5px;margin:9px 0">
+<div style="display:flex;flex-direction:column;align-items:center;gap:4px;flex:0 1 60px;min-width:33px;text-align:center">
+<span style="font-size:8px;line-height:1.15;white-space:pre-line;min-height:10px">FWD ARM</span>
+<button type="button" aria-label="FWD ARM" style="position:relative;padding:0;width:35px;height:34px;border:2px solid #c5c7a6;border-radius:4px;background:linear-gradient(#9e2520,#4d1310);box-shadow:0 3px 4px #372f27,inset 0 0 0 2px #171a17;color:#f6f2d9;cursor:default" tabindex="-1">
+<span style="display:block;font-size:7px;color:#676759">OFF</span>
+<span style="display:block;font-size:6px;margin-top:3px;color:#676759">GUARD</span>
+</button>
+</div>
+<div style="display:flex;flex-direction:column;align-items:center;gap:4px;flex:0 1 60px;min-width:33px;text-align:center">
+<span style="font-size:8px;line-height:1.15;white-space:pre-line;min-height:10px">AFT ARM</span>
+<button type="button" aria-label="AFT ARM" style="position:relative;padding:0;width:35px;height:34px;border:2px solid #c5c7a6;border-radius:4px;background:linear-gradient(#9e2520,#4d1310);box-shadow:0 3px 4px #372f27,inset 0 0 0 2px #171a17;color:#f6f2d9;cursor:default" tabindex="-1">
+<span style="display:block;font-size:7px;color:#676759">OFF</span>
+<span style="display:block;font-size:6px;margin-top:3px;color:#676759">GUARD</span>
+</button>
+</div>
+<div style="display:flex;flex-direction:column;align-items:center;gap:4px;flex:0 1 60px;min-width:33px;text-align:center">
+<span style="font-size:8px;line-height:1.15;white-space:pre-line;min-height:10px">DISCH</span>
+<button type="button" aria-label="DISCH" style="position:relative;padding:0;width:35px;height:34px;border:2px solid #c5c7a6;border-radius:4px;background:linear-gradient(#9e2520,#4d1310);box-shadow:0 3px 4px #372f27,inset 0 0 0 2px #171a17;color:#f6f2d9;cursor:default" tabindex="-1">
+<span style="display:block;font-size:7px;color:#676759">OFF</span>
+<span style="display:block;font-size:6px;margin-top:3px;color:#676759">GUARD</span>
+</button>
+</div>
+</div>
+</section>
+<section aria-label="ENGINE START / IGNITION" style="position:relative;min-height:155px;padding:13px 9px 9px;background:linear-gradient(125deg,#81745f,#6d6051 78%);border:2px solid #453d32;border-radius:5px;box-shadow:inset 0 1px #ac9980, 1px 2px 3px #302b26">
+<span aria-hidden="true" style="position:absolute;width:6px;height:6px;border-radius:50%;background:linear-gradient(130deg,#b2a085,#403a31);border:1px solid #3d362d;top:4px;left:4px">
+</span>
+<span aria-hidden="true" style="position:absolute;width:6px;height:6px;border-radius:50%;background:linear-gradient(130deg,#b2a085,#403a31);border:1px solid #3d362d;top:4px;right:4px">
+</span>
+<span aria-hidden="true" style="position:absolute;width:6px;height:6px;border-radius:50%;background:linear-gradient(130deg,#b2a085,#403a31);border:1px solid #3d362d;bottom:4px;left:4px">
+</span>
+<span aria-hidden="true" style="position:absolute;width:6px;height:6px;border-radius:50%;background:linear-gradient(130deg,#b2a085,#403a31);border:1px solid #3d362d;bottom:4px;right:4px">
+</span>
+<div style="text-align:center;color:#faf4df;font-weight:700;font-size:10px;letter-spacing:.09em;margin-bottom:8px">ENGINE START / IGNITION</div>
+<div style="display:flex;justify-content:space-evenly;align-items:flex-start;gap:5px;margin:9px 0">
+<div style="display:flex;flex-direction:column;align-items:center;gap:4px;flex:0 1 60px;min-width:33px;text-align:center">
+<span style="font-size:8px;line-height:1.15;white-space:pre-line;min-height:10px">L EEC MODE</span>
+<button type="button" aria-label="L EEC MODE" style="position:relative;padding:0;width:35px;height:34px;border:2px solid #c5c7a6;border-radius:4px;background:#262822;box-shadow:0 3px 4px #372f27,inset 0 0 0 2px #171a17;color:#f6f2d9;cursor:default" tabindex="-1">
+<span style="display:block;font-size:7px;color:#676759">OFF</span>
+<span style="display:block;font-size:6px;margin-top:3px;color:#676759">
+</span>
+</button>
+</div>
+<div style="display:flex;flex-direction:column;align-items:center;gap:4px;flex:0 1 60px;min-width:33px;text-align:center">
+<span style="font-size:8px;line-height:1.15;white-space:pre-line;min-height:10px">AUTOSTART</span>
+<button type="button" aria-label="AUTOSTART" style="position:relative;padding:0;width:35px;height:34px;border:2px solid #c5c7a6;border-radius:4px;background:#262822;box-shadow:0 3px 4px #372f27,inset 0 0 0 2px #171a17;color:#f6f2d9;cursor:default" tabindex="-1">
+<span style="display:block;font-size:7px;color:#676759">OFF</span>
+<span style="display:block;font-size:6px;margin-top:3px;color:#676759">
+</span>
+</button>
+</div>
+<div style="display:flex;flex-direction:column;align-items:center;gap:4px;flex:0 1 60px;min-width:33px;text-align:center">
+<span style="font-size:8px;line-height:1.15;white-space:pre-line;min-height:10px">R EEC MODE</span>
+<button type="button" aria-label="R EEC MODE" style="position:relative;padding:0;width:35px;height:34px;border:2px solid #c5c7a6;border-radius:4px;background:#262822;box-shadow:0 3px 4px #372f27,inset 0 0 0 2px #171a17;color:#f6f2d9;cursor:default" tabindex="-1">
+<span style="display:block;font-size:7px;color:#676759">OFF</span>
+<span style="display:block;font-size:6px;margin-top:3px;color:#676759">
+</span>
+</button>
+</div>
+</div>
+<div style="display:flex;justify-content:space-evenly;align-items:flex-start;gap:5px;margin:9px 0">
+<div style="display:flex;flex-direction:column;align-items:center;gap:4px;flex:0 1 60px;min-width:33px;text-align:center">
+<span style="font-size:8px;line-height:1.15;white-space:pre-line;min-height:10px">L START</span>
+<button type="button" aria-label="L START" style="position:relative;padding:0;width:38px;height:38px;border:2px solid #bcae8c;border-radius:50%;background:radial-gradient(circle at 30% 20%,#e5d8b5,#9b8a66);box-shadow:0 3px 4px #372f27,inset 0 0 0 2px #171a17;color:#f6f2d9;cursor:pointer" tabindex="-1">
+<span aria-hidden="true" style="position:absolute;left:13px;top:1px;width:8px;height:29px;background:linear-gradient(90deg,#ac9d7c,#f0e2be,#c3b18c);border-radius:4px;transform:rotate(-28deg);box-shadow:2px 2px 3px #574a35">
+<span style="position:absolute;height:12px;width:2px;background:#302b24;left:3px;top:1px">
+</span>
+</span>
+</button>
+<span style="font-size:7px;color:#ecdfb7;min-height:8px">NORM</span>
+</div>
+<div style="display:flex;flex-direction:column;align-items:center;gap:4px;flex:0 1 60px;min-width:33px;text-align:center">
+<span style="font-size:8px;line-height:1.15;white-space:pre-line;min-height:10px">R START</span>
+<button type="button" aria-label="R START" style="position:relative;padding:0;width:38px;height:38px;border:2px solid #bcae8c;border-radius:50%;background:radial-gradient(circle at 30% 20%,#e5d8b5,#9b8a66);box-shadow:0 3px 4px #372f27,inset 0 0 0 2px #171a17;color:#f6f2d9;cursor:pointer" tabindex="-1">
+<span aria-hidden="true" style="position:absolute;left:13px;top:1px;width:8px;height:29px;background:linear-gradient(90deg,#ac9d7c,#f0e2be,#c3b18c);border-radius:4px;transform:rotate(-28deg);box-shadow:2px 2px 3px #574a35">
+<span style="position:absolute;height:12px;width:2px;background:#302b24;left:3px;top:1px">
+</span>
+</span>
+</button>
+<span style="font-size:7px;color:#ecdfb7;min-height:8px">NORM</span>
+</div>
+</div>
+</section>
+<section aria-label="FUEL JETTISON" style="position:relative;min-height:110px;padding:13px 9px 9px;background:linear-gradient(125deg,#81745f,#6d6051 78%);border:2px solid #453d32;border-radius:5px;box-shadow:inset 0 1px #ac9980, 1px 2px 3px #302b26">
+<span aria-hidden="true" style="position:absolute;width:6px;height:6px;border-radius:50%;background:linear-gradient(130deg,#b2a085,#403a31);border:1px solid #3d362d;top:4px;left:4px">
+</span>
+<span aria-hidden="true" style="position:absolute;width:6px;height:6px;border-radius:50%;background:linear-gradient(130deg,#b2a085,#403a31);border:1px solid #3d362d;top:4px;right:4px">
+</span>
+<span aria-hidden="true" style="position:absolute;width:6px;height:6px;border-radius:50%;background:linear-gradient(130deg,#b2a085,#403a31);border:1px solid #3d362d;bottom:4px;left:4px">
+</span>
+<span aria-hidden="true" style="position:absolute;width:6px;height:6px;border-radius:50%;background:linear-gradient(130deg,#b2a085,#403a31);border:1px solid #3d362d;bottom:4px;right:4px">
+</span>
+<div style="text-align:center;color:#faf4df;font-weight:700;font-size:10px;letter-spacing:.09em;margin-bottom:8px">FUEL JETTISON</div>
+<div style="display:flex;justify-content:space-evenly;align-items:flex-start;gap:5px;margin:9px 0">
+<div style="display:flex;flex-direction:column;align-items:center;gap:4px;flex:0 1 60px;min-width:33px;text-align:center">
+<span style="font-size:8px;line-height:1.15;white-space:pre-line;min-height:10px">L NOZZLE</span>
+<button type="button" aria-label="L NOZZLE" style="position:relative;padding:0;width:35px;height:34px;border:2px solid #c5c7a6;border-radius:4px;background:#262822;box-shadow:0 3px 4px #372f27,inset 0 0 0 2px #171a17;color:#f6f2d9;cursor:default" tabindex="-1">
+<span style="display:block;font-size:7px;color:#676759">OFF</span>
+<span style="display:block;font-size:6px;margin-top:3px;color:#676759">
+</span>
+</button>
+</div>
+<div style="display:flex;flex-direction:column;align-items:center;gap:4px;flex:0 1 60px;min-width:33px;text-align:center">
+<span style="font-size:8px;line-height:1.15;white-space:pre-line;min-height:10px">FUEL TO REMAIN</span>
+<button type="button" aria-label="FUEL TO REMAIN" style="position:relative;padding:0;width:38px;height:38px;border:2px solid #bcae8c;border-radius:50%;background:radial-gradient(circle at 30% 20%,#e5d8b5,#9b8a66);box-shadow:0 3px 4px #372f27,inset 0 0 0 2px #171a17;color:#f6f2d9;cursor:default" tabindex="-1">
+<span aria-hidden="true" style="position:absolute;left:13px;top:1px;width:8px;height:29px;background:linear-gradient(90deg,#ac9d7c,#f0e2be,#c3b18c);border-radius:4px;transform:rotate(-28deg);box-shadow:2px 2px 3px #574a35">
+<span style="position:absolute;height:12px;width:2px;background:#302b24;left:3px;top:1px">
+</span>
+</span>
+</button>
+</div>
+<div style="display:flex;flex-direction:column;align-items:center;gap:4px;flex:0 1 60px;min-width:33px;text-align:center">
+<span style="font-size:8px;line-height:1.15;white-space:pre-line;min-height:10px">R NOZZLE</span>
+<button type="button" aria-label="R NOZZLE" style="position:relative;padding:0;width:35px;height:34px;border:2px solid #c5c7a6;border-radius:4px;background:#262822;box-shadow:0 3px 4px #372f27,inset 0 0 0 2px #171a17;color:#f6f2d9;cursor:default" tabindex="-1">
+<span style="display:block;font-size:7px;color:#676759">OFF</span>
+<span style="display:block;font-size:6px;margin-top:3px;color:#676759">
+</span>
+</button>
+</div>
+<div style="display:flex;flex-direction:column;align-items:center;gap:4px;flex:0 1 60px;min-width:33px;text-align:center">
+<span style="font-size:8px;line-height:1.15;white-space:pre-line;min-height:10px">ARM</span>
+<button type="button" aria-label="ARM" style="position:relative;padding:0;width:35px;height:34px;border:2px solid #c5c7a6;border-radius:4px;background:linear-gradient(#9e2520,#4d1310);box-shadow:0 3px 4px #372f27,inset 0 0 0 2px #171a17;color:#f6f2d9;cursor:default" tabindex="-1">
+<span style="display:block;font-size:7px;color:#676759">OFF</span>
+<span style="display:block;font-size:6px;margin-top:3px;color:#676759">GUARD</span>
+</button>
+</div>
+</div>
+</section>
+<section aria-label="FUEL" style="position:relative;min-height:258px;padding:13px 9px 9px;background:linear-gradient(125deg,#81745f,#6d6051 78%);border:2px solid #453d32;border-radius:5px;box-shadow:inset 0 1px #ac9980, 1px 2px 3px #302b26">
+<span aria-hidden="true" style="position:absolute;width:6px;height:6px;border-radius:50%;background:linear-gradient(130deg,#b2a085,#403a31);border:1px solid #3d362d;top:4px;left:4px">
+</span>
+<span aria-hidden="true" style="position:absolute;width:6px;height:6px;border-radius:50%;background:linear-gradient(130deg,#b2a085,#403a31);border:1px solid #3d362d;top:4px;right:4px">
+</span>
+<span aria-hidden="true" style="position:absolute;width:6px;height:6px;border-radius:50%;background:linear-gradient(130deg,#b2a085,#403a31);border:1px solid #3d362d;bottom:4px;left:4px">
+</span>
+<span aria-hidden="true" style="position:absolute;width:6px;height:6px;border-radius:50%;background:linear-gradient(130deg,#b2a085,#403a31);border:1px solid #3d362d;bottom:4px;right:4px">
+</span>
+<div style="text-align:center;color:#faf4df;font-weight:700;font-size:10px;letter-spacing:.09em;margin-bottom:8px">FUEL</div>
+<div style="position:relative">
+<svg aria-hidden="true" viewBox="0 0 190 165" preserveAspectRatio="none" style="position:absolute;width:100%;height:166px;pointer-events:none;opacity:0.65">
+<path d="M28 45H160 M28 45V128H77V150 M160 45V128H117V150 M95 45V90 M28 80H160" fill="none" stroke="#dce5bd" stroke-width="3">
+</path>
+<path d="M28 45H160 M28 45V128H77V150 M160 45V128H117V150 M95 45V90 M28 80H160" fill="none" stroke="#776c56" stroke-width="1">
+</path>
+</svg>
+<div style="display:flex;justify-content:space-evenly;align-items:flex-start;gap:5px;margin:9px 0;position:relative">
+<div style="display:flex;flex-direction:column;align-items:center;gap:4px;flex:0 1 60px;min-width:33px;text-align:center">
+<span style="font-size:8px;line-height:1.15;white-space:pre-line;min-height:10px">L FWD</span>
+<button type="button" aria-label="L FWD" style="position:relative;padding:0;width:35px;height:34px;border:2px solid #c5c7a6;border-radius:4px;background:#262822;box-shadow:0 3px 4px #372f27,inset 0 0 0 2px #171a17;color:#f6f2d9;cursor:pointer" tabindex="-1">
+<span style="display:block;font-size:7px;color:#c2fac4">ON</span>
+<span style="display:block;font-size:6px;margin-top:3px;color:#676759">
+</span>
+</button>
+<span style="font-size:7px;color:#ecdfb7;min-height:8px">ON</span>
+</div>
+<div style="display:flex;flex-direction:column;align-items:center;gap:4px;flex:0 1 60px;min-width:33px;text-align:center">
+<span style="font-size:8px;line-height:1.15;white-space:pre-line;min-height:10px">XFEED FWD</span>
+<button type="button" aria-label="XFEED FWD" style="position:relative;padding:0;width:35px;height:34px;border:2px solid #c5c7a6;border-radius:4px;background:#262822;box-shadow:0 3px 4px #372f27,inset 0 0 0 2px #171a17;color:#f6f2d9;cursor:pointer" tabindex="-1">
+<span style="display:block;font-size:7px;color:#676759">OFF</span>
+<span style="display:block;font-size:6px;margin-top:3px;color:#676759">
+</span>
+</button>
+<span style="font-size:7px;color:#ecdfb7;min-height:8px">OFF</span>
+</div>
+<div style="display:flex;flex-direction:column;align-items:center;gap:4px;flex:0 1 60px;min-width:33px;text-align:center">
+<span style="font-size:8px;line-height:1.15;white-space:pre-line;min-height:10px">R FWD</span>
+<button type="button" aria-label="R FWD" style="position:relative;padding:0;width:35px;height:34px;border:2px solid #c5c7a6;border-radius:4px;background:#262822;box-shadow:0 3px 4px #372f27,inset 0 0 0 2px #171a17;color:#f6f2d9;cursor:pointer" tabindex="-1">
+<span style="display:block;font-size:7px;color:#c2fac4">ON</span>
+<span style="display:block;font-size:6px;margin-top:3px;color:#676759">
+</span>
+</button>
+<span style="font-size:7px;color:#ecdfb7;min-height:8px">ON</span>
+</div>
+</div>
+<div style="display:flex;justify-content:space-evenly;align-items:flex-start;gap:5px;margin:9px 0;position:relative">
+<div style="display:flex;flex-direction:column;align-items:center;gap:4px;flex:0 1 60px;min-width:33px;text-align:center">
+<span style="font-size:8px;line-height:1.15;white-space:pre-line;min-height:10px">L AFT</span>
+<button type="button" aria-label="L AFT" style="position:relative;padding:0;width:35px;height:34px;border:2px solid #c5c7a6;border-radius:4px;background:#262822;box-shadow:0 3px 4px #372f27,inset 0 0 0 2px #171a17;color:#f6f2d9;cursor:pointer" tabindex="-1">
+<span style="display:block;font-size:7px;color:#c2fac4">ON</span>
+<span style="display:block;font-size:6px;margin-top:3px;color:#676759">
+</span>
+</button>
+<span style="font-size:7px;color:#ecdfb7;min-height:8px">ON</span>
+</div>
+<div style="display:flex;flex-direction:column;align-items:center;gap:4px;flex:0 1 60px;min-width:33px;text-align:center">
+<span style="font-size:8px;line-height:1.15;white-space:pre-line;min-height:10px">XFEED AFT</span>
+<button type="button" aria-label="XFEED AFT" style="position:relative;padding:0;width:35px;height:34px;border:2px solid #c5c7a6;border-radius:4px;background:#262822;box-shadow:0 3px 4px #372f27,inset 0 0 0 2px #171a17;color:#f6f2d9;cursor:default" tabindex="-1">
+<span style="display:block;font-size:7px;color:#676759">OFF</span>
+<span style="display:block;font-size:6px;margin-top:3px;color:#676759">
+</span>
+</button>
+</div>
+<div style="display:flex;flex-direction:column;align-items:center;gap:4px;flex:0 1 60px;min-width:33px;text-align:center">
+<span style="font-size:8px;line-height:1.15;white-space:pre-line;min-height:10px">R AFT</span>
+<button type="button" aria-label="R AFT" style="position:relative;padding:0;width:35px;height:34px;border:2px solid #c5c7a6;border-radius:4px;background:#262822;box-shadow:0 3px 4px #372f27,inset 0 0 0 2px #171a17;color:#f6f2d9;cursor:pointer" tabindex="-1">
+<span style="display:block;font-size:7px;color:#c2fac4">ON</span>
+<span style="display:block;font-size:6px;margin-top:3px;color:#676759">
+</span>
+</button>
+<span style="font-size:7px;color:#ecdfb7;min-height:8px">ON</span>
+</div>
+</div>
+<div style="display:flex;justify-content:space-evenly;align-items:flex-start;gap:5px;margin:9px 0;position:relative">
+<div style="display:flex;flex-direction:column;align-items:center;gap:4px;flex:0 1 60px;min-width:33px;text-align:center">
+<span style="font-size:8px;line-height:1.15;white-space:pre-line;min-height:10px">CTR L</span>
+<button type="button" aria-label="CTR L" style="position:relative;padding:0;width:35px;height:34px;border:2px solid #c5c7a6;border-radius:4px;background:#262822;box-shadow:0 3px 4px #372f27,inset 0 0 0 2px #171a17;color:#f6f2d9;cursor:pointer" tabindex="-1">
+<span style="display:block;font-size:7px;color:#676759">OFF</span>
+<span style="display:block;font-size:6px;margin-top:3px;color:#676759">
+</span>
+</button>
+<span style="font-size:7px;color:#ecdfb7;min-height:8px">OFF</span>
+</div>
+<div style="display:flex;flex-direction:column;align-items:center;gap:4px;flex:0 1 60px;min-width:33px;text-align:center">
+<span style="font-size:8px;line-height:1.15;white-space:pre-line;min-height:10px">CTR R</span>
+<button type="button" aria-label="CTR R" style="position:relative;padding:0;width:35px;height:34px;border:2px solid #c5c7a6;border-radius:4px;background:#262822;box-shadow:0 3px 4px #372f27,inset 0 0 0 2px #171a17;color:#f6f2d9;cursor:pointer" tabindex="-1">
+<span style="display:block;font-size:7px;color:#676759">OFF</span>
+<span style="display:block;font-size:6px;margin-top:3px;color:#676759">
+</span>
+</button>
+<span style="font-size:7px;color:#ecdfb7;min-height:8px">OFF</span>
+</div>
+</div>
+</div>
+</section>
+<section aria-label="ANTI-ICE" style="position:relative;min-height:108px;padding:13px 9px 9px;background:linear-gradient(125deg,#81745f,#6d6051 78%);border:2px solid #453d32;border-radius:5px;box-shadow:inset 0 1px #ac9980, 1px 2px 3px #302b26">
+<span aria-hidden="true" style="position:absolute;width:6px;height:6px;border-radius:50%;background:linear-gradient(130deg,#b2a085,#403a31);border:1px solid #3d362d;top:4px;left:4px">
+</span>
+<span aria-hidden="true" style="position:absolute;width:6px;height:6px;border-radius:50%;background:linear-gradient(130deg,#b2a085,#403a31);border:1px solid #3d362d;top:4px;right:4px">
+</span>
+<span aria-hidden="true" style="position:absolute;width:6px;height:6px;border-radius:50%;background:linear-gradient(130deg,#b2a085,#403a31);border:1px solid #3d362d;bottom:4px;left:4px">
+</span>
+<span aria-hidden="true" style="position:absolute;width:6px;height:6px;border-radius:50%;background:linear-gradient(130deg,#b2a085,#403a31);border:1px solid #3d362d;bottom:4px;right:4px">
+</span>
+<div style="text-align:center;color:#faf4df;font-weight:700;font-size:10px;letter-spacing:.09em;margin-bottom:8px">ANTI-ICE</div>
+<div style="display:flex;justify-content:space-evenly;align-items:flex-start;gap:5px;margin:9px 0">
+<div style="display:flex;flex-direction:column;align-items:center;gap:4px;flex:0 1 60px;min-width:33px;text-align:center">
+<span style="font-size:8px;line-height:1.15;white-space:pre-line;min-height:10px">WING</span>
+<button type="button" aria-label="WING" style="position:relative;padding:0;width:38px;height:38px;border:2px solid #bcae8c;border-radius:50%;background:radial-gradient(circle at 30% 20%,#e5d8b5,#9b8a66);box-shadow:0 3px 4px #372f27,inset 0 0 0 2px #171a17;color:#f6f2d9;cursor:pointer" tabindex="-1">
+<span aria-hidden="true" style="position:absolute;left:13px;top:1px;width:8px;height:29px;background:linear-gradient(90deg,#ac9d7c,#f0e2be,#c3b18c);border-radius:4px;transform:rotate(-28deg);box-shadow:2px 2px 3px #574a35">
+<span style="position:absolute;height:12px;width:2px;background:#302b24;left:3px;top:1px">
+</span>
+</span>
+</button>
+<span style="font-size:7px;color:#ecdfb7;min-height:8px">OFF</span>
+</div>
+<div style="display:flex;flex-direction:column;align-items:center;gap:4px;flex:0 1 60px;min-width:33px;text-align:center">
+<span style="font-size:8px;line-height:1.15;white-space:pre-line;min-height:10px">L ENGINE</span>
+<button type="button" aria-label="L ENGINE" style="position:relative;padding:0;width:38px;height:38px;border:2px solid #bcae8c;border-radius:50%;background:radial-gradient(circle at 30% 20%,#e5d8b5,#9b8a66);box-shadow:0 3px 4px #372f27,inset 0 0 0 2px #171a17;color:#f6f2d9;cursor:pointer" tabindex="-1">
+<span aria-hidden="true" style="position:absolute;left:13px;top:1px;width:8px;height:29px;background:linear-gradient(90deg,#ac9d7c,#f0e2be,#c3b18c);border-radius:4px;transform:rotate(-28deg);box-shadow:2px 2px 3px #574a35">
+<span style="position:absolute;height:12px;width:2px;background:#302b24;left:3px;top:1px">
+</span>
+</span>
+</button>
+<span style="font-size:7px;color:#ecdfb7;min-height:8px">OFF</span>
+</div>
+<div style="display:flex;flex-direction:column;align-items:center;gap:4px;flex:0 1 60px;min-width:33px;text-align:center">
+<span style="font-size:8px;line-height:1.15;white-space:pre-line;min-height:10px">R ENGINE</span>
+<button type="button" aria-label="R ENGINE" style="position:relative;padding:0;width:38px;height:38px;border:2px solid #bcae8c;border-radius:50%;background:radial-gradient(circle at 30% 20%,#e5d8b5,#9b8a66);box-shadow:0 3px 4px #372f27,inset 0 0 0 2px #171a17;color:#f6f2d9;cursor:pointer" tabindex="-1">
+<span aria-hidden="true" style="position:absolute;left:13px;top:1px;width:8px;height:29px;background:linear-gradient(90deg,#ac9d7c,#f0e2be,#c3b18c);border-radius:4px;transform:rotate(-28deg);box-shadow:2px 2px 3px #574a35">
+<span style="position:absolute;height:12px;width:2px;background:#302b24;left:3px;top:1px">
+</span>
+</span>
+</button>
+<span style="font-size:7px;color:#ecdfb7;min-height:8px">OFF</span>
+</div>
+</div>
+</section>
+<section aria-label="EXTERIOR LIGHTS" style="position:relative;min-height:165px;padding:13px 9px 9px;background:linear-gradient(125deg,#81745f,#6d6051 78%);border:2px solid #453d32;border-radius:5px;box-shadow:inset 0 1px #ac9980, 1px 2px 3px #302b26">
+<span aria-hidden="true" style="position:absolute;width:6px;height:6px;border-radius:50%;background:linear-gradient(130deg,#b2a085,#403a31);border:1px solid #3d362d;top:4px;left:4px">
+</span>
+<span aria-hidden="true" style="position:absolute;width:6px;height:6px;border-radius:50%;background:linear-gradient(130deg,#b2a085,#403a31);border:1px solid #3d362d;top:4px;right:4px">
+</span>
+<span aria-hidden="true" style="position:absolute;width:6px;height:6px;border-radius:50%;background:linear-gradient(130deg,#b2a085,#403a31);border:1px solid #3d362d;bottom:4px;left:4px">
+</span>
+<span aria-hidden="true" style="position:absolute;width:6px;height:6px;border-radius:50%;background:linear-gradient(130deg,#b2a085,#403a31);border:1px solid #3d362d;bottom:4px;right:4px">
+</span>
+<div style="text-align:center;color:#faf4df;font-weight:700;font-size:10px;letter-spacing:.09em;margin-bottom:8px">EXTERIOR LIGHTS</div>
+<div style="display:flex;justify-content:space-evenly;align-items:flex-start;gap:5px;margin:9px 0">
+<div style="display:flex;flex-direction:column;align-items:center;gap:4px;flex:0 1 60px;min-width:33px;text-align:center">
+<span style="font-size:8px;line-height:1.15;white-space:pre-line;min-height:10px">BEACON</span>
+<button type="button" aria-label="BEACON" style="position:relative;padding:0;width:35px;height:34px;border:2px solid #c5c7a6;border-radius:4px;background:#262822;box-shadow:0 3px 4px #372f27,inset 0 0 0 2px #171a17;color:#f6f2d9;cursor:pointer" tabindex="-1">
+<span style="display:block;font-size:7px;color:#c2fac4">ON</span>
+<span style="display:block;font-size:6px;margin-top:3px;color:#676759">
+</span>
+</button>
+<span style="font-size:7px;color:#ecdfb7;min-height:8px">ON</span>
+</div>
+<div style="display:flex;flex-direction:column;align-items:center;gap:4px;flex:0 1 60px;min-width:33px;text-align:center">
+<span style="font-size:8px;line-height:1.15;white-space:pre-line;min-height:10px">POSITION</span>
+<button type="button" aria-label="POSITION" style="position:relative;padding:0;width:35px;height:34px;border:2px solid #c5c7a6;border-radius:4px;background:#262822;box-shadow:0 3px 4px #372f27,inset 0 0 0 2px #171a17;color:#f6f2d9;cursor:pointer" tabindex="-1">
+<span style="display:block;font-size:7px;color:#c2fac4">ON</span>
+<span style="display:block;font-size:6px;margin-top:3px;color:#676759">
+</span>
+</button>
+<span style="font-size:7px;color:#ecdfb7;min-height:8px">ON</span>
+</div>
+<div style="display:flex;flex-direction:column;align-items:center;gap:4px;flex:0 1 60px;min-width:33px;text-align:center">
+<span style="font-size:8px;line-height:1.15;white-space:pre-line;min-height:10px">LOGO</span>
+<button type="button" aria-label="LOGO" style="position:relative;padding:0;width:35px;height:34px;border:2px solid #c5c7a6;border-radius:4px;background:#262822;box-shadow:0 3px 4px #372f27,inset 0 0 0 2px #171a17;color:#f6f2d9;cursor:pointer" tabindex="-1">
+<span style="display:block;font-size:7px;color:#676759">OFF</span>
+<span style="display:block;font-size:6px;margin-top:3px;color:#676759">
+</span>
+</button>
+<span style="font-size:7px;color:#ecdfb7;min-height:8px">OFF</span>
+</div>
+<div style="display:flex;flex-direction:column;align-items:center;gap:4px;flex:0 1 60px;min-width:33px;text-align:center">
+<span style="font-size:8px;line-height:1.15;white-space:pre-line;min-height:10px">WING</span>
+<button type="button" aria-label="WING" style="position:relative;padding:0;width:35px;height:34px;border:2px solid #c5c7a6;border-radius:4px;background:#262822;box-shadow:0 3px 4px #372f27,inset 0 0 0 2px #171a17;color:#f6f2d9;cursor:default" tabindex="-1">
+<span style="display:block;font-size:7px;color:#676759">OFF</span>
+<span style="display:block;font-size:6px;margin-top:3px;color:#676759">
+</span>
+</button>
+</div>
+</div>
+<div style="display:flex;justify-content:space-evenly;align-items:flex-start;gap:5px;margin:9px 0">
+<div style="display:flex;flex-direction:column;align-items:center;gap:4px;flex:0 1 60px;min-width:33px;text-align:center">
+<span style="font-size:8px;line-height:1.15;white-space:pre-line;min-height:10px">LANDING</span>
+<button type="button" aria-label="LANDING" style="position:relative;padding:0;width:35px;height:34px;border:2px solid #c5c7a6;border-radius:4px;background:#262822;box-shadow:0 3px 4px #372f27,inset 0 0 0 2px #171a17;color:#f6f2d9;cursor:pointer" tabindex="-1">
+<span aria-hidden="true" style="position:absolute;top:14px;left:13px;width:8px;height:20px;background:linear-gradient(90deg,#777,#eee,#aaa);border-radius:5px;box-shadow:2px 3px 3px #111">
+</span>
+</button>
+<span style="font-size:7px;color:#ecdfb7;min-height:8px">OFF</span>
+</div>
+<div style="display:flex;flex-direction:column;align-items:center;gap:4px;flex:0 1 60px;min-width:33px;text-align:center">
+<span style="font-size:8px;line-height:1.15;white-space:pre-line;min-height:10px">TAXI</span>
+<button type="button" aria-label="TAXI" style="position:relative;padding:0;width:35px;height:34px;border:2px solid #c5c7a6;border-radius:4px;background:#262822;box-shadow:0 3px 4px #372f27,inset 0 0 0 2px #171a17;color:#f6f2d9;cursor:pointer" tabindex="-1">
+<span aria-hidden="true" style="position:absolute;top:14px;left:13px;width:8px;height:20px;background:linear-gradient(90deg,#777,#eee,#aaa);border-radius:5px;box-shadow:2px 3px 3px #111">
+</span>
+</button>
+<span style="font-size:7px;color:#ecdfb7;min-height:8px">OFF</span>
+</div>
+<div style="display:flex;flex-direction:column;align-items:center;gap:4px;flex:0 1 60px;min-width:33px;text-align:center">
+<span style="font-size:8px;line-height:1.15;white-space:pre-line;min-height:10px">STROBE</span>
+<button type="button" aria-label="STROBE" style="position:relative;padding:0;width:35px;height:34px;border:2px solid #c5c7a6;border-radius:4px;background:#262822;box-shadow:0 3px 4px #372f27,inset 0 0 0 2px #171a17;color:#f6f2d9;cursor:pointer" tabindex="-1">
+<span aria-hidden="true" style="position:absolute;top:3px;left:13px;width:8px;height:20px;background:linear-gradient(90deg,#777,#eee,#aaa);border-radius:5px;box-shadow:2px 3px 3px #111">
+</span>
+</button>
+<span style="font-size:7px;color:#ecdfb7;min-height:8px">ON</span>
+</div>
+</div>
+</section>
+</div>
+<div style="display:flex;flex-direction:column;gap:5px">
+<section aria-label="VOICE RECORDER" style="position:relative;min-height:94px;padding:13px 9px 9px;background:linear-gradient(125deg,#81745f,#6d6051 78%);border:2px solid #453d32;border-radius:5px;box-shadow:inset 0 1px #ac9980, 1px 2px 3px #302b26">
+<span aria-hidden="true" style="position:absolute;width:6px;height:6px;border-radius:50%;background:linear-gradient(130deg,#b2a085,#403a31);border:1px solid #3d362d;top:4px;left:4px">
+</span>
+<span aria-hidden="true" style="position:absolute;width:6px;height:6px;border-radius:50%;background:linear-gradient(130deg,#b2a085,#403a31);border:1px solid #3d362d;top:4px;right:4px">
+</span>
+<span aria-hidden="true" style="position:absolute;width:6px;height:6px;border-radius:50%;background:linear-gradient(130deg,#b2a085,#403a31);border:1px solid #3d362d;bottom:4px;left:4px">
+</span>
+<span aria-hidden="true" style="position:absolute;width:6px;height:6px;border-radius:50%;background:linear-gradient(130deg,#b2a085,#403a31);border:1px solid #3d362d;bottom:4px;right:4px">
+</span>
+<div style="text-align:center;color:#faf4df;font-weight:700;font-size:10px;letter-spacing:.09em;margin-bottom:8px">VOICE RECORDER</div>
+<div style="display:flex;justify-content:space-evenly;align-items:flex-start;gap:5px;margin:9px 0">
+<div style="display:flex;flex-direction:column;align-items:center;gap:4px;flex:0 1 60px;min-width:33px;text-align:center">
+<span style="font-size:8px;line-height:1.15;white-space:pre-line;min-height:10px">AUTO / ON</span>
+<button type="button" aria-label="AUTO / ON" style="position:relative;padding:0;width:35px;height:34px;border:2px solid #c5c7a6;border-radius:4px;background:#262822;box-shadow:0 3px 4px #372f27,inset 0 0 0 2px #171a17;color:#f6f2d9;cursor:default" tabindex="-1">
+<span aria-hidden="true" style="position:absolute;top:14px;left:13px;width:8px;height:20px;background:linear-gradient(90deg,#777,#eee,#aaa);border-radius:5px;box-shadow:2px 3px 3px #111">
+</span>
+</button>
+</div>
+</div>
+</section>
+<section aria-label="AIR CONDITIONING" style="position:relative;min-height:230px;padding:13px 9px 9px;background:linear-gradient(125deg,#81745f,#6d6051 78%);border:2px solid #453d32;border-radius:5px;box-shadow:inset 0 1px #ac9980, 1px 2px 3px #302b26">
+<span aria-hidden="true" style="position:absolute;width:6px;height:6px;border-radius:50%;background:linear-gradient(130deg,#b2a085,#403a31);border:1px solid #3d362d;top:4px;left:4px">
+</span>
+<span aria-hidden="true" style="position:absolute;width:6px;height:6px;border-radius:50%;background:linear-gradient(130deg,#b2a085,#403a31);border:1px solid #3d362d;top:4px;right:4px">
+</span>
+<span aria-hidden="true" style="position:absolute;width:6px;height:6px;border-radius:50%;background:linear-gradient(130deg,#b2a085,#403a31);border:1px solid #3d362d;bottom:4px;left:4px">
+</span>
+<span aria-hidden="true" style="position:absolute;width:6px;height:6px;border-radius:50%;background:linear-gradient(130deg,#b2a085,#403a31);border:1px solid #3d362d;bottom:4px;right:4px">
+</span>
+<div style="text-align:center;color:#faf4df;font-weight:700;font-size:10px;letter-spacing:.09em;margin-bottom:8px">AIR CONDITIONING</div>
+<div style="display:flex;justify-content:space-evenly;align-items:flex-start;gap:5px;margin:9px 0">
+<div style="display:flex;flex-direction:column;align-items:center;gap:4px;flex:0 1 60px;min-width:33px;text-align:center">
+<span style="font-size:8px;line-height:1.15;white-space:pre-line;min-height:10px">EQUIP COOLING</span>
+<button type="button" aria-label="EQUIP COOLING" style="position:relative;padding:0;width:35px;height:34px;border:2px solid #c5c7a6;border-radius:4px;background:#262822;box-shadow:0 3px 4px #372f27,inset 0 0 0 2px #171a17;color:#f6f2d9;cursor:default" tabindex="-1">
+<span style="display:block;font-size:7px;color:#676759">OFF</span>
+<span style="display:block;font-size:6px;margin-top:3px;color:#676759">
+</span>
+</button>
+</div>
+<div style="display:flex;flex-direction:column;align-items:center;gap:4px;flex:0 1 60px;min-width:33px;text-align:center">
+<span style="font-size:8px;line-height:1.15;white-space:pre-line;min-height:10px">GASPER</span>
+<button type="button" aria-label="GASPER" style="position:relative;padding:0;width:35px;height:34px;border:2px solid #c5c7a6;border-radius:4px;background:#262822;box-shadow:0 3px 4px #372f27,inset 0 0 0 2px #171a17;color:#f6f2d9;cursor:default" tabindex="-1">
+<span style="display:block;font-size:7px;color:#676759">OFF</span>
+<span style="display:block;font-size:6px;margin-top:3px;color:#676759">
+</span>
+</button>
+</div>
+</div>
+<div style="display:flex;justify-content:space-evenly;align-items:flex-start;gap:5px;margin:9px 0">
+<div style="display:flex;flex-direction:column;align-items:center;gap:4px;flex:0 1 60px;min-width:33px;text-align:center">
+<span style="font-size:8px;line-height:1.15;white-space:pre-line;min-height:10px">RECIRC L</span>
+<button type="button" aria-label="RECIRC L" style="position:relative;padding:0;width:35px;height:34px;border:2px solid #c5c7a6;border-radius:4px;background:#262822;box-shadow:0 3px 4px #372f27,inset 0 0 0 2px #171a17;color:#f6f2d9;cursor:default" tabindex="-1">
+<span style="display:block;font-size:7px;color:#676759">OFF</span>
+<span style="display:block;font-size:6px;margin-top:3px;color:#676759">
+</span>
+</button>
+</div>
+<div style="display:flex;flex-direction:column;align-items:center;gap:4px;flex:0 1 60px;min-width:33px;text-align:center">
+<span style="font-size:8px;line-height:1.15;white-space:pre-line;min-height:10px">RECIRC R</span>
+<button type="button" aria-label="RECIRC R" style="position:relative;padding:0;width:35px;height:34px;border:2px solid #c5c7a6;border-radius:4px;background:#262822;box-shadow:0 3px 4px #372f27,inset 0 0 0 2px #171a17;color:#f6f2d9;cursor:default" tabindex="-1">
+<span style="display:block;font-size:7px;color:#676759">OFF</span>
+<span style="display:block;font-size:6px;margin-top:3px;color:#676759">
+</span>
+</button>
+</div>
+</div>
+<div style="display:flex;justify-content:space-evenly;align-items:flex-start;gap:5px;margin:9px 0">
+<div style="display:flex;flex-direction:column;align-items:center;gap:4px;flex:0 1 60px;min-width:33px;text-align:center">
+<span style="font-size:8px;line-height:1.15;white-space:pre-line;min-height:10px">FLT DECK TEMP</span>
+<button type="button" aria-label="FLT DECK TEMP" style="position:relative;padding:0;width:38px;height:38px;border:2px solid #bcae8c;border-radius:50%;background:radial-gradient(circle at 30% 20%,#e5d8b5,#9b8a66);box-shadow:0 3px 4px #372f27,inset 0 0 0 2px #171a17;color:#f6f2d9;cursor:default" tabindex="-1">
+<span aria-hidden="true" style="position:absolute;left:13px;top:1px;width:8px;height:29px;background:linear-gradient(90deg,#ac9d7c,#f0e2be,#c3b18c);border-radius:4px;transform:rotate(-28deg);box-shadow:2px 2px 3px #574a35">
+<span style="position:absolute;height:12px;width:2px;background:#302b24;left:3px;top:1px">
+</span>
+</span>
+</button>
+</div>
+<div style="display:flex;flex-direction:column;align-items:center;gap:4px;flex:0 1 60px;min-width:33px;text-align:center">
+<span style="font-size:8px;line-height:1.15;white-space:pre-line;min-height:10px">CABIN TEMP</span>
+<button type="button" aria-label="CABIN TEMP" style="position:relative;padding:0;width:38px;height:38px;border:2px solid #bcae8c;border-radius:50%;background:radial-gradient(circle at 30% 20%,#e5d8b5,#9b8a66);box-shadow:0 3px 4px #372f27,inset 0 0 0 2px #171a17;color:#f6f2d9;cursor:default" tabindex="-1">
+<span aria-hidden="true" style="position:absolute;left:13px;top:1px;width:8px;height:29px;background:linear-gradient(90deg,#ac9d7c,#f0e2be,#c3b18c);border-radius:4px;transform:rotate(-28deg);box-shadow:2px 2px 3px #574a35">
+<span style="position:absolute;height:12px;width:2px;background:#302b24;left:3px;top:1px">
+</span>
+</span>
+</button>
+</div>
+</div>
+<div style="display:flex;justify-content:space-evenly;align-items:flex-start;gap:5px;margin:9px 0">
+<div style="display:flex;flex-direction:column;align-items:center;gap:4px;flex:0 1 60px;min-width:33px;text-align:center">
+<span style="font-size:8px;line-height:1.15;white-space:pre-line;min-height:10px">L PACK</span>
+<button type="button" aria-label="L PACK" style="position:relative;padding:0;width:35px;height:34px;border:2px solid #c5c7a6;border-radius:4px;background:#262822;box-shadow:0 3px 4px #372f27,inset 0 0 0 2px #171a17;color:#f6f2d9;cursor:pointer" tabindex="-1">
+<span style="display:block;font-size:7px;color:#c2fac4">ON</span>
+<span style="display:block;font-size:6px;margin-top:3px;color:#676759">
+</span>
+</button>
+<span style="font-size:7px;color:#ecdfb7;min-height:8px">ON</span>
+</div>
+<div style="display:flex;flex-direction:column;align-items:center;gap:4px;flex:0 1 60px;min-width:33px;text-align:center">
+<span style="font-size:8px;line-height:1.15;white-space:pre-line;min-height:10px">TRIM AIR</span>
+<button type="button" aria-label="TRIM AIR" style="position:relative;padding:0;width:35px;height:34px;border:2px solid #c5c7a6;border-radius:4px;background:#262822;box-shadow:0 3px 4px #372f27,inset 0 0 0 2px #171a17;color:#f6f2d9;cursor:default" tabindex="-1">
+<span style="display:block;font-size:7px;color:#676759">OFF</span>
+<span style="display:block;font-size:6px;margin-top:3px;color:#676759">
+</span>
+</button>
+</div>
+<div style="display:flex;flex-direction:column;align-items:center;gap:4px;flex:0 1 60px;min-width:33px;text-align:center">
+<span style="font-size:8px;line-height:1.15;white-space:pre-line;min-height:10px">R PACK</span>
+<button type="button" aria-label="R PACK" style="position:relative;padding:0;width:35px;height:34px;border:2px solid #c5c7a6;border-radius:4px;background:#262822;box-shadow:0 3px 4px #372f27,inset 0 0 0 2px #171a17;color:#f6f2d9;cursor:pointer" tabindex="-1">
+<span style="display:block;font-size:7px;color:#c2fac4">ON</span>
+<span style="display:block;font-size:6px;margin-top:3px;color:#676759">
+</span>
+</button>
+<span style="font-size:7px;color:#ecdfb7;min-height:8px">ON</span>
+</div>
+</div>
+</section>
+<section aria-label="BLEED AIR" style="position:relative;min-height:182px;padding:13px 9px 9px;background:linear-gradient(125deg,#81745f,#6d6051 78%);border:2px solid #453d32;border-radius:5px;box-shadow:inset 0 1px #ac9980, 1px 2px 3px #302b26">
+<span aria-hidden="true" style="position:absolute;width:6px;height:6px;border-radius:50%;background:linear-gradient(130deg,#b2a085,#403a31);border:1px solid #3d362d;top:4px;left:4px">
+</span>
+<span aria-hidden="true" style="position:absolute;width:6px;height:6px;border-radius:50%;background:linear-gradient(130deg,#b2a085,#403a31);border:1px solid #3d362d;top:4px;right:4px">
+</span>
+<span aria-hidden="true" style="position:absolute;width:6px;height:6px;border-radius:50%;background:linear-gradient(130deg,#b2a085,#403a31);border:1px solid #3d362d;bottom:4px;left:4px">
+</span>
+<span aria-hidden="true" style="position:absolute;width:6px;height:6px;border-radius:50%;background:linear-gradient(130deg,#b2a085,#403a31);border:1px solid #3d362d;bottom:4px;right:4px">
+</span>
+<div style="text-align:center;color:#faf4df;font-weight:700;font-size:10px;letter-spacing:.09em;margin-bottom:8px">BLEED AIR</div>
+<div style="border:2px solid #c2d4ae;padding:2px 0;border-radius:5px">
+<div style="display:flex;justify-content:space-evenly;align-items:flex-start;gap:5px;margin:9px 0">
+<div style="display:flex;flex-direction:column;align-items:center;gap:4px;flex:0 1 60px;min-width:33px;text-align:center">
+<span style="font-size:8px;line-height:1.15;white-space:pre-line;min-height:10px">L ISLN</span>
+<button type="button" aria-label="L ISLN" style="position:relative;padding:0;width:35px;height:34px;border:2px solid #c5c7a6;border-radius:4px;background:#262822;box-shadow:0 3px 4px #372f27,inset 0 0 0 2px #171a17;color:#f6f2d9;cursor:default" tabindex="-1">
+<span style="display:block;font-size:7px;color:#676759">OFF</span>
+<span style="display:block;font-size:6px;margin-top:3px;color:#676759">
+</span>
+</button>
+</div>
+<div style="display:flex;flex-direction:column;align-items:center;gap:4px;flex:0 1 60px;min-width:33px;text-align:center">
+<span style="font-size:8px;line-height:1.15;white-space:pre-line;min-height:10px">C ISLN</span>
+<button type="button" aria-label="C ISLN" style="position:relative;padding:0;width:35px;height:34px;border:2px solid #c5c7a6;border-radius:4px;background:#262822;box-shadow:0 3px 4px #372f27,inset 0 0 0 2px #171a17;color:#f6f2d9;cursor:default" tabindex="-1">
+<span style="display:block;font-size:7px;color:#676759">OFF</span>
+<span style="display:block;font-size:6px;margin-top:3px;color:#676759">
+</span>
+</button>
+</div>
+<div style="display:flex;flex-direction:column;align-items:center;gap:4px;flex:0 1 60px;min-width:33px;text-align:center">
+<span style="font-size:8px;line-height:1.15;white-space:pre-line;min-height:10px">R ISLN</span>
+<button type="button" aria-label="R ISLN" style="position:relative;padding:0;width:35px;height:34px;border:2px solid #c5c7a6;border-radius:4px;background:#262822;box-shadow:0 3px 4px #372f27,inset 0 0 0 2px #171a17;color:#f6f2d9;cursor:default" tabindex="-1">
+<span style="display:block;font-size:7px;color:#676759">OFF</span>
+<span style="display:block;font-size:6px;margin-top:3px;color:#676759">
+</span>
+</button>
+</div>
+</div>
+<div style="display:flex;justify-content:space-evenly;align-items:flex-start;gap:5px;margin:9px 0">
+<div style="display:flex;flex-direction:column;align-items:center;gap:4px;flex:0 1 60px;min-width:33px;text-align:center">
+<span style="font-size:8px;line-height:1.15;white-space:pre-line;min-height:10px">L ENG</span>
+<button type="button" aria-label="L ENG" style="position:relative;padding:0;width:35px;height:34px;border:2px solid #c5c7a6;border-radius:4px;background:#262822;box-shadow:0 3px 4px #372f27,inset 0 0 0 2px #171a17;color:#f6f2d9;cursor:default" tabindex="-1">
+<span style="display:block;font-size:7px;color:#676759">OFF</span>
+<span style="display:block;font-size:6px;margin-top:3px;color:#676759">
+</span>
+</button>
+</div>
+<div style="display:flex;flex-direction:column;align-items:center;gap:4px;flex:0 1 60px;min-width:33px;text-align:center">
+<span style="font-size:8px;line-height:1.15;white-space:pre-line;min-height:10px">APU</span>
+<button type="button" aria-label="APU" style="position:relative;padding:0;width:35px;height:34px;border:2px solid #c5c7a6;border-radius:4px;background:#262822;box-shadow:0 3px 4px #372f27,inset 0 0 0 2px #171a17;color:#f6f2d9;cursor:pointer" tabindex="-1">
+<span style="display:block;font-size:7px;color:#676759">OFF</span>
+<span style="display:block;font-size:6px;margin-top:3px;color:#676759">
+</span>
+</button>
+<span style="font-size:7px;color:#ecdfb7;min-height:8px">OFF</span>
+</div>
+<div style="display:flex;flex-direction:column;align-items:center;gap:4px;flex:0 1 60px;min-width:33px;text-align:center">
+<span style="font-size:8px;line-height:1.15;white-space:pre-line;min-height:10px">R ENG</span>
+<button type="button" aria-label="R ENG" style="position:relative;padding:0;width:35px;height:34px;border:2px solid #c5c7a6;border-radius:4px;background:#262822;box-shadow:0 3px 4px #372f27,inset 0 0 0 2px #171a17;color:#f6f2d9;cursor:default" tabindex="-1">
+<span style="display:block;font-size:7px;color:#676759">OFF</span>
+<span style="display:block;font-size:6px;margin-top:3px;color:#676759">
+</span>
+</button>
+</div>
+</div>
+</div>
+</section>
+<section aria-label="PRESSURIZATION" style="position:relative;min-height:190px;padding:13px 9px 9px;background:linear-gradient(125deg,#81745f,#6d6051 78%);border:2px solid #453d32;border-radius:5px;box-shadow:inset 0 1px #ac9980, 1px 2px 3px #302b26">
+<span aria-hidden="true" style="position:absolute;width:6px;height:6px;border-radius:50%;background:linear-gradient(130deg,#b2a085,#403a31);border:1px solid #3d362d;top:4px;left:4px">
+</span>
+<span aria-hidden="true" style="position:absolute;width:6px;height:6px;border-radius:50%;background:linear-gradient(130deg,#b2a085,#403a31);border:1px solid #3d362d;top:4px;right:4px">
+</span>
+<span aria-hidden="true" style="position:absolute;width:6px;height:6px;border-radius:50%;background:linear-gradient(130deg,#b2a085,#403a31);border:1px solid #3d362d;bottom:4px;left:4px">
+</span>
+<span aria-hidden="true" style="position:absolute;width:6px;height:6px;border-radius:50%;background:linear-gradient(130deg,#b2a085,#403a31);border:1px solid #3d362d;bottom:4px;right:4px">
+</span>
+<div style="text-align:center;color:#faf4df;font-weight:700;font-size:10px;letter-spacing:.09em;margin-bottom:8px">PRESSURIZATION</div>
+<div style="display:flex;justify-content:space-evenly;align-items:flex-start;gap:5px;margin:9px 0">
+<div style="display:flex;flex-direction:column;align-items:center;gap:4px;flex:0 1 60px;min-width:33px;text-align:center">
+<span style="font-size:8px;line-height:1.15;white-space:pre-line;min-height:10px">FWD OUTFLOW</span>
+<button type="button" aria-label="FWD OUTFLOW" style="position:relative;padding:0;width:35px;height:34px;border:2px solid #c5c7a6;border-radius:4px;background:#262822;box-shadow:0 3px 4px #372f27,inset 0 0 0 2px #171a17;color:#f6f2d9;cursor:default" tabindex="-1">
+<span style="display:block;font-size:7px;color:#676759">OFF</span>
+<span style="display:block;font-size:6px;margin-top:3px;color:#676759">
+</span>
+</button>
+</div>
+<div style="display:flex;flex-direction:column;align-items:center;gap:4px;flex:0 1 60px;min-width:33px;text-align:center">
+<span style="font-size:8px;line-height:1.15;white-space:pre-line;min-height:10px">AFT OUTFLOW</span>
+<button type="button" aria-label="AFT OUTFLOW" style="position:relative;padding:0;width:35px;height:34px;border:2px solid #c5c7a6;border-radius:4px;background:#262822;box-shadow:0 3px 4px #372f27,inset 0 0 0 2px #171a17;color:#f6f2d9;cursor:default" tabindex="-1">
+<span style="display:block;font-size:7px;color:#676759">OFF</span>
+<span style="display:block;font-size:6px;margin-top:3px;color:#676759">
+</span>
+</button>
+</div>
+</div>
+<div style="display:flex;justify-content:space-evenly;align-items:flex-start;gap:5px;margin:9px 0">
+<div style="display:flex;flex-direction:column;align-items:center;gap:4px;flex:0 1 60px;min-width:33px;text-align:center">
+<span style="font-size:8px;line-height:1.15;white-space:pre-line;min-height:10px">FWD MANUAL</span>
+<button type="button" aria-label="FWD MANUAL" style="position:relative;padding:0;width:35px;height:34px;border:2px solid #c5c7a6;border-radius:4px;background:#262822;box-shadow:0 3px 4px #372f27,inset 0 0 0 2px #171a17;color:#f6f2d9;cursor:default" tabindex="-1">
+<span aria-hidden="true" style="position:absolute;top:14px;left:13px;width:8px;height:20px;background:linear-gradient(90deg,#777,#eee,#aaa);border-radius:5px;box-shadow:2px 3px 3px #111">
+</span>
+</button>
+</div>
+<div style="display:flex;flex-direction:column;align-items:center;gap:4px;flex:0 1 60px;min-width:33px;text-align:center">
+<span style="font-size:8px;line-height:1.15;white-space:pre-line;min-height:10px">LAND ALT</span>
+<button type="button" aria-label="LAND ALT" style="position:relative;padding:0;width:38px;height:38px;border:2px solid #bcae8c;border-radius:50%;background:radial-gradient(circle at 30% 20%,#e5d8b5,#9b8a66);box-shadow:0 3px 4px #372f27,inset 0 0 0 2px #171a17;color:#f6f2d9;cursor:default" tabindex="-1">
+<span aria-hidden="true" style="position:absolute;left:13px;top:1px;width:8px;height:29px;background:linear-gradient(90deg,#ac9d7c,#f0e2be,#c3b18c);border-radius:4px;transform:rotate(-28deg);box-shadow:2px 2px 3px #574a35">
+<span style="position:absolute;height:12px;width:2px;background:#302b24;left:3px;top:1px">
+</span>
+</span>
+</button>
+</div>
+<div style="display:flex;flex-direction:column;align-items:center;gap:4px;flex:0 1 60px;min-width:33px;text-align:center">
+<span style="font-size:8px;line-height:1.15;white-space:pre-line;min-height:10px">AFT MANUAL</span>
+<button type="button" aria-label="AFT MANUAL" style="position:relative;padding:0;width:35px;height:34px;border:2px solid #c5c7a6;border-radius:4px;background:#262822;box-shadow:0 3px 4px #372f27,inset 0 0 0 2px #171a17;color:#f6f2d9;cursor:default" tabindex="-1">
+<span aria-hidden="true" style="position:absolute;top:14px;left:13px;width:8px;height:20px;background:linear-gradient(90deg,#777,#eee,#aaa);border-radius:5px;box-shadow:2px 3px 3px #111">
+</span>
+</button>
+</div>
+</div>
+</section>
+<section aria-label="R WIPER" style="position:relative;min-height:160px;padding:13px 9px 9px;background:linear-gradient(125deg,#81745f,#6d6051 78%);border:2px solid #453d32;border-radius:5px;box-shadow:inset 0 1px #ac9980, 1px 2px 3px #302b26">
+<span aria-hidden="true" style="position:absolute;width:6px;height:6px;border-radius:50%;background:linear-gradient(130deg,#b2a085,#403a31);border:1px solid #3d362d;top:4px;left:4px">
+</span>
+<span aria-hidden="true" style="position:absolute;width:6px;height:6px;border-radius:50%;background:linear-gradient(130deg,#b2a085,#403a31);border:1px solid #3d362d;top:4px;right:4px">
+</span>
+<span aria-hidden="true" style="position:absolute;width:6px;height:6px;border-radius:50%;background:linear-gradient(130deg,#b2a085,#403a31);border:1px solid #3d362d;bottom:4px;left:4px">
+</span>
+<span aria-hidden="true" style="position:absolute;width:6px;height:6px;border-radius:50%;background:linear-gradient(130deg,#b2a085,#403a31);border:1px solid #3d362d;bottom:4px;right:4px">
+</span>
+<div style="text-align:center;color:#faf4df;font-weight:700;font-size:10px;letter-spacing:.09em;margin-bottom:8px">R WIPER</div>
+<div style="display:flex;justify-content:space-evenly;align-items:flex-start;gap:5px;margin:9px 0">
+<div style="display:flex;flex-direction:column;align-items:center;gap:4px;flex:0 1 60px;min-width:33px;text-align:center">
+<span style="font-size:8px;line-height:1.15;white-space:pre-line;min-height:10px">OFF · INT · LOW · HIGH</span>
+<button type="button" aria-label="OFF · INT · LOW · HIGH" style="position:relative;padding:0;width:38px;height:38px;border:2px solid #bcae8c;border-radius:50%;background:radial-gradient(circle at 30% 20%,#e5d8b5,#9b8a66);box-shadow:0 3px 4px #372f27,inset 0 0 0 2px #171a17;color:#f6f2d9;cursor:default" tabindex="-1">
+<span aria-hidden="true" style="position:absolute;left:13px;top:1px;width:8px;height:29px;background:linear-gradient(90deg,#ac9d7c,#f0e2be,#c3b18c);border-radius:4px;transform:rotate(-28deg);box-shadow:2px 2px 3px #574a35">
+<span style="position:absolute;height:12px;width:2px;background:#302b24;left:3px;top:1px">
+</span>
+</span>
+</button>
+</div>
+</div>
+</section>
+</div>
+</div>
+</div>
+</div>
+</body>
+</html>

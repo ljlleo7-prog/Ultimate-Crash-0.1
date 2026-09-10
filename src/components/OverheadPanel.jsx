@@ -1,8 +1,19 @@
 
-import React, { useState, useEffect } from 'react';
+import { lazy, Suspense } from 'react';
 import { useLanguage } from '../contexts/LanguageContext.jsx';
 import './FlightPanel.css';
-import B738OverheadPanel from '../data/aircraft/b738/overheadPanel.jsx';
+import { resolveICAO } from '../data/aircraft/index.js';
+
+const aircraftOverheads = {
+  B738: lazy(() => import('../data/aircraft/b738/overheadPanel.jsx')),
+  A320: lazy(() => import('../data/aircraft/a320/overheadPanel.jsx')),
+  B744: lazy(() => import('../data/aircraft/b744/overheadPanel.jsx')),
+  B752: lazy(() => import('../data/aircraft/b752/overheadPanel.jsx')),
+  B77W: lazy(() => import('../data/aircraft/b77w/overheadPanel.jsx')),
+  A333: lazy(() => import('../data/aircraft/a333/overheadPanel.jsx')),
+  A359: lazy(() => import('../data/aircraft/a359/overheadPanel.jsx')),
+  A388: lazy(() => import('../data/aircraft/a388/overheadPanel.jsx')),
+};
 
 const OverheadPanel = ({ onClose, flightState, onSystemAction, aircraftModel }) => {
   const { t } = useLanguage();
@@ -11,6 +22,7 @@ const OverheadPanel = ({ onClose, flightState, onSystemAction, aircraftModel }) 
   const is737 = modelLower.includes('737') || modelLower.includes('b73');
   const isBoeing = modelLower.includes('boeing') || modelLower.startsWith('b7');
   const isOtherBoeing = isBoeing && !is737 && !isAirbus;
+  const AircraftOverhead = aircraftOverheads[resolveICAO(aircraftModel)];
   
   // Helper to get system state safely
   const getSys = (path, def) => {
@@ -1488,10 +1500,15 @@ const OverheadPanel = ({ onClose, flightState, onSystemAction, aircraftModel }) 
   return (
     <div className="overhead-overlay">
       <div className="overhead-container">
-        <button className="close-btn" onClick={onClose}>X</button>
+        <button type="button" className="close-btn" aria-label="Close overhead panel" onClick={onClose}>X</button>
 
         <div className="overhead-grid">
-            {isAirbus && (
+            {AircraftOverhead && (
+              <Suspense fallback={<div className="overhead-loading">Loading overhead panel…</div>}>
+                <AircraftOverhead flightState={flightState} onSystemAction={onSystemAction} />
+              </Suspense>
+            )}
+            {!AircraftOverhead && isAirbus && (
               <div className="airbus-overhead-grid">
                 <div style={{ gridArea: 'adirs' }}><ADIRSPanel /></div>
                 <div style={{ gridArea: 'fire' }}><FirePanel /></div>
@@ -1508,13 +1525,13 @@ const OverheadPanel = ({ onClose, flightState, onSystemAction, aircraftModel }) 
                  </div>
                </div>
              )}
-            {is737 && !isAirbus && (
-              <B738OverheadPanel flightState={flightState} onSystemAction={onSystemAction} onClose={onClose} />
+            {!AircraftOverhead && is737 && !isAirbus && (
+              <div className="overhead-loading">Loading overhead panel…</div>
             )}
-            {isOtherBoeing && !isAirbus && !is737 && (
+            {!AircraftOverhead && isOtherBoeing && !isAirbus && !is737 && (
               <BoeingOverhead />
             )}
-            {!isAirbus && !is737 && !isOtherBoeing && (
+            {!AircraftOverhead && !isAirbus && !is737 && !isOtherBoeing && (
               <BoeingOverhead />
             )}
         </div>
@@ -1528,10 +1545,10 @@ const OverheadPanel = ({ onClose, flightState, onSystemAction, aircraftModel }) 
             display: flex; justify-content: center; align-items: center;
         }
         .overhead-container {
-            width: 960px; height: 720px;
+            width: min(96vw, 1240px); height: min(94vh, 1080px);
             background: #252525;
             border: 4px solid #444; border-radius: 10px;
-            display: flex; flexDirection: column;
+            display: flex; flex-direction: column;
             padding: 10px;
             color: #eee;
             font-family: 'Roboto', sans-serif;
@@ -1546,9 +1563,19 @@ const OverheadPanel = ({ onClose, flightState, onSystemAction, aircraftModel }) 
             z-index: 10; display: flex; align-items: center; justify-content: center;
         }
         .overhead-grid {
-            display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px;
-            flex: 1; overflow-y: auto;
-            transform: scale(0.95); transform-origin: center top;
+            display: block;
+            flex: 1; overflow: auto;
+            padding: 16px 26px 26px;
+        }
+        .overhead-grid > * {
+            margin-left: auto;
+            margin-right: auto;
+        }
+        .overhead-loading {
+            padding: 40px;
+            color: #d5dde1;
+            text-align: center;
+            letter-spacing: .12em;
         }
 
         .b737-overhead-grid {

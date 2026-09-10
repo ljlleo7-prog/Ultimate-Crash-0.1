@@ -3,7 +3,7 @@
  */
 
 import { describe, it } from 'node:test';
-import assert from 'node:assert';
+import assert from 'node:assert/strict';
 
 const testAircraft = {
   name: 'Test Aircraft',
@@ -56,5 +56,3 @@ describe('Ground Mode Warning Suppression', () => {
     assert.ok(true, 'Ground mode can be toggled');
   });
 });
-
-setTimeout(() => process.exit(0), 5000);

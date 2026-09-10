@@ -123,7 +123,7 @@ export default class SystemsService {
         };
     }
 
-    updateSystems(systems, engines, state, onGround, difficulty, failureParams, aircraft, payloadMass, dt) {
+    updateSystems(systems, engines, state, onGround, difficulty, failureParams, aircraft, payloadMass, dt, systemModel = null) {
         const context = {
             engineN2: engines.map(e => e.state.n2 || 0),
             altitude: -state.pos.z * 3.28084,
@@ -132,7 +132,9 @@ export default class SystemsService {
             difficulty
         };
 
+        systemModel?.update(systems, engines);
         OverheadLogic.update(systems, context, dt);
+        systemModel?.update(systems, engines);
 
         if (failureParams.quantity_rate) {
             const rates = failureParams.quantity_rate;
@@ -174,6 +176,16 @@ export default class SystemsService {
     }
 
     updateControlEffectiveness(systems) {
+        if (systems.resourceNetwork?.capabilities) {
+            const capabilities = systems.resourceNetwork.capabilities;
+            return {
+                aileron: capabilities.aileron,
+                elevator: capabilities.elevator,
+                rudder: capabilities.rudder,
+                gear: capabilities.gear,
+                spoilers: capabilities.spoilers
+            };
+        }
         if (!systems.hydraulics) return { aileron: 1.0, elevator: 1.0, rudder: 1.0 };
 
         const hydSystems = Object.values(systems.hydraulics);

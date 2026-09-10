@@ -184,13 +184,17 @@ class OverheadLogic {
      */
     updateElectrical(systems, context, dt) {
         const elec = systems.electrical;
+        const damage = systems.damage || {};
+        const activeComponents = new Set(systems.resourceNetwork?.activeComponents || []);
+        const hasNetwork = !!systems.resourceNetwork?.topologyId;
         const fuel = systems.fuel || {};
         const hydraulics = systems.hydraulics || {};
         const pressurization = systems.pressurization || {};
         const lighting = systems.lighting || {};
 
         const batterySelector = elec.batterySelector || (elec.battery ? 'AUTO' : 'OFF');
-        const batteryConnected = batterySelector !== 'OFF';
+        const batteryConnected = batterySelector !== 'OFF' && !damage.batteryFailed &&
+            (!hasNetwork || activeComponents.has('electrical.battery'));
         elec.batterySelector = batterySelector;
         elec.battery = batteryConnected;
         elec.stbyPower = batteryConnected;
@@ -204,7 +208,9 @@ class OverheadLogic {
         Object.keys(elec).forEach(key => {
             if (key.match(/^gen\d+$/)) {
                 const index = parseInt(key.replace('gen', '')) - 1;
-                const genOn = elec[key];
+                const componentId = `electrical.generator.${index + 1}`;
+                const genOn = elec[key] && !(index === 0 && damage.generator1Failed) &&
+                    (!hasNetwork || activeComponents.has(componentId));
                 const n2 = context.engineN2[index] || 0;
                 const genReady = n2 > 25;
 
@@ -222,8 +228,10 @@ class OverheadLogic {
         const apuGenReady = systems.apu.running && systems.apu.n2 > 95;
         const apuGen1Selected = !!(elec.apuGen1 ?? elec.apuGen);
         const apuGen2Selected = !!(elec.apuGen2 ?? elec.apuGen);
-        const apuGen1On = apuGenReady && apuGen1Selected;
-        const apuGen2On = apuGenReady && apuGen2Selected;
+        const apuGen1On = apuGenReady && apuGen1Selected &&
+            (!hasNetwork || activeComponents.has('electrical.apu_generator.1'));
+        const apuGen2On = apuGenReady && apuGen2Selected &&
+            (!hasNetwork || activeComponents.has('electrical.apu_generator.2'));
         elec.apuGen1 = apuGen1Selected;
         elec.apuGen2 = apuGen2Selected;
         elec.apuGen = apuGen1Selected || apuGen2Selected;
@@ -299,6 +307,15 @@ class OverheadLogic {
         if (pressurization.packR) load += 20;
 
         elec.acAmps = mainBusPowered ? load : 0;
+
+        if (damage.electricalMainBusFailed) {
+            elec.acVolts = 0;
+            elec.acFreq = 0;
+            elec.acAmps = 0;
+            elec.dcVolts = batteryConnected ? Math.min(elec.dcVolts, 24) : 0;
+            elec.sourceOff1 = true;
+            elec.sourceOff2 = true;
+        }
     }
 
     /**
@@ -307,6 +324,15 @@ class OverheadLogic {
      */
     updateAPU(systems, context, dt) {
         const apu = systems.apu;
+
+        if (systems.damage?.apuFailed) {
+            apu.running = false;
+            apu.starting = false;
+            apu.start = false;
+            apu.n2 = 0;
+            apu.state = 'FAILED';
+            return;
+        }
         
         // Ensure state variables exist
         if (apu.n2 === undefined) apu.n2 = 0;
@@ -410,6 +436,8 @@ class OverheadLogic {
         const pneu = systems.pressurization;
         const apu = systems.apu;
         const electrical = systems.electrical;
+        const activeComponents = new Set(systems.resourceNetwork?.activeComponents || []);
+        const hasNetwork = !!systems.resourceNetwork?.topologyId;
         
         // 1. Bleed Sources (Potential Pressure)
         let sourcePressL = 0;
@@ -423,7 +451,8 @@ class OverheadLogic {
             const bleedSw = pneu[`bleed${i+1}`];
             const n2 = context.engineN2[i];
             
-            if (bleedSw && n2 > 10) {
+            const componentId = `pneumatic.engine_bleed.${i + 1}`;
+            if (bleedSw && n2 > 10 && (!hasNetwork || activeComponents.has(componentId))) {
                 // Pressure curve based on N2
                 // Idle (20%) -> ~25 PSI
                 // Cruise/Max -> ~45 PSI
@@ -444,7 +473,8 @@ class OverheadLogic {
         
         // APU (Feeds Left Duct typically)
         // APU Bleed Valve must be OPEN and APU running
-        const apuBleedPressure = (apu.bleed && apu.running && apu.n2 > 90) ? 45 : 0;
+        const apuBleedPressure = (apu.bleed && apu.running && apu.n2 > 90 &&
+            (!hasNetwork || activeComponents.has('pneumatic.apu_bleed'))) ? 45 : 0;
         
         // APU usually feeds the manifold. If Isolation Valve is closed, it might only feed Left.
         // If Open, feeds both.
@@ -520,8 +550,10 @@ class OverheadLogic {
         
         // 5. Update Pack Flow status based on new pressures
         // Packs cut out if pressure is too low (< 15 PSI)
-        pneu.packLFlow = (pneu.packL && pneu.ductPressL > 15);
-        pneu.packRFlow = (pneu.packR && pneu.ductPressR > 15);
+        pneu.packLFlow = (pneu.packL && pneu.ductPressL > 15 &&
+            (!hasNetwork || activeComponents.has('pneumatic.pack.L')));
+        pneu.packRFlow = (pneu.packR && pneu.ductPressR > 15 &&
+            (!hasNetwork || activeComponents.has('pneumatic.pack.R')));
     }
 
     /**
@@ -531,9 +563,20 @@ class OverheadLogic {
     updateHydraulics(systems, context, dt) {
         const hydKeys = Object.keys(systems.hydraulics);
         const engineCount = context.engineN2.length;
+        const resources = new Set(systems.resourceNetwork?.resources || []);
+        const hasNetwork = !!systems.resourceNetwork?.topologyId;
 
         hydKeys.forEach((sysName, sysIdx) => {
             const sys = systems.hydraulics[sysName];
+            if (systems.damage?.hydraulicsFailed) {
+                sys.pressure = 0;
+                return;
+            }
+            const circuitResource = `hydraulic_${String.fromCharCode(65 + sysIdx)}`;
+            if (hasNetwork && !resources.has(circuitResource)) {
+                sys.pressure = Math.max(0, sys.pressure - this.CONSTANTS.HYD_DECAY_RATE * dt);
+                return;
+            }
             if (!sys.qty && sys.qty !== 0) sys.qty = 100;
 
             let drivingEngineIndices = [];
@@ -583,6 +626,8 @@ class OverheadLogic {
      */
     updateFuel(systems, context, dt) {
         const fuel = systems.fuel;
+        const activeComponents = new Set(systems.resourceNetwork?.activeComponents || []);
+        const hasNetwork = !!systems.resourceNetwork?.topologyId;
         
         // Initialize if missing
         if (!fuel.tanks) {
@@ -595,9 +640,12 @@ class OverheadLogic {
 
         // Pumps Output Pressure
         // Pressure drops if tank is empty (cavitation/air)
-        fuel.pressL = (fuel.leftPumps && systems.electrical.acVolts > 100 && fuel.tanks.left > 0) ? 35 : 0;
-        fuel.pressR = (fuel.rightPumps && systems.electrical.acVolts > 100 && fuel.tanks.right > 0) ? 35 : 0;
-        fuel.pressC = (fuel.centerPumps && systems.electrical.acVolts > 100 && fuel.tanks.center > 0) ? 35 : 0;
+        fuel.pressL = (fuel.leftPumps && systems.electrical.acVolts > 100 && fuel.tanks.left > 0 &&
+            (!hasNetwork || activeComponents.has('fuel.pump.left'))) ? 35 : 0;
+        fuel.pressR = (fuel.rightPumps && systems.electrical.acVolts > 100 && fuel.tanks.right > 0 &&
+            (!hasNetwork || activeComponents.has('fuel.pump.right'))) ? 35 : 0;
+        fuel.pressC = (fuel.centerPumps && systems.electrical.acVolts > 100 && fuel.tanks.center > 0 &&
+            (!hasNetwork || activeComponents.has('fuel.pump.center'))) ? 35 : 0;
 
         // Consumption Logic (Drain from tanks based on pump config)
         const apuBurn = (systems.apu.running) ? 0.2 * dt : 0;
@@ -628,7 +676,9 @@ class OverheadLogic {
         const pneu = systems.pressurization;
         
         // Flow available?
-        const flow = pneu.packLFlow || pneu.packRFlow;
+        const networkAllowsControl = !systems.resourceNetwork?.topologyId ||
+            systems.resourceNetwork.resources.includes('cabin_pressure_control');
+        const flow = networkAllowsControl && (pneu.packLFlow || pneu.packRFlow) && !pneu.breach;
         
         const aircraftAlt = context.altitude;
         const targetAlt = pneu.targetAlt || 35000;

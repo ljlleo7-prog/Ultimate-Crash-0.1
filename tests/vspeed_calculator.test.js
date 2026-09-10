@@ -3,7 +3,7 @@
  */
 
 import { describe, it } from 'node:test';
-import assert from 'node:assert';
+import assert from 'node:assert/strict';
 import VSpeedCalculator from '../src/services/VSpeedCalculator.js';
 
 describe('V-Speed Calculator', () => {
@@ -97,5 +97,3 @@ describe('V-Speed Calculator', () => {
     assert.ok(speeds.vapp > speeds.vref, 'VAPP > VREF');
   });
 });
-
-setTimeout(() => process.exit(0), 5000);

@@ -1,0 +1,115 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>B737 Overhead System Coverage Audit</title>
+  <style>
+    :root{color-scheme:dark;--bg:#071015;--panel:#0d191f;--line:#29404a;--text:#dce8eb;--muted:#78909b;--full:#55dc9a;--simple:#f0ba52;--state:#58b9e8;--visual:#7b8490;--disc:#ef6670}
+    *{box-sizing:border-box}body{margin:0;background:radial-gradient(circle at 15% 0,#16313a,transparent 30%),var(--bg);color:var(--text);font:12px Inter,system-ui,sans-serif;min-width:1050px}button,input{font:inherit}
+    header{position:sticky;top:0;z-index:9;background:#08151beb;border-bottom:1px solid var(--line);backdrop-filter:blur(10px);padding:17px 22px}.head{display:flex;justify-content:space-between;gap:20px;align-items:center}h1{font-size:18px;letter-spacing:.1em;margin:0}.sub{font:10px ui-monospace,monospace;color:var(--muted);margin-top:5px}.score{display:flex;gap:16px}.score div{text-align:right}.score b{display:block;font:19px ui-monospace,monospace}.score span{font-size:8px;color:var(--muted);letter-spacing:.1em}
+    .filters{display:flex;gap:7px;margin-top:14px}.filters button{padding:7px 10px;border:1px solid #29434d;border-radius:6px;background:#0c1b21;color:#93a7af;cursor:pointer}.filters button.active{border-color:#76ced0;color:white;background:#153139}.filters input{margin-left:auto;width:260px;background:#09171c;border:1px solid #29434d;border-radius:6px;padding:8px;color:white}
+    main{padding:18px 22px 35px}.summary{display:grid;grid-template-columns:repeat(5,1fr);gap:9px;margin-bottom:15px}.summary .tile{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:12px}.tile i{display:block;width:8px;height:8px;border-radius:50%;margin-bottom:8px}.tile b{font:20px ui-monospace,monospace}.tile p{margin:4px 0 0;color:var(--muted);font-size:9px;line-height:1.45}
+    .architecture{display:grid;grid-template-columns:repeat(5,1fr);gap:0;border:1px solid var(--line);border-radius:8px;overflow:hidden;margin-bottom:15px}.stage{padding:12px;background:#0b181e;border-right:1px solid var(--line);min-height:82px}.stage:last-child{border:0}.stage label{font:9px ui-monospace,monospace;color:#6f8790}.stage b{display:block;margin:7px 0 3px;font-size:11px}.stage span{font-size:9px;color:var(--muted);line-height:1.4}.arrow{color:#53c8ce;float:right}
+    .group{margin:18px 0}.group-title{display:flex;justify-content:space-between;border-bottom:1px solid #2b414a;padding:0 4px 8px;margin-bottom:7px}.group-title b{letter-spacing:.12em}.group-title span{color:var(--muted);font:9px ui-monospace,monospace}
+    .row{display:grid;grid-template-columns:170px 102px 165px 190px minmax(240px,1fr);gap:10px;align-items:center;background:#0b171d;border:1px solid #1f333b;border-radius:6px;padding:9px 11px;margin:5px 0;transition:.12s}.row:hover{border-color:#45636d;background:#0f2027}.component b{font-size:10px}.component small{display:block;color:#718690;margin-top:3px}.badge{width:max-content;border:1px solid currentColor;border-radius:99px;padding:4px 7px;font:8px ui-monospace,monospace;letter-spacing:.05em}.full{color:var(--full)}.simplified{color:var(--simple)}.state{color:var(--state)}.visual{color:var(--visual)}.disconnected{color:var(--disc)}.path,.model{font:9px ui-monospace,monospace;color:#9eb0b7;overflow-wrap:anywhere}.model em{font-style:normal;color:#59cad0}.evidence{font-size:10px;color:#8ca0a8;line-height:1.45}.hidden{display:none!important}
+    .legend{background:#0b171d;border:1px solid var(--line);border-radius:8px;padding:13px;display:grid;grid-template-columns:repeat(5,1fr);gap:14px}.legend b{font-size:9px}.legend p{font-size:9px;color:var(--muted);line-height:1.4;margin:5px 0 0}.foot{color:#617780;font:9px ui-monospace,monospace;margin-top:14px}
+  </style>
+</head>
+<body>
+<header><div class="head"><div><h1>B737 OVERHEAD → SYSTEM ALGORITHM COVERAGE</h1><div class="sub">STATIC AUDIT PREVIEW · PANEL CONTROL / DISPLAY → STORED STATE → LOGIC → RESOURCE TOPOLOGY → PHYSICAL EFFECT</div></div><div class="score"><div><b id="shown">0</b><span>SHOWN</span></div><div><b id="coverage">0%</b><span>SYSTEMATIC</span></div></div></div><div class="filters" id="filters"><button class="active" data-filter="all">ALL</button><button data-filter="full">INTEGRATED</button><button data-filter="simplified">SIMPLIFIED</button><button data-filter="state">STATE ONLY</button><button data-filter="visual">VISUAL ONLY</button><button data-filter="disconnected">DISCONNECTED</button><input id="search" placeholder="Search component, state, model…"></div></header>
+<main>
+  <section class="summary" id="summary"></section>
+  <section class="architecture"><div class="stage"><label>1 · PANEL</label><b>Switch / selector <i class="arrow">→</i></b><span>Calls onSystemAction, or may be explicitly inop.</span></div><div class="stage"><label>2 · STATE STORE</label><b>systems.* <i class="arrow">→</i></b><span>Mutable cockpit and aircraft state.</span></div><div class="stage"><label>3 · SYSTEM LOGIC</label><b>OverheadLogic <i class="arrow">→</i></b><span>Computes voltage, pressure, temperature and annunciation conditions.</span></div><div class="stage"><label>4 · RESOURCE MODEL</label><b>AircraftSystemModel <i class="arrow">→</i></b><span>Components consume and provide resources through the B738 topology.</span></div><div class="stage"><label>5 · SIMULATION</label><b>Physics / capability</b><span>Engine start, control authority, braking, fuel and cabin effects.</span></div></section>
+  <div class="legend"><div><b class="full">INTEGRATED</b><p>Control reaches state, system logic, resource topology and a downstream consequence.</p></div><div><b class="simplified">SIMPLIFIED</b><p>Functional, but grouped, binary, aliased, or missing real-aircraft detail.</p></div><div><b class="state">STATE ONLY</b><p>Value is stored or displayed but does not meaningfully enter the resource graph.</p></div><div><b class="visual">VISUAL ONLY</b><p>Static depiction or fixed annunciator with no backing state.</p></div><div><b class="disconnected">DISCONNECTED</b><p>A relevant state exists or is referenced, but the rendered control cannot change it.</p></div></div>
+  <div id="inventory"></div><div class="foot">AUDIT BASIS: src/data/aircraft/b738/overheadPanel.jsx · RealisticFlightPhysicsService.performSystemAction · OverheadLogic · B737SystemTopology · AircraftSystemModel</div>
+</main>
+<script>
+const item=(group,name,status,path,model,evidence)=>({group,name,status,path,model,evidence});
+const rows=[
+item('FLIGHT CONTROLS','Spoiler A / B switches','disconnected','none (controls marked inop)','Topology: controls.spoilers','A spoiler consumer exists in the resource model, but neither overhead switch dispatches an action.'),
+item('FLIGHT CONTROLS','Yaw damper switch / ON light','disconnected','reads flightControls.yawDamper','No topology component','The annunciator reads state, but the switch has no onClick handler.'),
+item('FLIGHT CONTROLS','Standby rudder / standby hydraulics','visual','none (inop)','No standby hydraulic topology','Switches and LOW PRESS lamps are static.'),
+item('FLIGHT CONTROLS','Alternate flaps / disconnect guard','visual','none (inop)','No alternate flap path','Panel furniture only.'),
+item('FLIGHT CONTROLS','FEEL DIFF PRESS / SPEED TRIM / MACH TRIM / AUTO SLAT','visual','none','No providers','All four failure annunciators are rendered permanently unlit.'),
+item('NAVIGATION / DISPLAY','VHF NAV / IRS / FMC / SOURCE / CTRL PNL selectors','visual','none (inop)','No display-source topology','All five selectors are static visual controls.'),
+item('IRS','IRS L / R mode selectors','disconnected','reads adirs.ir1, adirs.ir2, aligned','ADIRS state exists outside topology','Selectors display current mode but have no action callback.'),
+item('IRS','ALIGN annunciators','state','adirs.ir1 / ir2','No resource dependency','Lights reflect ALIGN state; electrical dependency and alignment progression are not represented here.'),
+item('IRS','ON DC / FAULT / DC FAIL annunciators','visual','fixed false','No diagnostic provider','Rendered but never driven.'),
+
+item('FUEL','Left forward + aft pump switches','simplified','fuel.leftPumps','fuel.pump.left → fuel_pressure_L','Both physical pumps are one boolean and one topology component; AC bus and tank supply are modeled.'),
+item('FUEL','Right forward + aft pump switches','simplified','fuel.rightPumps','fuel.pump.right → fuel_pressure_R','Both physical pumps are grouped; electrical dependency and pressure output are modeled.'),
+item('FUEL','Center left + right pump switches','simplified','fuel.centerPumps','fuel.pump.center → fuel_pressure_C','The center pair is a single state and provider.'),
+item('FUEL','Crossfeed valve / OPEN light','simplified','fuel.crossfeed','Not represented as a topology component','Affects engine fuel-source selection, but bypasses the component/resource network.'),
+item('FUEL','Tank quantity readouts','full','fuel.tanks.left / center / right','Seed resources fuel_tank_L/R/C','Stored quantity controls resource seeding, aircraft fuel mass and engine burn.'),
+item('FUEL','Fuel temperature gauge','state','fuel.fuelTemp or weather.temperature','No fuel-temperature consequence','Displays a value but does not affect waxing, pump performance or engine supply.'),
+item('FUEL','ENG VALVE CLOSED / FILTER BYPASS lights','visual','fixed false','No valve/filter components','Four annunciators have no backing conditions.'),
+item('FUEL','LOW PRESS lights','simplified','pump switch + electrical voltage','Derived fuel pressure exists','Lamp uses a coarse switch/power condition rather than individual pump pressure sensors.'),
+
+item('ELECTRICAL','Battery / standby power selector','full','electrical.batterySelector, battery, stbyPower','electrical.battery → dc_essential','Dispatch, stored state, topology resource and electrical calculations are connected.'),
+item('ELECTRICAL','Generator 1 / 2 switches','full','electrical.gen1 / gen2','electrical.generator.1/2 → ac_feed_1/2','Requires corresponding engine shaft; feeds buses and downstream consumers.'),
+item('ELECTRICAL','APU generator 1 / 2 switches','full','electrical.apuGen1 / apuGen2','electrical.apu_generator.1/2 → ac_feed_1/2','Requires APU shaft and can independently feed either AC side.'),
+item('ELECTRICAL','Ground power switch / available light','state','electrical.sourceOff1 + flightState.groundPowerAvailable','No external-power provider','Clickable state and availability display exist, but ground power is not a resource-network source.'),
+item('ELECTRICAL','Transfer bus / source off / gen off-bus annunciators','simplified','electrical source/gen/APU booleans','AC bus resources exist','Useful indications, but conditions are approximated from switches rather than contactor/bus sensing.'),
+item('ELECTRICAL','DC / AC meter gauges','simplified','electrical.dcVolts / acVolts','Derived from available buses','Real computed values, but selector-meter routing is absent.'),
+item('ELECTRICAL','DC/AC selector and meter selector','visual','none (inop)','No meter-selection state','Displayed rotary selectors cannot change the readout.'),
+item('ELECTRICAL','TR UNIT / ELEC annunciators','visual','fixed false','No transformer-rectifier component','No associated failure or diagnostic state.'),
+
+item('APU','APU master/start selector','full','apu.master / apu.start / apu.running','apu → apu_shaft','Starts a timed APU state machine; shaft enables generator and bleed providers.'),
+item('APU','APU EGT gauge','full','apu.egt','APU logic output','Gauge reflects the start/run/shutdown temperature evolution.'),
+item('APU','APU bleed switch','full','apu.bleed','pneumatic.apu_bleed → bleed_feed_L','Requires APU shaft and participates in duct/pack pressurization.'),
+
+item('HYDRAULICS','Engine pump A / B switches','full','hydraulics.sysA/B.engPump','hydraulic.engine_pump.A/B','Requires engine shaft and supplies the corresponding hydraulic circuit.'),
+item('HYDRAULICS','Electric pump A / B switches','full','hydraulics.sysA/B.elecPump','hydraulic.electric_pump.A/B','Requires its AC bus; restores pressure without engine pump supply.'),
+item('HYDRAULICS','LOW PRESS annunciators','simplified','hydraulics.sysA/B.pressure','hydraulic_A / hydraulic_B','Driven by grouped circuit pressure, not each physical pump outlet.'),
+item('HYDRAULICS','OVHT / FLT CONTROL / LOW QTY / FILTER BYPASS','visual','fixed false','No temperature, quantity or filter topology','Rendered annunciators are not backed by live failure conditions.'),
+
+item('BLEED / AIR','Engine 1 / 2 bleed switches','full','pressurization.bleed1 / bleed2','pneumatic.engine_bleed.1/2','Requires engine shaft and supplies its side duct.'),
+item('BLEED / AIR','Isolation valve','full','pressurization.isolationValve','pneumatic.isolation L→R and R→L','Controls cross-side pneumatic redundancy.'),
+item('BLEED / AIR','Pack L / R switches','full','pressurization.packL / packR','pneumatic.pack.L/R','Requires side duct pressure and AC bus; produces conditioned air.'),
+item('BLEED / AIR','Duct pressure gauge','full','pressurization.ductPressL/R','bleed_duct_L / bleed_duct_R','Displayed pressure is gated by live resource paths.'),
+item('BLEED / AIR','Pack flow selectors','visual','none (inop)','No variable-flow model','AUTO controls are static; packs are binary.'),
+item('BLEED / AIR','DUAL BLEED / RAM DOOR annunciators','visual','fixed false','No ram-door components','Panel labels do not respond to pneumatic configuration.'),
+item('BLEED / AIR','PACK / WING-BODY OVERHEAT / BLEED TRIP OFF','visual','fixed false','Some failure IDs map to components','Failure mappings exist for pack/bleed damage, but these displayed lamps are not connected to them.'),
+
+item('PRESSURIZATION','Cabin altitude / climb / differential gauges','full','pressurization.cabinAlt, cabinClimb, diffPressure','pressurization.controller + conditioned air','Live outputs respond to cabin pressure control availability and hull breach state.'),
+item('PRESSURIZATION','Mode selector / manual valve switch','visual','none (inop)','No outflow-valve topology','Controls are depicted but cannot affect cabin control.'),
+item('PRESSURIZATION','Flight altitude / landing altitude selectors','visual','none (inop)','No schedule-input connection','Knobs do not set the target values used by system logic.'),
+item('PRESSURIZATION','AUTO FAIL / OFF SCHED DESCENT / ALTN / MANUAL','visual','fixed false','No mode diagnostics','All mode annunciators remain static.'),
+
+item('AIR CONDITIONING','Air temperature gauge','state','weather.temperature fallback','No zone-temperature state path','Displays outside temperature as a proxy for supply/zone temperature.'),
+item('AIR CONDITIONING','Supply selector / zone temperature selectors','visual','none (inop)','No zone controllers','Selectors have no backing behavior.'),
+item('AIR CONDITIONING','Zone TEMP annunciators','visual','fixed false','No zone overheat diagnostics','Static lights only.'),
+
+item('ANTI-ICE / HEAT','Wing anti-ice','simplified','ice.wingAntiIce','Outside resource topology','Changes icing protection state, but has no bleed-air demand or valve dependency.'),
+item('ANTI-ICE / HEAT','Engine 1 / 2 cowl anti-ice','simplified','ice.eng1AntiIce / eng2AntiIce','Outside resource topology','Affects anti-ice state; no engine bleed penalty or resource consumption.'),
+item('ANTI-ICE / HEAT','Window heat switches','disconnected','reads grouped ice.windowHeat','No electrical consumer','Four switches are inop; ON lights mirror a shared state set elsewhere.'),
+item('ANTI-ICE / HEAT','Probe heat / CAPT / F/O heat','visual','none (inop)','No electrical load components','Static switches and annunciators.'),
+
+item('LIGHTING','Landing lights','simplified','lighting.landing','No electrical consumer','All landing lights use one boolean and remain available without bus power.'),
+item('LIGHTING','Taxi light','simplified','lighting.taxi','No electrical consumer','Clickable state without electrical dependency.'),
+item('LIGHTING','Position / strobe / beacon / logo lights','simplified','lighting.nav/strobe/beacon/logo','No electrical consumers','Individual stored states affect visuals, not buses or load shedding.'),
+item('LIGHTING','Runway turnoff lights','visual','none (inop)','No state/model','Both depicted switches are explicitly inop.'),
+item('LIGHTING','Wing light','simplified','lighting.wing','No electrical consumer','Clickable stored state, but it has no bus/load dependency.'),
+item('LIGHTING','Wheel-well light','disconnected','incorrectly dispatches lighting.strobe','Semantic wiring mismatch','The clickable WHEEL WELL switch controls the strobe state instead of a wheel-well-light state.'),
+item('LIGHTING','Panel / flood lighting controls','visual','none (inop)','No cockpit-light state','Brightness controls are static.'),
+
+item('COCKPIT SUPPORT','Left / right windshield wipers','simplified','wipers.left / right','No electrical consumer','Clickable and stored, but binary and independent of electrical supply or speed.'),
+item('COCKPIT SUPPORT','No smoking / seat-belts signs','state','signs.noSmoking / seatBelts','No electrical/passenger consequence','Selectors store/display state but do not enter aircraft-system logic.'),
+item('COCKPIT SUPPORT','Attend / ground call','disconnected','signs.attend / groundCall exist','No panel dispatch here','Service supports these actions, but this overhead renders both switches inop.'),
+item('COCKPIT SUPPORT','Equipment cooling supply / exhaust','visual','none (inop)','No cooling components','Static switches and OFF annunciators.'),
+item('COCKPIT SUPPORT','Emergency exit lights','visual','none (inop)','No lighting/state dependency','Switch and NOT ARMED annunciator are static.'),
+item('COCKPIT SUPPORT','Crew oxygen pressure / passenger oxygen','visual','display decoration / inop','No oxygen system topology','Mentioned on panel without consumable pressure or deployment behavior.'),
+
+item('ENGINE START','Engine 1 / 2 start selectors','full','engines.eng1/2.startSwitch','Starter uses bleed duct + DC ignition','GRD/FLT state enters engine startup physics; OFF/GRD/FLT is simplified from the panel legend.'),
+item('ENGINE START','Ignition selector','visual','none (inop)','No selectable igniter channel','BOTH selector is depicted but cannot affect ignition.'),
+item('ENGINE START','Engine run / fuel-control switches','disconnected','engines.eng1/2.fuelControl is read but not rendered','Fuel feed + startup physics exists','The file defines an EngineRunSwitch and reads both fuel-control states, but never places the switches on the panel.'),
+item('ENGINE START','Start-valve / low-oil annunciations','visual','not rendered on this overhead','Engine physics state exists elsewhere','The physics exposes these values, but this overhead panel provides no associated indication.')
+];
+const labels={full:['INTEGRATED','Complete path'],simplified:['SIMPLIFIED','Functional approximation'],state:['STATE ONLY','Stored/displayed'],visual:['VISUAL ONLY','No backing state'],disconnected:['DISCONNECTED','State/model gap']};
+let filter='all',query='';
+function draw(){const filtered=rows.filter(r=>(filter==='all'||r.status===filter)&&(`${r.group} ${r.name} ${r.path} ${r.model} ${r.evidence}`.toLowerCase().includes(query)));const groups=[...new Set(filtered.map(r=>r.group))];document.querySelector('#inventory').innerHTML=groups.map(g=>{const list=filtered.filter(r=>r.group===g);return `<section class="group"><div class="group-title"><b>${g}</b><span>${list.length} ITEMS</span></div>${list.map(r=>`<div class="row"><div class="component"><b>${r.name}</b><small>${r.group}</small></div><div><span class="badge ${r.status}">${labels[r.status][0]}</span></div><div class="path">${r.path}</div><div class="model"><em>${r.model}</em></div><div class="evidence">${r.evidence}</div></div>`).join('')}</section>`}).join('')||'<p class="foot">No matching components.</p>';const systematic=filtered.filter(r=>r.status==='full').length;document.querySelector('#shown').textContent=filtered.length;document.querySelector('#coverage').textContent=`${filtered.length?Math.round(systematic/filtered.length*100):0}%`}
+function drawSummary(){const counts=Object.keys(labels).map(k=>[k,rows.filter(r=>r.status===k).length]);document.querySelector('#summary').innerHTML=counts.map(([k,n])=>`<div class="tile"><i style="background:var(--${k==='state'?'state':k})"></i><b>${n}</b><p><span class="${k}">${labels[k][0]}</span><br>${labels[k][1]}</p></div>`).join('')}
+document.querySelectorAll('[data-filter]').forEach(b=>b.onclick=()=>{filter=b.dataset.filter;document.querySelectorAll('[data-filter]').forEach(x=>x.classList.toggle('active',x===b));draw()});document.querySelector('#search').oninput=e=>{query=e.target.value.trim().toLowerCase();draw()};drawSummary();draw();
+</script>
+</body></html>

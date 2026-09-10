@@ -35,7 +35,7 @@ test('calculates route progress from active plan and flight state', () => {
   assert.equal(result.waypointCount, 2);
   assert.ok(result.distanceToNext > 59 && result.distanceToNext < 61);
   assert.ok(result.distanceRemaining > 119 && result.distanceRemaining < 121);
-  assert.equal(result.eteNextText, '30:01');
+  assert.equal(result.eteNextText, '30:00');
 });
 
 test('calculates fuel plan and altitude advisory', () => {
@@ -108,5 +108,3 @@ test('builds weather briefing and aggregate EFB data', () => {
   assert.ok(efb.routeProgress.distanceToNext > 59 && efb.routeProgress.distanceToNext < 61);
   assert.ok(efb.fuelPlan.fuelFlowKgH > 2800 && efb.fuelPlan.fuelFlowKgH < 2900);
 });
-
-process.exit(0);

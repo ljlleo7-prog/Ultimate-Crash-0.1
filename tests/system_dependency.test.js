@@ -1,15 +1,13 @@
 import { test } from 'node:test';
-import { strict as assert } from 'node:assert';
+import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { getSystemDependencies, resolveSystemState, getSystemStatus } from '../src/services/SystemDependencyGraph.js';
+import { resolveSystemState } from '../src/services/SystemDependencyGraph.js';
 
 const aircraftDB = JSON.parse(readFileSync('./src/data/aircraftDatabase.json', 'utf-8'));
 
 test('Cold Startup Test - All Aircraft', async (t) => {
     for (const aircraft of aircraftDB.aircraft) {
         await t.test(`${aircraft.model} - Cold Startup`, () => {
-            const systems = getSystemDependencies(aircraft.model);
-
             // Step 1: Battery ON
             let state = { battery: true, battery_1: true, battery_2: true };
             let available = resolveSystemState(state, aircraft.model);
@@ -53,8 +51,6 @@ test('Cold Startup Test - All Aircraft', async (t) => {
 test('Post-Landing Shutdown Test - All Aircraft', async (t) => {
     for (const aircraft of aircraftDB.aircraft) {
         await t.test(`${aircraft.model} - Shutdown`, () => {
-            const systems = getSystemDependencies(aircraft.model);
-
             // Start with all systems running
             let state = { battery: true, battery_1: true };
             for (let i = 1; i <= aircraft.engineCount; i++) {
@@ -139,5 +135,3 @@ test('Mid-Air Engine Failure Restart Test - All Aircraft', async (t) => {
         });
     }
 });
-
-setTimeout(() => process.exit(0), 5000);
